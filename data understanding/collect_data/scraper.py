@@ -137,6 +137,7 @@ class CrawlerActions():
             # Por tag (c/u contiene la url de una jornada)
             for tag in l_tag_temporadas:
                 l_temporadas_new.append(tag.get_attribute('href'))
+
         except:
             print("Fallo extraccion de links de las paginas de las jornadas")
 
@@ -206,12 +207,12 @@ def main():
     """
     # DEFINCION DE PARAMETROS & VARIABLES
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
-    N_TEMPS = 5
+    N_TEMPS = 8
     df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'equipo_ganador'])
     crawler = CrawlerActions()  # Creo objeto de clase CrawlerActions()
 
     # Ingreso a pagina
-    crawler.driver.get('https://www.resultados-futbol.com/primera_division_argentina2020')  # hasta que no se carga toda la pagina, no sigue...
+    crawler.driver.get('https://www.resultados-futbol.com/primera_division_argentina2023')  # hasta que no se carga toda la pagina, no sigue...
     sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
 
     # Aceptar cookies en pop up
@@ -222,8 +223,8 @@ def main():
 
         # Ingreso a pagina de temporada
         crawler.driver.get(temporada)
-        print(" Temporada ".center(120, "#"))
-        i = 1
+        print(" Temporada: {} ".format(temporada[temporada.rfind("/")+1:]).center(120, "#"))
+        i = 1  # Numero de jornada
 
         # POR SUBPAGINA (JORNADA)
         for jornada in crawler.get_pagination_jornada():
