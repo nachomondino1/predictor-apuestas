@@ -15,36 +15,59 @@ def derive_new_columns(df):
         # Obtengo los partidos que jugo el equipo
         df_team = df[(df['Equipo local'] == equipo) | (df['Equipo Visitante'] == equipo)]
         l_idxs = list(df_team.index)
-        print(df_team.head())
 
         # Por partido que jugo el equipo
         for i in range(len(l_idxs)):  # for idx in l_idxs: NO HACER ESTO
 
             # Definicion de variables
-            idx = l_idxs[i]
+            df_aux = df.loc[l_idxs[i:len(l_idxs)]]  # quito partidos que ya se jugaron
 
             # Obtengo forma del equipo (antes de ese partido)
-            forma = calculate_forma(df_team, equipo, i)
-
-            # Obtengo puntaje segun rendimiento del equipo (antes de ese partido)
-            puntaje = puntaje(df_team, equipo, i)
+            forma = calculate_forma(df_aux, equipo, 10)
 
             # Guardo nuevos valores
             # Si el equipo es el local
-            if equipo == df.loc[idx, 'Equipo local']:
-                df.loc[idx, 'forma_loc'] = forma
+            if equipo == df.loc[l_idxs[i], 'Equipo local']:
+                df.loc[l_idxs[i], 'forma_loc'] = forma
             else:
-                df.loc[idx, 'forma_vis'] = forma
+                df.loc[l_idxs[i], 'forma_vis'] = forma
+
+
+    for equipo in l_equipos:
+
+        print(" Equipo: {} ".format(equipo).center(120, "#"))
+
+        # Obtengo los partidos que jugo el equipo
+        df_team = df[(df['Equipo local'] == equipo) | (df['Equipo Visitante'] == equipo)]
+        l_idxs = list(df_team.index)
+
+        # Por partido que jugo el equipo
+        for i in range(len(l_idxs)):  # for idx in l_idxs: NO HACER ESTO
+
+            # Definicion de variables
+            df_aux = df.loc[l_idxs[i:len(l_idxs)]]  # quito partidos que ya se jugaron
+
+            # Obtengo forma del equipo (antes de ese partido)
+            forma_pond = forma_ponderada(df_aux, equipo, 10)
+
+            # Guardo nuevos valores
+            # Si el equipo es el local
+            if equipo == df.loc[l_idxs[i], 'Equipo local']:
+                df.loc[l_idxs[i], 'dif_loc'] = forma_pond
+            else:
+                df.loc[l_idxs[i], 'dif_vis'] = forma_pond
 
     return df
 
-def calculate_forma(df_team, equipo, i):
+def calculate_forma(df, equipo, n_part):
     # Definicion de variables
     forma = 0
-    N_PARTIDOS = 5
+
+    # Selecciono los partidos que jugo el equipo
+    # df_team = df[(df['Equipo local'] == equipo) | (df['Equipo Visitante'] == equipo)]
 
     # Selecciono ultimos <N_PARTIDOS> resultados del equipo
-    l_resultados = list(df_team.iloc[i + 1:i + 1 + N_PARTIDOS, 3])  # Uso 3 en vez de "Resultado" por que deberia reiniciar el indice de df_team antes..
+    l_resultados = list(df.iloc[1:1+n_part, 3])  # Uso 3 en vez de "Resultado" por que deberia reiniciar el indice de df_team antes..
     print("Ultimos resultados", l_resultados)
 
     # Por resultado
@@ -62,39 +85,48 @@ def calculate_forma(df_team, equipo, i):
     return forma
 
 
-def puntaje(df, equipo, i):
-    # El datafrmae es por equipo
+
+def forma_ponderada(df, equipo, n_part):
+    # El dataframe es por equipo
 
     # Definicion de variables
-    N_PART = 10
     puntaje = 0
+    # dif_rival = lambda equipo, df, i: df.loc[i, 'forma_vis'] if equipo == df.loc[i, 'Equipo local'] else df.loc[i, 'forma_loc']
 
-    # Filtro dataframe segun localia
-    # Si el equipo juega de local
-    if equipo == df.loc[i, 'Equipo local']:
-        df_aux = df[df['Equipo local'] == equipo]
-    # Si el equipo juega de visitante
+    # Si el equipo es local
+    if equipo == df.iloc[0, 1]:  # Uso 1 en vez de "Equipo local" por que deberia reiniciar el indice de df_team antes..
+        df = df[df['Equipo local'] == equipo]
     else:
-        df_aux = df[df['Equipo Visitante'] == equipo]
+        df = df[df['Equipo Visitante'] == equipo]
 
     # Selecciono ultimos <N_PARTIDOS> resultados del equipo
-    # FALTA IMPLEMENTAR LA DIFICULTAD DEL RIVAL...
-    l_resultados = list(df_aux.iloc[i + 1:i + 1 + N_PART,3])  # Uso 3 en vez de "Resultado" por que deberia reiniciar el indice de df_team antes..
-    print("Ultimos resultados", l_resultados)
+    df_ult_partidos = df.iloc[1:1+n_part]  # Uso 3 en vez de "Resultado" por que deberia reiniciar el indice de df_team antes..
+    l_idxs = list(df_ult_partidos.index)
+    print("Ultimos resultado", df_ult_partidos)
 
-    # Por resultado
-    for resultado in l_resultados:
+    # Por partido
+    for i in range(len(l_idxs)):
 
+        # Defino variables (dif rival y resultado)
+        # Si el equipo es local
+        if equipo == df.loc[l_idxs[i], 'Equipo local']:
+            forma_rival = df_ult_partidos.loc[l_idxs[i], 'forma_vis']
+        else:
+            forma_rival = df_ult_partidos.loc[l_idxs[i], 'forma_loc']
+
+        resultado = df_ult_partidos.loc[l_idxs[i], 'Resultado']
+
+        # Calculo puntaje del partido segun dif rival y resultado
         # Si el equipo ganó
         if resultado == equipo:
-            puntaje += 10
+            puntaje += 10 * (1 + forma_rival /(n_part * 3))
 
         # Si el equipo empató
         elif resultado == "Empate":
-            puntaje += 5
+            puntaje += 5 * (1 + forma_rival /(n_part * 3))
 
         else:
-            puntaje += 1
+            puntaje += 1 * (1 + forma_rival /(n_part * 3))
 
     return puntaje
 
