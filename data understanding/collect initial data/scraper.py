@@ -52,6 +52,14 @@ class CrawlerActions():
         except:
             print("Fallo click en boton aceptar cookies")
 
+    def extract_items(self):
+        try:
+            l_items = WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, './/div[@id="col-resultados"]//table//tr[@class="vevent " or @class="vevent impar"]')))
+            print("Cantidad de items: {}".format(len(l_items)))
+            return l_items
+        except:
+            print("Fallo extraccion de items")
+
     def extract_fecha(self, item):
         """
         Extrae field
@@ -104,7 +112,7 @@ class CrawlerActions():
 
             # Si gano el equipo1
             if n_goles_equipo1 > n_goles_equipo2:
-                return equipo1
+                return "Local"
 
             # Si emparaton
             elif n_goles_equipo1 == n_goles_equipo2:
@@ -112,36 +120,12 @@ class CrawlerActions():
 
             # Si gano el equipo2
             else:
-                return equipo2
+                return "Visitante"
 
         # Si falla la extraccion del resultado, retorno None
         except:
             print("Fallo la extraccion del resultado")
             return None
-
-    def is_next_jornada(self):
-        """
-        Obtiene url de siguiente pagina si la pagina tiene link asociado
-        """
-        try:
-            self.driver.find_element(By.XPATH, './/a[text()="« Jornada Anterior"]')
-            print("Existe siguiente jornada")
-            return True
-        except:
-            print("No existe siguiente jornada")
-            return False
-
-    def is_next_temporada(self):
-        """
-        Obtiene url de siguiente pagina si la pagina tiene link asociado
-        """
-        try:
-            self.driver.find_element(By.XPATH, './/a[text()="Temporada Siguiente »"]')
-            print("Existe siguiente temporada")
-            return True
-        except:
-            print("No existe siguiente temporada")
-            return False
 
     def get_pagination_temporada(self):
         # Definicion de variables
@@ -174,49 +158,6 @@ class CrawlerActions():
 
         print("Nº de jornadas", len(l_jornadas_new))
         return l_jornadas_new
-
-    ''' 
-    def click_next_jornada(self):
-        """
-        Obtiene url de siguiente pagina si la pagina tiene link asociado
-        """
-        try:
-            url = self.driver.find_element(By.XPATH, './/a[text()="« Jornada Anterior"]').get_attribute('href')
-            print('URL prox jornada', url)
-            self.driver.get(url)
-
-            try:
-                # Intento extraer items (partidos)
-                WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, './/div[@id="col-resultados"]//table//tr[@class="vevent " or @class="vevent impar"]')))
-            except:
-                # Error 502, no pudo a ingresar a pagina en una primera instancia, intento nuevamente
-                print("Bad Gateway, error 502. Vuelvo a ingresar a la pagina")
-                self.driver.back()
-                sleep(5)
-                self.driver.get(url)
-        except:
-            print("No pudo hacer el click en la siguiente pagina")
-            return None'''
-
-    def click_next_temporada(self):
-        """
-        Obtiene url de siguiente pagina si la pagina tiene link asociado
-        """
-        try:
-            url = self.driver.find_element(By.XPATH, './/a[text()="Temporada Siguiente »"]').get_attribute('href')
-            print('URL prox temporada', url)
-            self.driver.get(url)
-        except:
-            print("No pudo hacer el click en la siguiente pagina")
-            return None
-
-    def extract_items(self):
-        try:
-            l_items = WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, './/div[@id="col-resultados"]//table//tr[@class="vevent " or @class="vevent impar"]')))
-            print("Cantidad de items: {}".format(len(l_items)))
-            return l_items
-        except:
-            print("Fallo extraccion de items")
 
 def format_date(fecha_string):
     """
@@ -265,8 +206,8 @@ def main():
     """
     # DEFINCION DE PARAMETROS & VARIABLES
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
-    N_TEMPS = 3
-    df = pd.DataFrame(columns=['Fecha', 'Equipo local', 'Equipo Visitante', 'Resultado'])
+    N_TEMPS = 5
+    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'equipo_ganador'])
     crawler = CrawlerActions()  # Creo objeto de clase CrawlerActions()
 
     # Ingreso a pagina

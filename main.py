@@ -28,6 +28,7 @@ df = df.loc[:600]
 
 '''
 # RED NEURONAL
+# https://www.aprendemachinelearning.com/una-sencilla-red-neuronal-en-python-con-keras-y-tensorflow/
 # cargamos las 4 combinaciones de las compuertas XOR
 # training_data = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], "float32")
 training_data = df.drop(['Resultado'], axis=1).to_numpy()
@@ -55,6 +56,7 @@ print(model.predict(training_data).round())
 
 
 # ARBOL DE DECISION --> tengo que sacar variables string como Fecha, equipo local y equipo visitante.. pero carece de sentido resolver el prbolema
+# https://www.aprendemachinelearning.com/arbol-de-decision-en-python-clasificacion-y-prediccion/#:~:text=Los%20arboles%20de%20decisi%C3%B3n%20son,(acr%C3%B3nimo%20del%20ingl%C3%A9s%20CART).
 import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = (16, 9)
 plt.style.use('ggplot')

@@ -131,6 +131,35 @@ def forma_ponderada(df, equipo, n_part):
     return puntaje
 
 
+def historial_entre_si(df):
+
+    # Por partido
+    for i in range(len(df)):
+
+        print(" Equipo: {} ".format(equipo).center(120, "#"))
+
+        # Obtengo los partidos que jugo el equipo
+        df_team = df[(df['Equipo local'] == equipo) | (df['Equipo Visitante'] == equipo)]
+        l_idxs = list(df_team.index)
+
+        # Por partido que jugo el equipo
+        for i in range(len(l_idxs)):  # for idx in l_idxs: NO HACER ESTO
+
+            # Definicion de variables
+            df_aux = df.loc[l_idxs[i:len(l_idxs)]]  # quito partidos que ya se jugaron
+
+            # Obtengo forma del equipo (antes de ese partido)
+            forma_pond = forma_ponderada(df_aux, equipo, 10)
+
+            # Guardo nuevos valores
+            # Si el equipo es el local
+            if equipo == df.loc[l_idxs[i], 'Equipo local']:
+                df.loc[l_idxs[i], 'dif_loc'] = forma_pond
+            else:
+                df.loc[l_idxs[i], 'dif_vis'] = forma_pond
+
+
+
 def main():
     # Levanto el dataframe formateado
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data understanding/df_formated.xlsx', index_col=0)
