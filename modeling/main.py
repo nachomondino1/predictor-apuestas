@@ -75,7 +75,7 @@ def create_classes(valores, cant_clases):
     # DEFINO VARIABLES
     valores_unicos = sorted(valores.dropna().unique())
     print("Valores unicos: ", valores_unicos)
-    cant_clases_perc = int(round(0.2 * cant_clases, 0))  # cantidad de clases utilizando percentiles
+    cant_clases_perc = int(round(0.1 * cant_clases, 0))  # cantidad de clases utilizando percentiles
     percentiles = 1 / cant_clases_perc  # percentil
     d = {}  # diccionario a retornar (con valores maximos y medios de cada clase)
 
@@ -185,8 +185,13 @@ def predict(df , d):
 
                 valor = df.loc[i, atrib]
                 name = '{}/{}'.format(atrib+str(valor), clase)
-                prob *= d[name]
-                print("P({}/{}) = {}".format(atrib+str(valor), clase, d[name]))
+
+                # Existe la posibilidad que un valor no tenga una probabildad calculada puesto que no ocurrio. (e.g. Barracas nunca empato de local, por lo que, P(equipoloc = Barracas / empato) no existe en el diccionario d)
+                try:
+                    prob *= d[name]
+                    print("P({}/{}) = {}".format(atrib+str(valor), clase, d[name]))
+                except:
+                    prob *= 1
 
             # Guardo probabilidad de que pertenezca a la clase
             print("Prob que sea clase {}: {}".format(clase, prob))
@@ -211,7 +216,9 @@ def balance_dataset(df):
     df_aux = pd.DataFrame(columns=df.columns)
     n_ejs_clase_min = 1000000000
     l_clases = list(df['equipo_ganador'].unique())
-    print("ASFSDAFGSAD", l_clases)
+
+    # Random shuffle dataframe (por evitar mal balanceo en caso de que el df este ordenado por algun campo)
+    df = df.sample(frac=1).reset_index(drop=True)
 
     # Paso 1: Identifico cuantos ejemplos deberia tener cada clase para que el dataset este balanceado
     # Por clase
@@ -258,7 +265,7 @@ def main():
     print(df.shape)
 
     # Remuevo ultimos 10 partidos de cada equipo (pues no puedo calcular bien la forma)
-    df = df.dropna(subset='dif_forma').reset_index(drop=True)  # Son 15 partidos por jornada y saco las ultimas 10 jornadas pues la forma la calculo 10 partidos para atras...
+    df = df.dropna(subset='dif_forma_pond').reset_index(drop=True)  # Son 15 partidos por jornada y saco las ultimas 10 jornadas pues la forma la calculo 10 partidos para atras...
     print(df.shape)
     print(df.head)
 
@@ -272,9 +279,6 @@ def main():
     l_prob_2 = []
     for i in range(N_CORRIDAS):
         print(" MODELO Nº{} ".format(i).center(120, '#'))
-
-        # Random shuffle del df
-        df_shuf = df.sample(frac=1).reset_index(drop=True)  # Random shuffle dataframe
 
         # Balanceo dataset  (Para mi en este proeycto no conviene balancear el dataset. Puesto que es importante que es mas probable ganar de local que de visitante). Sin embargo entiendo que el modelo puede parecer que da bien pero en realidad siempre decir que gana el local...
         # df = balance_dataset(df_shuf)
@@ -311,7 +315,6 @@ def main():
     print("El % de aciertos es {:.3f}%".format(sum(l_aciertos)/N_CORRIDAS))
     print("La probabilidad de certeza promedio en los aciertos es {:.3f}%".format(sum(l_prob)/N_CORRIDAS))
     print("La probabilidad de certeza promedio es {:.3f}%".format(sum(l_prob_2)/N_CORRIDAS))
-
 
     # MATRIZ DE CONFUSION
     confusion_matrix = metrics.confusion_matrix(df_result['y_real'], df_result['y_pred'])
