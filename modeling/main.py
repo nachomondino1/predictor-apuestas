@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 # from keras.models import Sequential
 # from keras.layers.core import Dense
+from sklearn import metrics
+import matplotlib.pyplot as plt
+import numpy
+
 
 
 # Naive Bayes
@@ -69,82 +73,32 @@ def create_classes(valores, cant_clases):
     :return: Diccionario con valores maximos de cada clase como key y con valores medios de cada clase como value
     """
     # DEFINO VARIABLES
-    # respecto de valores
     valores_unicos = sorted(valores.dropna().unique())
-    valor_min, valor_max = min(valores_unicos), max(valores_unicos)
     print("Valores unicos: ", valores_unicos)
-    # respecto de clases
-    rango = valor_max - valor_min
-    amplitud_clase = rango / cant_clases
-    cant_clases_perc = int(round(0.65 * cant_clases, 0))  # cantidad de clases utilizando percentiles
+    cant_clases_perc = int(round(0.2 * cant_clases, 0))  # cantidad de clases utilizando percentiles
     percentiles = 1 / cant_clases_perc  # percentil
-    # inicializo variables
     d = {}  # diccionario a retornar (con valores maximos y medios de cada clase)
-    PORC_MIN_CLASES_CON_VALOR, PORC_MAX_CLASES_CON_VALOR = 0.3, 0.72  # porcentajes min y max de clases con valores (es decir, no vacias)
 
-    # CREO CLASES CON MISMA AMPLITUD
-    print("Creo {} clases con amplitud de {:.2f}".format(cant_clases, amplitud_clase))
-    print("{:^10s}\t{:^10s}\t{:^10s}\t{:^10s}".format("Clase Nº","Valor min", "Valor med", "Valor max"))
+    # CREO CLASES A PARTIR DE PERCENTILES
     # Por clase
-    for i in range(cant_clases):
-        # Determino valores minimo, medio y maximo de la clase
-        valor_min_clase = round(valor_min + amplitud_clase * i, 2)  # valor min para estar en clase i
-        valor_max_clase = round(valor_min + amplitud_clase * (i + 1), 2)  # valor max para estar en clase i
-        valor_med_clase = round((valor_max_clase + valor_min_clase) / 2, 2)  # valor medio de clase i
+    print("{:^10s}\t{:^10s}\t{:^10s}\t{:^10s}".format("Clase Nº", "Valor min", "Valor med", "Valor max"))
+    for i in range(cant_clases_perc):
 
-        # Guardo valor medio y maximo de la clase
+        # Obtengo indices de valor min y max para la clase
+        idx_valor_min_clase = int(len(valores_unicos) * percentiles * i)  # valor min para estar en clase i
+        idx_valor_max_clase = int(len(valores_unicos) * percentiles * (i + 1)) - 1  # valor min para estar en clase i. El -1 seria porque el idx de la lista arranca en 0
+
+        # Obtengo valores min y max de la clase a partir de los indices
+        valor_min_clase = valores_unicos[idx_valor_min_clase]
+        valor_max_clase = valores_unicos[idx_valor_max_clase]
+        valor_med_clase = (valor_max_clase + valor_min_clase) / 2  # valor medio de clase i
+
+        # Guardo valor maximo y medio de la clase
         d[valor_max_clase] = valor_med_clase
-        print("{:^10d}\t{:^10.1f}\t{:^10.1f}\t{:^10.1f}".format(i+1, valor_min_clase, valor_med_clase, valor_max_clase))
+        print("{:^10d}\t{:^10.1f}\t{:^10.1f}\t{:^10.1f}".format(i + 1, valor_min_clase, valor_med_clase, valor_max_clase))
 
-    # Imprimo resultados de distribucion de valores en clase
-    cant_val_por_clase = values_distribution_in_classes(d, valores_unicos)
-
-    # Determino % de clases con al menos un valor
-    cant_clases_con_valor = len(cant_val_por_clase) - cant_val_por_clase.count(0)
-    porc_clases_con_valor = cant_clases_con_valor / cant_clases
-
-    # SI LA DISTRIBUCION DE VALORES EN CLASES NO ES BUENA
-    # Si menos del 50% de las clases tienen valores o mas del 71%
-    if (porc_clases_con_valor < PORC_MIN_CLASES_CON_VALOR) or (porc_clases_con_valor > PORC_MAX_CLASES_CON_VALOR):
-
-        # Imprimo razon, por la que, vuelvo a generar clases
-        print("No funciono bien la creacion de clases con misma amplitud. Razon: ", end="")
-        if porc_clases_con_valor < PORC_MIN_CLASES_CON_VALOR:
-            print("Hay pocas clases con valores, es decir, hay una gran concentracion de valores en pocas clases. "
-                  "Valores muy distintos tomaran mismo sentiment por estar en misma clase")
-        else:
-            print("Hay muchas clases con valores. Valores tendran sentiment poco robusto")
-        print("Ahora, generare {} clases a partir de tomar percentiles {}".format(cant_clases_perc, percentiles))
-
-        # Defino variables
-        d = {}  # reinicio diccionario pues no usare clases de misma amplitud
-
-        # CREO CLASES A PARTIR DE PERCENTILES
-        # Por clase
-        print("{:^10s}\t{:^10s}\t{:^10s}\t{:^10s}".format("Clase Nº", "Valor min", "Valor med", "Valor max"))
-        for i in range(cant_clases_perc):
-
-            # Obtengo indices de valor min y max para la clase
-            idx_valor_min_clase = int(len(valores_unicos) * percentiles * i)  # valor min para estar en clase i
-            idx_valor_max_clase = int(len(valores_unicos) * percentiles * (i + 1)) - 1  # valor min para estar en clase i. El -1 seria porque el idx de la lista arranca en 0
-
-            # Obtengo valores min y max de la clase a partir de los indices
-            valor_min_clase = valores_unicos[idx_valor_min_clase]
-            valor_max_clase = valores_unicos[idx_valor_max_clase]
-            valor_med_clase = (valor_max_clase + valor_min_clase) / 2  # valor medio de clase i
-
-            # Guardo valor maximo y medio de la clase
-            d[valor_max_clase] = valor_med_clase
-            print("{:^10d}\t{:^10.1f}\t{:^10.1f}\t{:^10.1f}".format(i + 1, valor_min_clase, valor_med_clase, valor_max_clase))
-
-        # Imprimo resultados de distribucion de valores en clases
-        values_distribution_in_classes(d, valores_unicos)
-
-    # SI LA DISTRIBUCION DE VALORES EN CLASES ES BUENA
-    else:
-        # IMPRIMO MENSAJE
-        print("Funciono correctamente la creacion de clases con misma amplitud! ")
-
+    # Imprimo resultados de distribucion de valores en clases
+    values_distribution_in_classes(d, valores_unicos)
     return d
 
 def values_distribution_in_classes(dict, valores_unicos):
@@ -188,7 +142,7 @@ def train_naive_bayes(df):
 
     # Paso 2: Por cada valor de cada atributo (e.g. atrib scones toma valor 0 o 1), calcular P(ai/vj)
     # Por atributo
-    for atributo in list(df.columns)[:-1]: # No debo incluir la variable respuesta (en este caso, Nacionalidad)
+    for atributo in list(df.drop(['equipo_ganador'], axis=1).columns): # No debo incluir la variable respuesta (en este caso, Nacionalidad)
 
         # Por valor
         for valor in df[atributo].unique():
@@ -204,71 +158,168 @@ def train_naive_bayes(df):
     return d
 
 
-def predict(df , d, ejemplo_a_pred):
+def predict(df , d):
+    # df es df_test
 
     # Definicion de variables
-    prob_max = 0
-    prob_den = 0
     l_clases = df['equipo_ganador'].unique()
-    l_atrib = list(df.columns)[:-1]  # Sin variable respuesta
+    l_atrib = list(df.drop(['equipo_ganador'], axis=1).columns) # Sin variable respuesta
+    df_result = pd.DataFrame()
+    df_result['y_real'] = df['equipo_ganador']
 
-    # Paso 3: Multiplicar P(ai/vj) y P(vj)
-    for clase in l_clases:
+    # Por registro
+    for i in range(len(df)):
 
         # Definicion de variables
-        prob = d[clase]  # Inicializo variable. Probabilidad de que sea de una clase dados ciertos atributos
+        prob_max = 0  # Probabilidad mas alta respecto de una clase
+        prob_den = 0  # Probabilidad del denominador. Para calcular la probabilidad respecto de cada clase de 0 a 1.
 
-        # Por atributo
-        for i in range(len(ejemplo_a_pred)):
+        # Paso 3: Multiplicar P(ai/vj) y P(vj)
+        for clase in l_clases:
 
-            valor = ejemplo_a_pred[i]
-            atrib = l_atrib[i]
-            name = '{}/{}'.format(atrib+str(valor), clase)
-            prob *= d[name]
-            print("P({}/{}) = {}}".format(atrib+str(valor), clase, d[name]))
+            # Definicion de variables
+            prob = d[clase]  # Inicializo variable. Probabilidad de que sea de una clase dados ciertos atributos
 
-        # Guardo probabilidad de que pertenezca a la clase
-        print("Prob que sea clase {}: {}".format(clase, prob))
-        if prob > prob_max:
-            prob_max = prob
-            clase_max = clase
+            # Por atributo
+            for atrib in l_atrib:
 
-        # Calculo prob del denominador para poder calcular la prob de una clase dado ciertos atrib
-        prob_den += prob
-        print("Prob denominador: ", prob_den)
+                valor = df.loc[i, atrib]
+                name = '{}/{}'.format(atrib+str(valor), clase)
+                prob *= d[name]
+                print("P({}/{}) = {}".format(atrib+str(valor), clase, d[name]))
 
-    # Imprimo resultados
-    prob_clase = prob_max / prob_den * 100
-    print("Dados los atributos, se infiere que esta persona es {} con una prob de {:.0f}%".format(clase_max, prob_clase))
+            # Guardo probabilidad de que pertenezca a la clase
+            print("Prob que sea clase {}: {}".format(clase, prob))
+            if prob > prob_max:
+                prob_max = prob
+                clase_max = clase
+
+            # Calculo prob del denominador para poder calcular la prob de una clase dado ciertos atrib
+            prob_den += prob
+            print("Prob denominador: ", prob_den)
+
+        # Imprimo resultados
+        prob_clase = prob_max / prob_den * 100
+        print("Dados los atributos, se infiere que esta persona es {} con una prob de {:.0f}%".format(clase_max, prob_clase))
+        df_result.loc[i, ['y_pred', 'y_pred_prob']] = clase_max, prob_clase
+
+    return df_result
+
+def balance_dataset(df):
+
+    # Definicion de variables
+    df_aux = pd.DataFrame(columns=df.columns)
+    n_ejs_clase_min = 1000000000
+    l_clases = list(df['equipo_ganador'].unique())
+    print("ASFSDAFGSAD", l_clases)
+
+    # Paso 1: Identifico cuantos ejemplos deberia tener cada clase para que el dataset este balanceado
+    # Por clase
+    for clase in l_clases:
+
+        # Obtengo cantidad de registros con dicha clase
+        n_ejs_clase = len(df[df['equipo_ganador'] == clase])
+        print("Clase: {}. Nºejemplos: {}".format(clase, n_ejs_clase))
+
+        # Si tiene menos ejemplos que las otras clases
+        if n_ejs_clase < n_ejs_clase_min:
+
+            # Guardo Nº ejemplos min
+            n_ejs_clase_min = n_ejs_clase
+
+    print("n_ejs_clase_min", n_ejs_clase_min)
+
+    # Paso 2: Efectuo el balanceo segun la cantidad que debe tener cada clase (n_ejs_clase_min)
+    for clase in l_clases:
+
+        print("Clase: ", clase)
+        df_clase = df[df['equipo_ganador'] == clase]
+        df_clase_bal = df_clase[:n_ejs_clase_min]
+        print(df_clase_bal)
+        print("Balanceo:", len(df_clase_bal))
+        df_aux = pd.concat([df_aux, df_clase_bal])
+        print(len(df_aux[df_aux['equipo_ganador'] == clase]))
+
+    # Random shuffle dataframe (pues esta ordenado segun la variable respuesta)
+    df_shuf = df_aux.sample(frac=1).reset_index(drop=True)
+    print(df_aux.shape)
+    return df_shuf
 
 def main():
     # Levanto el dataset
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data understanding/integrate_data/df_derived_data.xlsx',index_col=0)
     print(df)
+    print(df.shape)
 
-    # Remuevo columnas forma_loc y forma_vis
+    # Remuevo columnas fecha
     df.drop('fecha', inplace=True, axis=1)
-    # df.drop('equipo_loc', inplace=True, axis=1)
+    # df.drop('equipo_loc', inplace=True, axis=1)  # Tiene sentido calcular P(equipo_loc = Banfield / equipo_gan = Local) --> un equipo puede ser mas propenso a ganar de local que otro...
     # df.drop('equipo_vis', inplace=True, axis=1)
-    df.drop('forma_loc', inplace=True, axis=1)
-    df.drop('forma_vis', inplace=True, axis=1)
-    print(df)
+    print(df.shape)
 
     # Remuevo ultimos 10 partidos de cada equipo (pues no puedo calcular bien la forma)
-    df = df.loc[:len(df)-150]  # Son 15 partidos por jornada y saco las ultimas 10 jornadas pues la forma la calculo 10 partidos para atras...
+    df = df.dropna(subset='dif_forma').reset_index(drop=True)  # Son 15 partidos por jornada y saco las ultimas 10 jornadas pues la forma la calculo 10 partidos para atras...
+    print(df.shape)
+    print(df.head)
 
     # Categorizo columnas numericas
     df = categorize_numeric_columns(df)
 
-    # Separo conjunto de datos en train y test
+    # Corro 100 modelos y promedio resultados
+    N_CORRIDAS = 100
+    l_aciertos = []
+    l_prob = []
+    l_prob_2 = []
+    for i in range(N_CORRIDAS):
+        print(" MODELO Nº{} ".format(i).center(120, '#'))
+
+        # Random shuffle del df
+        df_shuf = df.sample(frac=1).reset_index(drop=True)  # Random shuffle dataframe
+
+        # Balanceo dataset  (Para mi en este proeycto no conviene balancear el dataset. Puesto que es importante que es mas probable ganar de local que de visitante). Sin embargo entiendo que el modelo puede parecer que da bien pero en realidad siempre decir que gana el local...
+        # df = balance_dataset(df_shuf)
+
+        # Separo conjunto de datos en train y test
+        corte = int(0.8 * len(df))
+        df_train, df_test = df.loc[:corte].reset_index(drop=True), df.loc[corte:].reset_index(drop=True)
+
+        # Implemento Naive Bayes
+        d = train_naive_bayes(df_train)
+        print(d)
+
+        # EVALUACION DEL MODELO
+        df_result = predict(df_test, d)
+
+        n_aciertos = 0
+        prob_certeza = 0
+        for i in range(len(df_result)):
+            y_real = df_result.loc[i, 'y_real']
+            y_pred = df_result.loc[i, 'y_pred']
+
+            if y_real == y_pred:
+                n_aciertos += 1
+                prob_certeza += df_result.loc[i, 'y_pred_prob']
+
+        # Guardo resultados del modelo
+        l_aciertos.append(n_aciertos/len(df_result)*100)
+        l_prob.append(prob_certeza/n_aciertos)
+        l_prob_2.append(sum(df_result['y_pred_prob'])/len(df_result))
+        print(l_aciertos)
+        print(l_prob)
+        print(l_prob_2)
+
+    print("El % de aciertos es {:.3f}%".format(sum(l_aciertos)/N_CORRIDAS))
+    print("La probabilidad de certeza promedio en los aciertos es {:.3f}%".format(sum(l_prob)/N_CORRIDAS))
+    print("La probabilidad de certeza promedio es {:.3f}%".format(sum(l_prob_2)/N_CORRIDAS))
 
 
-    # Implemento Naive Bayes
-    d = train_naive_bayes(df)
+    # MATRIZ DE CONFUSION
+    confusion_matrix = metrics.confusion_matrix(df_result['y_real'], df_result['y_pred'])
+    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=["Local", "Empate", "Visitante"])
+    cm_display.plot()
+    plt.show()
 
-    # Predigo
-    predict(df, d, ['Talleres Córdoba', 'Boca Juniors', , 0])
-    # Tengo que DIVIDIR CONJUNTO DE DATOS EN TEST Y TRAIN
+    # df.to_excel("./df_results.xlsx")
 
 main()
 
