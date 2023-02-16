@@ -41,18 +41,28 @@ class CrawlerActions():
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         return driver
 
-    def extract_fecha_2(self, n_part):
+    def reject_cookies(self):
+        """
+        Click en rechazar cookies
+        """
+        # Ubico el botón "Rechazar cookies" y lo clikeo
+        try:
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/button[@id="onetrust-reject-all-handler"]'))).click()
+            print("Rechace las cookies correctamente")
+        except:
+            print("Fallo click en boton rechazar cookies")
+
+    def extract_fecha(self, item):
         """
         Extrae field
         :param <param_name>: <param description>
         :return: String con field, en caso contrario, None
         """
         # Intento extraer el campo
+
         try:
             # Extraigo campo
-            l_items = WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, './/div[@id="fixturein"]//td[@class="game-info"]/a/ancestor::tr')))  # Uso parent para evitar los tr que no corresponden a items
-            item = l_items[n_part]
-            fecha = item.find_element(By.XPATH, './preceding-sibling::tr[@class="diapart"][1]').text
+            fecha = item.find_element(By.XPATH, './div[@class="event__time"]').text
             return fecha
 
         # Si falla la extraccion del campo, retorno None
@@ -60,34 +70,7 @@ class CrawlerActions():
             print("Fallo la extraccion de la fecha")
             return None
 
-    def extract_fecha(self):
-        """
-        Extrae field
-        :param <param_name>: <param description>
-        :return: String con field, en caso contrario, None
-        """
-        # Intento extraer el campo
-        l_dias = ['Viernes', 'Sábado', 'Domingo', "Lunes", 'Martes', 'Miércoles', 'Jueves', ]
-
-        try:
-            '''
-            # Alternativa (PROBAR!)
-            for dia in l_dias:
-                xpath = './/*[starts-with(text(), "{}")]'.format(dia)
-                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                fecha = self.driver.find_element(By.XPATH, xpath).text
-            '''
-            # Extraigo campo
-            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './/div[@id="ficha-horario"]')))
-            fecha = self.driver.find_element(By.XPATH, './/div[@id="ficha-horario"]').text
-            return fecha
-
-        # Si falla la extraccion del campo, retorno None
-        except:
-            print("Fallo la extraccion de la fecha")
-            return None
-
-    def extract_teams(self):
+    def extract_teams(self, item):
         """
         Extrae field
         :param <param_name>: <param description>
@@ -96,13 +79,13 @@ class CrawlerActions():
         # Intento extraer el campo
         try:
             # Extraigo campo
-            equipo1 = self.driver.find_element(By.XPATH, './/table[@id="formacion1"]//tr[1]').text
-            equipo2 = self.driver.find_element(By.XPATH, './/table[@id="formacion2"]//tr[1]').text
+            equipo1 = item.find_element(By.XPATH, './/div[starts-with(@class, "event__participant event__participant--home")]').text
+            equipo2 = item.find_element(By.XPATH, './/div[starts-with(@class, "event__participant event__participant--away")]').text
             return equipo1, equipo2
 
         # Si falla la extraccion del campo, retorno None
         except:
-            print("Fallo la extraccion del campo")
+            print("Fallo la extraccion de los equipos")
             return None, None
 
     def extract_arbitro(self):
@@ -131,8 +114,10 @@ class CrawlerActions():
         # Intento extraer el campo
         try:
             # Extraigo campo
-            entrenador_loc = self.driver.find_element(By.XPATH, './/table[@id="formacion1"]//tr[@class="dttr"]/td[@colspan="2"]').text
-            entrenador_vis = self.driver.find_element(By.XPATH, './/table[@id="formacion2"]//tr[@class="dttr"]/td[@colspan="2"]').text
+            entrenador_loc = self.driver.find_element(By.XPATH,
+                                                      './/table[@id="formacion1"]//tr[@class="dttr"]/td[@colspan="2"]').text
+            entrenador_vis = self.driver.find_element(By.XPATH,
+                                                      './/table[@id="formacion2"]//tr[@class="dttr"]/td[@colspan="2"]').text
             return entrenador_loc, entrenador_vis
 
         # Si falla la extraccion del campo, retorno None
@@ -140,7 +125,7 @@ class CrawlerActions():
             print("Fallo la extraccion del campo")
             return None, None
 
-    def extract_result(self):
+    def extract_result(self, item):
         """
         Extrae field
         :param <param_name>: <param description>
@@ -152,10 +137,10 @@ class CrawlerActions():
         # Intento extraer el campo
         try:
             # Extraigo goles de cada equipo para ver quien gano
-            n_goles_equipo1 = self.driver.find_element(By.XPATH, './/div[@id="ficha-resultado1"]').text  # e.g. 1
-            n_goles_equipo2 = self.driver.find_element(By.XPATH, './/div[@id="ficha-resultado2"]').text  # e.g. 2
-
-            return equipo_gan(ng1=n_goles_equipo1, ng2=n_goles_equipo2)
+            n_goles_equipo1 = item.find_element(By.XPATH, './div[@class="event__score event__score--home"]').text  # e.g. 1
+            n_goles_equipo2 = item.find_element(By.XPATH, './div[@class="event__score event__score--away"]').text  # e.g. 2
+            # return equipo_gan(ng1=n_goles_equipo1, ng2=n_goles_equipo2)
+            return int(n_goles_equipo1), int(n_goles_equipo2)
 
         # Si falla la extraccion del resultado, retorno None
         except:
@@ -173,51 +158,46 @@ class CrawlerActions():
 
         try:
             # Obtengo los tags que contienen urls de temporadas
-            l_tag_temporadas = self.driver.find_elements(By.XPATH, './/div[@id="historneos"]//td[@style="background:green"]/a')
+            l_tag_temporadas = self.driver.find_elements(By.XPATH,'.//section[@id="tournament-page-archiv"]//div[@class="archive__row"]/div[@class="archive__season"]/a')
 
             # Por tag (c/u contiene la url de una temporada)
             for i in range(n_temp):
-
                 # Guardo url de temporada
-                tag = l_tag_temporadas[i]
-                l_urls_temporadas.append(tag.get_attribute('href'))
+                l_urls_temporadas.append(l_tag_temporadas[i].get_attribute('href'))
 
         except:
             print("Fallo extraccion de las urls de las temporada")
         return l_urls_temporadas
 
-    def get_button_next_jornada(self):
+    def click_button_mas_part(self):
         """
         Click en siguiente jornada
         :return:
         """
+        # Mientras exista el boton "Mosotrar mas partidos"
         try:
-            # Obtengo la jornada actual, obtengo la jornada anterior (tengo que ir hacia atras pues comienza en la ult jornada)
-            jornada = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './/div[@id="flechaatr"]/img')))
-            return jornada
-
+            # Click en boton "Mostrar mas partidos"
+            tag_url = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './/a[text()="Mostrar más partidos"]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
+            self.driver.get(tag_url.get_attribute('href'))
+            print("Click en 'Mostrar mas partidos'")
         except:
-            print("Fallo el click en la jornada anterior. Posiblemente no hay mas jornadas que extraer de la temporada")
-            return None
+            print("No hay mas boton 'Mostrar mas partidos' o bien fallo el click")
 
-    def get_urls_partidos(self):  # No tengo mas el link a info de partido a partir de 2017/18
+    def click_button_mas_part_2(self):  # ES NECESARIA LA FUNCION. ES DISTINTA A LA OTRA.
         """
-        Extraer URLs de la informacion de cada partido
+        Click en siguiente jornada
         :return:
         """
-        # Definicion de variables
-        l_urls_partidos = []
-
-        try:
-            # Extraigo los tags que contienen las URLs a la informacion de cada partido de la jornada
-            l_tag_partidos = WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, './/div[@id="fixturein"]//td[@class="game-info"]/a')))
-
-            # Por tag (c/u contiene la url de un partido)
-            for tag in l_tag_partidos:
-                l_urls_partidos.append(tag.get_attribute('href'))
-            return l_urls_partidos
-        except:
-            print("Fallo extraccion de las URLs de la informacion de los partidos")
+        # Mientras exista el boton "Mosotrar mas partidos"
+        while True:
+            try:
+                # Click en boton "Mostrar mas partidos"
+                WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/a[text()="Mostrar más partidos"]'))).click()  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
+                # sleep(3)  # No llega a cargarse la nueva pagina para buscar el boton?
+                print("Click en 'Mostrar mas partidos'")
+            except:
+                print("No hay mas boton 'Mostrar mas partidos' o bien fallo el click")
+                break
 
 def format_date(fecha_string):
     """
@@ -231,7 +211,8 @@ def format_date(fecha_string):
     # PASO 2: FORMATEO FECHA
     # Si la fecha tiene hora o minutos
     try:
-        fecha_datetime = datetime.datetime(n_año, n_mes, n_dia) # Convierto variable de clase 'str' a clase 'datetime.datetime'
+        fecha_datetime = datetime.datetime(n_año, n_mes,
+                                           n_dia)  # Convierto variable de clase 'str' a clase 'datetime.datetime'
         return fecha_datetime.strftime("%d/%m/%Y")  # Convierto el formato de datetime del default al formato deseado
     # Si la fecha no tiene hora o minutos
     except:
@@ -246,17 +227,19 @@ def split_date_string(fecha_string):
     :return: Integer & Integer & Integer. Dia, mes y año.
     """
     # Definicion de variables
-    d = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8, "sep": 9, "oct": 10, 'nov': 11, 'dic': 12}
+    d = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8, "sep": 9, "oct": 10, 'nov': 11,
+         'dic': 12}
 
     # intento extraer dia, mes y año de string
     try:
-        dia, n_dia, de ,mes, n_año = fecha_string.split()  # Separo string original segun espacios para obtener elementos (mes y dia)
+        dia, n_dia, de, mes, n_año = fecha_string.split()  # Separo string original segun espacios para obtener elementos (mes y dia)
         n_año, n_mes, n_dia = int(n_año), d[mes[:3].lower()], int(n_dia)  # Convierto strings a integer
         return n_año, n_mes, n_dia
     # Si falla extraccion de dia, mes y año de string
     except:
         print("Fallo la conversion de la fecha {} de string a integer".format(fecha_string))  # Mensaje de aviso
         return None, None, None
+
 
 def main():
     """
@@ -267,75 +250,71 @@ def main():
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
     n_temp = 1
     N_TEMPS = 8
-    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'arbitro', 'entrenador_loc', 'entrenador_vis', 'equipo_ganador'])
+    # df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis', 'equipo_ganador'])
+    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'goles_loc', 'goles_vis'])
     crawler = CrawlerActions()  # Creo objeto de clase CrawlerActions()
 
-    l_urls_info_part = set()
-
     # Ingreso a pagina
-    crawler.driver.get('https://www.promiedos.com.ar/primera=historialtorneos')  # hasta que no se carga toda la pagina, no sigue...
+    crawler.driver.get('https://www.flashscore.es/futbol/argentina/liga-profesional/archivo/')  # hasta que no se carga toda la pagina, no sigue...
     sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+
+    # Reject cookies
+    crawler.reject_cookies()
 
     # POR PAGINA (TEMPORADA) DE PAGINACION
     for url_temp in crawler.get_urls_temporadas(N_TEMPS):
 
         # Ingreso a pagina de temporada
         crawler.driver.get(url_temp)
-        n_jorn = 1  # Numero de jornada
         print(" Nº Temporada: {} ".format(n_temp).center(120, "#"))
 
-        # Por fecha o jornada (hasta que no exista flecha de ir a siguiente fecha)
-        while True:
+        # Click en boton "Mostrar mas partidos" (para ver todas las jornadas de la temporada)
+        crawler.click_button_mas_part()
+        sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))  # no deberia ser necesaria pues el click_button que sigue tiene un WebDriverWait...
 
-            # Definicion de variables
-            print(" Nº Jornada: {} ".format(n_jorn).center(120, "-"))
-            n_part = 0
+        crawler.click_button_mas_part_2()
 
-            for url_partido in crawler.get_urls_partidos():
-                l_urls_info_part.add(url_partido)
-            print("Nº partidos", len(l_urls_info_part))
+        # Extraigo items (partidos)
+        l_items = crawler.driver.find_elements(By.XPATH, './/div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]')
 
-            # CLICK EN SIGUIENTE FECHA/JORNADA
-            # Falla la paginacion de la jornada. Lo raro es que falla solo cuando extrae los campos de los partidos sino no, especificamente cuando hace el driver.get() y el driver.back()
-            button_next_jornada = crawler.get_button_next_jornada()
+        # Por item (partido)
+        for item in l_items:
 
-            # Si hay aun jornadas sin extraer
-            if button_next_jornada is not None:
-                # Clickeo en sigueinte jornada
-                button_next_jornada.click()
-                n_jorn += 1
-            # Si ya extraje todas las jornadas de la temporada
-            else:
-                # Salgo del while tal que cambio de temporada
-                n_temp += 1
-                break
+            # Extraigo campos
+            fecha = crawler.extract_fecha(item)
+            equipo1, equipo2 = crawler.extract_teams(item)
+            goles_loc, goles_vis = crawler.extract_result(item)
 
-    # Por partido
-    for url_info_part in l_urls_info_part:
-        # Ingreso a pagina de informacion del partido
-        crawler.driver.get(url_info_part)
+            '''
+            # Ingreso a pagina de informacion del partido
+            crawler.driver.get(url_info_part)
 
-        # Extraigo campos
-        fecha = crawler.extract_fecha()
-        print("aksndgfnjadfia", fecha)
-        equipo1, equipo2 = crawler.extract_teams()
-        arbitro = crawler.extract_arbitro()
-        entrenador_loc, entrenador_vis = crawler.extract_dts()
-        equipo_ganador = crawler.extract_result()
+            arbitro = crawler.extract_arbitro()
+            entrenador_loc, entrenador_vis = crawler.extract_dts()
 
-        # Formateo fecha
-        fecha_form = format_date(fecha)
+            crawler.driver.back()
+            '''
 
-        # GUARDADO DE DATOS EN DATAFRAME
-        l_data = [fecha_form, equipo1, equipo2, arbitro, entrenador_loc, entrenador_vis, equipo_ganador]
-        df.loc[len(df)] = l_data
-        print(l_data)
+            # Formateo fecha
+            # fecha_form = format_date(fecha)
+
+            # GUARDADO DE DATOS EN DATAFRAME
+            # l_data = [fecha_form, equipo1, equipo2, arbitro, entrenador_loc, entrenador_vis, equipo_ganador]
+            l_data = [fecha, equipo1, equipo2, goles_loc, goles_vis]
+            df.loc[len(df)] = l_data
+            print(l_data)
+
+        # Vuelvo a pagina donde se listan las temporadas
+        crawler.driver.back()  # Salgo de pagina donde se desplegan las jornadas de la temporada
+        crawler.driver.back()  # Salgo de pagina donde solo se muestra la ultima jornada de la temporada
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    
+
     # Guardado de archivo excel en computadora
     df.to_excel('./liga_argentina_historico_2.xlsx', index=False)  # Cambiar la ruta del archivo
 
 
 main()
+
+
