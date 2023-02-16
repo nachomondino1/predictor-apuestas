@@ -52,7 +52,7 @@ class CrawlerActions():
         except:
             print("Fallo click en boton rechazar cookies")
 
-    def extract_fecha(self, item):
+    def extract_fecha(self):
         """
         Extrae field
         :param <param_name>: <param description>
@@ -61,8 +61,8 @@ class CrawlerActions():
         # Intento extraer el campo
         try:
             # Extraigo campo
-            WebDriverWait(item, 10).until(EC.presence_of_element_located((By.XPATH, './div[@class="event__time"]')))
-            fecha = item.find_element(By.XPATH, './div[@class="event__time"]').text
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './div[@class="duelParticipant__startTime"]')))
+            fecha = self.driver.find_element(By.XPATH, './div[@class="duelParticipant__startTime"]').text
             return fecha
 
         # Si falla la extraccion del campo, retorno None
@@ -79,6 +79,7 @@ class CrawlerActions():
         # Intento extraer el campo
         try:
             # Extraigo campo
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './/div[starts-with(@class, "event__participant event__participant--home")]')))
             equipo1 = item.find_element(By.XPATH, './/div[starts-with(@class, "event__participant event__participant--home")]').text
             equipo2 = item.find_element(By.XPATH, './/div[starts-with(@class, "event__participant event__participant--away")]').text
             return equipo1, equipo2
@@ -118,17 +119,10 @@ class CrawlerActions():
             boton = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/div[@class="tabs tabs__detail--nav"]//a[text()="Alineaciones"]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
             boton.click()
 
-            try:
-                # Extraigo dts
-                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH,'.//div[@class="lf__lineUp"]/div[@class="section"][last()]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
-                dt_loc = self.driver.find_element(By.XPATH, './/div[@class="lf__lineUp"]/div[@class="section"][last()]//div[@class="lf__participant "]').text
-                dt_vis = self.driver.find_element(By.XPATH, './/div[@class="lf__lineUp"]/div[@class="section"][last()]//div[@class="lf__participant lf__isReversed"]').text
-            except:
-                print("Fallo la extraccion del campo")
-                dt_loc, dt_vis = None, None
-
-            # Salgo de pagina de seccion "Alineaciones"
-            self.driver.back()
+            # Extraigo dts
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH,'.//div[@class="lf__lineUp"]/div[@class="section"][last()]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
+            dt_loc = self.driver.find_element(By.XPATH, './/div[@class="lf__lineUp"]/div[@class="section"][last()]//div[@class="lf__participant "]').text
+            dt_vis = self.driver.find_element(By.XPATH, './/div[@class="lf__lineUp"]/div[@class="section"][last()]//div[@class="lf__participant lf__isReversed"]').text
             return dt_loc, dt_vis
 
         # Si falla la extraccion del campo, retorno None
@@ -180,46 +174,37 @@ class CrawlerActions():
             print("Fallo extraccion de las urls de las temporada")
         return l_urls_temporadas
 
-    def click_button_mas_part(self):
+    def is_button_mas_part(self):
         """
         Click en siguiente jornada
         :return:
         """
-        # Mientras exista el boton "Mosotrar mas partidos"
+        try:
+            # Busco boton "Mostrar mas partidos"
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/a[text()="Mostrar más partidos"]')))
+            return True
+        except:
+            return False
+
+    def click_button_mas_part(self):  # ES NECESARIA LA FUNCION. ES DISTINTA A LA OTRA.
+        """
+        Click en siguiente jornada
+        :return:
+        """
         try:
             # Click en boton "Mostrar mas partidos"
-            tag_url = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './/a[text()="Mostrar más partidos"]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
-            self.driver.get(tag_url.get_attribute('href'))
+            boton = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/a[text()="Mostrar más partidos"]')))
+            boton.click()
             print("Click en 'Mostrar mas partidos'")
         except:
             print("No hay mas boton 'Mostrar mas partidos' o bien fallo el click")
 
-    def click_button_mas_part_2(self):  # ES NECESARIA LA FUNCION. ES DISTINTA A LA OTRA.
-        """
-        Click en siguiente jornada
-        :return:
-        """
-        # Mientras exista el boton "Mosotrar mas partidos"
-        while True:
-            try:
-                # Click en boton "Mostrar mas partidos"
-                WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/a[text()="Mostrar más partidos"]'))).click()  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
-                print("Click en 'Mostrar mas partidos'")
-            except:
-                print("No hay mas boton 'Mostrar mas partidos' o bien fallo el click")
-                break
-
-    def click_info_part(self, item):
+    def click_info_part(self, id_part):
         """
         Click en informacion del partido
         :return:
         """
         try:
-            # Obtengo el id del partido
-            print('snjdfnajfasdf', item.get_attribute('id'))
-            id_part = item.get_attribute('id')  # e.g. "g_1_fshvzbls"
-            id_part = id_part[id_part.rfind('_')+1:]  # e.g. "fshvzbls"
-
             # Construyo url de info del partido a partir del id
             url = 'https://www.flashscore.es/partido/{}/#/resumen-del-partido/resumen-del-partido'.format(id_part)
             print(url)
@@ -280,9 +265,10 @@ def main():
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
     n_temp = 1
     N_TEMPS = 8
-    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis', 'goles_loc', 'goles_vis'])
-    # df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'goles_loc', 'goles_vis'])
+    # df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis', 'goles_loc', 'goles_vis'])
+    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'goles_loc', 'goles_vis'])
     crawler = CrawlerActions()  # Creo objeto de clase CrawlerActions()
+    l_ids = []
 
     # Ingreso a pagina
     crawler.driver.get('https://www.flashscore.es/futbol/argentina/liga-profesional/archivo/')  # hasta que no se carga toda la pagina, no sigue...
@@ -300,9 +286,13 @@ def main():
 
         # Click en boton "Mostrar mas partidos" (para ver todas las jornadas de la temporada)
         crawler.click_button_mas_part()
-        # sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))  # no deberia ser necesaria pues el click_button que sigue tiene un WebDriverWait...
 
-        crawler.click_button_mas_part_2()  # CAMBIAR NOMBRE DE FUNCION
+        # Cargo todas las jornadas (solo aparecen algunas al principio)
+        i=1
+        while crawler.is_button_mas_part():
+            crawler.click_button_mas_part()
+            print(i)
+            i+=1
 
         # Extraigo items (partidos)
         l_items = crawler.driver.find_elements(By.XPATH, './/div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]')
@@ -310,38 +300,43 @@ def main():
         # Por item (partido)
         for item in l_items:
 
-            print("asdgfasgf", item)
-            print(item.text) # Deberia ver los datos del partido
-
             # Extraigo campos
-            fecha = crawler.extract_fecha(item)
             equipo1, equipo2 = crawler.extract_teams(item)
             goles_loc, goles_vis = crawler.extract_result(item)
-
-
-
-            # Ingreso a pagina de informacion del partido
-            crawler.click_info_part(item) # item.click() # Abre nueva pestaña...
-
-            arbitro = crawler.extract_arbitro()
-            dt_loc, dt_vis = crawler.extract_dts()
-
-            # Salgo de pagina de informacion del partido
-            crawler.driver.back()
-
-
-            # Formateo fecha
-            # fecha_form = format_date(fecha)
+            id = item.get_attribute('id')  # e.g. "g_1_fshvzbls"
+            l_ids.append(id[id.rfind('_')+1:])
 
             # GUARDADO DE DATOS EN DATAFRAME
-            l_data = [fecha, equipo1, equipo2,  arbitro, dt_loc, dt_vis, goles_loc, goles_vis]
-            # l_data = [fecha, equipo1, equipo2, goles_loc, goles_vis]
+            # l_data = [fecha, equipo1, equipo2,  arbitro, dt_loc, dt_vis, goles_loc, goles_vis]
+            l_data = [equipo1, equipo2, goles_loc, goles_vis]
             df.loc[len(df)] = l_data
             print(l_data)
 
         # Vuelvo a pagina donde se listan las temporadas
         crawler.driver.back()  # Salgo de pagina donde se desplegan las jornadas de la temporada
         crawler.driver.back()  # Salgo de pagina donde solo se muestra la ultima jornada de la temporada
+
+    # Extraigo fecha, arbitro y entrenadores
+    # Por item (c/u identificado con un id)
+    for i in range(len(l_ids)):
+
+        # Ingreso a pagina de informacion del partido
+        crawler.click_info_part(l_ids[i])
+
+        # Extraigo fecha, arbitro y entrenadores
+        fecha = crawler.extract_fecha()
+        arbitro = crawler.extract_arbitro()
+        dt_loc, dt_vis = crawler.extract_dts()
+
+        # Formateo fecha
+        # fecha_form = format_date(fecha)
+
+        # Guardo datos
+        df.loc[i,'fecha'] = fecha
+        df.loc[i,'arbitro'] = arbitro
+        df.loc[i,'dt_loc'] = dt_loc
+        df.loc[i,'dt_vis'] = dt_vis
+        print(fecha, arbitro, dt_loc, dt_vis)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
