@@ -59,9 +59,9 @@ class CrawlerActions():
         :return: String con field, en caso contrario, None
         """
         # Intento extraer el campo
-
         try:
             # Extraigo campo
+            WebDriverWait(item, 10).until(EC.presence_of_element_located((By.XPATH, './div[@class="event__time"]')))
             fecha = item.find_element(By.XPATH, './div[@class="event__time"]').text
             return fecha
 
@@ -97,12 +97,13 @@ class CrawlerActions():
         # Intento extraer el campo
         try:
             # Extraigo campo
-            arbitro = self.driver.find_element(By.XPATH, './/div[@id="ficha-horario"]/span/span').text
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, './/div[@class="mi__data"]//span[contains(text(), "Árbitro")]/following-sibling::span')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
+            arbitro = self.driver.find_element(By.XPATH, './/div[@class="mi__data"]//span[contains(text(), "Árbitro")]/following-sibling::span').text
             return arbitro
 
         # Si falla la extraccion del campo, retorno None
         except:
-            print("Fallo la extraccion del campo")
+            print("Fallo la extraccion del arbitro")
             return None
 
     def extract_dts(self):
@@ -113,16 +114,26 @@ class CrawlerActions():
         """
         # Intento extraer el campo
         try:
-            # Extraigo campo
-            entrenador_loc = self.driver.find_element(By.XPATH,
-                                                      './/table[@id="formacion1"]//tr[@class="dttr"]/td[@colspan="2"]').text
-            entrenador_vis = self.driver.find_element(By.XPATH,
-                                                      './/table[@id="formacion2"]//tr[@class="dttr"]/td[@colspan="2"]').text
-            return entrenador_loc, entrenador_vis
+            # Dentro de la pagina de informacion del partido, entro a seccion "Alineaciones"
+            boton = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/div[@class="tabs tabs__detail--nav"]//a[text()="Alineaciones"]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
+            boton.click()
+
+            try:
+                # Extraigo dts
+                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH,'.//div[@class="lf__lineUp"]/div[@class="section"][last()]')))  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
+                dt_loc = self.driver.find_element(By.XPATH, './/div[@class="lf__lineUp"]/div[@class="section"][last()]//div[@class="lf__participant "]').text
+                dt_vis = self.driver.find_element(By.XPATH, './/div[@class="lf__lineUp"]/div[@class="section"][last()]//div[@class="lf__participant lf__isReversed"]').text
+            except:
+                print("Fallo la extraccion del campo")
+                dt_loc, dt_vis = None, None
+
+            # Salgo de pagina de seccion "Alineaciones"
+            self.driver.back()
+            return dt_loc, dt_vis
 
         # Si falla la extraccion del campo, retorno None
         except:
-            print("Fallo la extraccion del campo")
+            print("Fallo click en seccion 'Alineaciones' para extraer los entrenadores de cada equipo")
             return None, None
 
     def extract_result(self, item):
@@ -132,7 +143,7 @@ class CrawlerActions():
         :return: String con field, en caso contrario, None
         """
         # Defino funcion que determina equipo ganador segun los goles que convirtio cada equipo
-        equipo_gan = lambda ng1, ng2: "Local" if ng1 > ng2 else ("Empate" if ng1 == ng2 else "Visitante")
+        equipo_gan = lambda ng1, ng2: "Local" if ng1 > ng2 else ("Empate" if ng1 == ng2 else "Visitante")  # Agregar a integrate data? Deduzco la columna "equipo_ganador"
 
         # Intento extraer el campo
         try:
@@ -145,7 +156,7 @@ class CrawlerActions():
         # Si falla la extraccion del resultado, retorno None
         except:
             print("Fallo la extraccion del resultado")
-            return None
+            return None, None
 
     def get_urls_temporadas(self, n_temp):
         """
@@ -193,11 +204,31 @@ class CrawlerActions():
             try:
                 # Click en boton "Mostrar mas partidos"
                 WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, './/a[text()="Mostrar más partidos"]'))).click()  # Hay dos botones "Mostrar mas partidos" pero selecciona el primero
-                # sleep(3)  # No llega a cargarse la nueva pagina para buscar el boton?
                 print("Click en 'Mostrar mas partidos'")
             except:
                 print("No hay mas boton 'Mostrar mas partidos' o bien fallo el click")
                 break
+
+    def click_info_part(self, item):
+        """
+        Click en informacion del partido
+        :return:
+        """
+        try:
+            # Obtengo el id del partido
+            print('snjdfnajfasdf', item.get_attribute('id'))
+            id_part = item.get_attribute('id')  # e.g. "g_1_fshvzbls"
+            id_part = id_part[id_part.rfind('_')+1:]  # e.g. "fshvzbls"
+
+            # Construyo url de info del partido a partir del id
+            url = 'https://www.flashscore.es/partido/{}/#/resumen-del-partido/resumen-del-partido'.format(id_part)
+            print(url)
+
+            # Ingreso a info_part
+            self.driver.get(url)
+        except:
+            print("Fallo click en pagina de informacion del partido")
+
 
 def format_date(fecha_string):
     """
@@ -211,8 +242,7 @@ def format_date(fecha_string):
     # PASO 2: FORMATEO FECHA
     # Si la fecha tiene hora o minutos
     try:
-        fecha_datetime = datetime.datetime(n_año, n_mes,
-                                           n_dia)  # Convierto variable de clase 'str' a clase 'datetime.datetime'
+        fecha_datetime = datetime.datetime(n_año, n_mes,n_dia)  # Convierto variable de clase 'str' a clase 'datetime.datetime'
         return fecha_datetime.strftime("%d/%m/%Y")  # Convierto el formato de datetime del default al formato deseado
     # Si la fecha no tiene hora o minutos
     except:
@@ -250,8 +280,8 @@ def main():
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
     n_temp = 1
     N_TEMPS = 8
-    # df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis', 'equipo_ganador'])
-    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'goles_loc', 'goles_vis'])
+    df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis', 'goles_loc', 'goles_vis'])
+    # df = pd.DataFrame(columns=['fecha', 'equipo_loc', 'equipo_vis', 'goles_loc', 'goles_vis'])
     crawler = CrawlerActions()  # Creo objeto de clase CrawlerActions()
 
     # Ingreso a pagina
@@ -270,9 +300,9 @@ def main():
 
         # Click en boton "Mostrar mas partidos" (para ver todas las jornadas de la temporada)
         crawler.click_button_mas_part()
-        sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))  # no deberia ser necesaria pues el click_button que sigue tiene un WebDriverWait...
+        # sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))  # no deberia ser necesaria pues el click_button que sigue tiene un WebDriverWait...
 
-        crawler.click_button_mas_part_2()
+        crawler.click_button_mas_part_2()  # CAMBIAR NOMBRE DE FUNCION
 
         # Extraigo items (partidos)
         l_items = crawler.driver.find_elements(By.XPATH, './/div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]')
@@ -280,27 +310,32 @@ def main():
         # Por item (partido)
         for item in l_items:
 
+            print("asdgfasgf", item)
+            print(item.text) # Deberia ver los datos del partido
+
             # Extraigo campos
             fecha = crawler.extract_fecha(item)
             equipo1, equipo2 = crawler.extract_teams(item)
             goles_loc, goles_vis = crawler.extract_result(item)
 
-            '''
+
+
             # Ingreso a pagina de informacion del partido
-            crawler.driver.get(url_info_part)
+            crawler.click_info_part(item) # item.click() # Abre nueva pestaña...
 
             arbitro = crawler.extract_arbitro()
-            entrenador_loc, entrenador_vis = crawler.extract_dts()
+            dt_loc, dt_vis = crawler.extract_dts()
 
+            # Salgo de pagina de informacion del partido
             crawler.driver.back()
-            '''
+
 
             # Formateo fecha
             # fecha_form = format_date(fecha)
 
             # GUARDADO DE DATOS EN DATAFRAME
-            # l_data = [fecha_form, equipo1, equipo2, arbitro, entrenador_loc, entrenador_vis, equipo_ganador]
-            l_data = [fecha, equipo1, equipo2, goles_loc, goles_vis]
+            l_data = [fecha, equipo1, equipo2,  arbitro, dt_loc, dt_vis, goles_loc, goles_vis]
+            # l_data = [fecha, equipo1, equipo2, goles_loc, goles_vis]
             df.loc[len(df)] = l_data
             print(l_data)
 
