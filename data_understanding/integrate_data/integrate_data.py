@@ -1,6 +1,22 @@
 import pandas as pd
 
-def calculate_forma(df, n_part):
+def derive_historial_entre_si(df):
+
+    pass
+
+def derive_winning_team():
+    # Defino funcion que determina equipo ganador segun los goles que convirtio cada equipo
+    equipo_gan = lambda ng1, ng2: "Local" if ng1 > ng2 else ("Empate" if ng1 == ng2 else "Visitante")  # Agregar a integrate data? Deduzco la columna "equipo_ganador"
+    # return equipo_gan(ng1=n_goles_equipo1, ng2=n_goles_equipo2)
+    pass
+
+
+def derive_n_goals_last_matches():
+    pass
+
+
+
+def derive_forma(df, n_part):
     # Requiere de dataframe ordenado por fecha decreciente
     # Tengo que agregar forma de cada equipo y puntaje antes de cada partido.
 
@@ -47,7 +63,7 @@ def calculate_forma(df, n_part):
 
     return df
 
-def calculate_forma_ponderada(df, n_part):
+def derive_forma_ponderada(df, n_part):
     # Definicion de variables
     l_equipos = df['equipo_loc'].unique()
     puntos_loc = lambda res: 10 if res == "Local" else (5 if res == "Empate" else 1)
@@ -57,7 +73,7 @@ def calculate_forma_ponderada(df, n_part):
     df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
 
     # Calculo las columnas forma_loc y forma_vis
-    df = calculate_forma(df, n_part)
+    df = derive_forma(df, n_part)
 
     # Por equipo
     for equipo in l_equipos:
@@ -113,9 +129,6 @@ def calculate_forma_ponderada(df, n_part):
     df = df.drop(['puntaje_vis'], axis=1)
     return df
 
-def historial_entre_si(df):
-    pass
-
 def n_dias_ult_partido(df):
     pass
 
@@ -124,7 +137,7 @@ def main():
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data understanding/format_data/df_formated.xlsx', index_col=0)
 
     # Derive new data
-    df = calculate_forma_ponderada(df=df, n_part=5)
+    df = derive_forma_ponderada(df=df, n_part=5)
     print(df.head())
 
     df.to_excel('./df_derived_data.xlsx')
