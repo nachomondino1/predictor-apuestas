@@ -23,7 +23,7 @@ def format_date(df):  # Aun no la probe pues deberia hice el format de la fecha 
 
     return df
 
-'''
+
 def convert_fecha_to_datetime(df):
 
     # Ordeno dataframe por fecha (de mas reciente a mas viejo)
@@ -35,16 +35,16 @@ def convert_fecha_to_datetime(df):
     # verify datatype
     print(type(df.fecha[0]))
     return df
-'''
 
 def main():
     # Levanto dataset
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/flashscore/liga_argentina_historico.xlsx')
+    print(df.head())
 
     # Formateo fecha
-    df = format_date(df)
+    # df = format_date(df)
 
     # Guardo el dataset
-    df.to_excel('./format_data/df_formated.xlsx')
+    df.to_excel('./df_formated.xlsx')
 
 main()
