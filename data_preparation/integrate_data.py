@@ -1,5 +1,3 @@
-import pandas as pd
-
 def derive_winning_team(df):
     """
     Crea columna 'equipo_ganador' donde se especifica el resultado de cada partido.
@@ -267,26 +265,3 @@ def derive_forma_ponderada(df, n_part):
 
 def n_dias_ult_partido(df):
     pass
-
-def main():
-    # Levanto el dataframe formateado
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/clean_data/df_clean.xlsx', index_col=0)
-
-    # Determino columna "equipo_ganador"
-    df = derive_winning_team(df)
-    print(df.head())
-
-    # Determino columna "historial_entre_si"
-    df = derive_historial_entre_si(df, n_part=5)
-    print(df.head())
-
-    # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
-    df = derive_dif_gol_last_matches(df, n_part=5)
-    print(df.head())
-
-    df = derive_forma_ponderada(df=df, n_part=5)
-    print(df.head())
-
-    df.to_excel('./df_derived_data.xlsx')
-
-main()

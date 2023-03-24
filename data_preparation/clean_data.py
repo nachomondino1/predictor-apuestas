@@ -1,5 +1,3 @@
-import pandas as pd
-
 def clean_teams(df):
     """
     Limpio string 'Vencedor' en el nombre de algunos equipos.
@@ -26,15 +24,3 @@ def clean_teams(df):
 
     print("Se encontraron {} equipos con la palabra 'Vencedor'".format(n_reemplazos))
     return df
-
-
-def main():
-    # Levanto el dataframe formateado
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/format_data/df_formated.xlsx', index_col=0)
-
-    # Quito string 'Vencedor' de equipos
-    df = clean_teams(df)
-    print(df)
-
-    df.to_excel('./df_clean.xlsx')
-main()
