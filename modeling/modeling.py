@@ -4,22 +4,25 @@ from sklearn.metrics import accuracy_score
 import pandas as pd
 import xgboost as xgb
 
+# Para red neuronal
 # import numpy as np
 # from keras.models import Sequential
 # from keras.layers import Dense, Activation, Embedding, Flatten, Dropout
 # from keras.utils import to_categorical
 # from sklearn.preprocessing import LabelEncoder
-#
-# from sklearn.naive_bayes import MultinomialNB
-# from sklearn.preprocessing import MinMaxScaler
-# from sklearn.preprocessing import OneHotEncoder
-# from sklearn.compose import ColumnTransformer
-# from sklearn.pipeline import Pipeline
 
+# Para Naive Bayes
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+from dspy.data_preparation import clean_data
 from dspy.modeling import naive_bayes, test_design
 
 
-def equipo_ganador(df):
+def equipo_ganador(df):  # Para red neuronal y xgboost
 
     for i in range(len(df)):
         str = df.loc[i, 'equipo_ganador']
@@ -28,19 +31,16 @@ def equipo_ganador(df):
     return df
 
 
-def red_neuronal(data):
+def red_neuronal(data):  # Tira error que desconozco, ni siquiera es muy googleable
 
     # Preprocesamiento de variables categóricas
-    cat_cols = ['equipo_loc', 'equipo_vis', 'cancha', 'arbitro', 'dt_loc', 'dt_vis']
+    cat_cols = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis']
     for col in cat_cols:
         le = LabelEncoder()
         data[col] = le.fit_transform(data[col])
 
     # Preprocesamiento de variables numéricas
-    num_cols = ['goles_anot_ult_part_vis', 'goles_recib_ult_part_vis', 'goles_anot_ult_part_loc', 'goles_recib_ult_part_loc',
-                'historial_entre_si', 'posesion_ult_part_loc', 'posesion_ult_part_vis', 'remates_ult_part_loc',
-                'remates_ult_part_vis', 'faltas_ult_part_loc', 'faltas_ult_part_vis', 'offsides_ult_part_loc', 'offsides_ult_part_vis', 'ataques_ult_part_loc',
-                'ataques_ult_part_vis', 'ataques_pelig_ult_part_loc', 'ataques_pelig_ult_part_vis']
+    num_cols = ['dif_gol','historial_entre_si', 'dif_posesion', 'dif_remates']
     data[num_cols] = (data[num_cols] - data[num_cols].mean()) / data[num_cols].std()
 
     # Creación de los conjuntos de entrenamiento y prueba
@@ -62,10 +62,11 @@ def red_neuronal(data):
     model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
     scores = model.evaluate(X_test, y_test, verbose=0)
     print("Accuracy: %.2f%%" % (scores[1] * 100))
+    return scores[1]
 
+def xgboost(df):  # Solo variables numericas y no funciona error "ValueError: Classification metrics can't handle a mix of unknown and multiclass targets"
 
-def xgboost(df):  # XGBoost
-
+    df = df.drop(['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis'], axis=1)  # No acepta categoricas
     X = df.drop('equipo_ganador', axis=1)
     y = df['equipo_ganador']
 
@@ -87,39 +88,52 @@ def xgboost(df):  # XGBoost
     accuracy = accuracy_score(y_test, y_pred)
 
     print("Accuracy: %.2f%%" % (accuracy * 100.0))
+    return accuracy
 
+def naive_bayes_lib(df):  # No puedo convertir las categoricas a numericas y encima tira error ValueError: could not convert string to float: 'Visitante' hasta cuando uso equipo_ganador()
 
-def naive_bayes(df):
+    df = df.drop(['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis'], axis=1)  # No acepta categoricas
+
+    X = df.drop('equipo_ganador', axis=1)
+    y = df['equipo_ganador']
+
+    # Se normalizan los datos
+    scaler = MinMaxScaler()
+    X = scaler.fit_transform(X)
 
     # Dividir los datos en conjuntos de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(df.drop('equipo_ganador', axis=1), df['equipo_ganador'], test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
+    ''' # No funciona
     # Seleccionar las variables predictoras categóricas y numéricas
-    cat_cols = ['equipo_loc', 'equipo_vis', 'cancha', 'arbitro', 'dt_loc', 'dt_vis']
-    num_cols = ['goles_anot_ult_part_vis', 'goles_recib_ult_part_vis', 'goles_anot_ult_part_loc', 'goles_recib_ult_part_loc',
-                'historial_entre_si', 'posesion_ult_part_loc', 'posesion_ult_part_vis', 'remates_ult_part_loc',
-                'remates_ult_part_vis', 'faltas_ult_part_loc', 'faltas_ult_part_vis', 'offsides_ult_part_loc', 'offsides_ult_part_vis', 'ataques_ult_part_loc',
-                'ataques_ult_part_vis', 'ataques_pelig_ult_part_loc', 'ataques_pelig_ult_part_vis']
+    cat_cols = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis']
 
     # Definir el transformador para la codificación one-hot
     ct = ColumnTransformer([
         ('onehot', OneHotEncoder(), cat_cols)],
         remainder='passthrough')
 
-    # Definir el modelo de Naive Bayes Multinomial
-    nb = MultinomialNB()
-
     # Combinar el transformador y el modelo en un pipeline
     pipe = Pipeline([
         ('transform', ct),
         ('nb', nb)
     ])
-
+    
     # Entrenar el modelo en los datos de entrenamiento
     pipe.fit(X_train, y_train)
+    print('Precisión:', pipe.score(X_test, y_test))
+    '''
+
+    # Definir el modelo de Naive Bayes Multinomial
+    model = MultinomialNB()
+    model.fit(X_train, y_train)
 
     # Evaluar la precisión del modelo en los datos de prueba
-    print('Precisión:', pipe.score(X_test, y_test))
+    y_pred = model.predict(y_test)
+    accuracy = accuracy_score(y_test, y_pred)
+
+    print("Accuracy: %.2f%%" % (accuracy * 100.0))
+    return accuracy
 
 
 # Pruebo funcion para implementar cambios tod@ junto
@@ -254,12 +268,19 @@ def naive_bayes_propio(df):
     return n_aciertos / len(df_result) * 100
 
 def main():
-    N_MODELOS = 100
+    N_MODELOS = 10
+
     # Levanto dataset
     df = pd.read_excel('/Users/nachomondino/Desktop/df_prepared.xlsx', index_col=0)
     print(df.head())
 
-    # df = equipo_ganador(df)
+    df = df.dropna(subset=['historial_entre_si']).reset_index()  # Elimina filas con al menos un valor nulo
+
+    df = df.drop(['dif_ataques'], axis=1)
+
+    # df = equipo_ganador(df)  # Para red neuronal y xgboost (para naive no)
+
+    # df = clean_data.balance_dataset(df, var_resp='equipo_ganador')
 
     l_aciertos = []
     # Por modelo
@@ -269,7 +290,10 @@ def main():
         df = df.sample(frac=1).reset_index(drop=True)
 
         # Entreno modelo y evaluo
-        precision = naive_bayes_propio(df)  # red_neuronal(df)
+        # precision = naive_bayes_propio(df)
+        # precision = red_neuronal(df)
+        # precision = xgboost(df)
+        precision = naive_bayes_lib(df)
 
         l_aciertos.append(precision)
 
