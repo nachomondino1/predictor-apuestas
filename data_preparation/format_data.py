@@ -61,13 +61,14 @@ def clean_teams(df):
     return df
 
 def main():
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/flashscore/liga_argentina_historico.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/liga_argentina_historico.xlsx')
 
     df = posesion_balon(df)
 
     df = format_column_date(df)  # Fundamental para poder ordenar el df por 'fecha'
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
+    # df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
 
-    df.to_excel('/Users/nachomondino/Desktop/df_formated_2.xlsx')
+    df = clean_teams(df)
+    df.to_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
 
 # main()
