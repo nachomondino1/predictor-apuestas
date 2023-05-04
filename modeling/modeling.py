@@ -1,12 +1,47 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 # from dspy.data_preparation import clean_data
 # from dspy.modeling import naive_bayes, test_design
 # from evaluation.evaluation import calculate_precision
 
+# Arbol de decision
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.preprocessing import LabelEncoder
 
 # Levanto dataset
-df = pd.read_excel('data_understanding/collect_data/liga_argentina_historico.xlsx', index_col=0)
+df = pd.read_excel('data_preparation/df_prepared.xlsx', index_col=0)
 print(df.head())
+
+# Divido en train y test
+X = df.drop('equipo_ganador', axis=1)
+y = df['equipo_ganador']
+
+# Codificamos las variables categoricas string en numericas
+labelencoder = LabelEncoder()
+for column in X.columns:
+    X[column] = labelencoder.fit_transform(X[column])
+
+# Dividimos datos
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Entrenamiento
+modelo = DecisionTreeClassifier(max_depth=3)
+modelo.fit(X_train, y_train)
+
+# Predicciones
+y_pred = modelo.predict(X_test)
+precision = accuracy_score(y_test, y_pred)
+matriz_confusion = confusion_matrix(y_test, y_pred)
+
+print("precision: ", precision)
+print(matriz_confusion)
+
+# Graficar el árbol
+fig, ax = plt.subplots(figsize=(10, 6))
+plot_tree(modelo, feature_names=X.columns, class_names=y.unique(), filled=True, ax=ax)
+plt.show()
 
 # Vamos a usar modelos de librerias independientes de la libreria que hizo Nacho
 def main():
@@ -15,7 +50,7 @@ def main():
     l_aciertos = []
 
     # Levanto dataset
-    df = pd.read_excel('data_understanding/collect_data/liga_argentina_historico.xlsx', index_col=0)
+    df = pd.read_excel('data_preparation/df_prepared.xlsx', index_col=0)
     print(df.head())
 
     # Balanceo dataset y elimino filas con historial=NaN
