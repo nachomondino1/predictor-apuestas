@@ -15,7 +15,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn import metrics
 
 # Levanto dataset
-df = pd.read_excel('data_preparation/df_prepared.xlsx', index_col=0)
+df = pd.read_excel('data_preparation/df_prepared.xlsx')
 df = df.dropna()  # Elimina filas con al menos un valor nulo
 print(df.head())
 
