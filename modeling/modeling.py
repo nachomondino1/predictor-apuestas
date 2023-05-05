@@ -67,10 +67,7 @@ for i in range(N_MODELOS):
     # Graficar el árbol
     # fig, ax = plt.subplots(figsize=(10, 6))
     # plot_tree(modelo, feature_names=X.columns, class_names=y.unique(), filled=True, ax=ax)
-    plt.show()
-    
-
-    
+    #plt.show()    
 print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
 
 
