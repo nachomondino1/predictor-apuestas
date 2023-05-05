@@ -14,6 +14,9 @@ import seaborn as sns
 from sklearn.model_selection import cross_val_score
 from sklearn import metrics
 
+# Random Forest
+from sklearn.ensemble import RandomForestClassifier
+
 # Levanto dataset
 df = pd.read_excel('data_preparation/df_prepared.xlsx')
 df = df.dropna()  # Elimina filas con al menos un valor nulo
@@ -36,14 +39,17 @@ for i in range(N_MODELOS):
     for column in cat_columns:
         X[column] = labelencoder.fit_transform(X[column])
     
-    print(X)
-    print(y)
-
     # Dividimos datos
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Entrenamiento
-    modelo = DecisionTreeClassifier(max_depth=6)
+    ###  Entrenamiento de modelos
+
+    # Arbol de decision
+    # modelo = DecisionTreeClassifier(max_depth=6)
+    # modelo.fit(X_train, y_train)
+
+    # Random Forest
+    modelo = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
     modelo.fit(X_train, y_train)
 
     # Predicciones
@@ -59,8 +65,8 @@ for i in range(N_MODELOS):
     print(matriz_confusion)
 
     # Graficar el árbol
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plot_tree(modelo, feature_names=X.columns, class_names=y.unique(), filled=True, ax=ax)
+    # fig, ax = plt.subplots(figsize=(10, 6))
+    # plot_tree(modelo, feature_names=X.columns, class_names=y.unique(), filled=True, ax=ax)
     plt.show()
     
 
