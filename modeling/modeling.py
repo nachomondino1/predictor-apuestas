@@ -22,34 +22,38 @@ df = pd.read_excel('data_preparation/df_prepared.xlsx')
 df = df.dropna()  # Elimina filas con al menos un valor nulo
 print(df.head())
 
+# Codificamos las variables categoricas string en numericas
+labelencoder = LabelEncoder()
+cat_columns = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis']
+for column in cat_columns:
+    df[column] = labelencoder.fit_transform(df[column])
+    
 N_MODELOS = 15
 l_aciertos = []
 
-for i in range(N_MODELOS):
-    # Shuffle dataset
-    df = df.sample(frac=1).reset_index(drop=True)
+# Definir el número de folds para la validación cruzada
+num_folds = 10
+# Dividir los datos en k folds
+folds = np.array_split(df, num_folds)
 
-    # Divido en train y test
-    X = df.drop('equipo_ganador', axis=1)
-    y = df['equipo_ganador']
+# Iterar sobre cada fold y entrenar el modelo
+for i in range(num_folds):
 
-    # Codificamos las variables categoricas string en numericas
-    labelencoder = LabelEncoder()
-    cat_columns = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis']
-    for column in cat_columns:
-        X[column] = labelencoder.fit_transform(X[column])
+    # Separar los datos de entrenamiento y prueba para el fold actual
+    test_data = folds[i]
+    train_data = pd.concat([f for j, f in enumerate(folds) if j != i])
+    X_train = train_data.drop("equipo_ganador", axis=1)
+    y_train = train_data["equipo_ganador"]
+    X_test = test_data.drop("equipo_ganador", axis=1)
+    y_test = test_data["equipo_ganador"]
     
-    # Dividimos datos
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    ###  Entrenamiento de modelos
-
+    ## Entrenar el modelo en los datos de entrenamiento del fold actual
     # Arbol de decision
     # modelo = DecisionTreeClassifier(max_depth=6)
     # modelo.fit(X_train, y_train)
 
     # Random Forest
-    modelo = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+    modelo = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
     modelo.fit(X_train, y_train)
 
     # Predicciones
@@ -63,6 +67,7 @@ for i in range(N_MODELOS):
 
     print("precision: ", precision)
     print(matriz_confusion)
+    print("Fold %d - Score: %.3f" % (i+1, modelo.score(X_test, y_test)))
 
     # Graficar el árbol
     # fig, ax = plt.subplots(figsize=(10, 6))
