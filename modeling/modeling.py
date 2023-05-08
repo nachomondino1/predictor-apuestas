@@ -19,8 +19,10 @@ from sklearn.ensemble import RandomForestClassifier
 
 # Levanto dataset
 df = pd.read_excel('data_preparation/df_prepared.xlsx')
+df.drop(['historial_entre_si'], axis = 1, inplace=True) # Elimino esta variable porque tiene muchos nans
 df = df.dropna()  # Elimina filas con al menos un valor nulo
 print(df.head())
+print(df.shape)
 
 # Codificamos las variables categoricas string en numericas
 labelencoder = LabelEncoder()
@@ -53,7 +55,7 @@ for i in range(num_folds):
     # modelo.fit(X_train, y_train)
 
     # Random Forest
-    modelo = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
+    modelo = RandomForestClassifier(n_estimators=100, random_state=42) # max_depth=30
     modelo.fit(X_train, y_train)
 
     # Predicciones
@@ -72,7 +74,7 @@ for i in range(num_folds):
     # Graficar el árbol
     # fig, ax = plt.subplots(figsize=(10, 6))
     # plot_tree(modelo, feature_names=X.columns, class_names=y.unique(), filled=True, ax=ax)
-    #plt.show()    
+    plt.show()    
 print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
 
 
