@@ -6,20 +6,16 @@ import matplotlib.pyplot as plt
 # Arbol de decision
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
+from sklearn.preprocessing import LabelEncoder, label_binarize
 import seaborn as sns
 from sklearn.model_selection import cross_val_score
 from sklearn import metrics
+from sklearn.multiclass import OneVsRestClassifier
+from itertools import cycle
 # Random Forest
 from sklearn.ensemble import RandomForestClassifier
-
-
-###### HIPERPARAMETROS #######
-num_folds = 10 # Cantidad de divisiones de validacion cruzada
-max_depth_tree = 6 # Profundidad del arbol
-number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
-
+import statistics as stat
 
 ###### FUNCIONES #######
 
@@ -35,19 +31,19 @@ def load_dataset_and_clean(path='data_preparation/df_prepared.xlsx'):
         df[column] = labelencoder.fit_transform(df[column])
     return df
 
-def train_and_test(num_folds, modelo, df, max_depth_tree, plot_tree = False, plot_conf_matrix = False):
-    l_aciertos = []
+def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False):
+    dict_metricas = {"accuracy":[], "precision":[] , "recall":[] , "f1":[]}
+    prom_metricas = {"accuracy":None, "precision":None , "recall":None , "f1":None}
+
     # Dividir los datos en k folds
     folds = np.array_split(df, num_folds)
-    # Iterar sobre cada fold y entrenar el modelo
+    # Validacion Cruzada: Iterar sobre cada fold y entrenar el modelo
     for i in range(num_folds):
         # Separar los datos de entrenamiento y prueba para el fold actual
         test_data = folds[i]
         train_data = pd.concat([f for j, f in enumerate(folds) if j != i])
-        X_train = train_data.drop("equipo_ganador", axis=1)
-        y_train = train_data["equipo_ganador"]
-        X_test = test_data.drop("equipo_ganador", axis=1)
-        y_test = test_data["equipo_ganador"]
+        X_train, y_train  = train_data.drop("equipo_ganador", axis=1), train_data["equipo_ganador"]
+        X_test, y_test = test_data.drop("equipo_ganador", axis=1), test_data["equipo_ganador"]
         
         # Entrenar el modelo en los datos de entrenamiento del fold actual
         if modelo == 'arbol':
@@ -62,24 +58,72 @@ def train_and_test(num_folds, modelo, df, max_depth_tree, plot_tree = False, plo
 
         # Predicciones
         y_pred = modelo.predict(X_test)
-        precision = accuracy_score(y_test, y_pred)
-        l_aciertos.append(precision)
+        y_pred_proba = modelo.predict_proba(X_test) # Devuelve 3 columnas, cada una posee la prob de una clase
+
+        # Métricas
+        dict_metricas["accuracy"].append(accuracy_score(y_test, y_pred))
+        dict_metricas["precision"].append(precision_score(y_test, y_pred, average='weighted'))
+        dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
+        dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
+        
         matriz_confusion = confusion_matrix(y_test, y_pred, labels=np.unique(y_pred))
         if plot_conf_matrix == 'True':
             cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
                                                         display_labels=["Local", "Empate", "Visitante"])
             cm_display.plot(cmap='Blues')
-
-        print("precision: ", precision)
         print(matriz_confusion)
         print("Fold %d - Score: %.3f" % (i+1, modelo.score(X_test, y_test)))
+
+        ## AUC y Curva ROC para cada clase 
+
+        # Binarizar las etiquetas de las clases
+        y_test_bin = label_binarize(y_test, classes=["Local", "Empate", "Visitante"])
+        n_classes = y_test_bin.shape[1]
+        # Calcular la curva ROC y el AUC para cada clase
+        fpr = {}
+        tpr = {}
+        roc_auc = {}
+        for i in range(n_classes):
+            fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_pred_proba[:, i])
+            roc_auc[i] = auc(fpr[i], tpr[i])
+
+        # Graficar la curva ROC para cada clase
+        plt.figure()
+        classes=["Local", "Empate", "Visitante"]
+        lw = 2
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
+        for i, color in zip(range(n_classes), colors):
+            plt.plot(fpr[i], tpr[i], color=color, lw=lw, 
+                    label=f'ROC curve (area = {roc_auc[i]:.2f}) for class {classes[i]}')
+        # Graficar la línea de referencia aleatoria
+        plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC)')
+        plt.legend(loc="lower right")
+
         plt.show()
-    print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
-    return max(l_aciertos), min(l_aciertos), sum(l_aciertos)/len(l_aciertos)
+
+    # print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
+    prom_metricas["accuracy"] = stat.mean(dict_metricas["accuracy"])
+    prom_metricas["precision"] = stat.mean(dict_metricas["precision"])
+    prom_metricas["recall"] = stat.mean(dict_metricas["recall"])
+    prom_metricas["f1"] = stat.mean(dict_metricas["f1"])
+    return prom_metricas
 
 ###### DATASET #######
 # Levanto dataset
 df = load_dataset_and_clean(path='data_preparation/df_prepared.xlsx')
 
+
+###### HIPERPARAMETROS #######
+num_folds = 10 # Cantidad de divisiones de validacion cruzada
+max_depth_tree = 6 # Profundidad del arbol
+number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
+
+
 ###### MODELOS #######
-train_and_test(10, 'arbol', df, max_depth_tree= 5, plot_tree = False, plot_conf_matrix = False)
+metricas = train_and_test(num_folds, 'arbol', df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False)
+print(metricas)
