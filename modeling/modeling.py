@@ -5,17 +5,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 # Arbol de decision
 from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
 from sklearn.preprocessing import LabelEncoder, label_binarize
 import seaborn as sns
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
 from itertools import cycle
 # Random Forest
 from sklearn.ensemble import RandomForestClassifier
 import statistics as stat
+
 
 ###### FUNCIONES #######
 
@@ -104,7 +104,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         plt.title('Receiver Operating Characteristic (ROC)')
         plt.legend(loc="lower right")
 
-        plt.show()
+       # plt.show()
 
     # print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
     prom_metricas["accuracy"] = stat.mean(dict_metricas["accuracy"])
@@ -113,17 +113,59 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
     prom_metricas["f1"] = stat.mean(dict_metricas["f1"])
     return prom_metricas
 
+def hiper_optimos(df, modelo='random_forest'):
+    X, y  = df.drop("equipo_ganador", axis=1), df["equipo_ganador"]
+    # Dividir datos en entrenamiento y prueba
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    # Definir modelo
+    if modelo == 'arbol':
+        model = DecisionTreeClassifier()
+        # Definir parámetros a probar
+        params = {'max_depth': [3, 4, 5, 6, 7, 8]}
+        
+    elif modelo == 'random_forest':
+        model = RandomForestClassifier() # max_depth=30
+        # Definir parámetros a probar
+        params = {'max_depth': [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 35],
+            'n_estimators': [50, 100,150, 200]}
+            
+    # Definir esquema de validación cruzada
+    cv = 5
+    # Realizar búsqueda de cuadrícula
+    grid_search = GridSearchCV(model, params, cv=cv)
+    grid_search.fit(X_train, y_train)
+
+    # Imprimir mejores parámetros y score
+    print("Best parameters: ", grid_search.best_params_)
+    print("Best cross-validation score: {:.2f}".format(grid_search.best_score_))
+
+    # Calcular precisión en conjunto de prueba
+    test_score = grid_search.score(X_test, y_test)
+    print("Test set score: {:.2f}".format(test_score))
+
+    results = grid_search.cv_results_
+    return results 
+
+
 ###### DATASET #######
 # Levanto dataset
 df = load_dataset_and_clean(path='data_preparation/df_prepared.xlsx')
 
-
 ###### HIPERPARAMETROS #######
 num_folds = 10 # Cantidad de divisiones de validacion cruzada
-max_depth_tree = 6 # Profundidad del arbol
+max_depth_tree = 7 # Profundidad del arbol
 number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
+
+# Eje x: K de validacion cruzada & Eje y: Precision
+
+# Eje x: Max profundidad & Eje y: Precision
+
+# Eje x: Cantidad de arboles & Eje y: Precision
 
 
 ###### MODELOS #######
-metricas = train_and_test(num_folds, 'arbol', df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False)
-print(metricas)
+metricas = train_and_test(num_folds, 'random_forest', df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False)
+print(metricas) # arbol
+
+results = hiper_optimos(df)
+print(results)
