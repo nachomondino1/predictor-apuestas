@@ -15,6 +15,7 @@ from itertools import cycle
 # Random Forest
 from sklearn.ensemble import RandomForestClassifier
 import statistics as stat
+from imblearn.over_sampling import RandomOverSampler
 
 
 ###### FUNCIONES #######
@@ -29,6 +30,7 @@ def load_dataset_and_clean(path='data_preparation/df_prepared.xlsx'):
     cat_columns = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis']
     for column in cat_columns:
         df[column] = labelencoder.fit_transform(df[column])
+    df = df.sample(frac=1, random_state=42) # Hacemos Shuffle
     return df
 
 def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False):
@@ -44,12 +46,17 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         train_data = pd.concat([f for j, f in enumerate(folds) if j != i])
         X_train, y_train  = train_data.drop("equipo_ganador", axis=1), train_data["equipo_ganador"]
         X_test, y_test = test_data.drop("equipo_ganador", axis=1), test_data["equipo_ganador"]
-        
+        print(y_test.value_counts())
+
+        # Probamos a balancear datos
+        oversampler = RandomOverSampler(random_state=42)
+        X_train, y_train = oversampler.fit_resample(X_train, y_train)
+
         # Entrenar el modelo en los datos de entrenamiento del fold actual
         if modelo == 'arbol':
             modelo = DecisionTreeClassifier(max_depth=max_depth_tree)
             modelo.fit(X_train, y_train)
-            if plot_tree == 'True': # Graficar el árbol
+            if plot_tree == True: # Graficar el árbol
                 fig, ax = plt.subplots(figsize=(10, 6))
                 plot_tree(modelo, feature_names=X.columns, class_names=y.unique(), filled=True, ax=ax)
         elif modelo == 'random_forest':
@@ -67,17 +74,18 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
         
         matriz_confusion = confusion_matrix(y_test, y_pred, labels=np.unique(y_pred))
-        if plot_conf_matrix == 'True':
+        if plot_conf_matrix == True:
             cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
-                                                        display_labels=["Local", "Empate", "Visitante"])
+                                                        display_labels=np.unique(y_pred))
             cm_display.plot(cmap='Blues')
+            plt.show()
         print(matriz_confusion)
         print("Fold %d - Score: %.3f" % (i+1, modelo.score(X_test, y_test)))
 
         ## AUC y Curva ROC para cada clase 
 
         # Binarizar las etiquetas de las clases
-        y_test_bin = label_binarize(y_test, classes=["Local", "Empate", "Visitante"])
+        y_test_bin = label_binarize(y_test, classes=np.unique(y_pred))
         n_classes = y_test_bin.shape[1]
         # Calcular la curva ROC y el AUC para cada clase
         fpr = {}
@@ -89,7 +97,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
 
         # Graficar la curva ROC para cada clase
         plt.figure()
-        classes=["Local", "Empate", "Visitante"]
+        classes=np.unique(y_pred)
         lw = 2
         colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
         for i, color in zip(range(n_classes), colors):
@@ -104,7 +112,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         plt.title('Receiver Operating Characteristic (ROC)')
         plt.legend(loc="lower right")
 
-       # plt.show()
+        # plt.show()
 
     # print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
     prom_metricas["accuracy"] = stat.mean(dict_metricas["accuracy"])
@@ -113,7 +121,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
     prom_metricas["f1"] = stat.mean(dict_metricas["f1"])
     return prom_metricas
 
-def hiper_optimos(df, modelo='random_forest'):
+def hiper_optimos(df, modelo='arbol'):
     X, y  = df.drop("equipo_ganador", axis=1), df["equipo_ganador"]
     # Dividir datos en entrenamiento y prueba
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
@@ -143,8 +151,8 @@ def hiper_optimos(df, modelo='random_forest'):
     test_score = grid_search.score(X_test, y_test)
     print("Test set score: {:.2f}".format(test_score))
 
-    results = grid_search.cv_results_
-    return results 
+    # results = grid_search.cv_results_
+    # return results 
 
 
 ###### DATASET #######
@@ -164,8 +172,8 @@ number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
 
 
 ###### MODELOS #######
-metricas = train_and_test(num_folds, 'random_forest', df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False)
-print(metricas) # arbol
+metricas = train_and_test(num_folds, 'random_forest', df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = True)
+print(metricas) #  arbol
 
-results = hiper_optimos(df)
-print(results)
+# hiper_optimos(df)
+
