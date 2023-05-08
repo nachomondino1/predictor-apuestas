@@ -65,6 +65,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
 
         # Predicciones
         y_pred = modelo.predict(X_test)
+        classes_names = np.unique(y_pred)
         y_pred_proba = modelo.predict_proba(X_test) # Devuelve 3 columnas, cada una posee la prob de una clase
 
         # Métricas
@@ -73,10 +74,10 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
         dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
         
-        matriz_confusion = confusion_matrix(y_test, y_pred, labels=np.unique(y_pred))
+        matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names)
         if plot_conf_matrix == True:
             cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
-                                                        display_labels=np.unique(y_pred))
+                                                        display_labels=classes_names)
             cm_display.plot(cmap='Blues')
             plt.show()
         print(matriz_confusion)
@@ -85,7 +86,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         ## AUC y Curva ROC para cada clase 
 
         # Binarizar las etiquetas de las clases
-        y_test_bin = label_binarize(y_test, classes=np.unique(y_pred))
+        y_test_bin = label_binarize(y_test, classes=classes_names)
         n_classes = y_test_bin.shape[1]
         # Calcular la curva ROC y el AUC para cada clase
         fpr = {}
