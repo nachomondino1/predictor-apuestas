@@ -69,10 +69,10 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
         elif modelo == 'xgboost': # Deberiamos hacer este mapeo con el resto de las variables categoricas
             le = LabelEncoder()
             y_train = le.fit_transform(y_train)
-            y_test = le.fit_transform(y_test)
             # y_train = label_binarize(y_train, classes=np.unique(y_train))
             # y_test = label_binarize(y_test, classes=np.unique(y_test))
             # Crear el modelo XGBoost
+            """
             params = {
                 'objective': 'multi:softmax',
                 'num_class': 3
@@ -84,9 +84,10 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
             y_pred_proba = modelo.predict(dtest, output_margin=True)
 
             classes_names = np.unique(y_pred)
-
-            # modelo =  xgb.XGBClassifier(objective='multi:softmax', num_classes=3)
-            # modelo.fit(X_train, y_train)
+            """
+            modelo =  xgb.XGBClassifier(objective='multi:softmax') # multi:softproba
+            modelo.fit(X_train, y_train)
+            """
             dict_metricas["accuracy"].append(accuracy_score(y_test, y_pred))
             dict_metricas["precision"].append(precision_score(y_test, y_pred, average='weighted'))
             dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
@@ -94,27 +95,30 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
 
             matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names)
             print(matriz_confusion)
+            """
 
         # Predicciones
-        # y_pred = modelo.predict(X_test)
+        y_pred = modelo.predict(X_test)
         classes_names = np.unique(y_pred)
-       #  y_pred_proba = modelo.predict_proba(X_test) # Devuelve 3 columnas, cada una posee la prob de una clase
+        # y_pred_proba = modelo.predict_proba(X_test) # Devuelve 3 columnas, cada una posee la prob de una clase
 
         # Métricas
-        # dict_metricas["accuracy"].append(accuracy_score(y_test, y_pred))
-        # dict_metricas["precision"].append(precision_score(y_test, y_pred, average='weighted'))
-        # dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
-        # dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
-
-        # matriz_confusion = multilabel_confusion_matrix(y_test, y_pred)
-        # matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names)
+        le = LabelEncoder()
+        y_test = le.fit_transform(y_test)
+        dict_metricas["accuracy"].append(accuracy_score(y_test, y_pred))
+        dict_metricas["precision"].append(precision_score(y_test, y_pred, average='weighted'))
+        dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
+        dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
+        
+        matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names)
         if plot_conf_matrix == True:
             cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
                                                         display_labels=classes_names)
             cm_display.plot(cmap='Blues')
             plt.show()
-        # print(matriz_confusion)
-        # print("Fold %d - Score: %.3f" % (i+1, modelo.score(X_test, y_test)))
+        print(matriz_confusion)
+        print("Fold %d - Score: %.3f" % (i+1, modelo.score(X_test, y_test)))
+
 
         ## AUC y Curva ROC para cada clase 
         """
@@ -154,6 +158,7 @@ def train_and_test(num_folds, modelo, df, max_depth_tree,number_tress_in_forest,
     prom_metricas["precision"] = stat.mean(dict_metricas["precision"])
     prom_metricas["recall"] = stat.mean(dict_metricas["recall"])
     prom_metricas["f1"] = stat.mean(dict_metricas["f1"])
+
     return prom_metricas
 
 def hiper_optimos(df, modelo='arbol'):
@@ -207,7 +212,7 @@ number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
 
 
 ###### MODELOS #######
-metricas = train_and_test(num_folds, 'xgboost', df, max_depth_tree, number_tress_in_forest, plot_tree = False, plot_conf_matrix = False)
+metricas = train_and_test(num_folds, 'xgboost', df, max_depth_tree, number_tress_in_forest, plot_tree = False, plot_conf_matrix = True)
 print(metricas) #  arbol xgboost random_forest
 
 # hiper_optimos(df)
