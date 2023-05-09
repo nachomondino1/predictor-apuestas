@@ -1,8 +1,8 @@
-###### LIBRERIAS #######
 # Generales
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.utils import shuffle
 # Arbol de decision
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.metrics import confusion_matrix, multilabel_confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
@@ -20,23 +20,27 @@ from imblearn.over_sampling import RandomOverSampler
 import xgboost as xgb
 
 
-###### FUNCIONES #######
-
 def load_dataset_and_clean(path='data_preparation/df_prepared.xlsx'):
     """
-    Levantamos el dataset, eliminamos nans y hacemos encoder en variables categoricas
+    Levantamos el dataset, eliminamos los nan y aplicamos un encoder a las variables categoricas
     """
+    # Abrimos dataset
     df = pd.read_excel(path)
     df.drop(['historial_entre_si'], axis = 1, inplace=True) # Elimino esta variable porque tiene muchos nans
     df = df.dropna()  # Elimina filas con al menos un valor nulo
-    labelencoder = LabelEncoder() # Codificamos las variables categoricas string en numericas
+    # Codificamos las variables categoricas de string a numericas
+    labelencoder = LabelEncoder() 
     cat_columns = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis']
     for column in cat_columns:
         df[column] = labelencoder.fit_transform(df[column])
-    df = df.sample(frac=1, random_state=42) # Hacemos Shuffle
+    # Hacemos Shuffle
+    df = shuffle(df) 
     return df
 
-def arbol_decision(X_train, y_train, plot_tree_bool='False'):
+def arbol_decision(X_train, y_train, max_depth_tree, plot_tree_bool='False'):
+    """
+    Entrenar un arbol de decisión
+    """
     modelo = DecisionTreeClassifier(max_depth=max_depth_tree)
     modelo.fit(X_train, y_train)
     if plot_tree_bool == True: # Graficar el árbol
@@ -45,29 +49,93 @@ def arbol_decision(X_train, y_train, plot_tree_bool='False'):
     return modelo
 
 
-def random_forest(X_train, y_train,number_tress_in_forest, max_depth_tree):
+def random_forest(X_train, y_train, number_tress_in_forest, max_depth_tree):
+    """
+    Entrenar random forest
+    """
     modelo = RandomForestClassifier(n_estimators=number_tress_in_forest, random_state=42, max_depth = max_depth_tree) # max_depth=30
     modelo.fit(X_train, y_train)
     return modelo
 
 def xgboost(X_train, y_train):
-    le = LabelEncoder() # Aplicamos encoder a y_train
+    """
+    Entrenar XGBoost
+    """
+    # Aplicamos encoder a y_train. Pasamos de tener strings [empate, local, visitante] a por ej: [0,1,2]
+    le = LabelEncoder() 
     y_train = le.fit_transform(y_train)
 
     modelo =  xgb.XGBClassifier(objective='multi:softmax') # multi:softproba
     modelo.fit(X_train, y_train)
     return modelo
 
-def predicciones_metricas():
-    pass
+def predicciones_metricas(modelo, X_test, y_test, i_cross_val, plot_conf_matrix='False'):
+    
+    y_pred = modelo.predict(X_test)
+    classes_names = np.unique(y_pred)
+
+    # Calculo métricas
+    dict_metricas = {"accuracy":[], "precision":[] , "recall":[] , "f1":[]}
+
+    le = LabelEncoder()
+    y_test = le.fit_transform(y_test)
+
+    dict_metricas["accuracy"].append(accuracy_score(y_test, y_pred))
+    dict_metricas["precision"].append(precision_score(y_test, y_pred, average='weighted'))
+    dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
+    dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
+    matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names)
+
+    # Graficamos la matriz de confusión
+    if plot_conf_matrix == True: 
+        cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
+                                                    display_labels=classes_names)
+        cm_display.plot(cmap='Blues')
+        plt.show()
+    print(matriz_confusion)
+    print("Fold %d - Score: %.3f" % (i_cross_val+1, modelo.score(X_test, y_test)))
+
+    return dict_metricas
+
 
 def curva_roc():
+    # y_pred_proba = modelo.predict_proba(X_test) # Devuelve 3 columnas, cada una posee la prob de una clase
+            ### CURVA ROC ###  
+    """
+    # Binarizar las etiquetas de las clases
+    y_test_bin = label_binarize(y_test, classes=classes_names)
+    n_classes = y_test_bin.shape[1]
+    # Calcular la curva ROC y el AUC para cada clase
+    fpr = {}
+    tpr = {}
+    roc_auc = {}
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_pred_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Graficar la curva ROC para cada clase
+    plt.figure()
+    classes=np.unique(y_pred)
+    lw = 2
+    colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(fpr[i], tpr[i], color=color, lw=lw, 
+                label=f'ROC curve (area = {roc_auc[i]:.2f}) for class {classes[i]}')
+    # Graficar la línea de referencia aleatoria
+    plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC)')
+    plt.legend(loc="lower right")
+
+    # plt.show()
+    """
     pass
 
 def train_and_test(num_folds, model_to_train, df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False):
-    dict_metricas = {"accuracy":[], "precision":[] , "recall":[] , "f1":[]}
     prom_metricas = {"accuracy":None, "precision":None , "recall":None , "f1":None}
-
     folds = np.array_split(df, num_folds) # Dividir los datos en k folds
 
     ### VALIDACION CRUZADA ### Iterar sobre cada fold y entrenar el modelo
@@ -94,61 +162,7 @@ def train_and_test(num_folds, model_to_train, df, max_depth_tree,number_tress_in
         elif model_to_train == 'xgboost': # Deberiamos hacer este mapeo con el resto de las variables categoricas
             modelo = xgboost(X_train, y_train)
 
-        ### PREDICCIONES ### 
-        y_pred = modelo.predict(X_test)
-        classes_names = np.unique(y_pred)
-        # y_pred_proba = modelo.predict_proba(X_test) # Devuelve 3 columnas, cada una posee la prob de una clase
-
-        ### METRICAS ### 
-        le = LabelEncoder()
-        y_test = le.fit_transform(y_test)
-        dict_metricas["accuracy"].append(accuracy_score(y_test, y_pred))
-        dict_metricas["precision"].append(precision_score(y_test, y_pred, average='weighted'))
-        dict_metricas["recall"].append(recall_score(y_test, y_pred, average='weighted'))
-        dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
-        
-        matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names)
-        if plot_conf_matrix == True:
-            cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
-                                                        display_labels=classes_names)
-            cm_display.plot(cmap='Blues')
-            plt.show()
-        print(matriz_confusion)
-        print("Fold %d - Score: %.3f" % (i+1, modelo.score(X_test, y_test)))
-
-
-        ### CURVA ROC ###  
-        """
-        # Binarizar las etiquetas de las clases
-        y_test_bin = label_binarize(y_test, classes=classes_names)
-        n_classes = y_test_bin.shape[1]
-        # Calcular la curva ROC y el AUC para cada clase
-        fpr = {}
-        tpr = {}
-        roc_auc = {}
-        for i in range(n_classes):
-            fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_pred_proba[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-
-        # Graficar la curva ROC para cada clase
-        plt.figure()
-        classes=np.unique(y_pred)
-        lw = 2
-        colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
-        for i, color in zip(range(n_classes), colors):
-            plt.plot(fpr[i], tpr[i], color=color, lw=lw, 
-                    label=f'ROC curve (area = {roc_auc[i]:.2f}) for class {classes[i]}')
-        # Graficar la línea de referencia aleatoria
-        plt.plot([0, 1], [0, 1], 'k--', lw=lw)
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver Operating Characteristic (ROC)')
-        plt.legend(loc="lower right")
-
-        # plt.show()
-        """
+        dict_metricas = predicciones_metricas(modelo, X_test, y_test, i, plot_conf_matrix='False')
 
     # print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
     prom_metricas["accuracy"] = stat.mean(dict_metricas["accuracy"])
