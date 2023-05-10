@@ -28,46 +28,23 @@ def load_dataset_and_clean(path='data_preparation/df_prepared.xlsx'):
     # Abrimos dataset
     df = pd.read_excel(path)
     df.drop(['historial_entre_si'], axis = 1, inplace=True) # Elimino esta variable porque tiene muchos nans
-    df = df.dropna()  # Elimina filas con al menos un valor nulo
+    df = df.dropna() 
     # Codificamos las variables categoricas de string a numericas
     labelencoder = LabelEncoder() 
     cat_columns = ['equipo_loc', 'equipo_vis', 'arbitro', 'dt_loc', 'dt_vis', 'equipo_ganador']
     for column in cat_columns:
         df[column] = labelencoder.fit_transform(df[column])
     classes_names = labelencoder.classes_
-    # Hacemos Shuffle
-    df = shuffle(df) 
+    # Balanceamos segun variable respuesta
+    X, y  = df.drop("equipo_ganador", axis=1), df["equipo_ganador"]
+    # undersampler = RandomUnderSampler(random_state=42)
+    oversampler = RandomOverSampler(random_state=42)
+    X_train_bal, y_train_bal = oversampler.fit_resample(X, y)
+    df_result = pd.concat([X_train_bal, y_train_bal], axis=1)
     print("Abrimos el dataset...")
-    return df, classes_names
-
-def arbol_decision(X_train, y_train, max_depth_tree, plot_tree_bool='False'):
-    """
-    Entrenar un arbol de decisión
-    """
-    modelo = DecisionTreeClassifier(max_depth=max_depth_tree)
-    modelo.fit(X_train, y_train)
-    if plot_tree_bool == True: # Graficar el árbol
-        fig, ax = plt.subplots(figsize=(10, 6))
-        plot_tree(modelo, feature_names=X_train.columns, class_names=y_train.unique(), filled=True, ax=ax)
-    return modelo
-
-
-def random_forest(X_train, y_train, number_tress_in_forest, max_depth_tree):
-    """
-    Entrenar random forest
-    """
-    modelo = RandomForestClassifier(n_estimators=number_tress_in_forest, random_state=42, max_depth = max_depth_tree) # max_depth=30
-    modelo.fit(X_train, y_train)
-    return modelo
-
-def xgboost(X_train, y_train):
-    """
-    Entrenar XGBoost
-    """
-    # Aplicamos encoder a y_train. Pasamos de tener strings [empate, local, visitante] a por ej: [0,1,2]
-    modelo =  xgb.XGBClassifier(objective='multi:softmax') # multi:softproba
-    modelo.fit(X_train, y_train)
-    return modelo
+    # Hacemos Shuffle
+    df_result = shuffle(df_result)
+    return df_result, classes_names
 
 def predicciones_metricas(modelo, X_test, y_test, i_cross_val, plot_conf_matrix='False'):
     """
@@ -85,10 +62,10 @@ def predicciones_metricas(modelo, X_test, y_test, i_cross_val, plot_conf_matrix=
     dict_metricas["f1"].append(f1_score(y_test, y_pred, average='weighted'))
 
     # Graficamos la matriz de confusión
-    matriz_confusion = confusion_matrix(y_test, y_pred, labels=np.unique(y_pred)) # print(y_test.dtype)
+    matriz_confusion = confusion_matrix(y_test, y_pred, labels=classes_names) # print(y_test.dtype)
     if plot_conf_matrix == True: 
         cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=matriz_confusion,
-                                                    display_labels=np.unique(y_pred))
+                                                    display_labels=classes_names)
         cm_display.plot(cmap='Blues')
         plt.show()
     print(matriz_confusion)
@@ -133,7 +110,7 @@ def curva_roc():
     """
     pass
 
-def train_and_test(num_folds, model_to_train, df, max_depth_tree,number_tress_in_forest, plot_tree = False, plot_conf_matrix = False):
+def train_and_test(num_folds, model_to_train, df, max_depth_tree,number_tress_in_forest, plot_tree_bool = False, plot_conf_matrix = False):
 
     """
     Entrenamiento de los modelos usando validacion cruzada y promediando los valores de las metricas
@@ -152,29 +129,36 @@ def train_and_test(num_folds, model_to_train, df, max_depth_tree,number_tress_in
         X_test, y_test = test_data.drop("equipo_ganador", axis=1), test_data["equipo_ganador"]
         
         # Balancear datos
-        oversampler = RandomOverSampler(random_state=42)
-        X_train_bal, y_train_bal = oversampler.fit_resample(X_train, y_train)
+        # oversampler = RandomOverSampler(random_state=42)
+        # X_train_bal, y_train_bal = oversampler.fit_resample(X_train, y_train)
 
         # Balancear los datos
         # undersampler = RandomUnderSampler(random_state=42)
         # X_train_bal, y_train_bal = undersampler.fit_resample(X_train, y_train)
 
-        # X_train_bal, y_train_bal = X_train, y_train
+        X_train_bal, y_train_bal = X_train, y_train
 
         print(y_train_bal.value_counts())
         
         ### ENTRENAMIENTO ### Entrenamos modelo con fold actual
         if model_to_train == 'arbol':
-           modelo = arbol_decision(X_train_bal, y_train_bal, max_depth_tree, plot_tree_bool='False')
+            modelo = DecisionTreeClassifier(max_depth=max_depth_tree)
+            modelo.fit(X_train_bal, y_train_bal)
+            if plot_tree_bool == True: # Graficar el árbol
+                fig, ax = plt.subplots(figsize=(10, 6))
+                plot_tree(modelo, feature_names=X_train_bal.columns, class_names=y_train_bal.unique(), filled=True, ax=ax)
+                plt.show()
 
         elif model_to_train == 'random_forest':
-            modelo = random_forest(X_train_bal, y_train_bal, number_tress_in_forest, max_depth_tree)
+            modelo = RandomForestClassifier(n_estimators=number_tress_in_forest, random_state=42, max_depth = max_depth_tree) # max_depth=30
+            modelo.fit(X_train_bal, y_train_bal)
 
         elif model_to_train == 'xgboost': # Deberiamos hacer este mapeo con el resto de las variables categoricas
-            modelo = xgboost(X_train_bal, y_train_bal)
+            modelo =  xgb.XGBClassifier(objective='multi:softmax', num_class=3) # multi:softproba
+            modelo.fit(X_train_bal, y_train_bal)
 
         print("Modelo entrenado!")
-        dict_metricas = predicciones_metricas(modelo, X_test, y_test, i, plot_conf_matrix='False')
+        dict_metricas = predicciones_metricas(modelo, X_test, y_test, i, plot_conf_matrix)
 
     # print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos)/len(l_aciertos)}")
     prom_metricas["accuracy"] = stat.mean(dict_metricas["accuracy"])
@@ -204,8 +188,8 @@ def hiper_optimos(df, modelo_a_entrenar='arbol'):
         model =  xgb.XGBClassifier(objective='multi:softmax') # multi:softproba
         # Definir parámetros a probar
         params = {'max_depth': [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 35],
-            'n_estimators': [50, 100, 150, 200]}
-            
+            'n_estimators': [50, 100, 150, 200, 250]}
+        
     # Definir esquema de validación cruzada
     cv = 5
     # Realizar búsqueda de cuadrícula
@@ -230,8 +214,8 @@ df, classes_names = load_dataset_and_clean(path='data_preparation/df_prepared.xl
 
 ###### HIPERPARAMETROS #######
 num_folds = 10 # Cantidad de divisiones de validacion cruzada
-max_depth_tree = 3 # Profundidad del arbol
-number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
+max_depth_tree = 25 # Profundidad del arbol
+number_tress_in_forest = 50 # Cantidad de arboles en el bosque de Random Forest
 
 # Eje x: K de validacion cruzada & Eje y: Precision
 
@@ -240,7 +224,7 @@ number_tress_in_forest = 100 # Cantidad de arboles en el bosque de Random Forest
 # Eje x: Cantidad de arboles & Eje y: Precision
 
 ###### MODELOS #######
-metricas = train_and_test(num_folds, 'xgboost', df, max_depth_tree, number_tress_in_forest, plot_tree = False, plot_conf_matrix = True)
+metricas = train_and_test(num_folds, 'xgboost', df, max_depth_tree, number_tress_in_forest, plot_tree_bool = False, plot_conf_matrix = True)
 print(metricas) #  arbol xgboost random_forest
 
 # hiper_optimos(df, modelo_a_entrenar="xgboost")
