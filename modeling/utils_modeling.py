@@ -206,3 +206,12 @@ def hiper_optimos(df, modelo_a_entrenar='arbol'):
 
     # results = grid_search.cv_results_
     # return results 
+
+
+# Agregar graficos:
+
+# Eje x: K de validacion cruzada & Eje y: Precision
+
+# Eje x: Max profundidad & Eje y: Precision
+
+# Eje x: Cantidad de arboles & Eje y: Precision
