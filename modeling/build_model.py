@@ -1,22 +1,43 @@
-def xgboost():
-    pass
+class Modelado:
+    
+    def __init__(self):
+        pass
 
-def logistic_regression():
-    pass
+    def procesar_datos(self):
+        pass
 
-def arbol_decision():
-    pass
+    def cross_validation(self):
+        pass
 
-def random_forest():
-    pass
+    def arbol_decision(self):
+        pass
 
-def svm():
-    pass
+    def random_forest(self):
+        pass
+    
+    def xgboost(self):
+        pass
 
-def neural_network():
-    pass
+    def regresion_logistica(self):
+        pass
+
+    def svm(self):
+        pass
+
+    def red_neuronal(self):
+        pass
+
+    def seleccionar_mejor_modelo(self):
+        pass
+
+    def graficar_matriz_confusion(self, model):
+        pass
+
+    def graficar_curva_roc(self):
+        pass
+
 
 def main():
     pass
 
-# main()
+main()
