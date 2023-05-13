@@ -10,7 +10,7 @@ max_depth_tree = 25 # Profundidad del arbol
 number_tress_in_forest = 50 # Cantidad de arboles en el bosque de Random Forest
 
 ###### MODELOS #######
-metricas = train_and_test(num_folds, 'xgboost', df, max_depth_tree, number_tress_in_forest, plot_tree_bool = False, plot_conf_matrix = True)
+metricas = train_and_test(num_folds, 'arbol', df, max_depth_tree, number_tress_in_forest, plot_tree_bool = False, plot_conf_matrix = True)
 print(metricas) #  arbol xgboost random_forest
 
 ###### ANALIZAR HIPERPARAMETROS OPTIMOS #######
