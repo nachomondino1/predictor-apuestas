@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.ensemble import RandomForestClassifier
 
 class Modelado:
     
@@ -64,8 +65,33 @@ class Modelado:
 
         return dt
 
-    def random_forest(self):
-        pass
+    def random_forest(self, num_folds_cv, number_tress_in_forest, max_depth_tree):
+        rf = RandomForestClassifier(n_estimators=number_tress_in_forest, random_state=42, max_depth = max_depth_tree) # max_depth=30
+        rf.fit(self.X_train_bal, self.y_train_bal)
+
+        # Realizar Cross Validation
+        cv_score = self.cross_validation(rf)
+
+        # Calcular precisión en datos de prueba
+        # test_score = cross_val_score(dt, self.X_train_bal, self.y_train_bal, cv=num_folds_cv, scoring=['accuracy', 'precision'])
+        # Especificar las métricas que se desean calcular
+        scoring = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro']
+
+        # Realizar validación cruzada y obtener los resultados
+        cv_results = cross_validate(rf, self.X_train_bal, self.y_train_bal, cv=num_folds_cv, scoring=scoring)
+
+        print(cv_results)
+
+        # Imprimir los resultados promedio de cada métrica
+        print("Accuracy: {:.3f}".format(cv_results['test_accuracy'].mean()))
+        print("Precision: {:.3f}".format(cv_results['test_precision_macro'].mean()))
+        print("Recall: {:.3f}".format(cv_results['test_recall_macro'].mean()))
+        print("F1 score: {:.3f}".format(cv_results['test_f1_macro'].mean()))
+
+        # Imprimir resultados
+        print("\nModelo de Random Forest")
+        print("Cross Validation Score:", cv_score)
+        # print("Test Score:", test_score.mean())
     
     def xgboost(self):
         pass
@@ -98,5 +124,6 @@ def main():
     modeler.procesar_datos()
 
     modeler.arbol_decision(max_depth_tree=25, num_folds_cv=10)
+    modeler.random_forest(num_folds_cv=10, number_tress_in_forest=100, max_depth_tree=25)
 
 main()
