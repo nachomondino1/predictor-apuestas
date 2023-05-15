@@ -46,7 +46,7 @@ class Modelado:
         scores = cross_val_score(model, self.X_bal, self.y_bal, cv=10)
         return scores.mean()
 
-    def calcular_metricas(self, model, n_folds_cv: int = 10) -> None:
+    def calcular_metricas(self, model, n_folds_cv: int = 10, select_best_by: str = 'accuracy') -> None:
         '''
         Calcula métricas de evaluación
         ''' 
@@ -54,7 +54,7 @@ class Modelado:
         scoring = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro']
 
         # Realizar validación cruzada y obtener los resultados
-        cv_results = cross_validate(model, self.X_bal, self.y_bal, cv=n_folds_cv, scoring=scoring)
+        cv_results = cross_validate(model, self.X_bal, self.y_bal, cv=n_folds_cv, scoring=scoring, return_train_score=True, return_estimator=True)
         cv_score = self.cross_validation(model)
 
         # Imprimir los resultados promedio de cada métrica
@@ -64,16 +64,26 @@ class Modelado:
         print("Recall: {:.3f}".format(cv_results['test_recall_macro'].mean()))
         print("F1 score: {:.3f}".format(cv_results['test_f1_macro'].mean()))
 
-        # Calcular la matriz de confusión
+        # Elegir el mejor modelo y calcular la matriz de confusión
         y_pred = cross_val_predict(model, self.X_bal, self.y_bal, cv=n_folds_cv)
         conf_mat = confusion_matrix(self.y_bal, y_pred)
         print("y_pred.shape ", y_pred.shape)
         print(conf_mat)
-        
         cm_display = ConfusionMatrixDisplay(confusion_matrix=conf_mat)
         cm_display.plot(cmap='Blues')
         plt.show()
 
+        # Otra manera:
+        # Obtenemos el mejor modelo según el puntaje en validación cruzada
+        best_model_idx = cv_results['test_precision_macro'].argmax()
+        best_model = cv_results['estimator'][best_model_idx]
+        y_pred = cross_val_predict(best_model,self.X_bal, self.y_bal, cv=5)
+        # Calculamos la matriz de confusión utilizando los datos de prueba
+        conf_mat = confusion_matrix(self.y_bal, y_pred)
+        print(conf_mat)
+        cm_display = ConfusionMatrixDisplay(confusion_matrix=conf_mat)
+        cm_display.plot(cmap='Blues')
+        plt.show()
 
     def arbol_decision(self, max_depth_tree: Optional[int] = None, n_folds_cv: Optional[int] = None) -> DecisionTreeClassifier: # Si args son None --> Poner grid
         '''
