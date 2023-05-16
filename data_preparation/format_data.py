@@ -1,74 +1,52 @@
 import pandas as pd
-import datetime
+import numpy as np
 
-def posesion_balon(df):
+def remove_percent_sign(df):
     """
     Transformo posesion de string a float
     :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
     ejemplo '65%'.
     :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
     """
-    l_variables = ['posesion_loc', 'posesion_vis']
-
-    # Por fila (partido)
-    for idx in df.index:
-
-        # Por variable de posesion
-        for variable in l_variables:
-
-            # Obtengo posesion
-            pos_balon = df.loc[idx, variable]
-
-            # Si es un string (evito nan que son float)
-            if isinstance(pos_balon, str):
-                # Reemplazo "%", convierto a entero y guardo el nuevo valor
-                df.loc[idx, variable] = int(pos_balon.replace("%", ""))
+    df['posesion_loc'] = df['posesion_loc'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
+    df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     return df
 
-def format_column_date(df):
+def transform_date_column(df):
     """
     Transformo fecha de string a datetime
     :param df: Dataframe. Con columna 'fecha' interpretada como string
     :return: Dataframe. Con columna 'fecha' interpretada como datetime
     """
-    # Por registro
-    for i in range(len(df)):
-
-        fecha_str = df.loc[i, 'fecha']
-        fecha_form = datetime.datetime.strptime(fecha_str, '%d.%m.%Y %H:%M').date()
-
-        df.loc[i, 'fecha'] = fecha_form
+    df['fecha'] = pd.to_datetime(df['fecha'], format='%d.%m.%Y %H:%M')
     return df
 
-def clean_teams(df):
+def remove_strings_from_teams(df):
     """
     Limpio string 'Vencedor' en el nombre de algunos equipos.
-    :param df:
-    :return:
+    :param df: Dataframe. Con columnas "equipo_loc" y "equipo_vis"
+    :return: Dataframe pasado por parametro sin strings "Vencedor" y "Equipo que avanza" en las columnas "equipo_loc"
+    y "equipo_vis".
     """
-    # Definicion de variables
-    l_variables = ['equipo_loc', 'equipo_vis']
-
-    # Por partido
-    for i in range(len(df)):
-
-        # Por variable de equipo
-        for variable in l_variables:
-
-            # Remuevo 'vencedor' o 'equipo que avanza' del nombre del equipo
-            str_equipo = df.loc[i, variable].replace('Vencedor', '').replace('Equipo que avanza','')
-            df.loc[i, variable] = str_equipo
+    df['equipo_loc'] = df['equipo_loc'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
+    df['equipo_vis'] = df['equipo_vis'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
     return df
 
+
 def main():
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/liga_argentina_historico.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/argentina/argentina.xlsx')
 
-    df = posesion_balon(df)
+    # Convierto posesion de string a integer
+    df = remove_percent_sign(df)
 
-    df = format_column_date(df)  # Fundamental para poder ordenar el df por 'fecha'
-    # df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
+    # Convierto fecha de string a datetime
+    df = transform_date_column(df)  # Fundamental para poder ordenar el df por 'fecha'
 
-    df = clean_teams(df)
+    # Remuevo strings adicionales en los nombres de los equipos
+    df = remove_strings_from_teams(df)
+
+    # Ordeno por campo 'fecha'
+    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
     df.to_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
 
 # main()
