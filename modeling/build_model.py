@@ -15,7 +15,7 @@ from itertools import cycle
 # Regresion Logistica
 from sklearn.linear_model import LogisticRegression
 import warnings
-
+import plotly.graph_objects as go
 
 
 class Modelado:
@@ -145,6 +145,32 @@ class Modelado:
 
         dt.fit(self.X_bal, self.y_bal)
         self.calcular_metricas(dt, n_folds_cv)
+
+        # Datos de ejemplo
+        features = self.X_bal.columns
+        feature_importances = dt.feature_importances_
+
+        # Crear figura
+        fig = go.Figure()
+
+        # Agregar barras al gráfico
+        fig.add_trace(go.Bar(
+            x=feature_importances,
+            y=features,
+            orientation='h'
+        ))
+
+        # Configurar el diseño del gráfico
+        fig.update_layout(
+            title='Importancia de las características',
+            xaxis_title='Importancia',
+            yaxis_title='Características',
+            yaxis=dict(autorange="reversed")  # Invertir el orden de las características
+        )
+
+        # Mostrar el gráfico
+        fig.show()
+
         return dt
 
     def random_forest(self, n_folds_cv: Optional[int] = None, n_tress_in_forest: Optional[int] = None, max_depth_tree: Optional[int] = None) -> RandomForestClassifier:
@@ -261,17 +287,17 @@ def main():
     modeler = Modelado(df, 'equipo_ganador')
     modeler.procesar_datos()
 
-    """
     modeler.arbol_decision() # max_depth_tree=25, n_folds_cv=10
 
+    """
     modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25) 
    
     modeler.xgboost(n_folds_cv=10, n_tress_in_forest=50, max_depth_tree=15)
-    """
+
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
     modeler.regresion_logistica(n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500) # n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500 
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
-    
+    """
 main()
