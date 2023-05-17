@@ -127,6 +127,30 @@ class Modelado:
         self.graficar_curva_roc()
         plt.show()
 
+    def graficar_importancia_atrib(self, model):
+        features = self.X_bal.columns
+        feature_importances = model.feature_importances_
+
+        # Crear figura
+        fig = go.Figure()
+
+        # Agregar barras al gráfico
+        fig.add_trace(go.Bar(
+            x=feature_importances,
+            y=features,
+            orientation='h'
+        ))
+
+        # Configurar el diseño del gráfico
+        fig.update_layout(
+            title='Importancia de las características',
+            xaxis_title='Importancia',
+            yaxis_title='Características',
+            yaxis=dict(autorange="reversed")  # Invertir el orden de las características
+        )
+
+        # Mostrar el gráfico
+        fig.show()
 
     def arbol_decision(self, max_depth_tree: Optional[int] = None, n_folds_cv: Optional[int] = None, plot_feature_importance: Optional[bool] = False) -> DecisionTreeClassifier: # Si args son None --> Poner grid
         '''
@@ -147,35 +171,11 @@ class Modelado:
         self.calcular_metricas(dt, n_folds_cv)
         
         if plot_feature_importance == True:
-
-            # Datos de ejemplo
-            features = self.X_bal.columns
-            feature_importances = dt.feature_importances_
-
-            # Crear figura
-            fig = go.Figure()
-
-            # Agregar barras al gráfico
-            fig.add_trace(go.Bar(
-                x=feature_importances,
-                y=features,
-                orientation='h'
-            ))
-
-            # Configurar el diseño del gráfico
-            fig.update_layout(
-                title='Importancia de las características',
-                xaxis_title='Importancia',
-                yaxis_title='Características',
-                yaxis=dict(autorange="reversed")  # Invertir el orden de las características
-            )
-
-            # Mostrar el gráfico
-            fig.show()
+            self.graficar_importancia_atrib(dt)
 
         return dt
 
-    def random_forest(self, n_folds_cv: Optional[int] = None, n_tress_in_forest: Optional[int] = None, max_depth_tree: Optional[int] = None) -> RandomForestClassifier:
+    def random_forest(self, n_folds_cv: Optional[int] = None, n_tress_in_forest: Optional[int] = None, max_depth_tree: Optional[int] = None, plot_feature_importance: Optional[bool] = False) -> RandomForestClassifier:
         '''
         Entrena Random Forest
         ''' 
@@ -199,6 +199,10 @@ class Modelado:
         
         rf.fit(self.X_bal, self.y_bal)        
         self.calcular_metricas(rf, n_folds_cv)
+        
+        if plot_feature_importance == True:
+            self.graficar_importancia_atrib(rf)
+
         return rf
 
     def xgboost(self, n_folds_cv: Optional[int] = None, n_tress_in_forest: Optional[int] = None, max_depth_tree: Optional[int] = None) -> xgb.sklearn.XGBClassifier:
@@ -289,9 +293,11 @@ def main():
     modeler = Modelado(df, 'equipo_ganador')
     modeler.procesar_datos()
 
+    modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25, plot_feature_importance=True) 
+    
+    """
     modeler.arbol_decision(plot_feature_importance=True) # max_depth_tree=25, n_folds_cv=10
 
-    """
     modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25) 
    
     modeler.xgboost(n_folds_cv=10, n_tress_in_forest=50, max_depth_tree=15)
