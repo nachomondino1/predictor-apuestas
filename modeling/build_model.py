@@ -16,6 +16,10 @@ from itertools import cycle
 from sklearn.linear_model import LogisticRegression
 import warnings
 import plotly.graph_objects as go
+# SVM
+from sklearn.svm import SVC
+# Redes Nueronales
+from sklearn.neural_network import MLPClassifier
 
 
 class Modelado:
@@ -205,7 +209,7 @@ class Modelado:
 
         return rf
 
-    def xgboost(self, n_folds_cv: Optional[int] = None, n_tress_in_forest: Optional[int] = None, max_depth_tree: Optional[int] = None) -> xgb.sklearn.XGBClassifier:
+    def xgboost(self, n_folds_cv: Optional[int] = None, n_tress_in_forest: Optional[int] = None, max_depth_tree: Optional[int] = None, plot_feature_importance: Optional[str] = False) -> xgb.sklearn.XGBClassifier:
         '''
         Aplica XGBoost
         ''' 
@@ -227,6 +231,9 @@ class Modelado:
             xg = xgb.XGBClassifier(n_estimators=n_tress_in_forest, objective='multi:softmax', num_class=len(self.y_bal.unique()), max_depth=max_depth_tree)
         xg.fit(self.X_bal, self.y_bal)
         self.calcular_metricas(xg, n_folds_cv)
+
+        if plot_feature_importance == True:
+            self.graficar_importancia_atrib(xg)
 
         return xg
 
@@ -271,14 +278,83 @@ class Modelado:
 
         return lr
 
-    def svm(self):
-        pass
+    def svm(self, n_folds_cv: Optional[int] = None, kernel_type: Optional[str] = None, ovo_o_ovr: Optional[str] = None) -> SVC:
+        '''
+        Aplica SVM
+        ''' 
+        print('\nSVM')
 
-    def red_neuronal(self):
-        pass
+        if n_folds_cv is None and kernel_type is None and ovo_o_ovr is None:
+            # Definir los hiperparámetros a ajustar
+            params = {
+                'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+                'decision_function_shape': ['ovo', 'ovr'],
+            }
+
+            grid_search = GridSearchCV(SVC(), param_grid=params, cv=10)
+            grid_search.fit(self.X_bal, self.y_bal)
+            print(f"Mejores parámetros: {grid_search.best_params_}")
+            print(f"Mejor score: {grid_search.best_score_}")  
+
+            best_params = grid_search.best_params_          
+            lr = SVC(**best_params)
+
+        else: 
+            lr = SVC(kernel=kernel_type, decision_function_shape=ovo_o_ovr)
+
+        lr.fit(self.X_bal, self.y_bal)
+        self.calcular_metricas(lr, n_folds_cv)
+        
+
+    def red_neuronal(self, n_folds_cv: Optional[int] = None) -> MLPClassifier:
+        '''
+        Aplica Redes Neuronales
+        ''' 
+        print('\nRedes Neuronales')
+
+        if n_folds_cv is None:
+            # Definir los hiperparámetros a ajustar
+            params = {
+                'activation': ['identity', 'logistic', 'tanh', 'relu'],
+                'solver': ['lbfgs', 'sgd', 'adam'],
+                'learning_rate': ['learning_rate', 'invscaling', 'adaptive'],
+                'max_iter': [200, 300, 400],
+            }
+
+            grid_search = GridSearchCV(MLPClassifier(), param_grid=params, cv=10)
+            grid_search.fit(self.X_bal, self.y_bal)
+            print(f"Mejores parámetros: {grid_search.best_params_}")
+            print(f"Mejor score: {grid_search.best_score_}")  
+
+            best_params = grid_search.best_params_          
+            mlp = MLPClassifier(**best_params)
+
+        else: 
+            mlp = MLPClassifier()
+
+        mlp.fit(self.X_bal, self.y_bal)
+        self.calcular_metricas(mlp, n_folds_cv)
+
+        return mlp
 
     def seleccionar_mejor_modelo(self):
-        pass
+        
+        # Crear una lista de modelos
+        modelos = [self.arbol_decision(), self.random_forest(), self.xgboost(), self.regresion_logistica(), self.svm(), self.red_neuronal()]
+
+        test_scores = [cross_validate(model, self.X_bal, self.y_bal, scoring = 'accuracy') for model in modelos]
+
+        # Calcular precisión en datos de prueba para cada modelo
+        # test_scores = [model.score(self.X_test, self.y_test) for model in modelos]
+
+        # Seleccionar el mejor modelo según la precisión en datos de prueba
+        best_model_idx = test_scores.index(max(test_scores))
+        best_model = modelos[best_model_idx]
+
+        print("\nEl mejor modelo es:")
+        print(best_model)
+
+        return best_model
 
     def graficar_matriz_confusion(self, model):
         pass
@@ -293,19 +369,26 @@ def main():
     modeler = Modelado(df, 'equipo_ganador')
     modeler.procesar_datos()
 
-    modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25, plot_feature_importance=True) 
-    
     """
     modeler.arbol_decision(plot_feature_importance=True) # max_depth_tree=25, n_folds_cv=10
 
-    modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25) 
+    modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25, plot_feature_importance=True) 
    
-    modeler.xgboost(n_folds_cv=10, n_tress_in_forest=50, max_depth_tree=15)
+    modeler.xgboost(n_folds_cv=10, n_tress_in_forest=50, max_depth_tree=15, plot_feature_importance=True)
 
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
     modeler.regresion_logistica(n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500) # n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500 
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
+
+    modeler.svm(n_folds_cv = 10, kernel_type = 'poly', ovo_o_ovr= 'ovo')
     """
+    warnings.filterwarnings("ignore")
+    t0 = time.time() # Registramos el tiempo de inicio
+    modeler.red_neuronal()
+    t1 = time.time() # Registramos el tiempo de fin
+    print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
+
+    
 main()
