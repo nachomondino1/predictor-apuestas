@@ -2,7 +2,7 @@ from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import RandomOverSampler
 import pandas as pd
 from sklearn.utils import shuffle
-from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV, cross_val_predict
+from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
@@ -20,6 +20,9 @@ import plotly.graph_objects as go
 from sklearn.svm import SVC
 # Redes Nueronales
 from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import Pipeline
+from tensorflow import keras
+from tensorflow.keras import layers
 
 
 class Modelado:
@@ -243,7 +246,7 @@ class Modelado:
         ''' 
         print('\nRegresion Logistica')
 
-        if n_folds_cv is None and penal is None and c_value is None and solv is None and max_iter is None:
+        if n_folds_cv is None and penal is None and c_value is None and solv is None and max_iteraciones is None:
             # Definir los hiperparámetros a ajustar
             params = {
                 'penalty': [None, 'l2'],
@@ -306,19 +309,20 @@ class Modelado:
         self.calcular_metricas(lr, n_folds_cv)
         
 
-    def red_neuronal(self, n_folds_cv: Optional[int] = None) -> MLPClassifier:
+    def perceptron_multiple(self, n_folds_cv: Optional[int] = None, activ: Optional[str] = None, solv: Optional[str] = None, lear_rate: Optional[str] = None, max_itera: Optional[int] = None, hidden_layer: Optional[tuple]= None) -> MLPClassifier:
         '''
-        Aplica Redes Neuronales
+        Aplica Perceptron Multicapa
         ''' 
-        print('\nRedes Neuronales')
+        print('\nPerceptron Multicapa')
 
-        if n_folds_cv is None:
+        if n_folds_cv is None and activ is None and solv is None and lear_rate is None and max_itera is  None and hidden_layer is None:
             # Definir los hiperparámetros a ajustar
             params = {
                 'activation': ['identity', 'logistic', 'tanh', 'relu'],
                 'solver': ['lbfgs', 'sgd', 'adam'],
                 'learning_rate': ['learning_rate', 'invscaling', 'adaptive'],
-                'max_iter': [200, 300, 400],
+                # 'max_iter': [200, 300],
+                'hidden_layer_sizes': [(64), (128), (64, 32)]
             }
 
             grid_search = GridSearchCV(MLPClassifier(), param_grid=params, cv=10)
@@ -330,17 +334,51 @@ class Modelado:
             mlp = MLPClassifier(**best_params)
 
         else: 
-            mlp = MLPClassifier()
+            mlp = MLPClassifier(hidden_layer_sizes=hidden_layer, activation = activ, solver = solv, learning_rate = lear_rate, max_iter = max_itera)
 
         mlp.fit(self.X_bal, self.y_bal)
         self.calcular_metricas(mlp, n_folds_cv)
 
         return mlp
+    
+    def red_neuronal(self):
+        '''
+        Aplica Redes Neuronales
+        ''' 
+        print('\nRedes Neuronales')
+
+        rn = keras.Sequential()
+        rn.add(layers.Dense(64, activation='relu', input_dim=self.X_bal.shape[1]))
+        rn.add(layers.Dense(32, activation='relu'))
+        rn.add(layers.Dense(3, activation='softmax'))  # Salida con 3 opciones
+        rn.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+        # Crear el pipeline con la red neuronal y la validación cruzada
+        estimators = []
+        estimators.append(('standardize', LabelEncoder()))
+        estimators.append(('mlp', keras.wrappers.scikit_learn.KerasClassifier(build_fn=rn, epochs=10, batch_size=16, verbose=0)))
+        pipeline = Pipeline(estimators)
+
+        # Realizar la validación cruzada
+        kfold = KFold(n_splits=10, shuffle=True, random_state=42)
+        results = cross_val_score(pipeline, self.X_bal, self.y_bal, cv=kfold)
+
+        # Mostrar los resultados de la validación cruzada
+        print('Accuracy:', np.mean(results))
+
+        return rn
 
     def seleccionar_mejor_modelo(self):
+        cv = 10
         
         # Crear una lista de modelos
-        modelos = [self.arbol_decision(), self.random_forest(), self.xgboost(), self.regresion_logistica(), self.svm(), self.red_neuronal()]
+        modelos = [self.arbol_decision(max_depth_tree=30, n_folds_cv=cv), 
+                   self.random_forest(n_folds_cv=cv, n_tress_in_forest=200, max_depth_tree=None), 
+                   self.xgboost(n_folds_cv=cv, n_tress_in_forest=50, max_depth_tree=20), 
+                   self.regresion_logistica(), 
+                   self.svm(), 
+                   self.red_neuronal(), 
+                   self.perceptron_multiple()]
 
         test_scores = [cross_validate(model, self.X_bal, self.y_bal, scoring = 'accuracy') for model in modelos]
 
@@ -383,6 +421,8 @@ def main():
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
 
     modeler.svm(n_folds_cv = 10, kernel_type = 'poly', ovo_o_ovr= 'ovo')
+
+    modeler.perceptron_multiple(n_folds_cv = 10, activ = 'tanh', solv = 'lbfgs', lear_rate = 'invscaling', max_itera = 300)
     """
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
@@ -390,5 +430,6 @@ def main():
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
 
-    
+    modeler.seleccionar_mejor_modelo()
+
 main()
