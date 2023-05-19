@@ -25,8 +25,9 @@ from tensorflow import keras
 # from tensorflow.keras import layers
 from keras.wrappers.scikit_learn import KerasClassifier
 from keras.models import Sequential
-from keras.layers import Dense
-from keras.utils import np_utils
+from keras.layers import Dense, Dropout
+from keras.utils import np_utils, to_categorical
+from keras.callbacks import EarlyStopping
 
 
 class Modelado:
@@ -121,7 +122,11 @@ class Modelado:
         scoring = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro']
 
         # Realizar validación cruzada y obtener los resultados
-        self.cv_results = cross_validate(model, self.X_bal, self.y_bal, cv=n_folds_cv, scoring=scoring, return_train_score=True, return_estimator=True)
+        if isinstance(model, keras.models.Sequential): # Si es una red neuronal, el y que usamos tiene que ser de tipo one hot encoder
+            print("ES UNA NN")
+            self.cv_results = cross_validate(model, self.X_bal, self.y_bal_encoded, cv=n_folds_cv, scoring=scoring, return_train_score=True, return_estimator=True)
+        else: 
+            self.cv_results = cross_validate(model, self.X_bal, self.y_bal, cv=n_folds_cv, scoring=scoring, return_train_score=True, return_estimator=True)
         cv_score = self.cross_validation(model)
 
         # Imprimir los resultados promedio de cada métrica
@@ -350,26 +355,31 @@ class Modelado:
         Crreacion de la Red Nueronal
         """
         model = Sequential()
-        model.add(Dense(neurons, input_dim=self.X_bal.shape[1], activation='relu'))
+        model.add(Dense(neurons, input_dim=self.X_bal.shape[1], activation='tanh'))
+        model.add(Dropout(0.3))  # Agregar dropout con una tasa de 0.2
+        model.add(Dense(neurons, activation='tanh'))
+        model.add(Dense(neurons, activation='tanh'))
+        model.add(Dense(neurons, activation='tanh'))
+        model.add(Dense(neurons, activation='tanh'))
         model.add(Dense(3, activation='softmax'))  # 3 clases: empate, local, visitante
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         return model 
-    # ['adam', 'sgd'],
+    # ['adam', 'sgd'], rmsprop
+
         
-    def red_neuronal(self, n_folds_cv: Optional[str] = None, epochs: Optional[int] = None, batches: Optional[int] = None):
+    def red_neuronal(self, n_folds_cv: Optional[int] = None, n_epochs: Optional[int] = None, batches: Optional[int] = None):
         '''
         Aplica Redes Neuronales
         ''' 
         print('\nRedes Neuronales')
 
-        if n_folds_cv is None and epochs is None and batches is None:        
+        model = KerasClassifier(build_fn=self.create_nn_model)
 
-            model = KerasClassifier(build_fn=self.create_nn_model)
-            print(model.get_params().keys())
+        if n_folds_cv is None and n_epochs is None and batches is None:        
 
             # Definir los parámetros a buscar en GridSearchCV
             params = {
-                'epochs' : [50, 100, 150],
+                # 'epochs' : [50, 100, 150],
                 'batch_size' : [32, 64, 128, 256]
             }
 
@@ -383,16 +393,16 @@ class Modelado:
             print(f"Mejor score: {grid_search.best_score_}")  
 
             # Entrenar el modelo con los mejores hiperparámetros
-            rn = grid_result.best_estimator_
-        else: 
-            rn = create_nn_model(epochs = epochs,  batch_size= batches)
+            model = grid_result.best_estimator_
 
-        # Ajustar el modelo a los datos de entrenamiento
-        callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=5)
-        rn.fit(self.X_bal, self.y_bal, epochs=10, batch_size=32, callbacks=[callback]) # , validation_data=(X_val, y_val)
-        self.calcular_metricas(rn, n_folds_cv)
-
-        return rn
+        else: # Entrenamos el modelo con los parametros brindados por el usuario
+       
+            early_stopping = keras.callbacks.EarlyStopping(monitor='loss', patience=8)
+            # Codificar las etiquetas en formato one-hot
+            self.y_bal_encoded = to_categorical(self.y_bal, num_classes=3)
+            model.fit(self.X_bal, self.y_bal_encoded, epochs=n_epochs, batch_size=batches, callbacks=[early_stopping]) # , validation_data=(X_val, y_val)
+        self.calcular_metricas(model, n_folds_cv)
+        return model
 
     def seleccionar_mejor_modelo(self):
         """
@@ -455,7 +465,7 @@ def main():
     """
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
-    modeler.red_neuronal()
+    modeler.red_neuronal(n_folds_cv = 10, n_epochs = 1000, batches = 256) # 
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
 
