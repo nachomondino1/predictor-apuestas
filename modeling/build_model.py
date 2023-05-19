@@ -374,7 +374,7 @@ class Modelado:
             }
 
             # Crear el objeto GridSearchCV con validación cruzada
-            kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+            kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
             grid_search = GridSearchCV(estimator=model, param_grid=params, cv=kfold)
             grid_result = grid_search.fit(self.X_bal, self.y_bal)
 
