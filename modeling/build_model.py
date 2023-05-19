@@ -2,7 +2,7 @@ from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import RandomOverSampler
 import pandas as pd
 from sklearn.utils import shuffle
-from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold
+from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
@@ -22,7 +22,11 @@ from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from tensorflow import keras
-from tensorflow.keras import layers
+# from tensorflow.keras import layers
+from keras.wrappers.scikit_learn import KerasClassifier
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.utils import np_utils
 
 
 class Modelado:
@@ -341,32 +345,53 @@ class Modelado:
 
         return mlp
     
-    def red_neuronal(self):
+    def create_nn_model(self, neurons=100): # 'activation': ['relu', 'tanh'], # 'neurons': [50, 100, 200]
+        """
+        Crreacion de la Red Nueronal
+        """
+        model = Sequential()
+        model.add(Dense(neurons, input_dim=self.X_bal.shape[1], activation='relu'))
+        model.add(Dense(3, activation='softmax'))  # 3 clases: empate, local, visitante
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        return model 
+    # ['adam', 'sgd'],
+        
+    def red_neuronal(self, n_folds_cv: Optional[str] = None, epochs: Optional[int] = None, batches: Optional[int] = None):
         '''
         Aplica Redes Neuronales
         ''' 
         print('\nRedes Neuronales')
 
-        rn = keras.Sequential()
-        rn.add(layers.Dense(64, activation='relu', input_dim=self.X_bal.shape[1]))
-        rn.add(layers.Dense(32, activation='relu'))
-        rn.add(layers.Dense(3, activation='softmax'))  # Salida con 3 opciones
-        rn.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        if n_folds_cv is None and epochs is None and batches is None:        
 
-        # Crear el pipeline con la red neuronal y la validación cruzada
-        estimators = []
-        estimators.append(('standardize', LabelEncoder()))
-        estimators.append(('mlp', keras.wrappers.scikit_learn.KerasClassifier(build_fn=rn, epochs=10, batch_size=16, verbose=0)))
-        pipeline = Pipeline(estimators)
+            model = KerasClassifier(build_fn=self.create_nn_model)
+            print(model.get_params().keys())
 
-        # Realizar la validación cruzada
-        kfold = KFold(n_splits=10, shuffle=True, random_state=42)
-        results = cross_val_score(pipeline, self.X_bal, self.y_bal, cv=kfold)
+            # Definir los parámetros a buscar en GridSearchCV
+            params = {
+                'epochs' : [50, 100, 150],
+                'batch_size' : [5, 10, 20]
+            }
 
-        # Mostrar los resultados de la validación cruzada
-        print('Accuracy:', np.mean(results))
+            # Crear el objeto GridSearchCV con validación cruzada
+            kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+            grid_search = GridSearchCV(estimator=model, param_grid=params, cv=kfold)
+            grid_result = grid_search.fit(self.X_bal, self.y_bal)
 
-        return rn
+            # Obtener los mejores hiperparámetros y el mejor modelo
+            print(f"Mejores parámetros: {grid_search.best_params_}")
+            print(f"Mejor score: {grid_search.best_score_}")  
+
+            # Entrenar el modelo con los mejores hiperparámetros
+            rn = grid_result.best_estimator_
+        else: 
+            rn = create_nn_model(epochs = epochs,  batch_size= batches)
+
+        # Ajustar el modelo a los datos de entrenamiento
+        callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=5)
+        rn.fit(self.X_bal, self.y_bal, epochs=10, batch_size=32, callbacks=[callback]) # , validation_data=(X_val, y_val)
+        self.calcular_metricas(rn, n_folds_cv)
+
 
     def seleccionar_mejor_modelo(self):
         cv = 10
@@ -375,10 +400,10 @@ class Modelado:
         modelos = [self.arbol_decision(max_depth_tree=30, n_folds_cv=cv), 
                    self.random_forest(n_folds_cv=cv, n_tress_in_forest=200, max_depth_tree=None), 
                    self.xgboost(n_folds_cv=cv, n_tress_in_forest=50, max_depth_tree=20), 
-                   self.regresion_logistica(), 
-                   self.svm(), 
+                   self.regresion_logistica(n_folds_cv = cv, penal = 'l2', c_value = 0.1, solv = 'lbfgs', max_iter= 500, multi_class='multinomial'), 
+                   self.svm(n_folds_cv = cv, kernel_type = 'rbf', ovo_o_ovr= 'ovo'), 
                    self.red_neuronal(), 
-                   self.perceptron_multiple()]
+                   self.perceptron_multiple(n_folds_cv = cv, activ = 'tanh', hidden_layer_sizes = 128, solv = 'adam', lear_rate = 'invscaling', max_itera = 300)]
 
         test_scores = [cross_validate(model, self.X_bal, self.y_bal, scoring = 'accuracy') for model in modelos]
 
@@ -429,7 +454,5 @@ def main():
     modeler.red_neuronal()
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
-
-    modeler.seleccionar_mejor_modelo()
 
 main()
