@@ -370,7 +370,7 @@ class Modelado:
             # Definir los parámetros a buscar en GridSearchCV
             params = {
                 'epochs' : [50, 100, 150],
-                'batch_size' : [5, 10, 20]
+                'batch_size' : [32, 64, 128, 256]
             }
 
             # Crear el objeto GridSearchCV con validación cruzada
@@ -392,8 +392,12 @@ class Modelado:
         rn.fit(self.X_bal, self.y_bal, epochs=10, batch_size=32, callbacks=[callback]) # , validation_data=(X_val, y_val)
         self.calcular_metricas(rn, n_folds_cv)
 
+        return rn
 
     def seleccionar_mejor_modelo(self):
+        """
+        Entrena todos los modelos y se elige cual es el mejor
+        """
         cv = 10
         
         # Crear una lista de modelos
