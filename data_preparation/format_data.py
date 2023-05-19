@@ -33,8 +33,39 @@ def remove_strings_from_teams(df):
     return df
 
 
+def remove_accent(df, l_col_names):  # EFICIENTIZAR. La hice asi no mas para poder integrar datos...
+
+    # Defino variables
+    d = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u'}
+
+    # Por registro
+    for i in range(len(df)):
+
+        # Por columna
+        for col_name in l_col_names:
+
+            string = df.loc[i, col_name]
+            new_str = str()
+
+            # Verificar si el elemento es un string
+            if isinstance(string, str):
+
+                # Por carecter
+                for char in string:
+
+                    # Si es una letra con tilde
+                    if char in d.keys():
+                        new_str += d[char]
+                    else:
+                        new_str += char
+
+                # Guardo string sin acentos
+                df.loc[i, col_name] = new_str
+    return df
+
 def main():
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/argentina/argentina.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/NO_BORRAR/entidad_partido_argentina.xlsx')
+    df_jug = pd.read_excel("/Users/nachomondino/Desktop/entidad_jugadores_final.xlsx", index_col=0)
 
     # Convierto posesion de string a integer
     df = remove_percent_sign(df)
@@ -45,8 +76,13 @@ def main():
     # Remuevo strings adicionales en los nombres de los equipos
     df = remove_strings_from_teams(df)
 
+    # Remuevo acentos en columnas con lista de jugadores
+    df = remove_accent(df, l_col_names=['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis','l_jug_ausentes_loc', 'l_jug_ausentes_vis'])
+    df_jug = remove_accent(df_jug, l_col_names=['nombre'])
+
     # Ordeno por campo 'fecha'
     df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
     df.to_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
+    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_formated.xlsx')
 
-# main()
+main()
