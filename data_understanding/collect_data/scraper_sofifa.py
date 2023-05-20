@@ -12,8 +12,7 @@ def main():
     # DEFINCION DE PARAMETROS & VARIABLES
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/entidad_competicion.xlsx')
-    df_jug = pd.DataFrame(columns=['id_jugador', 'nombre', 'altura', 'pie_habil'])
-    df_atrib_jug = pd.DataFrame(columns=['id_jugador', 'fecha', 'edad', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo'])
+    df_jug = pd.DataFrame(columns=['id_jugador', 'año', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo'])
     crawler = Crawler(headless=False, path=None)  # por algun motivo tarda 10 años el headless=True. A su vez el headless=False solo funciona si efectivamente miro el driver que se abre (sino no)
 
     # Ingreso a pagina de sofifa.com con los filtros correctos
@@ -26,7 +25,7 @@ def main():
     d = {}
     for i, header in enumerate(l_headers):
         d[header] = i + 1
-    print(d)
+    print(f"Campos a extraer y su posicion: \n{d}")
 
     # Obtengo paginas de la paginacion (c/pagina es un año)
     crawler.click_boton(xpath='.//h2//div[@class="dropdown"][1]/a')  # Ver si hace click, tal vez ni hace falta
@@ -34,15 +33,16 @@ def main():
     l_urls_years = [tag.get_attribute('href') for tag in l_tag_years]
 
     # POR AÑO (recorro todos las paginas de sofifa.com)
-    for url_year in l_urls_years[::-1]:
+    for url_year in l_urls_years: #[::-1]:
 
         # Ingreso a pagina del año
         crawler.driver.get(url_year)
         print(f" Url pagina: {url_year} ")
 
         # Extraigo fecha
-        fecha = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)
-        print(f" AÑO DEL FIFA: {fecha} ".center(120, "#"))
+        fecha = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)  # e.g. May 16, 2023
+        year = int(fecha.split()[-1]) # e.g. 2023
+        print(f" AÑO DEL FIFA: {year} ".center(120, "#"))
 
         # POR PAIS
         for pais in df_comp['pais'].unique()[:-1]:  # Evito "Sudamerica"
@@ -89,23 +89,16 @@ def main():
                             # Por campo a extraer
                             for header, pos_tag in d.items():
                                 d_data[header] = crawler.extract_tag(tag_inicial=tag, xpath=f'.//td[{pos_tag}]', text=True)
-                            # print(d_data)
 
                             # Formateo campos
                             d_data['NAME'] = d_data['NAME'].split('\n')[0]
-                            d_data['HEIGHT'] = d_data['HEIGHT'].split('cm')[0]
-                            d_data['TEAM & CONTRACT'] = d_data['TEAM & CONTRACT'].split('\n')[0]
-
-                            # Si aun no lo cargue en la entidad jugador (guardo datos que no cambian en el tiempo):
-                            if d_data["ID"] not in list(df_jug['id_jugador']):
-
-                                # Guardo datos en entidad jugador
-                                df_jug.loc[len(df_jug)] = [d_data['ID'], d_data['NAME'], d_data['HEIGHT'], d_data['FOOT']]
-                                print([d_data['ID'], d_data['NAME'], d_data['HEIGHT']])
+                            d_data['HEIGHT'] = d_data['HEIGHT'].split('cm')[0]  # e.g. 193cm / 6'4" --> 193
+                            d_data['TEAM & CONTRACT'] = d_data['TEAM & CONTRACT'].split('\n')[0]  # e.g. Salzburg 2021 ~ 2026 --> Salzburg
 
                             # Guardo los datos del jugador para dicho año
-                            df_atrib_jug.loc[len(df_atrib_jug)] = [d_data['ID'], fecha, d_data['AGE'], d_data['OVERALL RATING'], d_data['POTENTIAL'], d_data['TEAM & CONTRACT'], d_data['VALUE'], d_data['WAGE']]
-                            print([d_data['ID'], fecha, d_data['AGE'], d_data['OVERALL RATING'], d_data['POTENTIAL'], d_data['TEAM & CONTRACT'], d_data['VALUE'], d_data['WAGE']])
+                            l_data = [d_data['ID'], year, d_data['NAME'], d_data['AGE'], d_data['HEIGHT'], d_data['FOOT'], d_data['OVERALL RATING'], d_data['POTENTIAL'], d_data['TEAM & CONTRACT'], d_data['VALUE'], d_data['WAGE']]
+                            df_jug.loc[len(df_jug)] = l_data
+                            print(l_data)
 
                         # Clickeo en boton "Next" para recorrer todas las paginas
                         if crawler.click_boton(xpath='.//div[@class="pagination"]//span[contains(@class, "right")]//parent::a') is False:
@@ -125,8 +118,7 @@ def main():
                 input_league.send_keys(Keys.DELETE)
 
         # Exporto datasets
-        df_jug.to_excel(f'./jugadores/entidad_jugadores_{fecha.lower().replace(" ", "")}.xlsx')
-        df_atrib_jug.to_excel(f'./jugadores/entidad_atrib_jugadores_{fecha.lower().replace(" ", "")}.xlsx')
+        df_jug.to_excel(f'./entidad_jugadores_{year}.xlsx')
 
     crawler.driver.close()
 

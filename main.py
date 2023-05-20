@@ -12,9 +12,9 @@ def data_preparation(df):
     N_ULT_PART = 5
 
     # 3.1) Format data
-    df = format_data.format_column_date(df)
-    df = format_data.posesion_balon(df)
-    df = format_data.clean_teams(df)
+    df = format_data.remove_percent_sign(df)
+    df = format_data.transform_date_column(df)
+    df = format_data.remove_strings_from_teams(df)
 
     # 3.2) Construct data
     # Construct data
