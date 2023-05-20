@@ -2,9 +2,9 @@ from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import RandomOverSampler
 import pandas as pd
 from sklearn.utils import shuffle
-from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
+from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 import xgboost as xgb
 import numpy as np
 from typing import Optional
@@ -28,6 +28,8 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from keras.utils import np_utils, to_categorical
 from keras.callbacks import EarlyStopping
+# Gradient Boosting
+import lightgbm as lgb
 
 
 class Modelado:
@@ -53,6 +55,7 @@ class Modelado:
         # Balanceamos segun variable respuesta
         X, y  = df_mezclado.drop(self.target_col, axis=1), df_mezclado[self.target_col]
         self.X_bal, self.y_bal = self.oversampler.fit_resample(X, y)
+        print(self.X_bal.shape)
 
     def cross_validation(self, model) -> np.ndarray:
         '''
@@ -350,23 +353,19 @@ class Modelado:
 
         return mlp
     
-    def create_nn_model(self, neurons=100): # 'activation': ['relu', 'tanh'], # 'neurons': [50, 100, 200]
+    def create_nn_model(self, neurons=100): # 'activation': ['relu', 'tanh'], # 'neurons': [50, 100, 200]     # ['adam', 'sgd'], rmsprop
         """
         Crreacion de la Red Nueronal
         """
         model = Sequential()
-        model.add(Dense(neurons, input_dim=self.X_bal.shape[1], activation='tanh'))
-        model.add(Dropout(0.3))  # Agregar dropout con una tasa de 0.2
-        model.add(Dense(neurons, activation='tanh'))
-        model.add(Dense(neurons, activation='tanh'))
-        model.add(Dense(neurons, activation='tanh'))
-        model.add(Dense(neurons, activation='tanh'))
+        model.add(Dense(100, input_dim=self.X_bal.shape[1], activation='tanh'))
+        model.add(Dropout(0.2)) 
+        model.add(Dense(64, activation='tanh'))
+        model.add(Dense(32, activation='tanh'))
         model.add(Dense(3, activation='softmax'))  # 3 clases: empate, local, visitante
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         return model 
-    # ['adam', 'sgd'], rmsprop
 
-        
     def red_neuronal(self, n_folds_cv: Optional[int] = None, n_epochs: Optional[int] = None, batches: Optional[int] = None):
         '''
         Aplica Redes Neuronales
@@ -404,6 +403,51 @@ class Modelado:
         self.calcular_metricas(model, n_folds_cv)
         return model
 
+    def gradient_boosting(self, n_folds_cv: Optional[int] = None,):
+
+        '''
+        Aplica Gradient Boosting
+        ''' 
+        print('\nGradient Boosting')
+
+        # Crear el conjunto de datos de LightGBM
+        train_data = lgb.Dataset(self.X_bal, label=self.y_bal)
+        
+        if n_folds_cv is None:
+
+            # Definir los hiperparámetros a buscar en GridSearchCV
+            params = {
+                'learning_rate': [0.1, 0.05, 0.01],
+                'n_estimators': [100, 200, 300],
+                'max_depth': [3, 5, 7]
+            }
+
+            # Crear el objeto GridSearchCV
+            print("Grid Search")
+            grid_search = GridSearchCV(estimator=GradientBoostingClassifier(), param_grid=params, cv=10)
+
+            # Ajustar el modelo con GridSearchCV
+            print("Fitting...")
+            grid_search.fit(self.X_bal, self.y_bal)
+
+            # Obtener el mejor modelo y los mejores hiperparámetros
+            print(f"Mejores parámetros: {grid_search.best_params_}")
+            print(f"Mejor score: {grid_search.best_score_}")  
+            best_model = grid_search.best_estimator_
+            best_params = grid_search.best_params_
+
+            gbc = GradientBoostingClassifier(**best_params)
+        else: 
+            # Entrenar el modelo de Gradient Boosting
+            gbc = GradientBoostingClassifier()
+           
+        # Ajustar el modelo final con todos los datos de entrenamiento
+        gbc.fit(self.X_bal, self.y_bal)
+        self.calcular_metricas(gbc, n_folds_cv)
+
+        return gbc
+
+
     def seleccionar_mejor_modelo(self):
         """
         Entrena todos los modelos y se elige cual es el mejor
@@ -414,7 +458,7 @@ class Modelado:
         modelos = [self.arbol_decision(max_depth_tree=30, n_folds_cv=cv), 
                    self.random_forest(n_folds_cv=cv, n_tress_in_forest=200, max_depth_tree=None), 
                    self.xgboost(n_folds_cv=cv, n_tress_in_forest=50, max_depth_tree=20), 
-                   self.regresion_logistica(n_folds_cv = cv, penal = 'l2', c_value = 0.1, solv = 'lbfgs', max_iter= 500, multi_class='multinomial'), 
+                   self.regresion_logistica(n_folds_cv = cv, penal = 'l2', c_value = 0.1, solv = 'lbfgs', max_iteraciones= 500, multi_class='multinomial'), 
                    self.svm(n_folds_cv = cv, kernel_type = 'rbf', ovo_o_ovr= 'ovo'), 
                    self.red_neuronal(), 
                    self.perceptron_multiple(n_folds_cv = cv, activ = 'tanh', hidden_layer_sizes = 128, solv = 'adam', lear_rate = 'invscaling', max_itera = 300)]
@@ -433,39 +477,30 @@ class Modelado:
 
         return best_model
 
-    def graficar_matriz_confusion(self, model):
-        pass
-
 
 def main():
 
     df = pd.read_excel('data_preparation/df_prepared.xlsx')
     df = df.drop(['historial_entre_si'], axis = 1) 
     print(df.head())
+    print(df.shape)
 
     modeler = Modelado(df, 'equipo_ganador')
     modeler.procesar_datos()
 
     """
     modeler.arbol_decision(plot_feature_importance=True) # max_depth_tree=25, n_folds_cv=10
-
     modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25, plot_feature_importance=True) 
-   
     modeler.xgboost(n_folds_cv=10, n_tress_in_forest=50, max_depth_tree=15, plot_feature_importance=True)
-
-    warnings.filterwarnings("ignore")
-    t0 = time.time() # Registramos el tiempo de inicio
     modeler.regresion_logistica(n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500) # n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500 
-    t1 = time.time() # Registramos el tiempo de fin
-    print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
-
     modeler.svm(n_folds_cv = 10, kernel_type = 'poly', ovo_o_ovr= 'ovo')
-
     modeler.perceptron_multiple(n_folds_cv = 10, activ = 'tanh', solv = 'lbfgs', lear_rate = 'invscaling', max_itera = 300)
+    modeler.red_neuronal(n_folds_cv = 10, n_epochs = 1000, batches = 256) 
     """
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
-    modeler.red_neuronal(n_folds_cv = 10, n_epochs = 1000, batches = 256) # 
+    modeler.gradient_boosting()
+    # modeler.seleccionar_mejor_modelo()
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
 
