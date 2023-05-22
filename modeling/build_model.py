@@ -403,23 +403,20 @@ class Modelado:
         self.calcular_metricas(model, n_folds_cv)
         return model
 
-    def gradient_boosting(self, n_folds_cv: Optional[int] = None,):
+    def gradient_boosting(self, n_folds_cv: Optional[int] = None, lear_rate: Optional[float] = None, n_trees: Optional[int] = None, max_depth: Optional[int] = None):
 
         '''
         Aplica Gradient Boosting
         ''' 
         print('\nGradient Boosting')
-
-        # Crear el conjunto de datos de LightGBM
-        train_data = lgb.Dataset(self.X_bal, label=self.y_bal)
         
-        if n_folds_cv is None:
+        if n_folds_cv is None and lear_rate is None and n_trees is None and max_depth is None:
 
             # Definir los hiperparámetros a buscar en GridSearchCV
             params = {
                 'learning_rate': [0.1, 0.05, 0.01],
-                'n_estimators': [100, 200, 300],
-                'max_depth': [3, 5, 7]
+                'n_estimators': [100, 200], # 300
+                'max_depth': [None, 5, 7, 20, 30]
             }
 
             # Crear el objeto GridSearchCV
@@ -436,10 +433,11 @@ class Modelado:
             best_model = grid_search.best_estimator_
             best_params = grid_search.best_params_
 
+            print("Training gradient boosting with best parameters...")
             gbc = GradientBoostingClassifier(**best_params)
         else: 
             # Entrenar el modelo de Gradient Boosting
-            gbc = GradientBoostingClassifier()
+            gbc = GradientBoostingClassifier(learning_rate= lear_rate, n_estimators= n_trees, max_depth=max_depth)
            
         # Ajustar el modelo final con todos los datos de entrenamiento
         gbc.fit(self.X_bal, self.y_bal)
@@ -499,7 +497,7 @@ def main():
     """
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
-    modeler.gradient_boosting()
+    modeler.gradient_boosting(n_folds_cv = 10, lear_rate = 0.1, n_trees = 200, max_depth = 7)
     # modeler.seleccionar_mejor_modelo()
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
