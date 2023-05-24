@@ -26,20 +26,15 @@ def data_preparation(df):
     df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART)
 
     # No genero dif_gol porque tiene alta correlacion (0.9) con dif_forma
-    # df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
-    # df = construct_data.diferencia_col(df, col1='dif_gol_ult_part_loc', col2='dif_gol_ult_part_vis', nombre_nueva_col='dif_gol')  # ???? Calculo la dif de gol de loc - dif de gol de vis
-    # df = df.drop(['dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'],  axis=1)
+    df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
 
     df = construct_data.forma_reciente(df, n_part=N_ULT_PART)
-    df = construct_data.diferencia_col(df, col1='forma_loc', col2='forma_vis', nombre_nueva_col='dif_forma')  # ???? Calculo la dif de gol de loc - dif de gol de vis
-    df = df.drop(['forma_loc', 'forma_vis'], axis=1)
 
     l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases',
                           'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
     for var in l_variables_a_prom:
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
 
-    df = construct_data.diferencia_col(df, col1='l_jug_lesionados_loc', col2='l_jug_lesionados_vis', nombre_nueva_col='dif_lesionados')
     df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
 
     # 3.3) Select data
@@ -47,8 +42,7 @@ def data_preparation(df):
     df = df.drop(['id', 'fecha', 'cancha'], axis=1)
 
     # Remocion de variables redundantes (las de mayor correlacion)
-    df_correlation_matrix = df.drop('equipo_ganador',
-                                    axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
+    df_correlation_matrix = df.drop('equipo_ganador', axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
     df_correlation_matrix.to_excel('/Users/nachomondino/Desktop/correlation_matrix.xlsx')
     df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',
              'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'],

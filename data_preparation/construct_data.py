@@ -1,6 +1,6 @@
 import pandas as pd
 
-# ESTAN PERFECTAS
+
 def equipo_ganador(df):
     """
     Se determina el 'equipo_ganador' a partir de los goles que hizo cada equipo
@@ -15,30 +15,6 @@ def equipo_ganador(df):
 
         # Guardo equipo ganador
         df.loc[i, 'equipo_ganador'] = 'Local' if ng1 > ng2 else 'Empate' if ng1==ng2 else "Visitante"  # 1 if ng1 > ng2 else 0 if ng1==ng2 else -1
-    return df
-
-# REQUIEREN DE MEJORA
-def diferencia_col(df, col1, col2, nombre_nueva_col):  # Tengo que ver como implementarla. Algo no funciona
-    """
-    Para calcular una nueva columna cuyos valores son la diferencia entre otras dos columnas numericas.
-    :param df:
-    :param col1:
-    :param col2:
-    :param nombre_nueva_col:
-    :return:
-    """
-    # Por registro (partido)
-    for i in range(len(df)):
-
-        # Obtengo valores numericos a restar entre si
-        valor1 = df.loc[i, col1]
-        valor2 = df.loc[i, col2]
-
-        # Verifico que no sean None
-        if valor1 is not None and valor2 is not None:
-
-            # Guardo diferencia en nueva columna
-            df.loc[i, nombre_nueva_col] = valor1 - valor2
     return df
 
 def promedio_ult_partidos(df, n_ult_part, variable):  # Esta hecha para promediar la variable en los ultimos partidos, no para sumar..
@@ -84,7 +60,7 @@ def promedio_ult_partidos(df, n_ult_part, variable):  # Esta hecha para promedia
             print(f'{variable} ultimos partidos: {l}')
 
     # Calculo diferencia entre variables promedio para el equipo local y para el equipo vis
-    df = diferencia_col(df, col1=f'{variable}_ult_part_loc', col2=f'{variable}_ult_part_vis', nombre_nueva_col=f'dif_{variable}_segun_ult_part')
+    df[f'dif_{variable}_segun_ult_part'] = df[f'{variable}_ult_part_loc'] - df[f'{variable}_ult_part_vis']
 
     # Elimino columnas utilizadas para calcular tanto el promedio como la diferencia
     df = df.drop(columns=[f'{variable}_loc', f'{variable}_vis', f'{variable}_ult_part_loc', f'{variable}_ult_part_vis'])
@@ -130,92 +106,11 @@ def promedio_dif_gol_ult_part(df, n_ult_part):  # Con promedio_ult_part() funcio
             l_dif_goles.append(dif_gol)
             print(f'Dif gol: {l_dif_goles}')
 
+    # Calculo diferencia entre local y visitante
+    df['dif_gol'] = df['dif_gol_ult_part_loc'] - df['dif_gol_ult_part_vis']
+
     # Elimino variables
-    df = df.drop(columns=['goles_loc', 'goles_vis'])
-    return df
-
-def historial_entre_si(df, n_ult_part, n_part_hist_min = 3):
-    """
-    Crea columna 'equipo_ganador' donde se especifica el resultado de cada partido
-    :param df: Dataframe. Unidad de analisis: partido. Columnas: al menos fecha, equipo_loc, equipo_vis y equipo_ganador
-    :param n_ult_part: Integer. Numero de partidos a tener en cuenta para determinar el historial entre dos equipos.
-    :param n_part_hist_min: Integer. Numero minimo de partidos a tener en cuenta para determinar el historial entre dos
-    equipos.
-    :return: Dataframe pasado por parametro con nueva columna, 'historial_entre_si', que permite a cual de los dos
-    equipos de un partido lo favorece mas el historial entre ellos.
-    """
-    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
-    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)  # Mas reciente a mas antiguo
-
-    # Definicion de variables
-    l_equipos = df['equipo_loc'].unique()  # e.g. ['Aldosivi', 'Boca', 'Belgrano', ...]
-
-    # Por equipo1
-    for i in range(len(l_equipos)):
-
-        # Por equipo2
-        for j in range(i+1, len(l_equipos)):
-
-            # Definicion variables
-            eq1, eq2 = l_equipos[i], l_equipos[j]
-            # print(f' Historial entre {eq1} y {eq2} '.center(120, '+'))
-
-            # Selecciono unicamente los partidos entre equipo1 y equipo2
-            df_historial = df[((df['equipo_loc'] == eq1) & (df['equipo_vis'] == eq2)) | (df['equipo_loc'] == eq2) &
-                              (df['equipo_vis'] == eq1)]
-            # print(f'Cantidad de partidos: {df_historial.shape[0]}')
-
-            # Por PARTIDO entre si (a c/u intentare asignarle un historial)
-            for h in range(len(df_historial)):  # h toma [0, 1, 2, 3, 4, 5, 6, 7]
-                print(f"h={h}")
-
-                # Definicion de variables
-                l_historiales = []  # Reinicio historial
-                l_idxs = df_historial.index  # Lista de indices de df_historial
-                equipo_loc, equipo_vis = df.loc[l_idxs[h], 'equipo_loc'], df.loc[l_idxs[h], 'equipo_vis']
-                # print(f'Historial para el partido Nº{h+1} donde equipo local {equipo_loc} y equipo vis {equipo_vis}')
-
-                # Por partido anterior al partido h (a tener en cuenta en historial)  # no hago que tome desde los 4 ult partidos del h anterior porque cambia el equipo local entre h y por ende el historial
-                for k in range(h+1, h+1+n_ult_part):
-
-                    # Si aun hay <n_ult_part> anteriores a h
-                    if k < len(df_historial):
-                        print(f"k={k}")
-
-                        # Obtengo el equipo ganador y el equipo local del partido k
-                        equipo_ganador = df.loc[l_idxs[k], 'equipo_ganador']  # {'Local', 'Empate', 'Visitante}
-                        equipo_local = df.loc[l_idxs[k], 'equipo_loc']
-
-                        # Si gano el local
-                        if equipo_ganador == 'Local':
-                            # Si el local del partido k es el equipo local en el partido h
-                            historial = +1 if equipo_loc == equipo_local else -1
-
-                        # Si empataron
-                        elif equipo_ganador == 'Empate':
-                            historial = 0
-
-                        # Si gano el visitante
-                        else:
-                            # Si el local del partido k es el equipo local en el partido h
-                            historial = -1 if equipo_loc == equipo_local else +1
-
-                        l_historiales.append(historial)
-                        # print(l_historiales)
-
-                    # Si ya no hay <n_ult_part> anteriores a h
-                    else:
-                        break
-
-                # Guardo historial del partido h
-                if len(l_historiales) >= n_part_hist_min:
-                    df.loc[l_idxs[h], 'historial_entre_si'] = sum(l_historiales)
-                    # print(l_historiales)
-                    # print(f"Historial cargado: {sum(l_historiales)}")
-
-                # Si ya no hay al menos <n_part_hist_min> para determinar el historial
-                else:
-                    break
+    df = df.drop(columns=['goles_loc', 'goles_vis', 'dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'], axis=1)
     return df
 
 def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # quiero poner historial_entre_si segun localia. Es decir, para el partido River-Boca quiero poner el historial de los ultimos 5 River-Boca en el monumental (y no en los estadios)
@@ -333,18 +228,41 @@ def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo
             puntos = puntos_loc(resultado) if is_equipo_loc else puntos_vis(resultado)
             l_puntos.append(puntos)
             print(l_puntos)
+
+    # Calculo diferencia
+    df['dif_forma'] = df['forma_loc'] - df['forma_vis']
+
+    # Elimino variables
+    df = df.drop(columns=['forma_loc', 'forma_vis'], axis=1)
     return df
 
-def n_dias_ult_partido(df):
-    pass
+def n_dias_ult_partido(df):  # Peopuesta por Chat GPT
+    df = df.sort_values('fecha')
 
-def promedio_atrib_titulares(df):  # overall_rating, edad, altura
-    pass
+    df['dias_desde_ultimo_partido_loc'] = 0
+    df['dias_desde_ultimo_partido_vis'] = 0
 
-def suma_overall_rating_ausentes(df):  # overall_rating, edad, altura
-    pass
+    for i, row in df.iterrows():
+        equipo_loc = row['equipo_loc']
+        equipo_vis = row['equipo_vis']
 
-def convert_odds_to_prob(df):
+        # Calcula la diferencia de días desde el último partido jugado por equipo_loc
+        mask_loc = ((df['equipo_loc'] == equipo_loc) | (df['equipo_vis'] == equipo_loc)) & (df['fecha'] < row['fecha'])
+        ult_partido_loc = df.loc[mask_loc, 'fecha'].max()
+        if pd.notnull(ult_partido_loc):
+            dias_desde_ultimo_loc = (row['fecha'] - ult_partido_loc).days
+            df.loc[i, 'dias_desde_ultimo_partido_loc'] = dias_desde_ultimo_loc
+
+        # Calcula la diferencia de días desde el último partido jugado por equipo_vis
+        mask_vis = ((df['equipo_loc'] == equipo_vis) | (df['equipo_vis'] == equipo_vis)) & (df['fecha'] < row['fecha'])
+        ult_partido_vis = df.loc[mask_vis, 'fecha'].max()
+        if pd.notnull(ult_partido_vis):
+            dias_desde_ultimo_vis = (row['fecha'] - ult_partido_vis).days
+            df.loc[i, 'dias_desde_ultimo_partido_vis'] = dias_desde_ultimo_vis
+
+    return df
+
+def convert_odds_to_prob(df):  # No estoy seguro de que la vaya a usar... Para el caculo del ROI necesito las cuotas...
     ''' Converts bookkeeper odds to probabilities. '''
 
     # Por registro
@@ -364,40 +282,48 @@ def convert_odds_to_prob(df):
 
     return df
 
+def suma_overall_rating_ausentes(df):
+    pass
+
 def main():
+
     # Definicion de variables
     N_ULT_PART = 5
     l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
 
     # Levanto dataset
-    df = pd.read_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/df_integrated.xlsx')
     print(df.head())
 
     # Construct data
     df = equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
+
+    df = historial_entre_si_segun_localia(df, n_ult_part=3)
+
+    df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
+
+    df = forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
+
+    # Calculo diferencias para las variables promedio de los jugadores
+    df['dif_rat_tit'] = df['l_jug_tit_loc_prom_rat'] - df['l_jug_tit_vis_prom_rat']
+    df['dif_edad_tit'] = df['l_jug_tit_loc_prom_edad'] - df['l_jug_tit_vis_prom_edad']
+    df['dif_alt_tit'] = df['l_jug_tit_loc_prom_alt'] - df['l_jug_tit_vis_prom_alt']
+    df['dif_rat_sup'] = df['l_jug_sup_loc_prom_rat'] - df['l_jug_sup_vis_prom_rat']
+    df['dif_edad_sup'] = df['l_jug_sup_loc_prom_edad'] - df['l_jug_sup_vis_prom_edad']
+    df['dif_alt_sup'] = df['l_jug_sup_loc_prom_alt'] - df['l_jug_sup_vis_prom_alt']
+
+    for var in l_variables_a_prom:
+        df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
+
+    df = n_dias_ult_partido(df)
+    # df = convert_odds_to_prob(df)
     # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
-    # df = historial_entre_si_segun_localia(df, n_ult_part=3)
-
-    # df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
-    # df = diferencia_col(df, col1='dif_gol_ult_part_loc', col2='dif_gol_ult_part_vis', nombre_nueva_col='dif_gol')  # ???? Calculo la dif de gol de loc - dif de gol de vis
-    # df = df.drop(['dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'],  axis=1)
-
-    # df = forma_reciente(df, n_part=N_ULT_PART)
-    # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
-    # df = diferencia_col(df, col1='forma_loc', col2='forma_vis', nombre_nueva_col='dif_forma')  # ???? Calculo la dif de gol de loc - dif de gol de vis
-    # df = df.drop(['forma_loc', 'forma_vis'], axis=1)
-
-    # for var in l_variables_a_prom:
-        # df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
-        # df = promedio_ult_partidos_Chat_GPT(df, n_ult_part=N_ULT_PART, variable=var)
 
     print(df.head())
-    df.to_excel('/Users/nachomondino/Desktop/df_constructed_2.xlsx')
+    df.to_excel('./df_constructed.xlsx')
 
 
 main()
-
-
 
 '''
 def factor_ponderacion(df): # Me gusta la idea de ponderar las variables forma, posesion, remates, etc pues no es lo mismo hacerlo contra Boca de visitante que Local contra Olimpo. El factor tiene que ponderar, localidad, rival, su forma y que mas?
