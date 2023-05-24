@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
 import xgboost as xgb
 import numpy as np
 from typing import Optional
@@ -55,7 +55,7 @@ class Modelado:
         # Balanceamos segun variable respuesta
         X, y  = df_mezclado.drop(self.target_col, axis=1), df_mezclado[self.target_col]
         self.X_bal, self.y_bal = self.oversampler.fit_resample(X, y)
-        print(self.X_bal.shape)
+  
 
     def cross_validation(self, model) -> np.ndarray:
         '''
@@ -497,7 +497,7 @@ def main():
     """
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
-    modeler.gradient_boosting(n_folds_cv = 10, lear_rate = 0.1, n_trees = 200, max_depth = 7)
+    # modeler.gradient_boosting(n_folds_cv = 10, lear_rate = 0.1, n_trees = 200, max_depth = 7)
     # modeler.seleccionar_mejor_modelo()
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
