@@ -16,7 +16,10 @@ def data_preparation(df):
     df = format_data.transform_date_column(df)
     df = format_data.remove_strings_from_teams(df)
 
-    # 3.2) Construct data
+    # 3.2) Integrate data
+
+
+    # 3.3) Construct data
     # Construct data
     df = construct_data.equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
     df = construct_data.numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
@@ -56,8 +59,10 @@ def data_preparation(df):
     df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
 
     # 3.4) Clean data
-    df = clean_data.categorize_numeric_columns(df)  # Categorizo columnas numericas
+    # Categorizo columnas numericas
+    df = clean_data.categorize_numeric_columns(df)
 
+    # Tratamiento de NaN values
     df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
     df.to_excel('/Users/nachomondino/Desktop/df_prepared.xlsx', index=False)
 
