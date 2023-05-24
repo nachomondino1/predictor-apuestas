@@ -12,13 +12,13 @@ def remove_percent_sign(df):
     df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     return df
 
-def transform_date_column(df):
+def transform_date_column(df, string_format):
     """
     Transformo fecha de string a datetime
     :param df: Dataframe. Con columna 'fecha' interpretada como string
     :return: Dataframe. Con columna 'fecha' interpretada como datetime
     """
-    df['fecha'] = pd.to_datetime(df['fecha'], format='%d.%m.%Y %H:%M')
+    df['fecha'] = pd.to_datetime(df['fecha'], format=string_format)
     return df
 
 def remove_strings_from_teams(df):
@@ -32,57 +32,27 @@ def remove_strings_from_teams(df):
     df['equipo_vis'] = df['equipo_vis'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
     return df
 
-
-def remove_accent(df, l_col_names):  # EFICIENTIZAR. La hice asi no mas para poder integrar datos...
-
-    # Defino variables
-    d = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u'}
-
-    # Por registro
-    for i in range(len(df)):
-
-        # Por columna
-        for col_name in l_col_names:
-
-            string = df.loc[i, col_name]
-            new_str = str()
-
-            # Verificar si el elemento es un string
-            if isinstance(string, str):
-
-                # Por carecter
-                for char in string:
-
-                    # Si es una letra con tilde
-                    if char in d.keys():
-                        new_str += d[char]
-                    else:
-                        new_str += char
-
-                # Guardo string sin acentos
-                df.loc[i, col_name] = new_str
-    return df
-
 def main():
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/NO_BORRAR/entidad_partido_argentina.xlsx')
-    df_jug = pd.read_excel("/Users/nachomondino/Desktop/entidad_jugadores_final.xlsx", index_col=0)
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
+    df_jug = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx")
 
     # Convierto posesion de string a integer
     df = remove_percent_sign(df)
 
     # Convierto fecha de string a datetime
-    df = transform_date_column(df)  # Fundamental para poder ordenar el df por 'fecha'
+    df = transform_date_column(df, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
+    df_jug = transform_date_column(df_jug, string_format='%b %d, %Y')
 
     # Remuevo strings adicionales en los nombres de los equipos
     df = remove_strings_from_teams(df)
 
     # Remuevo acentos en columnas con lista de jugadores
-    df = remove_accent(df, l_col_names=['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis','l_jug_ausentes_loc', 'l_jug_ausentes_vis'])
-    df_jug = remove_accent(df_jug, l_col_names=['nombre'])
+    # df = remove_accent(df, l_col_names=['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis','l_jug_ausentes_loc', 'l_jug_ausentes_vis'])
+    # df_jug = remove_accent(df_jug, l_col_names=['nombre'])
 
     # Ordeno por campo 'fecha'
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
-    df.to_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
-    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_formated.xlsx')
+    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
+    df.to_excel('./df_formated.xlsx', index=False)
+    df_jug.to_excel('./df_jug_formated.xlsx', index=False)
 
 main()

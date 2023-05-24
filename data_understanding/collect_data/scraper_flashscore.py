@@ -27,7 +27,7 @@ def main():
                  'odds_loc', 'odds_emp', 'odds_vis'])
 
     # Por competicion
-    for i in range(len(df_comp)):
+    for i in range(28, 29):  # len(df_comp)  # Uruguay: 28
 
         # Obtengo datos de la competicion
         competicion, pais = df_comp.loc[i, 'nombre'], df_comp.loc[i, 'pais']
@@ -49,7 +49,7 @@ def main():
         print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
         # POR PAGINA (TEMPORADA) DE PAGINACION
-        for url_temp in l_urls_temporadas:
+        for url_temp in l_urls_temporadas[11:]:  #  Uruguay: 11
 
             # Ingreso a pagina de temporada
             crawler.driver.get(url_temp)
@@ -92,7 +92,7 @@ def main():
                 # if id not in list(df_arg['id']):
 
                 # Ingreso a pagina de informacion del partido
-                crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido/resumen-del-partido')
+                crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')  # Cambie porque fallo en un partido de 2005 de Peru. Saque el ultimo /resumen-del-partido... selenium.common.exceptions.WebDriverException: Message: unknown error: net::ERR_NAME_NOT_RESOLVED f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido/resumen-del-partido'
 
                 # EXTRACCION DE CAMPOS
                 # Extraigo campos de hoja "Resumen"
@@ -139,7 +139,7 @@ def main():
                     ataques_loc, ataques_vis = None, None
                     ataques_pelig_loc, ataques_pelig_vis = None, None
 
-                # Extraigo campos de hoja "Alineaciones"
+                # Extraigo campos de hoja "Formaciones"
                 if crawler.click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Formaciones"]', sec_wait=SEC_WAIT) is not False:
 
                     # Si existe la seccion de Titulares
@@ -175,7 +175,7 @@ def main():
                     dt_loc = crawler.extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][1]', text=True, sec_wait=SEC_WAIT)
                     dt_vis = crawler.extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][2]', text=True, sec_wait=SEC_WAIT)
 
-                # Si no hay hoja "Alineaciones"
+                # Si no hay hoja "Formaciones"
                 else:
                     l_jug_tit_loc, l_jug_tit_vis = None, None
                     l_jug_sup_loc, l_jug_sup_vis = None, None
@@ -187,7 +187,14 @@ def main():
                     odds_loc = crawler.extract_tag(xpath='.//div[@class="ui-table__row"]/a[1]', text=True, sec_wait=SEC_WAIT_LONG+1)
                     odds_emp = crawler.extract_tag(xpath='.//div[@class="ui-table__row"]/a[2]', text=True, sec_wait=SEC_WAIT)
                     odds_vis = crawler.extract_tag(xpath='.//div[@class="ui-table__row"]/a[3]', text=True, sec_wait=SEC_WAIT)
-                # Si no hay hoja "Cuotas"
+
+                # Si no existe la hoja "Cuotas" pero si la seccion "Cuotas pre-partido"
+                elif crawler.extract_tag(xpath='.//div[@class="oddsRow"]'):
+                    odds_loc = crawler.extract_tag(xpath='.//div[@class="cellWrapper"][1]', attribute='title', sec_wait=SEC_WAIT_LONG+1)
+                    odds_emp = crawler.extract_tag(xpath='.//div[@class="cellWrapper"][2]', attribute='title', sec_wait=SEC_WAIT)
+                    odds_vis = crawler.extract_tag(xpath='.//div[@class="cellWrapper"][3]', attribute='title', sec_wait=SEC_WAIT)
+
+                # Si no hay hoja "Cuotas" ni seccion "Cuotas prepartido"
                 else:
                     odds_loc, odds_emp, odds_vis = None, None, None
 
