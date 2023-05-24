@@ -286,28 +286,6 @@ def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # qu
                     break
     return df
 
-def numero_ausentes(df):
-    """
-    Obtener lista de lesionados y contarlos
-    :param df:
-    :return:
-    """
-    # Definicion de variables
-    l_var = ['l_jug_lesionados_loc', 'l_jug_lesionados_vis']
-
-    # Por fila (partido)
-    for idx in df.index:
-
-        # Por variable de lesionados (local y vis)
-        for variable in l_var:
-
-            # Convierto string a lista con eval()
-            l_lesionados = eval(df.loc[idx, variable])
-
-            # Cuento cantidad de lesionados y lo guardo (salvo cuando es [] pues es posible que no se tenga datos y no que no haya lesionados)
-            df.loc[idx, variable] = len(l_lesionados) if len(l_lesionados) != 0 else None
-    return df
-
 def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo que ver el nombre de la variable...
     # Requiere de dataframe ordenado por fecha decreciente
     # Tengo que agregar forma de cada equipo y puntaje antes de cada partido.
@@ -357,6 +335,71 @@ def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo
             print(l_puntos)
     return df
 
+def n_dias_ult_partido(df):
+    pass
+
+def promedio_atrib_titulares(df):  # overall_rating, edad, altura
+    pass
+
+def suma_overall_rating_ausentes(df):  # overall_rating, edad, altura
+    pass
+
+def convert_odds_to_prob(df):
+    ''' Converts bookkeeper odds to probabilities. '''
+
+    # Por registro
+    for i in range(len(df)):
+
+        # Converts odds to prob
+        prob_loc_with_over = 1 / df.loc[i, 'odds_loc']
+        prob_emp_with_over = 1 / df.loc[i, 'odds_emp']
+        prob_vis_with_over = 1 / df.loc[i, 'odds_vis']
+
+        prob_total_with_over = prob_loc_with_over + prob_emp_with_over + prob_vis_with_over
+
+        # Define output format and scale probs by sum over all probs
+        df.loc[i, 'odds_loc'] = prob_loc_with_over / prob_total_with_over
+        df.loc[:, 'odds_emp'] = prob_emp_with_over / prob_total_with_over
+        df.loc[:, 'odds_vis'] = prob_vis_with_over / prob_total_with_over
+
+    return df
+
+def main():
+    # Definicion de variables
+    N_ULT_PART = 5
+    l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
+
+    # Levanto dataset
+    df = pd.read_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
+    print(df.head())
+
+    # Construct data
+    df = equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
+    # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
+    # df = historial_entre_si_segun_localia(df, n_ult_part=3)
+
+    # df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
+    # df = diferencia_col(df, col1='dif_gol_ult_part_loc', col2='dif_gol_ult_part_vis', nombre_nueva_col='dif_gol')  # ???? Calculo la dif de gol de loc - dif de gol de vis
+    # df = df.drop(['dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'],  axis=1)
+
+    # df = forma_reciente(df, n_part=N_ULT_PART)
+    # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
+    # df = diferencia_col(df, col1='forma_loc', col2='forma_vis', nombre_nueva_col='dif_forma')  # ???? Calculo la dif de gol de loc - dif de gol de vis
+    # df = df.drop(['forma_loc', 'forma_vis'], axis=1)
+
+    # for var in l_variables_a_prom:
+        # df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
+        # df = promedio_ult_partidos_Chat_GPT(df, n_ult_part=N_ULT_PART, variable=var)
+
+    print(df.head())
+    df.to_excel('/Users/nachomondino/Desktop/df_constructed_2.xlsx')
+
+
+main()
+
+
+
+'''
 def factor_ponderacion(df): # Me gusta la idea de ponderar las variables forma, posesion, remates, etc pues no es lo mismo hacerlo contra Boca de visitante que Local contra Olimpo. El factor tiene que ponderar, localidad, rival, su forma y que mas?
     # Cada equipo tendra un factor en cada partido. Un boca que viene de 6 partidos seguidos ganando no es lo mismo que un Boca perdiendo 3 seguidos de local.
 
@@ -435,62 +478,7 @@ def derive_forma_ponderada(df, n_part):  # Me gusta la idea de ponderar las vari
     # df = df.drop(['puntaje_loc', 'puntaje_vis'], axis=1)
     return df
 
-def n_dias_ult_partido(df):
-    pass
-
-def convert_odds_to_prob(df):
-    ''' Converts bookkeeper odds to probabilities. '''
-
-    # Por registro
-    for i in range(len(df)):
-
-        # Converts odds to prob
-        prob_loc_with_over = 1 / df.loc[i, 'odds_loc']
-        prob_emp_with_over = 1 / df.loc[i, 'odds_emp']
-        prob_vis_with_over = 1 / df.loc[i, 'odds_vis']
-
-        prob_total_with_over = prob_loc_with_over + prob_emp_with_over + prob_vis_with_over
-
-        # Define output format and scale probs by sum over all probs
-        df.loc[i, 'odds_loc'] = prob_loc_with_over / prob_total_with_over
-        df.loc[:, 'odds_emp'] = prob_emp_with_over / prob_total_with_over
-        df.loc[:, 'odds_vis'] = prob_vis_with_over / prob_total_with_over
-
-    return df
-
-def main():
-    # Definicion de variables
-    N_ULT_PART = 5
-    l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-
-    # Levanto dataset
-    df = pd.read_excel('/Users/nachomondino/Desktop/df_formated.xlsx')
-    print(df.head())
-
-    # Construct data
-    df = equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
-    # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
-    # df = historial_entre_si_segun_localia(df, n_ult_part=3)
-
-    # df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
-    # df = diferencia_col(df, col1='dif_gol_ult_part_loc', col2='dif_gol_ult_part_vis', nombre_nueva_col='dif_gol')  # ???? Calculo la dif de gol de loc - dif de gol de vis
-    # df = df.drop(['dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'],  axis=1)
-
-    # df = forma_reciente(df, n_part=N_ULT_PART)
-    # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
-    # df = diferencia_col(df, col1='forma_loc', col2='forma_vis', nombre_nueva_col='dif_forma')  # ???? Calculo la dif de gol de loc - dif de gol de vis
-    # df = df.drop(['forma_loc', 'forma_vis'], axis=1)
-
-    # for var in l_variables_a_prom:
-        # df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
-        # df = promedio_ult_partidos_Chat_GPT(df, n_ult_part=N_ULT_PART, variable=var)
-
-    print(df.head())
-    df.to_excel('/Users/nachomondino/Desktop/df_constructed_2.xlsx')
-
-
-main()
-
+'''
 
 
 '''
