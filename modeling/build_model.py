@@ -396,7 +396,7 @@ class Modelado:
 
         else: # Entrenamos el modelo con los parametros brindados por el usuario
        
-            early_stopping = keras.callbacks.EarlyStopping(monitor='loss', patience=8)
+            early_stopping = keras.callbacks.EarlyStopping(monitor='loss', patience=20)
             # Codificar las etiquetas en formato one-hot
             self.y_bal_encoded = to_categorical(self.y_bal, num_classes=3)
             model.fit(self.X_bal, self.y_bal_encoded, epochs=n_epochs, batch_size=batches, callbacks=[early_stopping]) # , validation_data=(X_val, y_val)
@@ -456,10 +456,11 @@ class Modelado:
         modelos = [self.arbol_decision(max_depth_tree=30, n_folds_cv=cv), 
                    self.random_forest(n_folds_cv=cv, n_tress_in_forest=200, max_depth_tree=None), 
                    self.xgboost(n_folds_cv=cv, n_tress_in_forest=50, max_depth_tree=20), 
-                   self.regresion_logistica(n_folds_cv = cv, penal = 'l2', c_value = 0.1, solv = 'lbfgs', max_iteraciones= 500, multi_class='multinomial'), 
+                   self.regresion_logistica(n_folds_cv = cv, penal = 'l2', c_value = 0.1, solv = 'lbfgs', max_iteraciones= 500), 
                    self.svm(n_folds_cv = cv, kernel_type = 'rbf', ovo_o_ovr= 'ovo'), 
-                   self.red_neuronal(), 
-                   self.perceptron_multiple(n_folds_cv = cv, activ = 'tanh', hidden_layer_sizes = 128, solv = 'adam', lear_rate = 'invscaling', max_itera = 300)]
+                   self.red_neuronal(n_folds_cv = 10, n_epochs = 1000, batches = 256), 
+                   self.perceptron_multiple(n_folds_cv = cv, activ = 'tanh', hidden_layer = 128, solv = 'adam', lear_rate = 'invscaling', max_itera = 300),
+                   self.gradient_boosting(n_folds_cv = 10, lear_rate = 0.1, n_trees = 200, max_depth = 7)]
 
         test_scores = [cross_validate(model, self.X_bal, self.y_bal, scoring = 'accuracy') for model in modelos]
 
@@ -477,9 +478,11 @@ class Modelado:
 
 
 def main():
+    latest_file = "data_preparation/df_selected_manual.xlsx"
+    test_file = "data_preparation/df_prepared.xlsx"
 
-    df = pd.read_excel('data_preparation/df_prepared.xlsx')
-    df = df.drop(['historial_entre_si'], axis = 1) 
+    df = pd.read_excel(latest_file)
+    df = df.drop(['historial_entre_si', 'fecha', 'odds_loc', 'odds_emp', 'odds_vis', 'es_copa'], axis = 1) 
     print(df.head())
     print(df.shape)
 
@@ -498,7 +501,7 @@ def main():
     warnings.filterwarnings("ignore")
     t0 = time.time() # Registramos el tiempo de inicio
     # modeler.gradient_boosting(n_folds_cv = 10, lear_rate = 0.1, n_trees = 200, max_depth = 7)
-    # modeler.seleccionar_mejor_modelo()
+    modeler.seleccionar_mejor_modelo()
     t1 = time.time() # Registramos el tiempo de fin
     print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
 
