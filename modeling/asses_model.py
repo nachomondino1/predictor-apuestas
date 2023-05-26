@@ -1,7 +1,43 @@
 import pandas as pd
-from sklearn import metrics
+# from sklearn import metrics
 import matplotlib.pyplot as plt
 
+
+def calculate_ROI(df_result, var_resp, var_pred):
+    """
+    Calcula roi comparando sus predicciones y lo real
+    :param df_result: Dataframe test. Con variable respuesta y con la prediccion del modelo
+    :param var_resp: String. Nombre de la variable respuesta
+    :param var_pred: String. Nombre de la variable con la prediccion del modelo
+    :return: Float. ROI del modelo
+    """
+    ingresos = 0
+    inversion = len(df_result)  # Suponiendo 1 euro por cada partido del df_test
+
+    # Por registro
+    for i in range(len(df_result)):
+
+        # Si el modelo predijo bien
+        if df_result.loc[i, var_resp] == df_result.loc[i, var_pred]:
+
+            # Si es local --> saco cuota de local, si es empate saco cuota de empate y asi
+            if df_result.loc[i, var_resp] == "Local":
+
+                ingresos += df_result.loc[i, 'odds_loc']
+
+            elif df_result.loc[i, var_resp] == "Empate":
+
+                ingresos += df_result.loc[i, 'odds_emp']
+
+            else:
+                ingresos += df_result.loc[i, 'odds_vis']
+
+    roi = (ingresos - inversion) / inversion * 100
+    print(f" RESULTADOS ".center(120, "#"))
+    print(f"Dinero invertido: ${inversion}")
+    print(f"Dinero luego de apuestas: ${inversion}")
+    print(f"ROI: {roi:.2f}%")
+    return roi
 
 def calculate_precision(df_result, var_resp, var_pred):
     """
