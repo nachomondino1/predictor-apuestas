@@ -10,19 +10,17 @@ def main():
     Obtengo datos de jugadores mediante scrapear sofifa.com
     """
     # DEFINCION DE PARAMETROS & VARIABLES
-    SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
-    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/entidad_competicion.xlsx')
-    df_jug = pd.DataFrame(columns=['id_jugador', 'año', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo'])
+    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_competicion.xlsx')
+    df_jug = pd.DataFrame(columns=['id_jugador', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
     crawler = Crawler(headless=False, path=None)  # por algun motivo tarda 10 años el headless=True. A su vez el headless=False solo funciona si efectivamente miro el driver que se abre (sino no)
+    d = {}
 
     # Ingreso a pagina de sofifa.com con los filtros correctos
     crawler.driver.get('https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg')
-    sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
 
     # Extraigo headers para poder saber que indice tiene cada campo a extraer (la estructura html es complicada)
     l_tags_headers = crawler.extract_tags(xpath='.//tr[@class="persist-header"]/th')
     l_headers = [tag.text for tag in l_tags_headers]
-    d = {}
     for i, header in enumerate(l_headers):
         d[header] = i + 1
     print(f"Campos a extraer y su posicion: \n{d}")
@@ -33,16 +31,16 @@ def main():
     l_urls_years = [tag.get_attribute('href') for tag in l_tag_years]
 
     # POR AÑO (recorro todos las paginas de sofifa.com)
-    for url_year in l_urls_years: #[::-1]:
+    for url_year in l_urls_years:
 
         # Ingreso a pagina del año
         crawler.driver.get(url_year)
         print(f" Url pagina: {url_year} ")
 
         # Extraigo fecha
+        # crawler.click_boton(xpath='.//h2/div[@class="dropdown"][2]')  # e.g. May 16, 2023
         fecha = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)  # e.g. May 16, 2023
-        year = int(fecha.split()[-1]) # e.g. 2023
-        print(f" AÑO DEL FIFA: {year} ".center(120, "#"))
+        print(f" Fecha de actualizacion del fifa: {fecha} ".center(120, "#"))
 
         # POR PAIS
         for pais in df_comp['pais'].unique()[:-1]:  # Evito "Sudamerica"
@@ -88,15 +86,21 @@ def main():
                             d_data = {}
                             # Por campo a extraer
                             for header, pos_tag in d.items():
-                                d_data[header] = crawler.extract_tag(tag_inicial=tag, xpath=f'.//td[{pos_tag}]', text=True)
+
+                                # Si no debo extraer el nombre
+                                if header != "NAME":
+                                    d_data[header] = crawler.extract_tag(tag_inicial=tag, xpath=f'.//td[{pos_tag}]', text=True)
+                                else:
+                                    d_data[header] = crawler.extract_tag(tag_inicial=tag, xpath=f'.//td[{pos_tag}]/a',attribute="aria-label")
 
                             # Formateo campos
+                            print(d_data['NAME'])
                             d_data['NAME'] = d_data['NAME'].split('\n')[0]
                             d_data['HEIGHT'] = d_data['HEIGHT'].split('cm')[0]  # e.g. 193cm / 6'4" --> 193
                             d_data['TEAM & CONTRACT'] = d_data['TEAM & CONTRACT'].split('\n')[0]  # e.g. Salzburg 2021 ~ 2026 --> Salzburg
 
                             # Guardo los datos del jugador para dicho año
-                            l_data = [d_data['ID'], year, d_data['NAME'], d_data['AGE'], d_data['HEIGHT'], d_data['FOOT'], d_data['OVERALL RATING'], d_data['POTENTIAL'], d_data['TEAM & CONTRACT'], d_data['VALUE'], d_data['WAGE']]
+                            l_data = [d_data['ID'], fecha, d_data['NAME'], d_data['AGE'], d_data['HEIGHT'], d_data['FOOT'], d_data['OVERALL RATING'], d_data['POTENTIAL'], d_data['TEAM & CONTRACT'], d_data['VALUE'], d_data['WAGE'], pais]
                             df_jug.loc[len(df_jug)] = l_data
                             print(l_data)
 
@@ -117,9 +121,11 @@ def main():
                 input_league.send_keys(Keys.SHIFT + Keys.HOME)
                 input_league.send_keys(Keys.DELETE)
 
-        # Exporto datasets
-        df_jug.to_excel(f'./entidad_jugadores_{year}.xlsx')
+        # Exporto datasets por seguridad
+        df_jug.to_excel(f'./entidad_jugadores_{fecha}.xlsx')
 
+    # Exporto dataset final
+    df_jug.to_excel(f'./entidad_jugadores.xlsx')
     crawler.driver.close()
 
 main()

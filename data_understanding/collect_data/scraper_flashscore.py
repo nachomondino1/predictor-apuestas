@@ -14,7 +14,6 @@ def main():
     SLEEP_MIN, SLEEP_MAX = 1, 3  # Tiempos de espera luego de clicks para humanizar programa
     SEC_WAIT, SEC_WAIT_LONG = 0.1, 1.5
     crawler = Crawler(headless=True, path=None) # Creo objeto de clase CrawlerActions()
-    # df_arg = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/liga_argentina_historico.xlsx')
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/entidad_competicion.xlsx')
     df = pd.DataFrame(
         columns=['id', 'competicion', 'temporada', 'pais', 'es_copa', 'fecha', 'equipo_loc', 'equipo_vis',

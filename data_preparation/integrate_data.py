@@ -230,7 +230,7 @@ def main():
 
     df_part.to_excel('./df_integrated.xlsx', index=False)
 
-main()
+# main()
 
 
 '''

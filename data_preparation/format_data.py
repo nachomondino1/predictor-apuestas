@@ -46,13 +46,9 @@ def main():
     # Remuevo strings adicionales en los nombres de los equipos
     df = remove_strings_from_teams(df)
 
-    # Remuevo acentos en columnas con lista de jugadores
-    # df = remove_accent(df, l_col_names=['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis','l_jug_ausentes_loc', 'l_jug_ausentes_vis'])
-    # df_jug = remove_accent(df_jug, l_col_names=['nombre'])
-
     # Ordeno por campo 'fecha'
     df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
     df.to_excel('./df_formated.xlsx', index=False)
     df_jug.to_excel('./df_jug_formated.xlsx', index=False)
 
-main()
+# main()

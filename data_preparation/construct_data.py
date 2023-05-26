@@ -323,7 +323,7 @@ def main():
     df.to_excel('./df_constructed.xlsx')
 
 
-main()
+# main()
 
 '''
 def factor_ponderacion(df): # Me gusta la idea de ponderar las variables forma, posesion, remates, etc pues no es lo mismo hacerlo contra Boca de visitante que Local contra Olimpo. El factor tiene que ponderar, localidad, rival, su forma y que mas?
