@@ -1,26 +1,35 @@
+# Procesamiento de datos (no va aca)
 from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import RandomOverSampler
-import pandas as pd
 from sklearn.utils import shuffle
+
+# Generate test design
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
-import xgboost as xgb
+
+# Otras
+import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score
+import time
 import warnings
+
+# Modelos
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+import lightgbm as lgb  # Gradient Boosting
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
+from sklearn.svm import SVC  # SVM
+from sklearn.neural_network import MLPClassifier
+
+# Metricas
+from sklearn.metrics import accuracy_score
+# from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 # from typing import Optional
-# import time
-# from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 # import matplotlib.pyplot as plt
 # from itertools import cycle
 # import plotly.graph_objects as go
-# # SVM
-# from sklearn.svm import SVC
 # # Redes Nueronales
-# from sklearn.neural_network import MLPClassifier
 # from sklearn.pipeline import Pipeline
 # from tensorflow import keras
 # # from tensorflow.keras import layers
@@ -29,15 +38,12 @@ from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 # from keras.layers import Dense, Dropout
 # from keras.utils import np_utils, to_categorical
 # from keras.callbacks import EarlyStopping
-# # Gradient Boosting
-# import lightgbm as lgb
 
 
-def generate_test(df, var_resp):
+def generate_test(df, var_resp):  # La pongo momentaneamente aqui pero no va aca...
 
     # Shuffle dataset
-    df_mezclado = pd.DataFrame(shuffle(df))
-    # df = df.sample(frac=1).reset_index(drop=True)
+    df_mezclado = pd.DataFrame(shuffle(df)) # df = df.sample(frac=1).reset_index(drop=True)
 
     # Convertir variables categoricas string a categoricas numericas
     le = LabelEncoder()
@@ -60,15 +66,18 @@ def select_best_hiperparameters(X_train, y_train, model, k):
 
     # Definicion de variables
     model_name = str(model)[:str(model).find('(')]
-    d = {"DecisionTreeClassifier": {
-        'max_depth': [None, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44]},
+    d = {"DecisionTreeClassifier":
+             {'max_depth': [None, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44]},
         "RandomForestClassifier": {'max_depth': [None, 5, 6, 7, 8, 10, 15, 20, 25, 30, 35],
-                                     'n_estimators': [50, 100, 150, 200]},
-        'XGBClassifier': {'max_depth': [None, 5, 6, 7, 8, 10, 15, 20, 25, 30, 35],
-                            'n_estimators': [50, 100, 150, 200]},
+                                   'n_estimators': [50, 100, 150, 200]},
+        'XGBClassifier': {'max_depth': [None, 5, 6, 7, 8, 10, 15, 20, 25, 30, 35], 'n_estimators': [50, 100, 150, 200]},
         'LogisticRegression': {'penalty': [None, 'l2'], 'C': [0.1, 1.0, 10.0],
                                'solver': ['lbfgs', 'newton-cg', 'sag', 'saga', 'lbfgs'], 'max_iter': [100, 500, 1000],
-                               'multi_class': ['multinomial']}
+                               'multi_class': ['multinomial']},
+        'SVC': {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'], 'decision_function_shape': ['ovo', 'ovr']},
+        'MLPClassifier': {'activation': ['identity', 'logistic', 'tanh', 'relu'], 'solver': ['lbfgs', 'sgd', 'adam'],
+                'learning_rate': ['learning_rate', 'invscaling', 'adaptive'], 'max_iter': [200, 300],
+                'hidden_layer_sizes': [(64), (128), (64, 32)]}
     }
 
     # Crear el objeto GridSearchCV
@@ -158,11 +167,11 @@ def main():
                  # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                  # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
                  # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
-
-                 # self.svm(n_folds_cv=cv, kernel_type='rbf', ovo_o_ovr='ovo'),
+                 SVC(kernel='rbf', decision_function_shape='ovo'),
+                 MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
+                               max_iter=300),
+                 GradientBoostingClassifier(learning_rate= 0.1, n_estimators=200, max_depth=7)
                  # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
-                 # self.perceptron_multiple(n_folds_cv=cv, activ='tanh', hidden_layer=128, solv='adam', lear_rate='invscaling', max_itera=300),
-                 # self.gradient_boosting(n_folds_cv=10, lear_rate=0.1, n_trees=200, max_depth=7)]
                 ]
 
     # Por modelo a probar

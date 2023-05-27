@@ -8,31 +8,35 @@ from dspy.modeling import test_design
 from modeling.build_model import Modelado
 import time
 
-def format(df, df_jug):
+################################################## 3) DATA PREPARATION #################################################
+#++++++++++++++++++++++++++++++++++++++++++++++++++ 3.1 Format data ++++++++++++++++++++++++++++++++++++++++++++++++++#
+def format(df_part, df_jug):
 
     # Convierto posesion de string a integer
-    df = format_data.remove_percent_sign(df)
+    df_part = format_data.remove_percent_sign(df_part)
 
     # Convierto fecha de string a datetime
-    df = format_data.transform_date_column(df, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
+    df_part = format_data.transform_date_column(df_part, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
     df_jug = format_data.transform_date_column(df_jug, string_format='%b %d, %Y')
 
     # Remuevo strings adicionales en los nombres de los equipos
-    df = format_data.remove_strings_from_teams(df)
+    df_part = format_data.remove_strings_from_teams(df_part)
+    return df_part, df_jug
 
-    # Ordeno por campo 'fecha'
-    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
-    return df, df_jug
-
+#+++++++++++++++++++++++++++++++++++++++++++++++++ 3.2 Integrate data +++++++++++++++++++++++++++++++++++++++++++++++++#
 def integrate(df):
     pass
 
+#+++++++++++++++++++++++++++++++++++++++++++++++++ 3.3 Construct data +++++++++++++++++++++++++++++++++++++++++++++++++#
 def construct(df, N_ULT_PART = 5):
+
+    # Ordeno por campo 'fecha'
+    # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
 
     # Construct data
     df = construct_data.equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
     df = construct_data.numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
-    df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART)
+    df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=N_ULT_PART)
 
     # No genero dif_gol porque tiene alta correlacion (0.9) con dif_forma
     df = construct_data.promedio_dif_gol_ult_part(df,
@@ -46,9 +50,9 @@ def construct(df, N_ULT_PART = 5):
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
 
     df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
-
     return df
 
+#++++++++++++++++++++++++++++++++++++++++++++++++++ 3.4 Select data ++++++++++++++++++++++++++++++++++++++++++++++++++#
 def select(df):
 
     # Caro
@@ -72,63 +76,75 @@ def select(df):
     '''
     return df
 
+#++++++++++++++++++++++++++++++++++++++++++++++++++ 3.5 Clean data ++++++++++++++++++++++++++++++++++++++++++++++++++#
 def clean(df):
     # Categorizo columnas numericas
     # df = clean_data.categorize_numeric_columns(df)
 
     # Remover NaN values
-    df = df.dropna()  # inplace=True
-    # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
-    # df.to_excel('/Users/nachomondino/Desktop/df_prepared.xlsx', index=False)
+    df = df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
+
+    # Eliminacion de outliers
 
     return df
 
+##################################################### 4) MODELING #####################################################
+#++++++++++++++++++++++++++++++++++++++++++++++ 4.2 Generate test design ++++++++++++++++++++++++++++++++++++++++++++++#
 def generate_test(df, var_resp):
-
-    # Shuffle dataset
-    df_mezclado = pd.DataFrame(shuffle(df))
-    # df = df.sample(frac=1).reset_index(drop=True)
-
-    # Convertir variables categoricas string a categoricas numericas
+    # Definicion de variables
     le = LabelEncoder()
     oversampler = RandomOverSampler()
+
+    # Shuffle dataset
+    df_mezclado = pd.DataFrame(shuffle(df))  # df = df.sample(frac=1).reset_index(drop=True)
+
+    # Convertir variables categoricas string a categoricas numericas
     for col in df_mezclado.select_dtypes(include=['object']).columns:
         df_mezclado[col] = le.fit_transform(df_mezclado[col])
 
     # Balanceamos segun variable respuesta
-    X, y = df_mezclado.drop(var_resp, axis=1), df_mezclado[var_resp]
+    X, y = df_mezclado.drop(var_resp, axis=1), df_mezclado[var_resp]  # df = clean_data.balance_dataset(df, var_resp='equipo_ganador')
     X_bal, y_bal = oversampler.fit_resample(X, y)
-    # df = clean_data.balance_dataset(df, var_resp='equipo_ganador')
 
     # Separo conjunto de datos en train y test
     # df_train, df_test = test_design.separate_train_and_test(df, porc_corte=0.8)
     # df_train = df_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
     # print(df_train.shape, df_test.shape)
-    return X_bal, y_bal
+    return X_bal, y_bal  # retorno df_train y df_test?
 
-def build_model(X_bal, y_bal):
+#++++++++++++++++++++++++++++++++++++++++++++++++++ 4.3 Build model ++++++++++++++++++++++++++++++++++++++++++++++++++#
+def build_model(X, y):
 
-    modeler = Modelado(X_bal, y_bal, 'equipo_ganador')
+    warnings.filterwarnings("ignore")
+    best_acurracy = 0
+    l_modelos = [DecisionTreeClassifier(max_depth=30),
+                 # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
+                 # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
+                 # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
+                 SVC(kernel='rbf', decision_function_shape='ovo'),
+                 MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
+                               max_iter=300),
+                 GradientBoostingClassifier(learning_rate= 0.1, n_estimators=200, max_depth=7)
+                 # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
+                ]
 
-    # Probamos varios modelos
-    modeler.arbol_decision(plot_feature_importance=True) # max_depth_tree=25, n_folds_cv=10
-    modeler.random_forest(n_folds_cv=10, n_tress_in_forest=100, max_depth_tree=25, plot_feature_importance=True) 
-    modeler.xgboost(n_folds_cv=10, n_tress_in_forest=50, max_depth_tree=15, plot_feature_importance=True)
-    modeler.regresion_logistica(n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500) # n_folds_cv= 10, penal = 'l2', c_value = 1, solv = 'lbfgs', max_iter= 500 
-    modeler.svm(n_folds_cv = 10, kernel_type = 'poly', ovo_o_ovr= 'ovo')
-    modeler.perceptron_multiple(n_folds_cv = 10, activ = 'tanh', solv = 'lbfgs', lear_rate = 'invscaling', max_itera = 300)
-    modeler.red_neuronal(n_folds_cv = 10, n_epochs = 1000, batches = 256)
-    modeler.gradient_boosting(n_folds_cv = 10, lear_rate = 0.1, n_trees = 200, max_depth = 7)
-    # warnings.filterwarnings("ignore")
+    # Por modelo a probar
+    for modelo in l_modelos:
 
-    # Seleccionamos mejor modelo
-    t0 = time.time() # Registramos el tiempo de inicio
-    best_model = modeler.seleccionar_mejor_modelo()
-    t1 = time.time() # Registramos el tiempo de fin
-    print(f"La función tardó {(t1-t0)/60:.2f} minutos en ejecutarse") # Imprimimos el tiempo transcurrido
+        # Entreno modelo
+        print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '#'))
+        model, cv_accuracy, test_accuracy = build_model(X, y, modelo, best_params=True, k=5) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
 
+        # Si es el mejor modelo hasta aqui
+        if test_accuracy > best_acurracy:
+            # Guardo modelo
+            best_acurracy = test_accuracy
+            best_model = model
+
+    print(f"\nEl mejor modelo es: {best_model}")
     return best_model, df_result   #df_result y_real e y_pred
 
+#++++++++++++++++++++++++++++++++++++++++++++++++++ 4.4 Assess model ++++++++++++++++++++++++++++++++++++++++++++++++++#
 def assess_model(model, df_test, var_resp):
 
     df_result = naive_bayes.predict_naive_bayes(modelo_nb, df_test, var_resp=var_resp, con_prob=True)
@@ -142,48 +158,44 @@ def assess_model(model, df_test, var_resp):
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    N_MODELOS = 15
-    l_aciertos, l_roi = [], []
+    data_prep = False
+    modeling = True
 
-    '''
-    # Levanto el dataset
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/liga_argentina_historico.xlsx')
+    if data_prep is True:
 
-    # 3) Data preparation
-    df = format(df, df_jug)
+        # Levanto datasets
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/liga_argentina_historico.xlsx')
+        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx')
 
-    df = integrate(df, df_jug)
+        # 3.1 Format data
+        df_part, df_jug = format(df_part, df_jug)
 
-    df = construct(df, N_ULT_PART=5)
+        # 3.2 Integrate data
+        df = integrate(df_part, df_jug)
 
-    df = clean(df)
-    '''
+        # 3.3 Construct data
+        df = construct(df, N_ULT_PART=5)
 
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/df_selected_manual.xlsx')
-    df = clean(df)
+        # 3.4 Select data
+        df = select(df)
 
-    x_bal, y_bal = generate_test(df, var_resp="equipo_ganador")
+        # 3.5 Clean data
+        df = clean(df)
 
-
-    best_model = build_model(x_bal, y_bal)
-    # Guardar best_model
-
-    # Modeler() --> best_model y df_result
-
-    assess_model()
+    else:
+        # Levanto dataset ya preparado
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/df_selected_manual.xlsx')
 
 
-    '''
-    # 4) Modeling
-    # Por modelo
-    for i in range(N_MODELOS):
-        precision, roi = modeling(df)
-        l_aciertos.append(precision)
-        l_roi.append(roi)
+    if modeling is True:
 
-    print(f"Max: {max(l_aciertos)} Min: {min(l_aciertos)} Prom: {sum(l_aciertos) / len(l_aciertos)}")
-    print(f"Max: {max(l_roi)} Min: {min(l_roi)} Prom: {sum(l_roi) / len(l_roi)}")
-    '''
-    # que hacer CV?
-    # Dejamos metricas en Modeler? o ponemos en assess_model?
+        # 4.2 Generate test design
+        x_bal, y_bal = generate_test(df, var_resp="equipo_ganador")
+
+        # 4.3 Build model
+        best_model = build_model(x_bal, y_bal)
+
+        # 4.4 Assess model
+        assess_model(model, df_test, 'equipo_ganador')
+
 main()

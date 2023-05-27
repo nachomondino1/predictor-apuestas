@@ -1,6 +1,6 @@
 import pandas as pd
-from sklearn.feature_selection import SelectFromModel
-from sklearn.ensemble import RandomForestClassifier
+# from sklearn.feature_selection import SelectFromModel
+# from sklearn.ensemble import RandomForestClassifier
 
 def feature_selection(df):  # Es sin variables categoricas
 
