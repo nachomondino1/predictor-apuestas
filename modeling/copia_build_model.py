@@ -94,10 +94,11 @@ def select_best_hiperparameters(X_train, y_train, model, k):
     model = grid_search.best_estimator_
     return model
 
-def build_model(X, y, model, best_params=False, k=5):
+def build_model(df_train, df_test, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
     # Dividir los datos en conjunto de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = df_train.drop(var_resp, axis=1), df_test.drop(var_resp, axis=1), df_train[var_resp], df_test[var_resp]
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Verificar si se deben buscar los mejores hiperparámetros
     if best_params:

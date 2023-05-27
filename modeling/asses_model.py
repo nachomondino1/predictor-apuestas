@@ -133,9 +133,6 @@ def entrenamiento_y_calcular_metricas(self, model, n_folds_cv: int = 10, select_
     # Especificar las métricas que se desean calcular
     scoring = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro']
 
-    # Grid (cambia para cada modelo)
-    # modelo, parametros, numero_cv
-
     # Realizar validación cruzada y obtener los resultados
     if isinstance(model, keras.models.Sequential):  #  Si es una red neuronal, el y que usamos tiene que ser de tipo one hot encoder
         print("ES UNA NN")
