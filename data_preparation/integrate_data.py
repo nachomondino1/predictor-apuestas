@@ -5,7 +5,24 @@ import re
 import time
 
 
-def separate_lists_in_columns(df, variable):  # Altamente ineficiente. Cuando extraiga cada jugador en vez de la lista, podre borrala
+def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
+    '''
+    Prepara el texto de las columnas que contengan strings.
+    :param df: Dataframe.
+    :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
+    '''
+    # Convertir variables categoricas string a categoricas numericas
+    for var in df.select_dtypes(include=['object']).columns:
+
+        prepare_text = TextPreparation(textos=df[var])
+        prepare_text.to_lower()
+        prepare_text.delete_accent()
+        prepare_text.delete_special_characters()
+        df[var] = prepare_text.textos
+
+    return df
+
+def separate_lists_in_columns(df, variable):  # Altamente ineficiente.( tampoco tanto, tarda 4.2 seg, 4.1, 2.3, 1.9, 0.6, 0.6 Cuando extraiga cada jugador en vez de la lista, podre borrala
     """
     Convierto columnas que contienen listas en multiples columnas de un solo elemento
     :param df: Dataframe.
@@ -33,29 +50,77 @@ def separate_lists_in_columns(df, variable):  # Altamente ineficiente. Cuando ex
     df = df.drop([variable], axis=1)
     return df
 
-def separate_name_and_surname(name):
+def search_player_data(df_part, df_jug, variable):  # ojo con la comparacion si hay mayusculas...
     """
-    De un nombre completo separo en nombre y apellido
-    :param name: String. Nombre completo (e.g. "L. Gonzalez", "Nacho Fernandez", "higuita")
+    Segun el nombre del jugador, la fecha y el equipo(?) en la entidad partido, busco sus atributos en la entidad jugador
+    :param df:
     :return:
     """
-    # Si contiene punto  (e.g. "Gonzalez L.", "De la cruz N.")
-    if len(name.split(".")) > 1:
+    # Defino las columnas a procesar segun la variable
+    pattern = variable[2:] + '_[0-9]*'
+    l_jug_to_preprocess = df_part.filter(regex=pattern, axis=1).columns.tolist()  #LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
+    d = {}
 
-        pos_punto = name.find('.')
-        nombre = name[pos_punto - 1:pos_punto]
-        apellido = name[:pos_punto - 2]  # Si hay doble apellido, lo selecciono   # apellido = nombre_jug_part.split()[0]  # Si hay doble apellido, me quedo solo con el primero...
-        return nombre, apellido
+    # Por partido (fila) en entidad partido
+    for i in range(len(df_part)):
 
-    # Si contiene punto  (e.g. "Nacho Fernandez")
-    elif len(name.split()) > 1:
-        nombre = name[:name.find(" ")][0]  # Solo la letra inicial
-        apellido = name[name.find(" ")+1:]
-        return nombre, apellido
+        # Obtengo equipo y año del partido
+        equipo_jug_part = df_part.loc[i, 'equipo_loc'] if 'loc' in variable else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
+        year_part = df_part.loc[i, 'fecha'].year   # e.g. 2023
+        print(f' Partido Nº: {i} '.center(120, '#'))
 
-    # Si es un solo nombre (suele ser solo el apellido)
-    else:
-        return str(), name
+        # Reinicio variables
+        l_prom_edad, l_prom_alt, l_prom_rating, l_prom_valor = [], [], [], []
+
+        # Por jugador
+        for jug in l_jug_to_preprocess:
+
+            # Busco nombre del jugador en la entidad partido
+            nombre_jug_part = df_part.loc[i, jug]  # e.g. "Rodriguez D. (G) (C)"
+
+            # Si el jugador no es nan
+            if isinstance(nombre_jug_part, str):
+
+                print(f' {nombre_jug_part} '.center(100, '-'))
+                print(f' JUGADOR EN ENTIDAD PARTIDO: ')
+                print(f'\t- Nombre: {nombre_jug_part}')
+                print(f'\t- Equipo: {equipo_jug_part}')
+                print(f'\t- Año: {year_part}')
+                print('\nBuscando jugador en entidad partido...')
+
+                # Busco match entre df_part y df_jug solo si ya no lo busque para dicho jugador
+                if f'{equipo_jug_part}{year_part}{nombre_jug_part}' in d.keys():
+                    l = d[f'{equipo_jug_part}{year_part}{nombre_jug_part}']
+                    edad, altura, overall_rating = l[0], l[1], l[2]
+                else:
+                    edad, altura, overall_rating = find_match(df_jug, nombre_jug_part, equipo_jug_part, year_part)
+
+                # Obtengo datos del jugador (overall_rating, edad, altura, valor de mercado)
+                print(f"\nMejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}")
+
+                if edad is not None:
+                    l_prom_edad.append(edad)
+                    l_prom_alt.append(altura)
+                    l_prom_rating.append(overall_rating)
+                    # l_prom_valor.append(df_jug.loc[idx, 'valor_mercado'])  # es un string...
+
+                    # Guardo coincidencia de jugador para evitar volver a buscarlo...
+                    d[f'{equipo_jug_part}{year_part}{nombre_jug_part}'] = [edad, altura, overall_rating]
+                else:
+                    print("Fallo la busqueda")
+
+        # Guardo promedios de edad, altura, overall_rating y valor de mercado
+        try:
+            df_part.loc[i, f'{variable}_prom_edad'] = sum(l_prom_edad) / len(l_prom_edad)
+            df_part.loc[i, f'{variable}_prom_alt'] = sum(l_prom_alt) / len(l_prom_alt)
+            df_part.loc[i, f'{variable}_prom_rat'] = sum(l_prom_rating) / len(l_prom_rating)
+            print(f'Promedio de edad: {sum(l_prom_edad) / len(l_prom_edad)}')
+            print(f'Promedio de altura: {sum(l_prom_alt) / len(l_prom_alt)}')
+            print(f'Promedio de rating: {sum(l_prom_rating) / len(l_prom_rating)}')
+
+        except ZeroDivisionError:
+            print("Aparentemente no hay datos de jugadores para el partido")
+    return df_part
 
 def find_match(df_jug, nombre_jug_part, equipo_jug_part, year_part):
 
@@ -108,126 +173,52 @@ def find_match(df_jug, nombre_jug_part, equipo_jug_part, year_part):
             match_data['overall_rating'] = df_jug_filt.loc[j, 'overall_rating']
     return match_data['edad'], match_data['altura'], match_data['overall_rating']
 
-def search_player_data(df_part, df_jug, variable):  # ojo con la comparacion si hay mayusculas...
+def separate_name_and_surname(name):
     """
-    Segun el nombre del jugador, la fecha y el equipo(?) en la entidad partido, busco sus atributos en la entidad jugador
-    :param df:
+    De un nombre completo separo en nombre y apellido
+    :param name: String. Nombre completo (e.g. "L. Gonzalez", "Nacho Fernandez", "higuita")
     :return:
     """
-    # Defino las columnas a procesar segun la variable
-    pattern = variable[2:] + '_[0-9]*'
-    l_jug_to_preprocess = df_part.filter(regex=pattern, axis=1).columns.tolist()  #LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
-    d = {}
+    # Si contiene punto  (e.g. "Gonzalez L.", "De la cruz N.")
+    if len(name.split(".")) > 1:
 
-    # Por partido (fila) en entidad partido
-    for i in range(len(df_part)):
+        pos_punto = name.find('.')
+        nombre = name[pos_punto - 1:pos_punto]
+        apellido = name[:pos_punto - 2]  # Si hay doble apellido, lo selecciono   # apellido = nombre_jug_part.split()[0]  # Si hay doble apellido, me quedo solo con el primero...
+        return nombre, apellido
 
-        # Obtengo equipo y año del partido
-        equipo_jug_part = df_part.loc[i, 'equipo_loc'] if 'loc' in variable else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
-        year_part = df_part.loc[i, 'fecha'].year   # e.g. 2023
-        print(f' Partido Nº: {i} '.center(120, '#'))
+    # Si contiene punto  (e.g. "Nacho Fernandez")
+    elif len(name.split()) > 1:
+        nombre = name[:name.find(" ")][0]  # Solo la letra inicial
+        apellido = name[name.find(" ")+1:]
+        return nombre, apellido
 
-        # Reinicio variables
-        l_prom_edad, l_prom_alt, l_prom_rating, l_prom_valor = [], [], [], []
-
-        # Por jugador
-        for jug in l_jug_to_preprocess:
-
-            # Busco nombre del jugador en la entidad partido
-            nombre_jug_part = df_part.loc[i, jug]  # e.g. "Rodriguez D. (G) (C)"
-
-            # Si el jugador no es nan
-            if isinstance(nombre_jug_part, str):
-
-                print(f' {nombre_jug_part} '.center(100, '-'))
-                print(f' JUGADOR EN ENTIDAD PARTIDO: ')
-                print(f'\t- Nombre: {nombre_jug_part}')
-                print(f'\t- Equipo: {equipo_jug_part}')
-                print(f'\t- Año: {year_part}')
-                print('\nBuscando jugador en entidad partido...')
-
-                if f'{equipo_jug_part}{year_part}{nombre_jug_part}' in d.keys():
-                    l = d[f'{equipo_jug_part}{year_part}{nombre_jug_part}']
-                    edad, altura, overall_rating = l[0], l[1], l[2]
-
-                else:
-                    edad, altura, overall_rating = find_match(df_jug, nombre_jug_part, equipo_jug_part, year_part)
-
-                # Obtengo datos del jugador (overall_rating, edad, altura, valor de mercado)
-                print(f"\nMejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}")
-
-                if edad is not None:
-                    l_prom_edad.append(edad)
-                    l_prom_alt.append(altura)
-                    l_prom_rating.append(overall_rating)
-                    # l_prom_valor.append(df_jug.loc[idx, 'valor_mercado'])  # es un string...
-
-                    # Guardo coincidencia de jugador para evitar volver a buscarlo...
-                    d[f'{equipo_jug_part}{year_part}{nombre_jug_part}'] = [edad, altura, overall_rating]
-                else:
-                    print("Fallo la busqueda")
-
-        # Guardo promedios de edad, altura, overall_rating y valor de mercado
-        try:
-            df_part.loc[i, f'{variable}_prom_edad'] = sum(l_prom_edad) / len(l_prom_edad)
-            df_part.loc[i, f'{variable}_prom_alt'] = sum(l_prom_alt) / len(l_prom_alt)
-            df_part.loc[i, f'{variable}_prom_rat'] = sum(l_prom_rating) / len(l_prom_rating)
-            print(f'Promedio de edad: {sum(l_prom_edad) / len(l_prom_edad)}')
-            print(f'Promedio de altura: {sum(l_prom_alt) / len(l_prom_alt)}')
-            print(f'Promedio de rating: {sum(l_prom_rating) / len(l_prom_rating)}')
-
-        except ZeroDivisionError:
-            print("Aparentemente no hay datos de jugadores para el partido")
-    return df_part
-
+    # Si es un solo nombre (suele ser solo el apellido)
+    else:
+        return str(), name
 
 def main():
-    '''
     # Definicion de variables
     l_var = ['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis', 'l_jug_ausentes_loc', 'l_jug_ausentes_vis']
 
     # Levanto datasets
-    df = pd.read_excel("./df_formated.xlsx")
+    df_part = pd.read_excel("./df_formated.xlsx")
     df_jug = pd.read_excel("./df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
-    print(df.head())
+    print(df_part.head())
 
-    # Prepato texto de df_part
-    l_var_to_prepare_part = ['equipo_loc', 'equipo_vis', 'l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc',
-                             'l_jug_sup_vis', 'l_jug_ausentes_loc', 'l_jug_ausentes_vis']
-    for var in l_var_to_prepare_part:
-        prepare_text = TextPreparation(textos=df[var])
-        prepare_text.to_lower()
-        prepare_text.delete_accent()
-        prepare_text.delete_special_characters()
-        df[var] = prepare_text.textos
+    # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores
+    df_part = prepare_text_columns(df_part)
+    df_jug = prepare_text_columns(df_jug)
 
-    # Prepato texto de df_jug
-    l_var_to_prepare_jug = ['nombre', 'equipo_actual']
-    for var in l_var_to_prepare_jug:
-        prepare_text = TextPreparation(textos=df_jug[var])
-        prepare_text.to_lower()
-        prepare_text.delete_accent()
-        prepare_text.delete_special_characters()
-        df_jug[var] = prepare_text.textos
-
-    # Separo columnas listas en multiples columnas
+    # Separo columnas listas en multiples columnas (NO VA A SER NECESARIO CUANDO DESDE LA MISMA EXTRACCION EXTRAIGA VARIAS COLUMNAS...)
     for var in l_var:
-        df = separate_lists_in_columns(df, var)
+        df_part = separate_lists_in_columns(df_part, var)
 
-    df.to_excel('./prueba.xlsx', index=False)
-    df_jug.to_excel('./prueba_2.xlsx', index=False)
-
-    '''
-    # Relaciono jugador de entidad partido con jugador de entidad jugador
-    df = pd.read_excel('./prueba.xlsx')
-    df_jug = pd.read_excel('./prueba_2.xlsx') # A pesar de correr format_data con index=False, hace falta el index_col=0
-    print(df.head())
-    print(df_jug.head())
-
-    l_var = ['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis', 'l_jug_ausentes_loc', 'l_jug_ausentes_vis']
+    # Integro datasets
     for var in l_var:
-        df_part = search_player_data(df, df_jug, var)
+        df = search_player_data(df_part, df_jug, var)
 
-    df_part.to_excel('./df_integrated.xlsx', index=False)
+    df.to_excel('./df_integrated.xlsx', index=False)
 
-# main()
+
+main()
