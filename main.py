@@ -1,6 +1,8 @@
 # Importo librerias
 import pandas as pd
 import time
+import numpy as np
+import warnings
 
 # Data understanding
 from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
@@ -8,23 +10,36 @@ from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
 # Data preparation
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 from dspy.data_preparation import clean_data
-# from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 
-# Modeling
-# from modeling import copia_build_model, asses_model
-# from sklearn.utils import shuffle
+# # Generate test design
 # from dspy.modeling import test_design
-# from dspy.modeling.supervised_learning import naive_bayes
 # from imblearn.over_sampling import RandomOverSampler
+# from sklearn.utils import shuffle
+#
+#
+# # Modelos
+# from modeling import copia_build_model, asses_model
+# from dspy.modeling.supervised_learning import naive_bayes
+# from sklearn.tree import DecisionTreeClassifier, plot_tree
+# import xgboost as xgb  # XGBoost
+# from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+# import lightgbm as lgb  # Gradient Boosting
+# from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
+# from sklearn.svm import SVC  # SVM
+# from sklearn.neural_network import MLPClassifier
+# from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
+#
+# # Metricas
+# from sklearn.metrics import accuracy_score
 
 
-# Por ahi es al pedo la clase, ver si conviene y justificar.
 class DataPreparation:
 
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def format_data(self, df_part, df_jug):
+    def format_data(self, df_part, df_jug, export=False):
 
         # Convierto posesion de string a integer
         df_part = format_data.remove_percent_sign(df_part)
@@ -36,12 +51,13 @@ class DataPreparation:
         # Remuevo strings adicionales en los nombres de los equipos
         df_part = format_data.remove_strings_from_teams(df_part)
 
-        df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
-        df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
+        if export:
+            df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
+            df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
 
         return df_part, df_jug
 
-    def integrate_data(self, df_part, df_jug):
+    def integrate_data(self, df_part, df_jug, export=False):
 
         # Definicion de variables
         l_var = ['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis', 'l_jug_ausentes_loc',
@@ -59,10 +75,11 @@ class DataPreparation:
         for var in l_var:
             df_integrated = integrate_data.search_player_data(df_part, df_jug, var)
 
-        df_integrated.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
+        if export:
+            df_integrated.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
         return df_integrated
 
-    def construct_data(self, df, N_ULT_PART = 5):
+    def construct_data(self, df, N_ULT_PART = 5, export=False):
 
         # Ordeno por campo 'fecha'
         # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
@@ -80,6 +97,7 @@ class DataPreparation:
         df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
 
         # Calculo diferencias para las variables promedio de los jugadores
+        # Podria hacer una resta de todas las variables que tengan "loc" en su nombre con "vis"...
         df['dif_rat_tit'] = df['l_jug_tit_loc_prom_rat'] - df['l_jug_tit_vis_prom_rat']
         df['dif_edad_tit'] = df['l_jug_tit_loc_prom_edad'] - df['l_jug_tit_vis_prom_edad']
         df['dif_alt_tit'] = df['l_jug_tit_loc_prom_alt'] - df['l_jug_tit_vis_prom_alt']
@@ -94,16 +112,14 @@ class DataPreparation:
         # df = convert_odds_to_prob(df)
         # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
 
-        df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
+        if export:
+            df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
         return df
 
-    def select_data(self, df):
-
-        # Caro
-        # df = df.drop(['historial_entre_si', 'fecha', 'odds_loc', 'odds_emp', 'odds_vis', 'es_copa'], axis = 1)
+    def select_data(self, df, export=False):
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df = df.drop(['id', 'fecha', 'cancha'], axis=1)
+        df = df.drop(['id', 'fecha', 'cancha', 'es_copa', 'historial_entre_si'], axis=1)
 
         # Remocion de variables redundantes (las de mayor correlacion)
         df_correlation_matrix = df.drop(self.var_resp, axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
@@ -114,10 +130,11 @@ class DataPreparation:
         # select_data.feature_selection(df)
         df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
 
-        df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
+        if export:
+            df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
         return df
 
-    def clean_data(self, df):
+    def clean_data(self, df, export=False):
 
         # Categorizo columnas numericas
         # df = clean_data.categorize_numeric_columns(df)
@@ -132,7 +149,8 @@ class DataPreparation:
         for col in df.select_dtypes(include=['object']).columns:
             df[col] = le.fit_transform(df[col])
 
-        df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
+        if export:
+            df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
         return df
 
 class Modeling:
@@ -140,48 +158,44 @@ class Modeling:
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def generate_test_design(self, df):
+    def generate_test_design(self, df, export=True):
 
         # Definicion de variables
         oversampler = RandomOverSampler()
 
         # Shuffle dataset
         df = pd.DataFrame(shuffle(df))  # df = df.sample(frac=1).reset_index(drop=True)
+        print(f"Shape dataframe original: {df.shape}")
 
-        # Balanceamos segun variable respuesta
-        df = clean_data.balance_dataset(df, var_resp=self.var_resp)
-        # X, y = df_mezclado.drop(var_resp, axis=1), df_mezclado[var_resp]
-        # X_bal, y_bal = oversampler.fit_resample(X, y)
+        # Balanceamos segun variable respuesta     # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
+        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
+        X_bal, y_bal = oversampler.fit_resample(X, y)
+        df_balanced = pd.concat([X_bal, y_bal], axis=1)  # Funciona?
+        print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
 
         # Separo conjunto de datos en train y test
-        df_train, df_test = test_design.separate_train_and_test(df, porc_corte=0.8)
+        df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=0.8)
         df_train = df_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        print(df_train.shape, df_test.shape)
+        print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
+
+        if export:
+            df_train.to_excel('./modeling/data/df_train.xlsx', index=False)
+            df_test.to_excel('./modeling/data/df_test.xlsx', index=False)
 
         return df_train, df_test
 
-    def build_model(self, df_train, df_test):  # que argumentos? l_modelos, best_params?, k?
+    def select_best_model(self, df_train, df_test, l_modelos, best_params=False, k=10):  # que argumentos? l_modelos, best_params?, k?
 
         # Definicion de variables
         warnings.filterwarnings("ignore")
         best_acurracy = 0
-        l_modelos = [DecisionTreeClassifier(max_depth=30),
-                  # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
-                  # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
-                  # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
-                  SVC(kernel='rbf', decision_function_shape='ovo'),
-                  MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
-                                max_iter=300),
-                  GradientBoostingClassifier(learning_rate= 0.1, n_estimators=200, max_depth=7)
-                  # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
-                 ]
 
         # Por modelo a probar
         for modelo in l_modelos:
 
             # Entreno modelo
             print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '#'))
-            model, cv_accuracy, test_accuracy = copia_build_model.build_model(df_train, df_test, self.var_resp, modelo, best_params=True, k=5) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
+            model, cv_accuracy, test_accuracy = copia_build_model.build_model(df_train, df_test, self.var_resp, modelo, best_params=best_params, k=k) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
 
             # Si es el mejor modelo hasta aqui
             if test_accuracy > best_acurracy:  # GUARDAR MAS METRICAS? HAGO EL ASSESS MODEL ACA?
@@ -191,7 +205,6 @@ class Modeling:
 
         print(f"\nEl mejor modelo es: {best_model}")
         return best_model, df_result #df_result y_real e y_pred
-
 
     def assess_model(self, model, df_test):
 
@@ -212,37 +225,44 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
     data_unders = False
-    data_prep = False
-    modeling = True
+    data_prep = True
+    modeling = False
     var_resp = 'equipo_ganador'
 
     # Hiperparametros
     N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+    l_modelos = [DecisionTreeClassifier(max_depth=30),
+                 # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
+                 # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
+                 # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
+                 SVC(kernel='rbf', decision_function_shape='ovo'),
+                 MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
+                               max_iter=300),
+                 GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
+                 # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
+                 ]
 
     if data_unders is True:
-
         df_part = scraper_flashscore.extract_flashscore()
         df_jug = scraper_sofifa.extract_sofifa
-
     else:
         # Levanto datasets
         df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
         df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx')
 
-    if data_prep is True:
 
+    if data_prep is True:
         prepare = DataPreparation(var_resp)
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(df_part, df_jug)
-        df = prepare.integrate_data(df_part, df_jug)
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART)
-        df = prepare.select_data(df)
-        df = prepare.clean_data(df)
-
+        df_part, df_jug = prepare.format_data(df_part, df_jug, export=True)
+        df = prepare.integrate_data(df_part, df_jug, export=True)
+        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
+        df = prepare.select_data(df, export=True)
+        df = prepare.clean_data(df, export=True)
     else:
          # Levanto dataset ya preparado
-         df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/df_selected_manual.xlsx')
+         df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_selected_manual.xlsx')
 
 
     if modeling is True:
@@ -251,8 +271,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         modeler = Modeling(var_resp)
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(df)
-        best_model, df_result = modeler.build_model(df_train, df_test)
-        precision, roi = modeler.assess_model(best_model, df_result)
+        df_train, df_test = modeler.generate_test_design(df, export=True)
+        # best_model, df_result = modeler.select_best_model(df_train, df_test, l_modelos, best_params=True, k=5)
+        # precision, roi = modeler.assess_model(best_model, df_result)
 
 main()

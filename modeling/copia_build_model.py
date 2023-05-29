@@ -1,16 +1,10 @@
-# Procesamiento de datos (no va aca)
-from sklearn.preprocessing import LabelEncoder
-from imblearn.over_sampling import RandomOverSampler
-from sklearn.utils import shuffle
-
-# Generate test design
-from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
-
-# Otras
 import pandas as pd
 import numpy as np
 import time
 import warnings
+
+# Generate test design
+from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
 
 # Modelos
 from sklearn.tree import DecisionTreeClassifier, plot_tree
@@ -38,29 +32,6 @@ from sklearn.metrics import accuracy_score
 # from keras.layers import Dense, Dropout
 # from keras.utils import np_utils, to_categorical
 # from keras.callbacks import EarlyStopping
-
-
-def generate_test(df, var_resp):  # La pongo momentaneamente aqui pero no va aca...
-
-    # Shuffle dataset
-    df_mezclado = pd.DataFrame(shuffle(df)) # df = df.sample(frac=1).reset_index(drop=True)
-
-    # Convertir variables categoricas string a categoricas numericas
-    le = LabelEncoder()
-    oversampler = RandomOverSampler()
-    for col in df_mezclado.select_dtypes(include=['object']).columns:
-        df_mezclado[col] = le.fit_transform(df_mezclado[col])
-
-    # Balanceamos segun variable respuesta
-    X, y = df_mezclado.drop(var_resp, axis=1), df_mezclado[var_resp]
-    X_bal, y_bal = oversampler.fit_resample(X, y)
-    # df = clean_data.balance_dataset(df, var_resp='equipo_ganador')
-
-    # Separo conjunto de datos en train y test
-    # df_train, df_test = test_design.separate_train_and_test(df, porc_corte=0.8)
-    # df_train = df_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-    # print(df_train.shape, df_test.shape)
-    return X_bal, y_bal
 
 def select_best_hiperparameters(X_train, y_train, model, k):
 
@@ -148,7 +119,7 @@ def build_model(df_train, df_test, var_resp, model, best_params=False, k=5):  # 
 def main():
 
     # Levanto dataset
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/df_selected_manual.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_selected_manual.xlsx')
 
 
     # Procesamiento que le falta al df --> no iria aca...
@@ -191,4 +162,4 @@ def main():
     print(f"\nEl mejor modelo es: {best_model}")
 
 
-main()
+# main()
