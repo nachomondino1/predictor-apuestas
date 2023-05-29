@@ -39,10 +39,10 @@ class DataPreparation:
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def format_data(self, df_part, df_jug, export=False):
+    def format_data(self, df_part, df_jug, export=False): # 1 min
 
         start = time.time()
-        print("Formateando los datos")
+        print("\nFormateando los datos...")
 
         # Convierto posesion de string a integer
         df_part = format_data.convert_posesion_to_int(df_part)
@@ -59,18 +59,21 @@ class DataPreparation:
         for var in l_var:
             df_part = format_data.separate_lists_in_columns(df_part, var)
 
+        # Convierto valor de mercado en entero
+        df_jug = format_data.convert_valor_mercado_to_int(df_jug)
+
         if export:
             df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
             df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
 
         end = time.time()
-        print(f"Formateo de datos en {(end - start):.1f} segundos")
+        print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
         return df_part, df_jug
 
-    def integrate_data(self, df_part, df_jug, export=False):
+    def integrate_data(self, df_part, df_jug, export=False):  # 55 min
 
         start = time.time()
-        print("Integrando los datos")
+        print("\nIntegrando los datos...")
 
         # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores (lo hago aqui y no en clean_data porque uso variables strings para integrar datos)
         df_part = clean_data.prepare_text_columns(df_part)
@@ -83,40 +86,38 @@ class DataPreparation:
             df_integrated.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
 
         end = time.time()
-        print(f"Integracion de datos en {(end - start):.1f} segundos")
+        print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         return df_integrated
 
     def construct_data(self, df, N_ULT_PART = 5, export=False):
 
         start = time.time()
-        print("Construyendo nuevos datos")
+        print("\nConstruyendo nuevos datos...")
 
         # Ordeno por campo 'fecha'
-        # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
-
-        l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases',
-                               'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
+        # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)  # Todos son ascending=True salvo historial_entre_si_segun_localia
 
         # Construct data
-        df = construct_data.equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
+        df = construct_data.determinar_equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
 
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
+
+        l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
+        for var in l_variables_a_prom:
+            df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
 
         df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
 
         df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
 
         # Calculo diferencias para las variables promedio de los jugadores
-        # Podria hacer una resta de todas las variables que tengan "loc" en su nombre con "vis"...
+        # Podria hacer una resta de todas las variables que tengan "loc" en su nombre con "vis"...?
         df['dif_rat_tit'] = df['l_jug_tit_loc_prom_rat'] - df['l_jug_tit_vis_prom_rat']
         df['dif_edad_tit'] = df['l_jug_tit_loc_prom_edad'] - df['l_jug_tit_vis_prom_edad']
         df['dif_alt_tit'] = df['l_jug_tit_loc_prom_alt'] - df['l_jug_tit_vis_prom_alt']
         df['dif_rat_sup'] = df['l_jug_sup_loc_prom_rat'] - df['l_jug_sup_vis_prom_rat']
         df['dif_edad_sup'] = df['l_jug_sup_loc_prom_edad'] - df['l_jug_sup_vis_prom_edad']
         df['dif_alt_sup'] = df['l_jug_sup_loc_prom_alt'] - df['l_jug_sup_vis_prom_alt']
-
-        for var in l_variables_a_prom:
-            df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
 
         df = construct_data.n_dias_ult_partido(df)
         # df = convert_odds_to_prob(df)
@@ -126,13 +127,13 @@ class DataPreparation:
             df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
 
         end = time.time()
-        print(f"Construccion de datos en {(end - start):.1f} segundos")
+        print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         return df
 
     def select_data(self, df, export=False):
 
         start = time.time()
-        print("Seleccionado datos")
+        print("\nSeleccionado datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'es_copa', 'historial_entre_si'], axis=1)
@@ -150,13 +151,13 @@ class DataPreparation:
             df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
 
         end = time.time()
-        print(f"Seleccion de datos en {(end - start):.1f} segundos")
+        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
         return df
 
     def clean_data(self, df, export=False):
 
         start = time.time()
-        print("Limpiando los datos")
+        print("\nLimpiando los datos...")
 
         # Categorizo columnas numericas
         # df = clean_data.categorize_numeric_columns(df)
@@ -173,7 +174,7 @@ class DataPreparation:
             df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
 
         end = time.time()
-        print(f"Limpieza de datos en {(end - start):.1f} segundos")
+        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
         return df
 
 class Modeling:
@@ -270,9 +271,9 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         df_jug = scraper_sofifa.extract_sofifa
     else:
         # Levanto datasets
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx', index_col=0)  # Tengo una columna indice...
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx', index_col=0)  # Tengo una columna indice...
-
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
+        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx', index_col=0)
+        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
     if data_prep is True:
         prepare = DataPreparation(var_resp)
