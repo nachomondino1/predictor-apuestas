@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def remove_percent_sign(df):
+def convert_posesion_to_int(df):
     """
     Transformo posesion de string a float
     :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
@@ -12,7 +12,7 @@ def remove_percent_sign(df):
     df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     return df
 
-def transform_date_column(df, string_format):
+def convert_fecha_to_datetime(df, string_format):
     """
     Transformo fecha de string a datetime
     :param df: Dataframe. Con columna 'fecha' interpretada como string
@@ -21,15 +21,32 @@ def transform_date_column(df, string_format):
     df['fecha'] = pd.to_datetime(df['fecha'], format=string_format)
     return df
 
-def remove_strings_from_teams(df):
+def separate_lists_in_columns(df, variable):  # Si bien es ineficiente, no me conviene mejorarla puesto que extraere ya las columnas separadas... ( tampoco tanto, tarda 4.2 seg, 4.1, 2.3, 1.9, 0.6, 0.6) Cuando extraiga cada jugador en vez de la lista, podre borrala
     """
-    Limpio string 'Vencedor' en el nombre de algunos equipos.
-    :param df: Dataframe. Con columnas "equipo_loc" y "equipo_vis"
-    :return: Dataframe pasado por parametro sin strings "Vencedor" y "Equipo que avanza" en las columnas "equipo_loc"
-    y "equipo_vis".
+    Convierto columnas que contienen listas en multiples columnas de un solo elemento
+    :param df: Dataframe.
+    :param variable: String. Nombre de la variable
+    :return: Dataframe.
     """
-    df['equipo_loc'] = df['equipo_loc'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
-    df['equipo_vis'] = df['equipo_vis'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
+    # Por registro
+    for i in range(len(df)):
+
+        # Obtengo lista
+        str_with_list = df.loc[i, variable]
+
+        # Verificar si el elemento es un string (Evito nan)
+        if isinstance(str_with_list, str):
+
+            # Convierto string a lista
+            l_jug = eval(str_with_list)  # e.g. ["Dibu", ..., "Messi"]
+
+            # Por elemento de la lista
+            for j in range(len(l_jug)):
+
+                # Guardo jugador en columna nueva
+                df.loc[i, f'{variable[2:]}_{j+1}'] = l_jug[j]
+
+    df = df.drop([variable], axis=1)
     return df
 
 def main():

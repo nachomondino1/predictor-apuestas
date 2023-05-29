@@ -1,71 +1,24 @@
 # Juntar entidades jugadores, partido y atrib_jugadores
 import pandas as pd
-from dspy.data_preparation.text_preparation import TextPreparation
 import re
 import time
 
-
-def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
-    '''
-    Prepara el texto de las columnas que contengan strings.
-    :param df: Dataframe.
-    :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
-    '''
-    # Convertir variables categoricas string a categoricas numericas
-    for var in df.select_dtypes(include=['object']).columns:
-
-        prepare_text = TextPreparation(textos=df[var])
-        prepare_text.to_lower()
-        prepare_text.delete_accent()
-        prepare_text.delete_special_characters()
-        df[var] = prepare_text.textos
-
-    return df
-
-def separate_lists_in_columns(df, variable):  # Si bien es ineficiente, no me conviene mejorarla puesto que extraere ya las columnas separadas... ( tampoco tanto, tarda 4.2 seg, 4.1, 2.3, 1.9, 0.6, 0.6) Cuando extraiga cada jugador en vez de la lista, podre borrala
-    """
-    Convierto columnas que contienen listas en multiples columnas de un solo elemento
-    :param df: Dataframe.
-    :param variable: String. Nombre de la variable
-    :return: Dataframe.
-    """
-    # Por registro
-    for i in range(len(df)):
-
-        # Obtengo lista
-        str_with_list = df.loc[i, variable]
-
-        # Verificar si el elemento es un string (Evito nan)
-        if isinstance(str_with_list, str):
-
-            # Convierto string a lista
-            l_jug = eval(str_with_list)  # e.g. ["Dibu", ..., "Messi"]
-
-            # Por elemento de la lista
-            for j in range(len(l_jug)):
-
-                # Guardo jugador en columna nueva
-                df.loc[i, f'{variable[2:]}_{j+1}'] = l_jug[j]
-
-    df = df.drop([variable], axis=1)
-    return df
-
-def search_player_data(df_part, df_jug, variable):  # ojo con la comparacion si hay mayusculas...
+def search_player_data(df_part, df_jug):  # Ver como guardar los datos de prom edad solo para titulares, solo suplentes y asi... si es que quiero asi...
     """
     Segun el nombre del jugador, la fecha y el equipo(?) en la entidad partido, busco sus atributos en la entidad jugador
     :param df:
     :return:
     """
     # Defino las columnas a procesar segun la variable
-    pattern = variable[2:] + '_[0-9]*'
-    l_jug_to_preprocess = df_part.filter(regex=pattern, axis=1).columns.tolist()  #LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
+    pattern = 'jug_' # pattern = variable[2:] + '_[0-9]*'
+    l_col_to_preprocess = df_part.filter(regex=pattern, axis=1).columns.tolist()  #LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
+    print(f'Columnas a procesar: {l_col_to_preprocess}')
     d = {}
 
     # Por partido (fila) en entidad partido
     for i in range(len(df_part)):
 
         # Obtengo equipo y año del partido
-        equipo_jug_part = df_part.loc[i, 'equipo_loc'] if 'loc' in variable else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
         year_part = df_part.loc[i, 'fecha'].year   # e.g. 2023
         print(f' Partido Nº: {i} '.center(120, '#'))
 
@@ -73,10 +26,11 @@ def search_player_data(df_part, df_jug, variable):  # ojo con la comparacion si 
         l_prom_edad, l_prom_alt, l_prom_rating, l_prom_valor = [], [], [], []
 
         # Por jugador
-        for jug in l_jug_to_preprocess:
+        for jug in l_col_to_preprocess:
 
             # Busco nombre del jugador en la entidad partido
             nombre_jug_part = df_part.loc[i, jug]  # e.g. "Rodriguez D. (G) (C)"
+            equipo_jug_part = df_part.loc[i, 'equipo_loc'] if 'loc' in jug else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
 
             # Si el jugador no es nan
             if isinstance(nombre_jug_part, str):
@@ -205,14 +159,6 @@ def main():
     df_part = pd.read_excel("./df_formated.xlsx")
     df_jug = pd.read_excel("./df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(df_part.head())
-
-    # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores
-    df_part = prepare_text_columns(df_part)
-    df_jug = prepare_text_columns(df_jug)
-
-    # Separo columnas listas en multiples columnas (NO VA A SER NECESARIO CUANDO DESDE LA MISMA EXTRACCION EXTRAIGA VARIAS COLUMNAS...)
-    for var in l_var:
-        df_part = separate_lists_in_columns(df_part, var)
 
     # Integro datasets
     for var in l_var:

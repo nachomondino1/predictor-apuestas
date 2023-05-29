@@ -1,21 +1,40 @@
 import pandas as pd
+from dspy.data_preparation.text_preparation import TextPreparation
+from sklearn.preprocessing import LabelEncoder
 
+def remove_strings_from_teams(df):
+    """
+    Limpio string 'Vencedor' en el nombre de algunos equipos.
+    :param df: Dataframe. Con columnas "equipo_loc" y "equipo_vis"
+    :return: Dataframe pasado por parametro sin strings "Vencedor" y "Equipo que avanza" en las columnas "equipo_loc"
+    y "equipo_vis".
+    """
+    df['equipo_loc'] = df['equipo_loc'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
+    df['equipo_vis'] = df['equipo_vis'].str.replace('Vencedor', '').str.replace('Equipo que avanza', '').str.strip()
+    return df
 
-
-def procesar_datos() -> None:
+def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
     '''
-    Procesamiento del dataframe: tratamos los nans, balanceamos los datos y aplicamos encoder
+    Prepara el texto de las columnas que contengan strings.
+    :param df: Dataframe.
+    :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
     '''
-    # Remover NaN values
-    self.df = self.df.dropna()  # inplace=True
+    # Convertir variables categoricas string a categoricas numericas
+    for var in df.select_dtypes(include=['object']).columns:
 
-    # Shuffle
-    df_mezclado = pd.DataFrame(shuffle(self.df))
+        prepare_text = TextPreparation(textos=df[var])
+        prepare_text.to_lower()
+        prepare_text.delete_accent()
+        prepare_text.delete_special_characters()
+        df[var] = prepare_text.textos
+
+    return df
+
+def convert_columns_to_int(df):
 
     # Convertir variables categoricas string a categoricas numericas
-    for col in df_mezclado.select_dtypes(include=['object']).columns:
-        df_mezclado[col] = self.le.fit_transform(df_mezclado[col])
+    le = LabelEncoder()
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = le.fit_transform(df[col])
 
-    # Balanceamos segun variable respuesta
-    X, y = df_mezclado.drop(self.target_col, axis=1), df_mezclado[self.target_col]
-    self.X_bal, self.y_bal = self.oversampler.fit_resample(X, y)
+    return df

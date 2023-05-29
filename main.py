@@ -9,16 +9,16 @@ from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
 
 # Data preparation
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-from dspy.data_preparation import clean_data
-from sklearn.preprocessing import LabelEncoder
+from dspy.data_preparation import clean_data as cd
 
+# # Modeling
 # # Generate test design
 # from dspy.modeling import test_design
 # from imblearn.over_sampling import RandomOverSampler
 # from sklearn.utils import shuffle
 #
 #
-# # Modelos
+# # Build model
 # from modeling import copia_build_model, asses_model
 # from dspy.modeling.supervised_learning import naive_bayes
 # from sklearn.tree import DecisionTreeClassifier, plot_tree
@@ -30,7 +30,7 @@ from sklearn.preprocessing import LabelEncoder
 # from sklearn.neural_network import MLPClassifier
 # from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
 #
-# # Metricas
+# # Assess model
 # from sklearn.metrics import accuracy_score
 
 
@@ -41,45 +41,55 @@ class DataPreparation:
 
     def format_data(self, df_part, df_jug, export=False):
 
+        start = time.time()
+        print("Formateando los datos")
+
         # Convierto posesion de string a integer
-        df_part = format_data.remove_percent_sign(df_part)
+        df_part = format_data.convert_posesion_to_int(df_part)
 
         # Convierto fecha de string a datetime
-        df_part = format_data.transform_date_column(df_part, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
-        df_jug = format_data.transform_date_column(df_jug, string_format='%b %d, %Y')
+        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
+        df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
 
-        # Remuevo strings adicionales en los nombres de los equipos
-        df_part = format_data.remove_strings_from_teams(df_part)
+        # Remuevo strings adicionales en los nombres de los equipos  (lo hago aca porque requiero los equipos limpios para integrar datos)
+        df_part = clean_data.remove_strings_from_teams(df_part)
+
+        # Separo columnas listas en multiples columnas (NO VA A SER NECESARIO CUANDO DESDE LA MISMA EXTRACCION EXTRAIGA VARIAS COLUMNAS...)
+        l_var = ['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis', 'l_jug_ausentes_loc', 'l_jug_ausentes_vis']
+        for var in l_var:
+            df_part = format_data.separate_lists_in_columns(df_part, var)
 
         if export:
             df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
             df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
 
+        end = time.time()
+        print(f"Formateo de datos en {(end - start):.1f} segundos")
         return df_part, df_jug
 
     def integrate_data(self, df_part, df_jug, export=False):
 
-        # Definicion de variables
-        l_var = ['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis', 'l_jug_ausentes_loc',
-                 'l_jug_ausentes_vis']
+        start = time.time()
+        print("Integrando los datos")
 
-        # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores
-        df_part = integrate_data.prepare_text_columns(df_part)
-        df_jug = integrate_data.prepare_text_columns(df_jug)
-
-        # Separo columnas listas en multiples columnas (NO VA A SER NECESARIO CUANDO DESDE LA MISMA EXTRACCION EXTRAIGA VARIAS COLUMNAS...)
-        for var in l_var:
-            df_part = integrate_data.separate_lists_in_columns(df_part, var)
+        # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores (lo hago aqui y no en clean_data porque uso variables strings para integrar datos)
+        df_part = clean_data.prepare_text_columns(df_part)
+        df_jug = clean_data.prepare_text_columns(df_jug)
 
         # Integro datasets
-        for var in l_var:
-            df_integrated = integrate_data.search_player_data(df_part, df_jug, var)
+        df_integrated = integrate_data.search_player_data(df_part, df_jug)
 
         if export:
             df_integrated.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
+
+        end = time.time()
+        print(f"Integracion de datos en {(end - start):.1f} segundos")
         return df_integrated
 
     def construct_data(self, df, N_ULT_PART = 5, export=False):
+
+        start = time.time()
+        print("Construyendo nuevos datos")
 
         # Ordeno por campo 'fecha'
         # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
@@ -114,9 +124,15 @@ class DataPreparation:
 
         if export:
             df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
+
+        end = time.time()
+        print(f"Construccion de datos en {(end - start):.1f} segundos")
         return df
 
     def select_data(self, df, export=False):
+
+        start = time.time()
+        print("Seleccionado datos")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'es_copa', 'historial_entre_si'], axis=1)
@@ -132,9 +148,15 @@ class DataPreparation:
 
         if export:
             df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
+
+        end = time.time()
+        print(f"Seleccion de datos en {(end - start):.1f} segundos")
         return df
 
     def clean_data(self, df, export=False):
+
+        start = time.time()
+        print("Limpiando los datos")
 
         # Categorizo columnas numericas
         # df = clean_data.categorize_numeric_columns(df)
@@ -142,15 +164,16 @@ class DataPreparation:
         # Remover NaN values
         df = df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
 
-        # Eliminacion de outliers
+        # Eliminacion de outliers?
 
         # Convertir variables categoricas string a categoricas numericas
-        le = LabelEncoder()
-        for col in df.select_dtypes(include=['object']).columns:
-            df[col] = le.fit_transform(df[col])
+        df = clean_data.convert_columns_to_int(df)
 
         if export:
             df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
+
+        end = time.time()
+        print(f"Limpieza de datos en {(end - start):.1f} segundos")
         return df
 
 class Modeling:
@@ -231,7 +254,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Hiperparametros
     N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-    l_modelos = [DecisionTreeClassifier(max_depth=30),
+    '''l_modelos = [DecisionTreeClassifier(max_depth=30),
                  # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                  # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
                  # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
@@ -240,15 +263,15 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                                max_iter=300),
                  GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
                  # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
-                 ]
+                 ]'''
 
     if data_unders is True:
         df_part = scraper_flashscore.extract_flashscore()
         df_jug = scraper_sofifa.extract_sofifa
     else:
         # Levanto datasets
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx')
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx', index_col=0)  # Tengo una columna indice...
+        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx', index_col=0)  # Tengo una columna indice...
 
 
     if data_prep is True:
@@ -257,9 +280,9 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # Preparo el dataset para el analisis
         df_part, df_jug = prepare.format_data(df_part, df_jug, export=True)
         df = prepare.integrate_data(df_part, df_jug, export=True)
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.select_data(df, export=True)
-        df = prepare.clean_data(df, export=True)
+        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
+        # df = prepare.select_data(df, export=True)
+        # df = prepare.clean_data(df, export=True)
     else:
          # Levanto dataset ya preparado
          df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_selected_manual.xlsx')

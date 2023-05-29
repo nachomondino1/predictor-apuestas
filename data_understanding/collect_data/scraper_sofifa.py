@@ -129,4 +129,4 @@ def extract_sofifa():
     crawler.driver.close()
     return df_jug
 
-extract_sofifa()
+# extract_sofifa()

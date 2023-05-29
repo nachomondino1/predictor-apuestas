@@ -212,4 +212,4 @@ def extract_flashscore():
     crawler.driver.close()
     return df
 
-extract_flashscore()
+# extract_flashscore()
