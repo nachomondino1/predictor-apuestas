@@ -5,7 +5,7 @@ from time import sleep
 import random
 
 
-def main():
+def extract_sofifa():
     """
     Obtengo datos de jugadores mediante scrapear sofifa.com
     """
@@ -127,5 +127,6 @@ def main():
     # Exporto dataset final
     df_jug.to_excel(f'./entidad_jugadores.xlsx')
     crawler.driver.close()
+    return df_jug
 
-main()
+extract_sofifa()

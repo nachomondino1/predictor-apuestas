@@ -22,7 +22,7 @@ def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar
 
     return df
 
-def separate_lists_in_columns(df, variable):  # Altamente ineficiente.( tampoco tanto, tarda 4.2 seg, 4.1, 2.3, 1.9, 0.6, 0.6 Cuando extraiga cada jugador en vez de la lista, podre borrala
+def separate_lists_in_columns(df, variable):  # Si bien es ineficiente, no me conviene mejorarla puesto que extraere ya las columnas separadas... ( tampoco tanto, tarda 4.2 seg, 4.1, 2.3, 1.9, 0.6, 0.6) Cuando extraiga cada jugador en vez de la lista, podre borrala
     """
     Convierto columnas que contienen listas en multiples columnas de un solo elemento
     :param df: Dataframe.
@@ -221,4 +221,4 @@ def main():
     df.to_excel('./df_integrated.xlsx', index=False)
 
 
-main()
+# main()

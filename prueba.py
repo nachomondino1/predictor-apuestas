@@ -1,6 +1,7 @@
 import pandas as pd
+import numpy as np
 
-str = "Hola"
-str_2 = "ol"
+df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/df_formated.xlsx')
 
-print(str_2 in str)
+
+df.to_excel('./prueba_10.xlsx')

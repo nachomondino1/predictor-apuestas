@@ -18,7 +18,7 @@ def extract_cuota(crawler, SEC_WAIT_LONG, i):
         return crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]//span[@class="oddsValueInner"]', text=True, sec_wait=SEC_WAIT_LONG + 1)
 
 
-def main():
+def extract_flashscore():
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -218,5 +218,6 @@ def main():
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
+    return df
 
-main()
+extract_flashscore()

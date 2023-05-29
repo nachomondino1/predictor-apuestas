@@ -2,24 +2,28 @@
 import pandas as pd
 import time
 
+# Data understanding
+from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
+
 # Data preparation
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 from dspy.data_preparation import clean_data
-from sklearn.preprocessing import LabelEncoder
-from imblearn.over_sampling import RandomOverSampler
+# from sklearn.preprocessing import LabelEncoder
+# from imblearn.over_sampling import RandomOverSampler
 
 # Modeling
-from modeling import copia_build_model, asses_model
-from sklearn.utils import shuffle
-from dspy.modeling import test_design
-from dspy.modeling.supervised_learning import naive_bayes
+# from modeling import copia_build_model, asses_model
+# from sklearn.utils import shuffle
+# from dspy.modeling import test_design
+# from dspy.modeling.supervised_learning import naive_bayes
 
 
 class DataPreparation:
 
-    def __init__(self, df_part, df_jug):
+    def __init__(self, df_part, df_jug, var_resp):
         self.df_part = df_part
         self.df_jug = df_jug
+        self.var_resp = var_resp
 
     def format_data(self):
 
@@ -32,6 +36,9 @@ class DataPreparation:
 
         # Remuevo strings adicionales en los nombres de los equipos
         self.df_part = format_data.remove_strings_from_teams(self.df_part)
+
+        self.df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
+        self.df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
 
     def integrate_data(self):
 
@@ -51,7 +58,7 @@ class DataPreparation:
         for var in l_var:
             self.df = integrate_data.search_player_data(self.df_part, self.df_jug, var)
 
-        self.df.to_excel('./df_integrated.xlsx', index=False)
+        self.df.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
 
     def construct_data(self, N_ULT_PART = 5):
 
@@ -85,6 +92,8 @@ class DataPreparation:
          # df = convert_odds_to_prob(df)
          # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
 
+         self.df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
+
     def select_data(self):
 
          # Caro
@@ -94,7 +103,7 @@ class DataPreparation:
          self.df = self.df.drop(['id', 'fecha', 'cancha'], axis=1)
 
          # Remocion de variables redundantes (las de mayor correlacion)
-         df_correlation_matrix = self.df.drop('equipo_ganador', axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
+         df_correlation_matrix = self.df.drop(self.var_resp, axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
          df_correlation_matrix.to_excel('/Users/nachomondino/Desktop/correlation_matrix.xlsx')
          self.df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',
                   'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'],
@@ -104,6 +113,8 @@ class DataPreparation:
          # select_data.feature_selection(df)
          self.df = self.df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
 
+         self.df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
+
     def clean_data(self):
          # Categorizo columnas numericas
          # df = clean_data.categorize_numeric_columns(df)
@@ -112,6 +123,8 @@ class DataPreparation:
          self.df = self.df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
 
          # Eliminacion de outliers
+
+         self.df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
 
 
 class Modeling:
@@ -192,30 +205,37 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_prep = False
-    modeling = True
+    data_unders = False
+    data_prep = True
+    modeling = False
     var_resp = 'equipo_ganador'
 
     # Hiperparametros
-    N_ULT_PART = 5
+    N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+
+    if data_unders is True:
+
+        df_part = scraper_flashscore.extract_flashscore()
+        df_jug = scraper_sofifa.extract_sofifa
+
+    else:
+        # Levanto datasets
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
+        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx')
 
     if data_prep is True:
 
-        # Levanto datasets
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/liga_argentina_historico.xlsx')
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx')
-
-        prepare = DataPreparation(df_part, df_jug)
+        prepare = DataPreparation(df_part, df_jug, var_resp)
 
         # Preparo el dataset para el analisis
         prepare.format_data()
         prepare.integrate_data()
-        prepare.construct_data(N_ULT_PART=N_ULT_PART)
-        prepare.select_data()
-        prepare.clean_data()
+        # prepare.construct_data(N_ULT_PART=N_ULT_PART)
+        # prepare.select_data()
+        # prepare.clean_data()
 
         # Obtengo el dataset ya preparado
-        df = prepare.df
+        df = prepare.df  # cuando solo corro format: AttributeError: 'DataPreparation' object has no attribute 'df'
 
     else:
          # Levanto dataset ya preparado

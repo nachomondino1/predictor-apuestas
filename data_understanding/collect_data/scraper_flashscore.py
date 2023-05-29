@@ -5,7 +5,7 @@ import time
 import random
 
 
-def main():
+def extract_flashscore():
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -210,5 +210,6 @@ def main():
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
+    return df
 
-main()
+extract_flashscore()
