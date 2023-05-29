@@ -1,8 +1,6 @@
 import pandas as pd
 from dspy.data_understanding.web_scraping.selenium import Crawler
 from selenium.webdriver.common.keys import Keys
-from time import sleep
-import random
 
 
 def extract_sofifa():
@@ -12,33 +10,25 @@ def extract_sofifa():
     # DEFINCION DE PARAMETROS & VARIABLES
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_competicion.xlsx')
     df_jug = pd.DataFrame(columns=['id_jugador', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
-    crawler = Crawler(headless=False, path=None)  # por algun motivo tarda 10 años el headless=True. A su vez el headless=False solo funciona si efectivamente miro el driver que se abre (sino no)
-    d = {}
+    crawler = Crawler(headless=True, path=None)
+    d_pais_a_seleccionar = {'brazil': 'brasil'}  # Por diferencias entre nombres de paises entre Flashscore y Sofifa
 
-    # Ingreso a pagina de sofifa.com con los filtros correctos
+    # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados
     crawler.driver.get('https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg')
 
-    # Extraigo headers para poder saber que indice tiene cada campo a extraer (la estructura html es complicada)
-    l_tags_headers = crawler.extract_tags(xpath='.//tr[@class="persist-header"]/th')
-    l_headers = [tag.text for tag in l_tags_headers]
-    for i, header in enumerate(l_headers):
-        d[header] = i + 1
-    print(f"Campos a extraer y su posicion: \n{d}")
-
-    # Obtengo paginas de la paginacion (c/pagina es un año)
+    # Obtengo urls de las paginas de la paginacion (c/pagina es un año o fifa)
     crawler.click_boton(xpath='.//h2//div[@class="dropdown"][1]/a')  # Ver si hace click, tal vez ni hace falta
     l_tag_years = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][1]/div/a')
     l_urls_years = [tag.get_attribute('href') for tag in l_tag_years]
 
-    # POR AÑO (recorro todos las paginas de sofifa.com)
-    for url_year in l_urls_years:
+    # POR AÑO O FIFA (e.g. Fifa 23, fifa 22, fifa 21, ..., fifa 07)
+    for url_year in l_urls_years[::-1]:
 
-        # Ingreso a pagina del año
+        # Ingreso a pagina del año o fifa
         crawler.driver.get(url_year)
         print(f" Url pagina: {url_year} ")
 
-        # Extraigo fecha
-        # crawler.click_boton(xpath='.//h2/div[@class="dropdown"][2]')  # e.g. May 16, 2023
+        # Extraigo fecha de la ultima actualizacion  # crawler.click_boton(xpath='.//h2/div[@class="dropdown"][2]')  # e.g. May 16, 2023
         fecha = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)  # e.g. May 16, 2023
         print(f" Fecha de actualizacion del fifa: {fecha} ".center(120, "#"))
 
@@ -63,11 +53,13 @@ def extract_sofifa():
                 # Selecciono la liga que mas se asemeja a mi input (cuidado: puede no existar la liga para dicho fifa)
                 input_league.send_keys(Keys.ENTER)  # Tengo que dar enter
 
-                pais_a_seleccionar = liga_a_seleccionar[liga_a_seleccionar.find('[')+1: liga_a_seleccionar.find(']')] # e.g. [Argentina] Liga profesional
+                pais_a_seleccionar = liga_a_seleccionar[liga_a_seleccionar.find('[')+1: liga_a_seleccionar.find(']')].lower() # e.g. [Argentina] Liga profesional
+                if pais_a_seleccionar in d_pais_a_seleccionar.keys():  # Por ejemplo, en flashscore aparece 'Brasil' mientras que en Sofifa aparece Brazil
+                    pais_a_seleccionar = d_pais_a_seleccionar[pais_a_seleccionar]
                 print(f"Pais a seleccionar: {pais_a_seleccionar}")
 
                 # Si la liga a seleccionar corresponde a la del pais
-                if pais.lower()[:3] in pais_a_seleccionar.lower()[:3]:  # Comparo las 3 primeras letras puesto que falla 'Brasil' in '[Brazil] ...' y 'Perú' in '[Peru] ...'
+                if pais in pais_a_seleccionar:
 
                     # Clickeo en buscar jugadores
                     crawler.click_boton(xpath='.//button[text()="Submit"]')
@@ -84,25 +76,26 @@ def extract_sofifa():
 
                             # Extraigo datos del jugador
                             d_data = {}
-                            # Por campo a extraer
-                            for header, pos_tag in d.items():
+                            d_data['id_jugador'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pi"]', text=True)
+                            d_data['fecha'] = fecha
+                            d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a', attribute="aria-label")
+                            d_data['edad'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ae"]', text=True)
+                            d_data['altura'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="hi"]', text=True)
+                            d_data['pie_habil'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pf"]', text=True)
+                            d_data['overall_rating'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="oa"]', text=True)
+                            d_data['potencial'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pt"]', text=True)
+                            d_data['equipo_actual'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/div[@class="ellipsis"]/a', text=True)
+                            d_data['valor_mercado'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="vl"]', text=True)
+                            d_data['sueldo'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="wg"]', text=True)
+                            d_data['pais'] = pais
 
-                                # Si no debo extraer el nombre
-                                if header != "NAME":
-                                    d_data[header] = crawler.extract_tag(tag_inicial=tag, xpath=f'.//td[{pos_tag}]', text=True)
-                                else:
-                                    d_data[header] = crawler.extract_tag(tag_inicial=tag, xpath=f'.//td[{pos_tag}]/a',attribute="aria-label")
-
-                            # Formateo campos
-                            print(d_data['NAME'])
-                            d_data['NAME'] = d_data['NAME'].split('\n')[0]
-                            d_data['HEIGHT'] = d_data['HEIGHT'].split('cm')[0]  # e.g. 193cm / 6'4" --> 193
-                            d_data['TEAM & CONTRACT'] = d_data['TEAM & CONTRACT'].split('\n')[0]  # e.g. Salzburg 2021 ~ 2026 --> Salzburg
+                            # Formateo campo altura # e.g. 193cm / 6'4" --> 193
+                            d_data['altura'] = d_data['altura'].split('cm')[0]
 
                             # Guardo los datos del jugador para dicho año
-                            l_data = [d_data['ID'], fecha, d_data['NAME'], d_data['AGE'], d_data['HEIGHT'], d_data['FOOT'], d_data['OVERALL RATING'], d_data['POTENTIAL'], d_data['TEAM & CONTRACT'], d_data['VALUE'], d_data['WAGE'], pais]
-                            df_jug.loc[len(df_jug)] = l_data
-                            print(l_data)
+                            nueva_fila_df = pd.DataFrame([d_data])
+                            df_jug = pd.concat([df_jug, nueva_fila_df], ignore_index=True)
+                            print(d_data)
 
                         # Clickeo en boton "Next" para recorrer todas las paginas
                         if crawler.click_boton(xpath='.//div[@class="pagination"]//span[contains(@class, "right")]//parent::a') is False:
@@ -121,12 +114,13 @@ def extract_sofifa():
                 input_league.send_keys(Keys.SHIFT + Keys.HOME)
                 input_league.send_keys(Keys.DELETE)
 
-        # Exporto datasets por seguridad
+        # Por seguridad, exporto datasets
         df_jug.to_excel(f'./entidad_jugadores_{fecha}.xlsx')
 
-    # Exporto dataset final
+    # Exporto dataset final y cierro webdriver
     df_jug.to_excel(f'./entidad_jugadores.xlsx')
     crawler.driver.close()
+
     return df_jug
 
-# extract_sofifa()
+extract_sofifa()
