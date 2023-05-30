@@ -1,5 +1,5 @@
 import pandas as pd
-
+import time
 
 def determinar_equipo_ganador(df):  # Se podria simplificar con?: df['equipo_ganador'] = np.where(df['goles_loc'] > df['goles_vis'], 'Local', np.where(df['goles_loc'] < df['goles_vis'], 'Visitante', 'Empate'))
 
@@ -296,13 +296,16 @@ def calculate_dif_col_jugadores(df):
 
         for var in l_var_jug:
 
-            df[f'dif_{var}_{titularidad}'] = df[f'prom_{var}_jug_{titularidad}_loc'] - df[
-                f'prom_{var}_jug_{titularidad}_vis']
+            nombre_col_dif = f'dif_{var}_{titularidad}'
+            nombre_col_loc = f'prom_{var}_jug_{titularidad}_loc'
+            nombre_col_vis = f'prom_{var}_jug_{titularidad}_vis'
+            df[nombre_col_dif] = df[nombre_col_loc] - df[nombre_col_vis]
 
+            # Elimino variables utilizadas para calcular la diferencia
+            df = df.drop([nombre_col_loc, nombre_col_vis], axis=1)
     return df
 
 def prueba():
-
     # Definicion de variables
     N_ULT_PART = 5
 
@@ -310,29 +313,31 @@ def prueba():
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx')
     print(df.head())
 
+    start = time.time()
     # Construct data
     df = determinar_equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
 
-    # Calculo diferencias para las variables promedio de los jugadores
-    df = calculate_dif_col_jugadores(df)
-    
-    df = historial_entre_si_segun_localia(df, n_ult_part=3)
+    df = historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART / 2))
+
+    l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases',
+                          'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
+    df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_variables_a_prom)
 
     df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
 
     df = forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
 
-
-
-    l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-    df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_variables_a_prom)
+    # Calculo diferencias para las variables promedio de los jugadores
+    df = calculate_dif_col_jugadores(df)
 
     df = n_dias_ult_partido(df)
     # df = convert_odds_to_prob(df)
     # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
 
-    print(df.head())
-    df.to_excel('./df_constructed.xlsx')
+
+    df.to_excel('./data/df_constructed.xlsx')
+    end = time.time()
+    print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
 
 prueba()
