@@ -78,7 +78,7 @@ def extract_sofifa():
                             d_data = {}
                             d_data['id_jugador'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pi"]', text=True)
                             d_data['fecha'] = fecha
-                            d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a/div[@class="ellipsis"]', text=True)  # l. gonzalez pirez # Nombre completo: d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a', attribute="aria-label")
+                            d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a', attribute="aria-label") # Nombre corto (e.g. l. gonzalez pirez) d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a/div[@class="ellipsis"]', text=True)
                             d_data['edad'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ae"]', text=True)
                             d_data['altura'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="hi"]', text=True)
                             d_data['pie_habil'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pf"]', text=True)
@@ -115,7 +115,7 @@ def extract_sofifa():
                 input_league.send_keys(Keys.DELETE)
 
         # Por seguridad, exporto datasets
-        df_jug.to_excel(f'./entidad_jugadores_{fecha}.xlsx')
+        df_jug.to_excel(f'./data_seg/entidad_jugadores_{fecha}.xlsx')
 
     # Exporto dataset final y cierro webdriver
     df_jug.to_excel(f'./entidad_jugadores.xlsx')
