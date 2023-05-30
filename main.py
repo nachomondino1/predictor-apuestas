@@ -70,7 +70,7 @@ class DataPreparation:
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
         return df_part, df_jug
 
-    def integrate_data(self, df_part, df_jug, export=False):  # 55 min
+    def integrate_data(self, df_part, df_jug, export=False):  # 55 min --> tengo que eficientizar...
 
         start = time.time()
         print("\nIntegrando los datos...")
@@ -89,7 +89,7 @@ class DataPreparation:
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         return df_integrated
 
-    def construct_data(self, df, N_ULT_PART = 5, export=False):
+    def construct_data(self, df, N_ULT_PART = 5, export=False):  # 4.2 min
 
         start = time.time()
         print("\nConstruyendo nuevos datos...")
@@ -103,21 +103,14 @@ class DataPreparation:
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
 
         l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-        for var in l_variables_a_prom:
-            df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
+        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_variables_a_prom)
 
         df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
 
         df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
 
         # Calculo diferencias para las variables promedio de los jugadores
-        # Podria hacer una resta de todas las variables que tengan "loc" en su nombre con "vis"...?
-        df['dif_rat_tit'] = df['l_jug_tit_loc_prom_rat'] - df['l_jug_tit_vis_prom_rat']
-        df['dif_edad_tit'] = df['l_jug_tit_loc_prom_edad'] - df['l_jug_tit_vis_prom_edad']
-        df['dif_alt_tit'] = df['l_jug_tit_loc_prom_alt'] - df['l_jug_tit_vis_prom_alt']
-        df['dif_rat_sup'] = df['l_jug_sup_loc_prom_rat'] - df['l_jug_sup_vis_prom_rat']
-        df['dif_edad_sup'] = df['l_jug_sup_loc_prom_edad'] - df['l_jug_sup_vis_prom_edad']
-        df['dif_alt_sup'] = df['l_jug_sup_loc_prom_alt'] - df['l_jug_sup_vis_prom_alt']
+        df = construct_data.calculate_dif_col_jugadores(df)
 
         df = construct_data.n_dias_ult_partido(df)
         # df = convert_odds_to_prob(df)
