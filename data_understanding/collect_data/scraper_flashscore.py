@@ -32,6 +32,11 @@ def extract_flashscore():
     # DEFINCION DE PARAMETROS & VARIABLES
     SEC_WAIT, SEC_WAIT_LONG = 0.2, 1.5
     crawler = Crawler(headless=True, path=None) # Creo objeto de clase CrawlerActions()
+    d_formaciones = {'Formaciones iniciales': 'tit', 'Suplentes': 'sup', 'Jugadores ausentes': 'aus'}
+    d_estadisticas = {'posesion': 'Posesión de balón', 'remates': 'Remates', 'remates_a_puerta': 'Remates a puerta',
+                      'tarjetas_amarillas': 'Tarjetas amarillas', 'faltas': 'Faltas', 'pases': 'Pases totales',
+                      'pases_comp': 'Pases completados', 'offsides': 'Fueras de juego', 'ataques': 'Ataques',
+                      'ataques_pelig': 'Ataques peligrosos'}
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_competicion.xlsx')
     df_part = pd.DataFrame( # Debo agregar una columna por cada jugador en vez de las listas....
         columns=['id', 'competicion', 'temporada', 'pais', 'es_copa', 'fecha', 'equipo_loc', 'equipo_vis', 'arbitro',
@@ -46,7 +51,7 @@ def extract_flashscore():
     for pais in df_comp['pais'].unique():
 
         # Filtro competiciones por pais
-        df_pais = df_comp[df_comp['pais'] == pais]
+        df_comp_pais = df_comp[df_comp['pais'] == pais]
         print(f' PAIS: {pais} '.center(120, '#'))
         pais = pais.lower()
 
@@ -57,7 +62,7 @@ def extract_flashscore():
             df_part = pd.DataFrame(columns=['id'])  # inicializo con id para evitar error en if id not in df_part
 
         # POR COMPETICION
-        for competicion, categoria in zip(df_pais['nombre'], df_pais['categoria']):
+        for competicion, categoria in zip(df_comp_pais['nombre'], df_comp_pais['categoria']):
 
             # Obtengo datos de la competicion
             print(f' Competicion: {competicion} '.center(120, '+'))
@@ -124,77 +129,34 @@ def extract_flashscore():
 
                         # Extraigo campos de hoja "Estadísticas"
                         if crawler.click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Estadísticas"]', sec_wait=SEC_WAIT_LONG) is not False:
-                            d_nueva_fila['posesion_loc'] = crawler.extract_tag(xpath='.//div[text()="Posesión de balón"]//preceding-sibling::div', text=True, sec_wait=SEC_WAIT_LONG)
-                            d_nueva_fila['posesion_vis'] = crawler.extract_tag(xpath='.//div[text()="Posesión de balón"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['remates_loc'] = crawler.extract_tag(xpath='.//div[text()="Remates"]//preceding-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['remates_vis'] = crawler.extract_tag(xpath='.//div[text()="Remates"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['remates_a_puerta_loc'] = crawler.extract_tag(xpath='.//div[text()="Remates a puerta"]//preceding-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['remates_a_puerta_vis'] = crawler.extract_tag(xpath='.//div[text()="Remates a puerta"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['tarjetas_amarillas_loc'] = crawler.extract_tag(xpath='.//div[text()="Tarjetas amarillas"]//preceding-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['tarjetas_amarillas_vis'] = crawler.extract_tag(xpath='.//div[text()="Tarjetas amarillas"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['faltas_loc'] = crawler.extract_tag(xpath='.//div[text()="Faltas"]//preceding-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['faltas_vis'] = crawler.extract_tag(xpath='.//div[text()="Faltas"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['pases_loc'] = crawler.extract_tag(xpath='.//div[text()="Pases totales"]//preceding-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['pases_vis'] = crawler.extract_tag(xpath='.//div[text()="Pases totales"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['pases_comp_loc'] = crawler.extract_tag(xpath='.//div[text()="Pases completados"]//preceding-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['pases_comp_vis'] = crawler.extract_tag(xpath='.//div[text()="Pases completados"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['offsides_loc'] = crawler.extract_tag(xpath='.//div[text()="Fueras de juego"]//preceding-sibling::div', text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['offsides_vis'] = crawler.extract_tag(xpath='.//div[text()="Fueras de juego"]//following-sibling::div', text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['ataques_loc'] = crawler.extract_tag(xpath='.//div[text()="Ataques"]//preceding-sibling::div', text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['ataques_vis'] = crawler.extract_tag(xpath='.//div[text()="Ataques"]//following-sibling::div', text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['ataques_pelig_loc'] = crawler.extract_tag(xpath='.//div[text()="Ataques peligrosos"]//preceding-sibling::div', text=True, sec_wait=SEC_WAIT)
-                            d_nueva_fila['ataques_pelig_vis'] = crawler.extract_tag(xpath='.//div[text()="Ataques peligrosos"]//following-sibling::div', text=True, sec_wait=SEC_WAIT)
+
+                            # Por estadistica (posesion, remates, etc)
+                            for estadistica in d_estadisticas.keys():
+
+                                # Extraigo dicha estadistica tanto para el equipo local como para el visitante
+                                d_nueva_fila[f'{estadistica}_loc'] = crawler.extract_tag(xpath=f'.//div[text()="{d_estadisticas[estadistica]}"]//preceding-sibling::div', text=True, sec_wait=SEC_WAIT)
+                                d_nueva_fila[f'{estadistica}_vis'] = crawler.extract_tag(xpath=f'.//div[text()="{d_estadisticas[estadistica]}"]//following-sibling::div',text=True, sec_wait=SEC_WAIT)
 
                         # Extraigo campos de hoja "Formaciones"
                         if crawler.click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Formaciones"]', sec_wait=SEC_WAIT) is not False:
 
-                            # Si existe la seccion de Titulares
-                            if crawler.extract_tag(xpath='.//div[text()="Formaciones iniciales"]', sec_wait=SEC_WAIT_LONG) is not None:
-                                # NO DEBO EXTRAER EL TAG A, HAY VECES QUE FALLA PORQUE LOS JUGADORES NO TIENEN ASOCIADO UN LINK
-                                l_tags_jug_tit_loc = crawler.extract_tags(xpath='.//div[text()="Formaciones iniciales"]//following-sibling::div//div[@class="lf__side"][1]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT)  # Es lista de tags o None
-                                l_tags_jug_tit_vis = crawler.extract_tags(xpath='.//div[text()="Formaciones iniciales"]//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT)  # Es lista de tags o None
+                            # Por seccion ("Formacion inicial", "Suplentes" y  "Ausentes")
+                            for formacion in d_formaciones.keys():
 
-                                # Creo una columna por cada jugador titular del equipo local
-                                if l_tags_jug_tit_loc is not None:
-                                    for i in range(len(l_tags_jug_tit_loc)):
-                                        d_nueva_fila[f'jug_tit_loc_{i}'] = l_tags_jug_tit_loc[i].text
+                                if crawler.extract_tag(xpath=f'.//div[text()="{formacion}"]', sec_wait=SEC_WAIT_LONG) is not None:
 
-                                # Creo una columna por cada jugador titular del equipo visitante
-                                if l_tags_jug_tit_vis is not None:
-                                    for i in range(len(l_tags_jug_tit_vis)):
-                                        d_nueva_fila[f'jug_tit_vis_{i}'] = l_tags_jug_tit_vis[i].text
+                                    l_tags_jug_loc = crawler.extract_tags(xpath=f'.//div[text()="{formacion}"]//following-sibling::div//div[@class="lf__side"][1]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT*2)  # Es lista de tags o None
+                                    l_tags_jug_vis = crawler.extract_tags(xpath=f'.//div[text()="{formacion}"]//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT*2)  # Es lista de tags o None
 
-                            # Si existe la seccion de Suplentes
-                            if crawler.extract_tag(xpath='.//div[text()="Suplentes"]', sec_wait=SEC_WAIT) is not None:
-                                # NO DEBO EXTRAER EL TAG A, HAY VECES QUE FALLA PORQUE LOS JUGADORES NO TIENEN ASOCIADO UN LINK
-                                l_tags_jug_sup_loc = crawler.extract_tags(xpath='.//div[text()="Suplentes"]//following-sibling::div//div[@class="lf__side"][1]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT)  # Es lista de tags o None
-                                l_tags_jug_sup_vis = crawler.extract_tags(xpath='.//div[text()="Suplentes"]//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT)  # Es lista de tags o None
+                                    # Creo una columna por cada jugador local
+                                    if l_tags_jug_loc is not None:
+                                        for i in range(len(l_tags_jug_loc)):
+                                            d_nueva_fila[f'jug_{d_formaciones[formacion]}_loc_{i}'] = l_tags_jug_loc[i].text
 
-                                # Creo una columna por cada jugador suplente del equipo local
-                                if l_tags_jug_sup_loc is not None:
-                                    for i in range(len(l_tags_jug_sup_loc)):
-                                        d_nueva_fila[f'jug_sup_loc_{i}'] = l_tags_jug_sup_loc[i].text
-
-                                # Creo una columna por cada jugador suplente del equipo visitante
-                                if l_tags_jug_sup_vis is not None:
-                                    for i in range(len(l_tags_jug_sup_vis)):
-                                        d_nueva_fila[f'jug_sup_vis_{i}'] = l_tags_jug_sup_vis[i].text
-
-                            # Si existe la seccion de jugadores ausentes
-                            if crawler.extract_tag(xpath='.//div[text()="Jugadores ausentes"]', sec_wait=SEC_WAIT) is not None:
-                                # NO DEBO EXTRAER EL TAG A, HAY VECES QUE FALLA PORQUE LOS JUGADORES NO TIENEN ASOCIADO UN LINK
-                                l_tags_jug_ausentes_loc = crawler.extract_tags(xpath='.//div[text()="Jugadores ausentes"]//following-sibling::div//div[@class="lf__side"][1]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT)  # Es lista de tags o None
-                                l_tags_jug_ausentes_vis = crawler.extract_tags(xpath='.//div[text()="Jugadores ausentes"]//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=SEC_WAIT)
-
-                                # Creo una columna por cada jugador ausente del equipo local
-                                if l_tags_jug_ausentes_loc is not None:
-                                    for i in range(len(l_tags_jug_ausentes_loc)):
-                                        d_nueva_fila[f'jug_aus_loc_{i}'] = l_tags_jug_ausentes_loc[i].text
-
-                                # Creo una columna por cada jugador ausente del equipo visitante
-                                if l_tags_jug_ausentes_vis is not None:
-                                    for i in range(len(l_tags_jug_ausentes_vis)):
-                                        d_nueva_fila[f'jug_aus_vis_{i}'] = l_tags_jug_ausentes_vis[i].text
+                                    # Creo una columna por cada jugador visitante
+                                    if l_tags_jug_vis is not None:
+                                        for i in range(len(l_tags_jug_vis)):
+                                            d_nueva_fila[f'jug_{d_formaciones[formacion]}_vis_{i}'] = l_tags_jug_vis[i].text
 
                             d_nueva_fila['dt_loc'] = crawler.extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][1]', text=True, sec_wait=SEC_WAIT)
                             d_nueva_fila['dt_vis'] = crawler.extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][2]', text=True, sec_wait=SEC_WAIT)
