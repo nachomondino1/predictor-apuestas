@@ -22,34 +22,6 @@ def convert_fecha_to_datetime(df, string_format):
     df['fecha'] = pd.to_datetime(df['fecha'], format=string_format)
     return df
 
-def separate_lists_in_columns(df, variable):  # Si bien es ineficiente, no me conviene mejorarla puesto que extraere ya las columnas separadas... ( tampoco tanto, tarda 4.2 seg, 4.1, 2.3, 1.9, 0.6, 0.6) Cuando extraiga cada jugador en vez de la lista, podre borrala
-    """
-    Convierto columnas que contienen listas en multiples columnas de un solo elemento
-    :param df: Dataframe.
-    :param variable: String. Nombre de la variable
-    :return: Dataframe.
-    """
-    # Por registro
-    for i in range(len(df)):
-
-        # Obtengo lista
-        str_with_list = df.loc[i, variable]
-
-        # Verificar si el elemento es un string (Evito nan)
-        if isinstance(str_with_list, str):
-
-            # Convierto string a lista
-            l_jug = eval(str_with_list)  # e.g. ["Dibu", ..., "Messi"]
-
-            # Por elemento de la lista
-            for j in range(len(l_jug)):
-
-                # Guardo jugador en columna nueva
-                df.loc[i, f'{variable[2:]}_{j+1}'] = l_jug[j]
-
-    df = df.drop([variable], axis=1)
-    return df
-
 def convert_valor_mercado_to_int(df):
     """
     Transformo fecha de string a datetime
