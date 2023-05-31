@@ -54,11 +54,6 @@ class DataPreparation:
         # Remuevo strings adicionales en los nombres de los equipos  (lo hago aca porque requiero los equipos limpios para integrar datos)
         df_part = clean_data.remove_strings_from_teams(df_part)
 
-        # Separo columnas listas en multiples columnas (NO VA A SER NECESARIO CUANDO DESDE LA MISMA EXTRACCION EXTRAIGA VARIAS COLUMNAS...)
-        l_var = ['l_jug_tit_loc', 'l_jug_tit_vis', 'l_jug_sup_loc', 'l_jug_sup_vis', 'l_jug_ausentes_loc', 'l_jug_ausentes_vis']
-        for var in l_var:
-            df_part = format_data.separate_lists_in_columns(df_part, var)
-
         # Convierto valor de mercado en entero
         df_jug = format_data.convert_valor_mercado_to_int(df_jug)
 
