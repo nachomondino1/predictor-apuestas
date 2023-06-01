@@ -4,35 +4,36 @@ import time
 import numpy as np
 import warnings
 
-# Data understanding
-from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
-from dspy.data_understanding.describe_data import getting_to_know_data
+# # Data understanding
+# from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
+# from dspy.data_understanding.describe_data import getting_to_know_data
+#
+# # Data preparation
+# from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
+# from dspy.data_preparation import clean_data as cd
 
-# Data preparation
-from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-from dspy.data_preparation import clean_data as cd
+# Modeling
+# Generate test design
+from dspy.modeling import test_design
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.utils import shuffle
 
-# # Modeling
-# # Generate test design
-# from dspy.modeling import test_design
-# from imblearn.over_sampling import RandomOverSampler
-# from sklearn.utils import shuffle
-#
-#
-# # Build model
-# from modeling import copia_build_model, asses_model
-# from dspy.modeling.supervised_learning import naive_bayes
-# from sklearn.tree import DecisionTreeClassifier, plot_tree
-# import xgboost as xgb  # XGBoost
-# from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-# import lightgbm as lgb  # Gradient Boosting
-# from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
-# from sklearn.svm import SVC  # SVM
-# from sklearn.neural_network import MLPClassifier
-# from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
-#
-# # Assess model
-# from sklearn.metrics import accuracy_score
+
+# Build model
+from modeling import copia_build_model, asses_model
+from dspy.modeling.supervised_learning import naive_bayes
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+import xgboost as xgb  # XGBoost
+from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+import lightgbm as lgb  # Gradient Boosting
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
+from sklearn.svm import SVC  # SVM
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, GridSearchCV, cross_val_predict, KFold, StratifiedKFold
+
+# Assess model
+from modeling.asses_model import calculate_ROI
+from sklearn.metrics import accuracy_score
 
 
 class DataPreparation:
@@ -48,6 +49,7 @@ class DataPreparation:
             # df_jug = pd.read_excel('data_understanding/collect_data/data/entidad_jugadores.xlsx')
             df_part = pd.read_excel('data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
             df_jug = pd.read_excel('data_understanding/collect_data/data_seg/entidad_jugadores.xlsx')
+            df_jug = df_jug[df_jug['pais'] == 'argentina']  # Selecciono solo jugadores de argentina para hacer mas rapido...
 
         start = time.time()
         print("\nFormateando los datos...")
@@ -55,6 +57,7 @@ class DataPreparation:
         # Entidad partido: fecha de string a datetime, posesion de str a float
         df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M') # Fundamental para poder ordenar el df por 'fecha' # A pesar de transformalo en la extraccion, lo vuelve a entender como str y no como dt
         df_part = format_data.convert_posesion_to_int(df_part)
+        df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
 
         # Entidad jugador: fecha de string a datetime y convierto valor de mercado en entero
         df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
@@ -69,7 +72,7 @@ class DataPreparation:
 
         return df_part, df_jug
 
-    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 55 min --> tengo que eficientizar...  # 6.6 min (solo 2022, 2023 liga arg)
+    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 42.6 min (sin copa arg y otras comp)
 
         # Si no han pasado un dataset utilizo un dataframe guardado
         if df_part is None and df_jug is None:
@@ -135,40 +138,11 @@ class DataPreparation:
 
         return df
 
-    def select_data(self, df=None, export=False):
+    def clean_data(self, df=None, export=False):  # tengo que limpiar los datos antes de seleccionar porque no le pueden entrar NaN ni columnas no numericas. A su vez, tengo que eliminar las columnas que no sirven para el modelo puesto que puede que me hagan borrar mas registros al tener mas nan values.
 
         # Si no han pasado un dataset utilizo un dataframe guardado
         if df is None:
-            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx')
-
-        start = time.time()
-        print("\nSeleccionado datos...")
-
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df = df.drop(['id', 'fecha', 'cancha', 'es_copa', 'historial_entre_si'], axis=1)
-
-        # Remocion de variables redundantes (las de mayor correlacion)
-        df_correlation_matrix = df.drop(self.var_resp, axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
-        df_correlation_matrix.to_excel('/Users/nachomondino/Desktop/correlation_matrix.xlsx')
-        df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'], inplace=True, axis=1)
-
-        # Elimino otras variables no son importantes... (lo hice manual sin algoritmo pero falta algoritmo)
-        # select_data.feature_selection(df)
-        df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
-
-        end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
-
-        return df
-
-    def clean_data(self, df, export=False):
-
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        if df is None:
-            df = pd.read_excel('data_preparation/data/df_selected.xlsx')
+            df = pd.read_excel('data_preparation/data/df_constructed.xlsx')
 
         start = time.time()
         print("\nLimpiando los datos...")
@@ -176,10 +150,13 @@ class DataPreparation:
         # Categorizo columnas numericas
         # df = clean_data.categorize_numeric_columns(df)
 
+        # Eliminacion de outliers?
+
+        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+
         # Remover NaN values
         df = df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
-
-        # Eliminacion de outliers?
 
         # Convertir variables categoricas string a categoricas numericas
         df = clean_data.convert_columns_to_int(df)
@@ -192,6 +169,33 @@ class DataPreparation:
 
         return df
 
+    def select_data(self, df=None, export=False):  # Implementar feature selection...
+
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df is None:
+            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_cleaned.xlsx')
+
+        start = time.time()
+        print("\nSeleccionado datos...")
+
+        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+
+        # No usaré la matriz de correlacion puesto que haré feature selection
+
+        # Elimino variables no son importantes
+        # df = select_data.feature_selection(df)
+        # df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
+        # df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'], inplace=True, axis=1)
+
+        end = time.time()
+        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
+
+        if export:
+            df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
+
+        return df
+
 class Modeling:
 
     def __init__(self, var_resp):
@@ -201,9 +205,7 @@ class Modeling:
 
         if df is None:
             # Levanto dataset ya preparado
-            # df = pd.read_excel('data_preparation/data/df_cleaned.xlsx')
-            df = pd.read_excel('data_preparation/data/df_selected_manual.xlsx')  # Cambiar a cleaned...
-
+            df = pd.read_excel('data_preparation/data/df_selected.xlsx')  # Cambiar a cleaned...
 
         # Definicion de variables
         oversampler = RandomOverSampler()
@@ -229,7 +231,7 @@ class Modeling:
 
         return df_train, df_test
 
-    def select_best_model(self, df_train, df_test, l_modelos, best_params=False, k=10):  # que argumentos? l_modelos, best_params?, k?
+    def select_best_model(self, df_train, l_modelos, best_params=False, k=10):  # que argumentos? l_modelos, best_params?, k?
 
         # Definicion de variables
         warnings.filterwarnings("ignore")
@@ -240,54 +242,62 @@ class Modeling:
 
             # Entreno modelo
             print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '#'))
-            model, cv_accuracy, test_accuracy = copia_build_model.build_model(df_train, df_test, self.var_resp, modelo, best_params=best_params, k=k) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
+            # model, cv_accuracy, test_accuracy = copia_build_model.build_model(df_train, df_test, self.var_resp, modelo, best_params=best_params, k=k) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
+            model, cv_accuracy = copia_build_model.train_model(df_train, self.var_resp, modelo, best_params=best_params, k=k)
 
-            # Si es el mejor modelo hasta aqui
-            if test_accuracy > best_acurracy:  # GUARDAR MAS METRICAS? HAGO EL ASSESS MODEL ACA?
+            # Si es el mejor modelo hasta aqui # Uso accuracy en todos los folds de cv... para elegir el mejor modelo
+            if cv_accuracy > best_acurracy:  # GUARDAR MAS METRICAS? HAGO EL ASSESS MODEL ACA?
                 # Guardo modelo
-                best_acurracy = test_accuracy
+                best_acurracy = cv_accuracy
                 best_model = model
 
         print(f"\nEl mejor modelo es: {best_model}")
-        return best_model, df_result #df_result y_real e y_pred
+        return best_model  #df_result y_real e y_pred
 
-    def assess_model(self, model, df_test):
-
+    def assess_model(self, model, df_test, var_resp):
         # Hago prediccion aca? y calculo metricas?
 
-        '''
-        df_result = naive_bayes.predict_naive_bayes(modelo_nb, df_test, var_resp=var_resp, con_prob=True)
-        df_result.to_excel('/Users/nachomondino/Desktop/df_result.xlsx')
-        precision = calculate_precision(df_result, var_resp=var_resp, var_pred=var_pred)
-        roi = calculate_ROI(df_result, var_resp=var_resp, var_pred=var_pred)
-        # confusion_matrix(df_result, var_resp=var_resp, var_pred=var_pred)
-        '''
+        y_real = df_test[var_resp]
 
-        return precision, roi
+        df_test_without_odds = df_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+
+        # Predecir las etiquetas para los datos de prueba
+        y_pred = model.predict(df_test_without_odds.drop(var_resp, axis=1))  # es un numpy array
+
+        # Calculo metricas
+        test_accuracy = accuracy_score(y_real, y_pred)
+        print(f"Precisión del modelo en los datos de prueba: {test_accuracy:.3f}")
+
+        # Agrego y_pred a df_test para poder calcular ROI
+        df_test['y_pred'] = y_pred
+        roi = calculate_ROI(df_test, var_resp=var_resp, var_pred='y_pred')
+        print(f"ROI del modelo en los datos de prueba: {roi:.3f}")
+
+        df_test.to_excel('/Users/nachomondino/Desktop/df_results.xlsx')
+        # confusion_matrix(df_result, var_resp=var_resp, var_pred=var_pred)
+        return test_accuracy, roi
 
 
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders = False
-    data_prep = True
-    modeling = False
+    data_unders, data_prep, modeling = False, False, True
     var_resp = 'equipo_ganador'
     prepare = DataPreparation(var_resp)
     modeler = Modeling(var_resp)
 
     # Hiperparametros
     N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-    '''l_modelos = [DecisionTreeClassifier(max_depth=30),
+    l_modelos = [DecisionTreeClassifier(max_depth=30),
                  # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                  # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
                  # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
-                 SVC(kernel='rbf', decision_function_shape='ovo'),
-                 MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
-                               max_iter=300),
-                 GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
+                 # SVC(kernel='rbf', decision_function_shape='ovo'),
+                 # MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
+                 #               max_iter=300),
+                 # GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
                  # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
-                 ]'''
+                 ]
 
     if data_unders is True:
         # Collect initial data
@@ -302,17 +312,17 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if data_prep is True:
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
-        df = prepare.integrate_data(df_part, df_jug, export=True)
-        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        # df = prepare.select_data(df, export=True)
-        # df = prepare.clean_data(df, export=True)
+        # df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
+        # df = prepare.integrate_data(df_part, df_jug, export=True)
+        # df = prepare.construct_data(N_ULT_PART=N_ULT_PART, export=True) # df
+        df = prepare.clean_data(export=True)
+        df = prepare.select_data(df, export=True)
 
     if modeling is True:
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(df, export=True)
-        # best_model, df_result = modeler.select_best_model(df_train, df_test, l_modelos, best_params=True, k=5)
-        # precision, roi = modeler.assess_model(best_model, df_result)
+        df_train, df_test = modeler.generate_test_design(export=True)
+        best_model = modeler.select_best_model(df_train, l_modelos, best_params=True, k=5)
+        precision, roi = modeler.assess_model(best_model, df_test, var_resp)
 
 main()
