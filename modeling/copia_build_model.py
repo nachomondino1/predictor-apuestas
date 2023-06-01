@@ -65,11 +65,10 @@ def select_best_hiperparameters(X_train, y_train, model, k):
     model = grid_search.best_estimator_
     return model
 
-def build_model(df_train, df_test, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
+def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
     # Dividir los datos en conjunto de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = df_train.drop(var_resp, axis=1), df_test.drop(var_resp, axis=1), df_train[var_resp], df_test[var_resp]
-    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, y_train = df_train.drop(var_resp, axis=1), df_train[var_resp]
 
     # Verificar si se deben buscar los mejores hiperparámetros
     if best_params:
@@ -80,9 +79,9 @@ def build_model(df_train, df_test, var_resp, model, best_params=False, k=5):  # 
     fold_size = len(X_train) // k
 
     for i in range(k):
+
         # Dividir los datos en conjuntos de entrenamiento y validación
-        start = i * fold_size
-        end = (i + 1) * fold_size
+        start, end = i * fold_size, (i + 1) * fold_size
         X_train_fold = np.concatenate((X_train[:start], X_train[end:]), axis=0)
         y_train_fold = np.concatenate((y_train[:start], y_train[end:]), axis=0)
         X_val_fold = X_train[start:end]
@@ -101,37 +100,13 @@ def build_model(df_train, df_test, var_resp, model, best_params=False, k=5):  # 
     # Calcular la precisión promedio de la validación cruzada
     cv_accuracy = np.mean(scores)
     print(f"Precisión de la validación cruzada: {cv_accuracy:.3f}")
-
-    # Entrenar el modelo final con todos los datos de entrenamiento
-    model.fit(X_train, y_train)
-
-    # Predecir las etiquetas para los datos de prueba
-    y_pred = model.predict(X_test)
-
-    # Calcular la precisión del modelo en los datos de prueba
-    test_accuracy = accuracy_score(y_test, y_pred)
-    print(f"Precisión del modelo en los datos de prueba: {test_accuracy:.3f}")
-
-    # Devolver el modelo entrenado, precisión de la validación cruzada y precisión en los datos de prueba
-    return model, cv_accuracy, test_accuracy
+    return model, cv_accuracy  # Por que devoler la test_accuracy? eso lo hago en assess model no?
 
 
 def main():
 
     # Levanto dataset
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_selected_manual.xlsx')
-
-
-    # Procesamiento que le falta al df --> no iria aca...
-    # Select data
-    df = df.drop(['historial_entre_si', 'odds_loc', 'odds_emp', 'odds_vis'], axis = 1)
-    print(df.head())
-    print(df.shape)
-    # Borro NaNs
-    df = df.dropna()
-    # Genero test design
-    X, y = generate_test(df, 'equipo_ganador')
-
 
     warnings.filterwarnings("ignore")
     best_acurracy = 0
