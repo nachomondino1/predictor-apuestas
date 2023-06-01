@@ -123,4 +123,4 @@ def extract_sofifa():
 
     return df_jug
 
-extract_sofifa()
+# extract_sofifa()

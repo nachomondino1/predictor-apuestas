@@ -340,4 +340,4 @@ def prueba():
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
 
-prueba()
+# prueba()
