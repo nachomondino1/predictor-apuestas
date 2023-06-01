@@ -6,6 +6,7 @@ import warnings
 
 # Data understanding
 from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
+from dspy.data_understanding.describe_data import getting_to_know_data
 
 # Data preparation
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
@@ -39,52 +40,67 @@ class DataPreparation:
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def format_data(self, df_part, df_jug, export=False): # 1 min
+    def format_data(self, df_part=None, df_jug=None, export=False):  # 0.2 min
+
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df_part is None and df_jug is None:
+            # df_part = pd.read_excel('data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
+            # df_jug = pd.read_excel('data_understanding/collect_data/data/entidad_jugadores.xlsx')
+            df_part = pd.read_excel('data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
+            df_jug = pd.read_excel('data_understanding/collect_data/data_seg/entidad_jugadores.xlsx')
 
         start = time.time()
         print("\nFormateando los datos...")
 
-        # Convierto posesion de string a integer
+        # Entidad partido: fecha de string a datetime, posesion de str a float
+        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M') # Fundamental para poder ordenar el df por 'fecha' # A pesar de transformalo en la extraccion, lo vuelve a entender como str y no como dt
         df_part = format_data.convert_posesion_to_int(df_part)
 
-        # Convierto fecha de string a datetime
-        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
+        # Entidad jugador: fecha de string a datetime y convierto valor de mercado en entero
         df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
-
-        # Remuevo strings adicionales en los nombres de los equipos  (lo hago aca porque requiero los equipos limpios para integrar datos)
-        df_part = clean_data.remove_strings_from_teams(df_part)
-
-        # Convierto valor de mercado en entero
         df_jug = format_data.convert_valor_mercado_to_int(df_jug)
+
+        end = time.time()
+        print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
             df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
 
-        end = time.time()
-        print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
         return df_part, df_jug
 
-    def integrate_data(self, df_part, df_jug, export=False):  # 55 min --> tengo que eficientizar...
+    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 55 min --> tengo que eficientizar...  # 6.6 min (solo 2022, 2023 liga arg)
+
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df_part is None and df_jug is None:
+            df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_part_formated.xlsx')
+            df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_jug_formated.xlsx')
 
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores (lo hago aqui y no en clean_data porque uso variables strings para integrar datos)
-        df_part = clean_data.prepare_text_columns(df_part)
-        df_jug = clean_data.prepare_text_columns(df_jug)
+        # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
+        df_part = clean_data.remove_strings_from_teams(df_part)  # remuevo strings adicionales en los nombres de los equipos
+        df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_part = clean_data.change_teams_names(df_part)  # e.g. atl. tucuman --> atletico tucuman
 
-        # Integro datasets
-        df_integrated = integrate_data.search_player_data(df_part, df_jug)
+        # Integro entidad partido y jugador
+        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)
+
+        end = time.time()
+        print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_integrated.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
 
-        end = time.time()
-        print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         return df_integrated
 
-    def construct_data(self, df, N_ULT_PART = 5, export=False):  # 4.2 min
+    def construct_data(self, df=None, N_ULT_PART = 5, export=False):  # 4.2 min
+
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df is None:
+            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx')
 
         start = time.time()
         print("\nConstruyendo nuevos datos...")
@@ -111,14 +127,19 @@ class DataPreparation:
         # df = convert_odds_to_prob(df)
         # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
 
+        end = time.time()
+        print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
+
         if export:
             df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
 
-        end = time.time()
-        print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         return df
 
-    def select_data(self, df, export=False):
+    def select_data(self, df=None, export=False):
+
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df is None:
+            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx')
 
         start = time.time()
         print("\nSeleccionado datos...")
@@ -135,14 +156,19 @@ class DataPreparation:
         # select_data.feature_selection(df)
         df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
 
+        end = time.time()
+        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
+
         if export:
             df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
 
-        end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
         return df
 
     def clean_data(self, df, export=False):
+
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df is None:
+            df = pd.read_excel('data_preparation/data/df_selected.xlsx')
 
         start = time.time()
         print("\nLimpiando los datos...")
@@ -158,11 +184,12 @@ class DataPreparation:
         # Convertir variables categoricas string a categoricas numericas
         df = clean_data.convert_columns_to_int(df)
 
+        end = time.time()
+        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
+
         if export:
             df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
 
-        end = time.time()
-        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
         return df
 
 class Modeling:
@@ -170,7 +197,13 @@ class Modeling:
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def generate_test_design(self, df, export=True):
+    def generate_test_design(self, df=None, export=True):
+
+        if df is None:
+            # Levanto dataset ya preparado
+            # df = pd.read_excel('data_preparation/data/df_cleaned.xlsx')
+            df = pd.read_excel('data_preparation/data/df_selected_manual.xlsx')  # Cambiar a cleaned...
+
 
         # Definicion de variables
         oversampler = RandomOverSampler()
@@ -240,6 +273,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     data_prep = True
     modeling = False
     var_resp = 'equipo_ganador'
+    prepare = DataPreparation(var_resp)
+    modeler = Modeling(var_resp)
 
     # Hiperparametros
     N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
@@ -255,32 +290,25 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                  ]'''
 
     if data_unders is True:
-        df_part = scraper_flashscore.extract_flashscore()
+        # Collect initial data
+        df_part = scraper_flashscore.extract_flashscore()  # Tengo que ver que no se corran igual por no comentar la funcion en su archivo...
         df_jug = scraper_sofifa.extract_sofifa
-    else:
-        # Levanto datasets
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx', index_col=0)
         print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
+        # Describe data (quiero describir los datos igual aunque no los extraiga...)
+        getting_to_know_data(df_part)
+        getting_to_know_data(df_jug)
+
     if data_prep is True:
-        prepare = DataPreparation(var_resp)
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(df_part, df_jug, export=True)
+        df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
         df = prepare.integrate_data(df_part, df_jug, export=True)
         # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
         # df = prepare.select_data(df, export=True)
         # df = prepare.clean_data(df, export=True)
-    else:
-         # Levanto dataset ya preparado
-         df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_selected_manual.xlsx')
-
 
     if modeling is True:
-
-        # Definicion de variables
-        modeler = Modeling(var_resp)
 
         # Analizo los datos
         df_train, df_test = modeler.generate_test_design(df, export=True)

@@ -38,3 +38,21 @@ def convert_columns_to_int(df):
         df[col] = le.fit_transform(df[col])
 
     return df
+
+def change_teams_names(df_part):
+    """
+    Cambio el nombre de algunos equipos de la entidad partido puesto que falla su busqueda en la entidad jugador por
+    estar abreviados. Por ejemplo, "atl. tucuman" en vez de "atletico tucuman"
+    :param df_part: Dataframe
+    :return: Dataframe con nombres de equipos modificados para facilitar la integracion
+    """
+    # Definicion de variables
+    d = {'gimnasia l.p.': 'gimnasia la plata', 'atl. tucuman': 'atletico tucuman', 'argentinos jrs.': 'argentinos juniors',
+         'boca jrs.': 'boca juniors', 'estudiantes l.p.': 'estudiantes'}
+
+    for equipo_part, equipo_jug in d.items():
+
+        df_part['equipo_loc'] = df_part['equipo_loc'].replace(equipo_part, equipo_jug)
+        df_part['equipo_vis'] = df_part['equipo_vis'].replace(equipo_part, equipo_jug)
+
+    return df_part

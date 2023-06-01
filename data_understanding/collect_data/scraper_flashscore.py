@@ -7,21 +7,24 @@ import warnings
 from dspy.data_understanding.web_scraping.selenium import Crawler
 
 
-def extract_cuota(crawler, SEC_WAIT, i):
+def extract_cuota(crawler, SEC_WAIT, i):  # Probar funcion... NO ESTA VERIFICADA...  # Puedo volver a la anterior, solo fallaron 41 cuotas por "Cuotas retiradas por la casa de apuestas."
 
     # Busco odd suponiendo que cambio durante el partido
-    odds = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]', attribute='title', sec_wait=SEC_WAIT)
+    try:
+        text_with_odds = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]', attribute='title', sec_wait=SEC_WAIT)  # 3.00 » 2.25
+        odds = float(text_with_odds.split('»')[0].strip())  # 3.00
+        return odds
 
-    # Si la odd cambio (el title no es un string vacio)
-    if len(odds) > 1:
-        # Extraigo la odd antes de iniciar el partido
-        return odds.split('»')[0].strip()
+    # Si la odd no cambio durante el partido, o bien, aparece "Cuotas retiradas por la casa de apuestas."
+    except ValueError:  # could not convert string to float:
+        try:
+            odds_str = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]//span[@class="oddsValueInner"]', text=True, sec_wait=SEC_WAIT)
+            odds = float(odds_str)
+            return odds
 
-    # Si la odd no cambio (el title es un string vacio)
-    else:
-        # Busco el texto de la odd inicial
-        return crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]//span[@class="oddsValueInner"]', text=True, sec_wait=SEC_WAIT)
-
+        except ValueError:  # could not convert string to float
+            print("Fallo extraccion de la cuota")
+            return None
 
 def extract_flashscore():
     """
@@ -77,7 +80,7 @@ def extract_flashscore():
             print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
             # POR PAGINA (TEMPORADA) DE PAGINACION
-            for url_temp in l_urls_temporadas:
+            for url_temp in l_urls_temporadas[6:]:
 
                 # Ingreso a pagina de temporada e imprimo año de la temporada
                 crawler.driver.get(url_temp)
@@ -110,7 +113,7 @@ def extract_flashscore():
                     # if id not in list(df_part['id']):
 
                     # Ingreso a pagina de informacion del partido
-                    crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')  # Cambie porque fallo en un partido de 2005 de Peru. Saque el ultimo /resumen-del-partido... selenium.common.exceptions.WebDriverException: Message: unknown error: net::ERR_NAME_NOT_RESOLVED f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido/resumen-del-partido'
+                    crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
 
                     # EXTRACCION DE CAMPOS
                     fecha_str = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
@@ -132,7 +135,7 @@ def extract_flashscore():
                         # Extraigo campos de hoja "Estadísticas"
                         if crawler.click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Estadísticas"]', sec_wait=SEC_WAIT_LONG) is not False:
 
-                            time.sleep(random.uniform(SEC_WAIT+2, SEC_WAIT_LONG+2)) # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
+                            time.sleep(random.uniform(SEC_WAIT+3, SEC_WAIT_LONG+3)) # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
 
                             # Por estadistica (posesion, remates, etc)
                             for estadistica in d_estadisticas.keys():
@@ -144,7 +147,7 @@ def extract_flashscore():
                         # Extraigo campos de hoja "Formaciones"
                         if crawler.click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Formaciones"]', sec_wait=SEC_WAIT) is not False:
 
-                            time.sleep(random.uniform(SEC_WAIT+2, SEC_WAIT_LONG+2)) # Por posible falla en el primer campo a extraer
+                            time.sleep(random.uniform(SEC_WAIT+3, SEC_WAIT_LONG+3)) # Por posible falla en el primer campo a extraer
 
                             # Por seccion ("Formacion inicial", "Suplentes" y  "Ausentes")
                             for formacion in d_formaciones.keys():
@@ -183,7 +186,7 @@ def extract_flashscore():
 
                                             d_nueva_fila[f'jug_{d_formaciones[formacion]}_vis_{i+1}'] = nombre  # l_tags_jug_vis[i].text
 
-                            # Extraigo entrenadores
+                            # Extraigo entrenadores  # Sacar los try - except horribles
                             # d_nueva_fila['dt_loc'] = crawler.extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][1]', text=True, sec_wait=SEC_WAIT)
                             # d_nueva_fila['dt_vis'] = crawler.extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][2]', text=True, sec_wait=SEC_WAIT)
                             # Intento extraer nombre completo (solo si tiene link asociado) (e.g. "genez nahuel")
@@ -226,4 +229,6 @@ def extract_flashscore():
     crawler.driver.close()
     return df_part
 
-extract_flashscore()
+# extract_flashscore()
+
+# Puedo eficientizar el codigo (en entrenadores y demas) agregando la posibilidad de un xpath alternativo en extract_tag...
