@@ -289,7 +289,7 @@ def suma_overall_rating_ausentes(df):
     pass
 
 def calculate_dif_col_jugadores(df):
-    l_titularidad = ['tit', 'sup', 'ausentes']
+    l_titularidad = ['tit', 'sup', 'aus']
     l_var_jug = ['edad', 'alt', 'rat', 'valor']
 
     for titularidad in l_titularidad:

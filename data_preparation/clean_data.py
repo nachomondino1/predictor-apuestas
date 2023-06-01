@@ -56,3 +56,12 @@ def change_teams_names(df_part):
         df_part['equipo_vis'] = df_part['equipo_vis'].replace(equipo_part, equipo_jug)
 
     return df_part
+
+''' fill NaN values
+    for col in df.select_dtypes(include=['float64', 'int64']).columns:
+
+        mean = df[col].mean()  # Calcula la media de una columna
+        df[col] = df[col].fillna(mean)  # Rellena los NaN en esa columna con la media
+
+        print(f"Columna: {col} \nMedia: {mean}")
+'''
