@@ -100,6 +100,9 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
     # Calcular la precisión promedio de la validación cruzada
     cv_accuracy = np.mean(scores)
     print(f"Precisión de la validación cruzada: {cv_accuracy:.3f}")
+
+    # Entrenar el modelo final con todos los datos de entrenamiento
+    model.fit(X_train, y_train)
     return model, cv_accuracy  # Por que devoler la test_accuracy? eso lo hago en assess model no?
 
 
