@@ -43,23 +43,36 @@ def convert_valor_mercado_to_int(df):
     df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
     return df
 
+def convert_odds_to_float(df):  # El nuevo dataframe tuvo falla en la extraccion de algunas cuotas (lo cual ya lo tendria arreglado para proximas extracciones) y hace que el dtype sea object...
+    """
+    Transformo posesion de string a float
+    :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
+    ejemplo '65%'.
+    :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
+    """
+    l_var = ['odds_loc', 'odds_emp', 'odds_vis']
+    for var in l_var:
+        print(f"Antes: {df[var]}")
+        df[var] = df[var].replace("Cuotas retiradas por la casa de apuestas.", None).apply(lambda x: float(x) if isinstance(x, str) else np.nan)
+        print(f"Despues: {df[var]}")
+    return df
+
 def prueba():
     # Levanto datasets
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
-    df_jug = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_jugadores.xlsx", index_col=0)
+    df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
+    df_jug = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_jugadores.xlsx", index_col=0)
 
-    # Convierto posesion de string a integer
-    df = convert_posesion_to_int(df)
+    # Entidad partido: fecha de string a datetime, posesion de str a float
+    df_part = convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')
+    df_part = convert_posesion_to_int(df_part)
+    df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
+    df_part = convert_odds_to_float(df_part)  # Extrajo mal cuotas en algunos partidos...
 
-    # Convierto fecha de string a datetime
-    df = convert_fecha_to_datetime(df, string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha'
+    # Entidad jugador: fecha de string a datetime y convierto valor de mercado en entero
     df_jug = convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
-
-    # Convierto valor de mercado en entero
     df_jug = convert_valor_mercado_to_int(df_jug)
 
-    # Ordeno por campo 'fecha'
-    df.to_excel('./df_part_formated.xlsx', index=False)
-    df_jug.to_excel('./df_jug_formated.xlsx', index=False)
+    df_part.to_excel('/Users/nachomondino/Desktop/df_part_formated.xlsx', index=False)
+    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_formated.xlsx', index=False)
 
-# prueba()
+prueba()
