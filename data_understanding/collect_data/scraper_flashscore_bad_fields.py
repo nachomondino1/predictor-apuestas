@@ -4,10 +4,9 @@ from dspy.data_understanding.web_scraping.selenium import Crawler
 
 
 def extract_bad_fields_flashscore():
-    """
-    It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
-    driver, then enter the page, then accept cookies and so on.
-    """
+
+    # Solucionar el tema de que cuando falla un campo, tengo que volver a extraer tod@... Dar la posibildiad de recorrer los ids ya extraidos y extraer de nuevo el campo que falló
+
     # DEFINCION DE PARAMETROS & VARIABLES
     SEC_WAIT, SEC_WAIT_LONG = 0.2, 1.5
     crawler = Crawler(headless=True, path=None) # Creo objeto de clase CrawlerActions()

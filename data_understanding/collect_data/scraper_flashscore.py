@@ -7,25 +7,6 @@ import warnings
 from dspy.data_understanding.web_scraping.selenium import Crawler
 
 
-def extract_cuota(crawler, SEC_WAIT, i):  # Probar funcion... NO ESTA VERIFICADA...  # Puedo volver a la anterior, solo fallaron 41 cuotas por "Cuotas retiradas por la casa de apuestas."
-
-    # Busco odd suponiendo que cambio durante el partido
-    try:
-        text_with_odds = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]', attribute='title', sec_wait=SEC_WAIT)  # 3.00 » 2.25
-        odds = float(text_with_odds.split('»')[0].strip())  # 3.00
-        return odds
-
-    # Si la odd no cambio durante el partido, o bien, aparece "Cuotas retiradas por la casa de apuestas."
-    except ValueError:  # could not convert string to float:
-        try:
-            odds_str = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]//span[@class="oddsValueInner"]', text=True, sec_wait=SEC_WAIT)
-            odds = float(odds_str)
-            return odds
-
-        except ValueError:  # could not convert string to float
-            print("Fallo extraccion de la cuota")
-            return None
-
 def extract_flashscore():
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
@@ -80,7 +61,7 @@ def extract_flashscore():
             print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
             # POR PAGINA (TEMPORADA) DE PAGINACION
-            for url_temp in l_urls_temporadas[6:]:
+            for url_temp in l_urls_temporadas:
 
                 # Ingreso a pagina de temporada e imprimo año de la temporada
                 crawler.driver.get(url_temp)
@@ -211,6 +192,7 @@ def extract_flashscore():
                             d_nueva_fila['odds_loc'] = extract_cuota(crawler, SEC_WAIT, i=1)
                             d_nueva_fila['odds_emp'] = extract_cuota(crawler, SEC_WAIT, i=2)
                             d_nueva_fila['odds_vis'] = extract_cuota(crawler, SEC_WAIT, i=3)
+                            print(d_nueva_fila['odds_loc'], d_nueva_fila['odds_emp'], d_nueva_fila['odds_vis'])
 
                         # GUARDADO DE DATOS EN DATAFRAME
                         df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
@@ -229,6 +211,29 @@ def extract_flashscore():
     crawler.driver.close()
     return df_part
 
-# extract_flashscore()
+def extract_cuota(crawler, SEC_WAIT, i):  # Puedo volver a la anterior, solo fallaron 41 cuotas por "Cuotas retiradas por la casa de apuestas."
+
+    # Busco odd suponiendo que cambio durante el partido
+    try:
+        odds_str = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]', attribute='title', sec_wait=SEC_WAIT)  # 3.00 » 2.25
+        cuota = float(odds_str.split('»')[0].strip())  # 3.00
+
+    # Si la odd no cambio durante el partido, o bien, aparece "Cuotas retiradas por la casa de apuestas."
+    except ValueError: # could not convert string to float:
+
+        try:
+            odds_str = crawler.extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]//span[@class="oddsValueInner"]', text=True, sec_wait=SEC_WAIT)
+            cuota = float(odds_str)
+
+        except (ValueError, TypeError):
+            print("Fallo extraccion de la cuota")
+            cuota = None
+    return cuota
+
+def prueba():
+    extract_flashscore()
+
+# prueba()
 
 # Puedo eficientizar el codigo (en entrenadores y demas) agregando la posibilidad de un xpath alternativo en extract_tag...
+# Solucionar el tema de que cuando falla un campo, tengo que volver a extraer tod@... Dar la posibildiad de recorrer los ids ya extraidos y extraer de nuevo el campo que falló
