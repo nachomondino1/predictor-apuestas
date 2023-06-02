@@ -6,23 +6,29 @@ import warnings
 from sklearn.model_selection import GridSearchCV
 
 # Modelos (solo lo uso para pruebas)
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-import xgboost as xgb  # XGBoost
-from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-import lightgbm as lgb  # Gradient Boosting
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
-from sklearn.svm import SVC  # SVM
-from sklearn.neural_network import MLPClassifier
+# from sklearn.tree import DecisionTreeClassifier, plot_tree
+# import xgboost as xgb  # XGBoost
+# from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+# import lightgbm as lgb  # Gradient Boosting
+# from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
+# from sklearn.svm import SVC  # SVM
+# from sklearn.neural_network import MLPClassifier
 
 # Metricas
 from sklearn.metrics import accuracy_score
+from modeling.asses_model import calculate_ROI
+
 # from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 
 def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
+    # Va en generate test design pero lo traje para ver si puedo calcular el roi
+    # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi
+    df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+
     # Dividir los datos en conjunto de entrenamiento y prueba
-    X_train, y_train = df_train.drop(var_resp, axis=1), df_train[var_resp]
+    X_train, y_train = df_train_without_odds.drop(var_resp, axis=1), df_train_without_odds[var_resp]
 
     # Verificar si se deben buscar los mejores hiperparámetros
     if best_params:
@@ -30,6 +36,7 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
 
     # Realizar validación cruzada manual
     scores = []
+    rois = []
     fold_size = len(X_train) // k
 
     for i in range(k):
@@ -38,26 +45,36 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
         start, end = i * fold_size, (i + 1) * fold_size
         X_train_fold = np.concatenate((X_train[:start], X_train[end:]), axis=0)
         y_train_fold = np.concatenate((y_train[:start], y_train[end:]), axis=0)
-        X_val_fold = X_train[start:end]
-        y_val_fold = y_train[start:end]
+        X_test_fold = X_train[start:end]
+        y_test_fold = y_train[start:end]
 
         # Entrenar el modelo con el conjunto de entrenamiento de la iteración actual
         model.fit(X_train_fold, y_train_fold)
 
         # Realizar predicciones en el conjunto de validación
-        y_pred = model.predict(X_val_fold)
+        y_pred = model.predict(X_test_fold)
 
         # Calcular la precisión en el conjunto de validación y agregarla a la lista de scores
-        accuracy = accuracy_score(y_val_fold, y_pred)
+        accuracy = accuracy_score(y_test_fold, y_pred) * 100
         scores.append(accuracy)
+
+        # Calculo el roi
+        df_res = df_train[start:end]  # Chequear si es lo mismo que df_test
+        df_res['y_pred'] = y_pred  # Guardo las predicciones
+        roi = calculate_ROI(df_res, var_resp, 'y_pred')
+        rois.append(roi)
+
+        # print(f'Fold {i} --> Precision: {accuracy:.1f}%  ROI: {roi:.1f}%')
 
     # Calcular la precisión promedio de la validación cruzada
     cv_accuracy = np.mean(scores)
-    print(f"Precisión de la validación cruzada: {cv_accuracy:.3f}")
+    cv_roi = np.mean(rois)
+    print(f"Precisión de la validación cruzada: {cv_accuracy:.1f}%")
+    print(f"ROI de la validación cruzada: {cv_roi:.1f}%")
 
     # Entrenar el modelo final con todos los datos de entrenamiento
     model.fit(X_train, y_train)
-    return model, cv_accuracy
+    return model, cv_accuracy, cv_roi
 
 def select_best_hiperparameters(X_train, y_train, model, k):
 

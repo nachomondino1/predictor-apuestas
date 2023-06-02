@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import re
 
 def convert_posesion_to_int(df):
     """

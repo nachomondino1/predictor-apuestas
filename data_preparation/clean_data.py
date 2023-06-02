@@ -31,11 +31,19 @@ def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar
     return df
 
 def convert_columns_to_int(df):
-
     # Convertir variables categoricas string a categoricas numericas
     le = LabelEncoder()
+
+    # Por variable string
     for col in df.select_dtypes(include=['object']).columns:
         df[col] = le.fit_transform(df[col])
+
+        # Verificar si la variable es "equipo_ganador"
+        if col == "equipo_ganador":
+            etiquetas = le.classes_
+            codigos = le.transform(etiquetas)
+            df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
+            df_etiquetas.to_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/etiquetas_equipo_ganador.xlsx", index=False)
 
     return df
 
@@ -56,6 +64,22 @@ def change_teams_names(df_part):
         df_part['equipo_vis'] = df_part['equipo_vis'].replace(equipo_part, equipo_jug)
 
     return df_part
+
+def prueba():
+    # Levanto dataset
+    df = pd.read_excel('data/df_constructed.xlsx')
+
+    # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+    df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+
+    # Remover NaN values
+    df = df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
+
+    # Convertir variables categoricas string a categoricas numericas
+    df = convert_columns_to_int(df)
+
+# prueba()
+
 
 ''' fill NaN values
     for col in df.select_dtypes(include=['float64', 'int64']).columns:
