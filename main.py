@@ -292,7 +292,6 @@ class Modeling:
             if cv_accuracy > best_acurracy:  # GUARDAR MAS METRICAS? HAGO EL ASSESS MODEL ACA?
                 # Guardo modelo
                 best_acurracy = cv_accuracy
-                # best_roi = roi?
                 best_model = model
 
             if cv_roi > best_roi:
