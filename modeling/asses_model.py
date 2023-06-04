@@ -38,7 +38,7 @@ def calculate_ROI(df_result, var_resp, var_pred):  # NO SE QUE NRO LE CORRESPOND
             etiqueta = df_etiquetas.loc[idx, 'Etiqueta']
 
             # Obtengo el ingreso obtenido segun la etiqueta
-            ingreso = df_result.loc[i, 'odds_loc'] if etiqueta == "Local" else df_result.loc[i, 'odds_emp'] if etiqueta == "Empate" else df_result.loc[i, 'odds_vis']
+            ingreso = df_result.loc[i, 'odds_loc'] if etiqueta == "Local" else df_result.loc[i, 'odds_emp'] if etiqueta == "Empate" else df_result.loc[i, 'odds_vis']  # Vefificada
             ingresos += ingreso
             # print(f"Ganamos ${ingreso}")
 

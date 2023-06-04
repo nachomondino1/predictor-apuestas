@@ -23,8 +23,7 @@ from modeling.asses_model import calculate_ROI
 
 def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
-    # Va en generate test design pero lo traje para ver si puedo calcular el roi
-    # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi
+    # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
     df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
 
     # Dividir los datos en conjunto de entrenamiento y prueba
@@ -35,8 +34,7 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
         model = select_best_hiperparameters(X_train, y_train, model, k)
 
     # Realizar validación cruzada manual
-    scores = []
-    rois = []
+    scores, rois = [], []
     fold_size = len(X_train) // k
 
     for i in range(k):
@@ -54,23 +52,19 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
         # Realizar predicciones en el conjunto de validación
         y_pred = model.predict(X_test_fold)
 
-        # Calcular la precisión en el conjunto de validación y agregarla a la lista de scores
+        # Calcular la precisión y el roi en el conjunto de validación y agregarla a la lista de scores
         accuracy = accuracy_score(y_test_fold, y_pred) * 100
         scores.append(accuracy)
 
-        # Calculo el roi
         df_res = df_train[start:end]  # Chequear si es lo mismo que df_test
         df_res['y_pred'] = y_pred  # Guardo las predicciones
         roi = calculate_ROI(df_res, var_resp, 'y_pred')
         rois.append(roi)
-
         # print(f'Fold {i} --> Precision: {accuracy:.1f}%  ROI: {roi:.1f}%')
 
     # Calcular la precisión promedio de la validación cruzada
-    cv_accuracy = np.mean(scores)
-    cv_roi = np.mean(rois)
-    print(f"Precisión de la validación cruzada: {cv_accuracy:.1f}%")
-    print(f"ROI de la validación cruzada: {cv_roi:.1f}%")
+    cv_accuracy, cv_roi = np.mean(scores), np.mean(rois)
+    # print(f"Resultados promedios de validación cruzada: \n  - Precision prom: {cv_accuracy:.1f}% \n  - ROI prom: {cv_roi:.1f}%")
 
     # Entrenar el modelo final con todos los datos de entrenamiento
     model.fit(X_train, y_train)

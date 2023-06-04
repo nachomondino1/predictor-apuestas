@@ -233,6 +233,7 @@ class Modeling:
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
+        print("\nGenerando datasets de entrenamiento y testeo...")
         if df is None:
             # Levanto dataset ya preparado
             df = pd.read_excel('data_preparation/data/df_selected.xlsx')  # Cambiar a cleaned...
@@ -253,17 +254,13 @@ class Modeling:
         df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=0.8)
         print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
 
-        # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi
-        # df_train = df_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        # Lo llevo momentaneamente a train_model() para ver si puedo calcular el roi
-
         if export:
             df_train.to_excel('./modeling/data/df_train.xlsx', index=False)
             df_test.to_excel('./modeling/data/df_test.xlsx', index=False)
 
         return df_train, df_test
 
-    def select_best_model(self, df_train, l_modelos, best_params=False, k=10):
+    def select_best_model(self, df_train, l_modelos, best_params=False, k=10, export=True):
         """
         Selecciona el mejor modelo a partir de la precision
         :param df_train: Dataframe de entrenamiento. (DataFrame)
@@ -271,47 +268,42 @@ class Modeling:
         :param best_params: Booleano para indicar si se deben buscar los mejores hiperparametros para cada modelo. True
         para buscar, False de lo contrario. (bool)
         :param k: Numero de folds. (int)
+        :param export: Booleano para indicar si se debe exportar el dataframe. True para exportar, False de lo contrario. (bool)
         :return: Mejor modelo. (sklearn.ensemble?)
         """
         # Definicion de variables
         warnings.filterwarnings("ignore")
-        best_acurracy = 0
-        best_model = None
+        df_models = pd.DataFrame(columns=['model', 'cv_accuracy', 'cv_roi'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
+        print("\nSeleccionando el mejor modelo...")
 
-        best_roi = 0
-        best_model_2 = 0
-
-        # Por modelo a probar
+        # Entreno modelos
         for modelo in l_modelos:
 
-            # Entreno modelo
-            print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '#'))
+            # print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
             model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, best_params, k)
+            df_models.loc[len(df_models)] = [model, cv_accuracy, cv_roi]
 
-            # Si es el mejor modelo hasta aqui # Uso accuracy en todos los folds de cv... para elegir el mejor modelo
-            if cv_accuracy > best_acurracy:  # GUARDAR MAS METRICAS? HAGO EL ASSESS MODEL ACA?
-                # Guardo modelo
-                best_acurracy = cv_accuracy
-                best_model = model
+        # Selecciono el mejor modelo
+        idx = df_models[df_models['cv_roi'] == max(df_models['cv_roi'])].index[0]
+        best_model, best_accuracy, best_roi = df_models.loc[idx, 'model'], df_models.loc[idx, 'cv_accuracy'], df_models.loc[idx, 'cv_roi']
+        print(f"El mejor modelo es: {best_model} con ROI: {best_roi:.1f}% y precision: {best_accuracy:.1f}%")
 
-            if cv_roi > best_roi:
-                best_roi = cv_roi
-                best_model_2 = model
+        if export:
+            df_models.to_excel('./modeling/data/df_modelos.xlsx')
 
-        print(f"\nEl mejor modelo es: {best_model}")
+        return best_model
 
-        print(f"\nEl mejor modelo es: {best_model_2}")
-
-        return best_model  #df_result y_real e y_pred
-
-    def assess_model(self, model, df_test):
+    def assess_model(self, model, df_test, export=True):
         """
         # Hago prediccion aca? y calculo metricas?
 
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
         :param df_test: Dataframe de testeo. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Precision del modelo y roi en el conjunto de testeo. (int) y (float)
         """
+        print("\nEvaluando modelo con datos de prueba...")
+
         # Quito odds de df_test para evitar error
         df_test_without_odds = df_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
 
@@ -319,17 +311,19 @@ class Modeling:
         y_pred = model.predict(df_test_without_odds.drop(self.var_resp, axis=1))  # es un numpy array
 
         # Calculo metricas
-        test_accuracy = accuracy_score(df_test[self.var_resp], y_pred)
-        print(f"Precisión del modelo en los datos de prueba: {test_accuracy:.3f}")
-
-        # Agrego y_pred a df_test para poder calcular ROI
-        df_test['y_pred'] = y_pred
+        test_accuracy = accuracy_score(df_test[self.var_resp], y_pred) * 100
+        df_test['y_pred'] = y_pred  # Agrego y_pred a df_test para poder calcular ROI
         roi = calculate_ROI(df_test, self.var_resp, self.var_pred)
-        print(f"ROI del modelo en los datos de prueba: {roi:.3f}")
 
+        # Imprimo matriz de cofusion
         confusion_matrix(df_test, self.var_resp, self.var_pred)
 
-        df_test.to_excel('/Users/nachomondino/Desktop/df_results.xlsx')
+        # Imprimo resultados
+        print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
+
+        if export:
+            df_test.to_excel('/Users/nachomondino/Desktop/df_results.xlsx')
+
         return test_accuracy, roi
 
 
@@ -341,18 +335,26 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
 
     if data_unders is True:
+
+        print(" Data understanding ".center(120, "#"))
+
         # Collect initial data
+        print(" Recolectando datos... ")
         df_part = scraper_flashscore.extract_flashscore()  # Tengo que ver que no se corran igual por no comentar la funcion en su archivo...
         df_jug = scraper_sofifa.extract_sofifa
         print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
+
         # Describe data (quiero describir los datos igual aunque no los extraiga...)
+        print(" Describiendo datos... ")
         getting_to_know_data(df_part)
         getting_to_know_data(df_jug)
 
     if data_prep is True:
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+
+        print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
         # df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
@@ -365,7 +367,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
         # Hiperparametros
         best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
-        k = 2  # Numero de folds
+        k = 5  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                      xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # num_class = len(y.unique()) Depende del numero de clases...
@@ -376,9 +378,11 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                      # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
                      ]
 
+        print(" Modeling ".center(120, "#"))
+
         # Analizo los datos
         df_train, df_test = modeler.generate_test_design(export=True)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k)
-        precision, roi = modeler.assess_model(best_model, df_test)
+        modeler.assess_model(best_model, df_test)
 
 main()
