@@ -162,16 +162,14 @@ class DataPreparation:
         start = time.time()
         print("\nLimpiando los datos...")
 
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles) --> Deberia ir en select data... pero necesito ejecutarla antes de convert to int.
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
         # Convertir variables categoricas string a categoricas numericas (antes de nan por fillna_with_ml pues necesita col int)
         df = clean_data.convert_columns_to_int(df)
 
         # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
-        # df.info()
         df = clean_data.treat_nan_values(df, type=treat_nan)
-        # df.info()
 
         end = time.time()
         print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
@@ -198,12 +196,8 @@ class DataPreparation:
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
-        # No usaré la matriz de correlacion puesto que haré feature selection
-
-        # Elimino variables no son importantes
-        # df = select_data.feature_selection(df)
-        # df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal
-        # df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'], inplace=True, axis=1)
+        # Elimino variables no son importantes   # No usaré la matriz de correlacion puesto que haré feature selection
+        df = select_data.feature_selection(df, self.var_resp)   # df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal  # df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'], inplace=True, axis=1)
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -212,6 +206,7 @@ class DataPreparation:
             df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
 
         return df
+
 
 class Modeling:
 
@@ -308,11 +303,9 @@ class Modeling:
         df_test['y_pred'] = y_pred  # Agrego y_pred a df_test para poder calcular ROI
         roi = calculate_ROI(df_test, self.var_resp, self.var_pred)
 
-        # Imprimo matriz de cofusion
-        confusion_matrix(df_test, self.var_resp, self.var_pred)
-
         # Imprimo resultados
         print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
+        confusion_matrix(df_test, self.var_resp, self.var_pred)
 
         if export:
             df_test.to_excel('/Users/nachomondino/Desktop/df_results.xlsx')
@@ -323,7 +316,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, True, True
+    data_unders, data_prep, modeling = False, True, False
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
 
@@ -354,7 +347,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
         # df = prepare.integrate_data(df_part, df_jug, export=True)
         # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.clean_data(treat_nan=treat_nan, export=True)  # df
+        df = prepare.clean_data(treat_nan=treat_nan, export=True)
         prepare.select_data(df, export=False)
 
     if modeling is True:

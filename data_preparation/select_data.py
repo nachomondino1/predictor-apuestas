@@ -1,163 +1,193 @@
+# Importo librerias
 import pandas as pd
-import numpy as np
-
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import SelectFromModel
-
-from sklearn.feature_selection import f_regression
-
-from sklearn.feature_selection import RFE
-from sklearn.linear_model import LogisticRegression
+from sklearn.feature_selection import SelectFromModel, SelectKBest, f_classif, chi2
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+import plotly.graph_objects as go
 
 
-from data_preparation import clean_data
+def select_best_features(features, importance, threshold):
+    l_selected_features = []
+
+    # Selecciono caracteristicas mas importantes segun threshold
+    for feature, imp in zip(features, importance):
+
+        if imp > threshold:
+            l_selected_features.append(feature)
+    return l_selected_features
 
 
-from sklearn.decomposition import PCA
+# Opción 1: Buscamos variables mas importantes con un random forest
+def random_forest(X, y, threshold=0.1):
+
+    # Crear un clasificador Random Forest
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X, y)
+
+    # Obtener la importancia de las características
+    importances = clf.feature_importances_
+
+    graficar_importancia_atrib(clf, X)  # Probe a graficar puesto que es un arbol...
+
+    # Selecciono caracteristicas mas importantes segun threshold
+    l_selected_features = select_best_features(features=list(X.columns), importance=importances, threshold=threshold)
+    print("Características seleccionadas:\n", l_selected_features)
+    return l_selected_features
+
+# Opción 2: Arbol de decision
+def arbol(X_train, y_train, threshold):
+
+    # Definicion de variables
+    l_selected_features = []
+
+    # Entreno arbol de decision
+    dt = DecisionTreeClassifier(max_depth=7)
+    dt.fit(X_train, y_train)
+
+    # Selecciono caracteristicas mas importantes segun threshold
+    select_best_features(features=X_train.columns, importance=dt.feature_importances_, threshold=threshold)
+
+    graficar_importancia_atrib(dt, X_train)
+
+    print("Características seleccionadas:\n", l_selected_features)
+    return l_selected_features
+
+def graficar_importancia_atrib(model, X_train):
+
+    features = X_train.columns
+    feature_importances = model.feature_importances_
+
+    # Crear figura
+    fig = go.Figure()
+
+    # Agregar barras al gráfico
+    fig.add_trace(go.Bar(
+        x=feature_importances,
+        y=features,
+        orientation='h'
+    ))
+
+    # Configurar el diseño del gráfico
+    fig.update_layout(
+        title='Importancia de las características',
+        xaxis_title='Importancia',
+        yaxis_title='Características',
+        yaxis=dict(autorange="reversed")  # Invertir el orden de las características
+    )
+
+    # Mostrar el gráfico
+    fig.show()
+
+# Opción 3: Análisis univariable con tests estadísticos
+def analisis_univariable(X, y, threshold):
+
+    # Definicion de variables
+    l_selected_features, l_scores = [], []
+
+    # Selecciono variables numericas y categoricas
+    numeric_vars = X.select_dtypes(include='number').columns.tolist()
+    categorical_vars = X.select_dtypes(include='object').columns.tolist()
+
+    # Variables predictoras numéricas
+    if len(numeric_vars) > 0:
+        numeric_X = X[numeric_vars].clip(lower=0)  # Asegurar que los valores sean no negativos
+        numeric_selector = SelectKBest(score_func=f_classif, k='all')  # Utiliza ANOVA o f-score, selecciona las 3 mejores características
+        numeric_X_selected = numeric_selector.fit_transform(numeric_X, y)
+        numeric_selected_features = [numeric_vars[i] for i in range(len(numeric_vars)) if numeric_selector.get_support()[i]]
+        numeric_scores = numeric_selector.scores_
+
+        l_selected_features += numeric_selected_features
+        l_scores += list(numeric_scores)
+
+    # Variables predictoras categóricas
+    if len(categorical_vars) > 0:
+        categorical_X = X[categorical_vars]
+        categorical_selector = SelectKBest(score_func=chi2, k='all')  # Utiliza chi-cuadrado, selecciona las 3 mejores características
+        categorical_X_selected = categorical_selector.fit_transform(categorical_X, y)
+        categorical_selected_features = [categorical_vars[i] for i in range(len(categorical_vars)) if categorical_selector.get_support()[i]]
+        categorical_scores = categorical_selector.scores_
+
+        l_selected_features += categorical_selected_features
+        l_scores += list(categorical_scores)
+
+    graf_imp(l_selected_features, l_scores)
+
+    # Selecciono caracteristicas mas importantes segun threshold --> Implemento seleccion porque devuelve todas las variables...
+    l_selected_features = select_best_features(features=l_selected_features, importance=l_scores, threshold=threshold)
+    # Imprimir las características seleccionadas y los puntajes de relevancia
+    # print(f"Características seleccionadas: \n{l_selected_features} \nPuntajes de relevancia: {l_scores}")
+    print(f"Características seleccionadas: \n{l_selected_features}")
+    return l_selected_features  # Devuelvo todas?
+
+def graf_imp(selected_features, scores):
+
+    # Crear gráfico de barras
+    fig = go.Figure(data=go.Bar(x=selected_features, y=scores))
+
+    # Configurar etiquetas y título del gráfico
+    fig.update_layout(
+        xaxis=dict(title='Características'),
+        yaxis=dict(title='Puntajes de relevancia'),
+        title='Puntajes de relevancia de las características'
+    )
+
+    # Rotar etiquetas en el eje x
+    fig.update_layout(xaxis_tickangle=-45)
+
+    # Mostrar el gráfico
+    fig.show()
+
+def feature_selection(df, var_resp):
+
+    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+    X = df.drop([var_resp], axis=1)
+    y = df[var_resp]
+
+    # Dividir los datos en conjuntos de entrenamiento y prueba
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    print("Dimensiones de los conjuntos de entrenamiento:", X_train.shape, y_train.shape)
+    print("Dimensiones de los conjuntos de prueba:", X_test.shape, y_test.shape)
+
+    # Opcion 1
+    l_selected_features_1 = random_forest(X, y, threshold=0.03)
+
+    # Opcion 2? es parte de la opcion 1?
+    l_selected_features_2 = arbol(X_train, y_train, threshold=0.03)
+
+    # Opcion 3
+    l_selected_features_3 = analisis_univariable(X, y, threshold=30)
 
 
+    # Seleccion de variables mas importantes segun 1, 2 y 3
+    d = {}
+    for col in X_train.columns:
+        n_sel = 0
 
-def pca(X, n_components):
-    # X es el conjunto de datos de características (variables predictoras)
+        if col in l_selected_features_1:
+           n_sel += 1
 
-    # Inicializar el objeto PCA con el número de componentes deseados
-    pca = PCA(n_components=n_components)
+        if col in l_selected_features_2:
+            n_sel += 1
 
-    # Ajustar y transformar los datos
-    X_pca = pca.fit_transform(X)
+        if col in l_selected_features_3:
+            n_sel += 1
 
-    # Obtener la varianza explicada por cada componente principal
-    explained_variance_ratio = pca.explained_variance_ratio_
+        d[col] = n_sel
 
-    # Imprimir la varianza explicada por cada componente principal
-    for i in range(n_components):
-        print(f"Varianza explicada por el Componente Principal {i + 1}: {explained_variance_ratio[i]}")
+    print(d)
 
-    # Obtener los componentes principales
-    components = pca.components_
-
-
-
-def random_forest_classifier(df, var_resp):  # Es sin variables categoricas
-
-    # Dividir los datos en características (X) y variable objetivo (y)
-    X, y = df.drop(var_resp, axis=1), df[var_resp]
-
-    # Crear el modelo de Random Forest
-    model = RandomForestClassifier()
-
-    # Ajustar el modelo a los datos
-    model.fit(X, y)
-
-    # Obtener la importancia de características
-    feature_importance = model.feature_importances_
-
-    # Crear un DataFrame con la importancia de características
-    feature_importance_df = pd.DataFrame({'Feature': X.columns, 'Importance': feature_importance})
-
-    # Ordenar las características por importancia descendente
-    feature_importance_df = feature_importance_df.sort_values('Importance', ascending=False)
-
-    # Imprimir las características más importantes
-    print(feature_importance_df.head(10))
-
-    # Selecciona las características con importancia por encima de un umbral
-    threshold = 0.05
-    selector = SelectFromModel(model, threshold='mean', prefit=True)  # 'mean'
-    X_new = selector.transform(X)
-
-    # Muestra la importancia de las características seleccionadas
-    support = selector.get_support()
-    for feature, importance, supported in zip(X.columns, feature_importance, support):
-        if supported:
-            print(f"{feature}: {importance:.3f} (selected)")
-        else:
-            print(f"{feature}: {importance:.3f}")
-
-    # Ajusta un nuevo modelo de bosque aleatorio solo con las características seleccionadas
-    rf_new = RandomForestClassifier(n_estimators=100, random_state=42)
-    rf_new.fit(X_new, y)
-
-def f_regressiones(df, var_resp):
-
-    # Dividir los datos en características (X) y variable objetivo (y)
-    X, y = df.drop(var_resp, axis=1), df[var_resp]
-
-    # Realizar la prueba F y obtener los valores F y p-valores
-    f_values, p_values = f_regression(X, y)
-
-    # Ordenar las características por su p-valor
-    sorted_indices = np.argsort(p_values)
-    sorted_features = X.columns[sorted_indices]
-
-    # Seleccionar las características con un p-valor significativo (por ejemplo, p < 0.05)
-    significant_features = sorted_features[p_values[sorted_indices] < 0.1]
-
-    # Imprimir las características seleccionadas
-    print(significant_features)
-
-def rfe(df, var_resp, n_features_to_select = 5):
-    """
-    :param df:
-    :param var_resp:
-    :param n_features_to_select: Número de características a seleccionar
-    :return:
-    """
-
-    # Dividir los datos en características (X) y variable objetivo (y)
-    X, y = df.drop(var_resp, axis=1), df[var_resp]
-
-    # Inicializar el estimador del modelo
-    estimator = LogisticRegression()
-
-    # Inicializar el selector RFE
-    selector = RFE(estimator)
-
-    # Definir el número de características a seleccionar
-    selector.n_features_to_select = n_features_to_select
-
-    # Realizar la selección de características
-    selector.fit(X, y)
-
-    # Obtener las características seleccionadas
-    selected_features = X.columns[selector.support_]
-    print(selected_features)
 
 def prueba():
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_cleaned.xlsx')
 
-    # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-    df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
-    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+    feature_selection(df, 'equipo_ganador')
 
+    '''
+    dt = DecisionTreeClassifier(max_depth=7)
+    dt.fit(X_train, y_train)
 
-    # # Eliminacion de NaN values
-    # for col in df.select_dtypes(include=['float64', 'int64']).columns:
-    #     mean = df[col].mean()  # Calcula la media de una columna
-    #     df[col] = df[col].fillna(mean)  # Rellena los NaN en esa columna con la media
-    #     print(f"Columna: {col} \nMedia: {mean}")
+    graficar_importancia_atrib(dt, X_train)
+    '''
 
-    # df = df.drop(['dif_pases_comp_segun_ult_part', 'dif_edad_aus', 'dif_alt_aus', 'dif_rat_aus', 'dif_pases_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'], axis=1) # Tienen mucho nan, solo me quedan 229 registros...
-    df = df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
-    print(df.shape)
-
-    # Convertir variables categoricas string a categoricas numericas
-    df = clean_data.convert_columns_to_int(df)
-
-
-    # df_correlation_matrix = df.drop('equipo_ganador', axis=1).corr()  # OJO que no tiene en cuenta las variables categoricas... y si quiero tenerlas en cuenta como "equipo ganador"
-    # df_correlation_matrix.to_excel('/Users/nachomondino/Desktop/correlation_matrix.xlsx')
-
-
-
-    # random_forest_classifier(df, 'equipo_ganador')
-
-    # f_regressiones(df, 'equipo_ganador')
-
-    # rfe(df, 'equipo_ganador', 8)
-
-    pca(df.drop('equipo_ganador', axis=1), 2)
-
-    # df.drop(['dif_pases', 'dif_pases_comp', 'dif_remates_a_puerta', 'dif_tarjetas_amarillas', 'dif_ataques_pelig'], inplace=True, axis=1)
-
-# prueba()
+prueba()
