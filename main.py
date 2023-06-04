@@ -2,16 +2,12 @@
 import pandas as pd
 import time
 import warnings
-
-# # Data understanding
-# from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
-# from dspy.data_understanding.describe_data import getting_to_know_data
-#
-# # Data preparation
-# from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-# from dspy.data_preparation import clean_data as cd  # Para categorizar variables numericas
-
-
+# Data understanding
+from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
+from dspy.data_understanding.describe_data import getting_to_know_data
+# Data preparation
+from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
+from dspy.data_preparation import clean_data as cd  # Para categorizar variables numericas
 # Modeling
 # Generate test design
 from dspy.modeling import test_design
@@ -151,7 +147,7 @@ class DataPreparation:
 
         return df
 
-    def clean_data(self, df=None, export=False):  # tengo que limpiar los datos antes de seleccionar porque no le pueden entrar NaN ni columnas no numericas. A su vez, tengo que eliminar las columnas que no sirven para el modelo puesto que puede que me hagan borrar mas registros al tener mas nan values.
+    def clean_data(self, df=None, treat_nan="drop", export=False):  # tengo que limpiar los datos antes de seleccionar porque no le pueden entrar NaN ni columnas no numericas. A su vez, tengo que eliminar las columnas que no sirven para el modelo puesto que puede que me hagan borrar mas registros al tener mas nan values.
         """
         Limpia los datos de un dataframe. Elimina variables que no se usan para analizar los datos, remueve NaNs y
         convierte variables str a int.
@@ -166,19 +162,16 @@ class DataPreparation:
         start = time.time()
         print("\nLimpiando los datos...")
 
-        # Categorizo columnas numericas
-        # df = clean_data.categorize_numeric_columns(df)
-
-        # Eliminacion de outliers?
-
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
-        # Remover NaN values
-        df = df.dropna()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
-
-        # Convertir variables categoricas string a categoricas numericas
+        # Convertir variables categoricas string a categoricas numericas (antes de nan por fillna_with_ml pues necesita col int)
         df = clean_data.convert_columns_to_int(df)
+
+        # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
+        # df.info()
+        df = clean_data.treat_nan_values(df, type=treat_nan)
+        # df.info()
 
         end = time.time()
         print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
@@ -330,7 +323,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
 
@@ -353,6 +346,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if data_prep is True:
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+        treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
 
         print(" Data preparation ".center(120, "#"))
 
@@ -360,8 +354,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
         # df = prepare.integrate_data(df_part, df_jug, export=True)
         # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.clean_data(export=True)  # df
-        df = prepare.select_data(df, export=True)
+        df = prepare.clean_data(treat_nan=treat_nan, export=True)  # df
+        prepare.select_data(df, export=False)
 
     if modeling is True:
 
@@ -372,7 +366,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                      xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # num_class = len(y.unique()) Depende del numero de clases...
                      LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
-                     SVC(kernel='rbf', decision_function_shape='ovo'), # --> tarda mas de 1 hora
+                     SVC(kernel='rbf', decision_function_shape='ovo'),  # --> tarda mas de 1 hora
                      MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling', max_iter=300),
                      GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
                      # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
