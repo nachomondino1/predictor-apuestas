@@ -136,8 +136,6 @@ class DataPreparation:
         df = construct_data.calculate_dif_col_jugadores(df)
 
         df = construct_data.n_dias_ult_partido(df)
-        # df = convert_odds_to_prob(df)
-        # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -196,8 +194,10 @@ class DataPreparation:
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
-        # Elimino variables no son importantes   # No usaré la matriz de correlacion puesto que haré feature selection
-        df = select_data.feature_selection(df, self.var_resp)   # df = df.drop(['dif_faltas_segun_ult_part', 'dif_offsides_segun_ult_part'], axis=1)  # Para red neuronal  # df.drop(['dif_pases_segun_ult_part', 'dif_pases_comp_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_tarjetas_amarillas_segun_ult_part', 'dif_ataques_segun_ult_part', 'dif_ataques_pelig_segun_ult_part'], inplace=True, axis=1)
+        # No usaré la matriz de correlacion puesto que haré feature selection??
+
+        # Elimino variables no son importantes
+        df = select_data.feature_selection(df, self.var_resp, percentil=0.7)
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")

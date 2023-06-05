@@ -97,41 +97,41 @@ def graficar_importancia_atrib(l_features, l_importance):
     # Mostrar el gráfico
     fig.show()
 
-def select_best_features_from_all_models(df_importance, threshold):
+def select_best_features_from_all_models(df_importance, percentil):
 
     # Normalizar cada columna del DataFrame
-    # df_normalized = pd.DataFrame(normalize(df_importance), columns=df_importance.columns)
     df_normalized = pd.DataFrame(scale(df_importance), columns=df_importance.columns, index=df_importance.index)
 
     # Calcular la suma de columnas para cada fila
-    df_normalized['Sum'] = df_normalized.sum(axis=1)
+    df_normalized['suma_de_imp'] = df_normalized.sum(axis=1)
     df_normalized.to_excel('./df_normalized.xlsx')
 
-    # Seleccionar los índices donde el valor de la columna "Sum" es mayor al umbral
-    l_selected_features = list(df_normalized.loc[df_normalized['Sum'] > threshold].index)
+    # Calculo percentil
+    valor_percentil = df_normalized['suma_de_imp'].quantile(percentil)
+
+    # Seleccionar los índices donde el valor de la columna "suma_de_imp" es mayor al umbral
+    l_selected_features = list(df_normalized.loc[df_normalized['suma_de_imp'] > valor_percentil].index)
     return l_selected_features
 
-def feature_selection(df, var_resp):
+def feature_selection(df, var_resp, percentil, best_params=True, k=10):
 
     # Definicion de varibles
     df_importance = pd.DataFrame(columns=['analisis_uni', 'arbol', 'random'], index=df.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1).columns)  # que cada analisis devuelva las features y su importancia y guardarlo en un Dataframe...
-    dt = DecisionTreeClassifier(max_depth=7)
-    rf = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42)
+    dt = DecisionTreeClassifier(max_depth=38)
+    rf = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
 
     # Obtengo importancia de cada variable segun distintos analisis
     d1 = analisis_univariable(df, var_resp)  # Opción 1: Análisis univariable con tests estadísticos
-    d2 = machine_learning_model(df, var_resp, dt, best_params=True, k=10)  # Opcion 2: Arbol
-    d3 = machine_learning_model(df, var_resp, rf,  best_params=True, k=10) # Opcion 3: Random Forest
+    d2 = machine_learning_model(df, var_resp, dt, best_params, k)  # Opcion 2: Arbol
+    d3 = machine_learning_model(df, var_resp, rf,  best_params, k) # Opcion 3: Random Forest
 
     # Guardo resultados en DataFrame
     df_importance['analisis_uni'] = df_importance.index.map(d1)
     df_importance['arbol'] = df_importance.index.map(d2)
     df_importance['random'] = df_importance.index.map(d3)
-    print(df_importance)
 
     # Selecciono variables mas importantes
-    l_selected_features = select_best_features_from_all_models(df_importance, threshold=-1)
-    print(l_selected_features)
+    l_selected_features = select_best_features_from_all_models(df_importance, percentil)
     return df.loc[:, l_selected_features]
 
 def prueba():
