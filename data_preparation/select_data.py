@@ -123,7 +123,7 @@ def feature_selection(df, var_resp, percentil):
     # Obtengo importancia de cada variable segun distintos analisis
     d1 = analisis_univariable(df, var_resp)  # Opción 1: Análisis univariable con tests estadísticos
     # d2 = machine_learning_model(df, var_resp, dt, best_params, k)  # Opcion 2: Arbol
-    d3 = machine_learning_model(df, var_resp, rf,  best_params=True, k=10) # Opcion 3: Random Forest
+    d3 = machine_learning_model(df, var_resp, rf,  best_params=True, k=5) # Opcion 3: Random Forest
 
     # Guardo resultados en DataFrame
     df_importance['analisis_uni'] = df_importance.index.map(d1)
@@ -132,7 +132,9 @@ def feature_selection(df, var_resp, percentil):
 
     # Selecciono variables mas importantes
     l_selected_features = select_best_features_from_all_models(df_importance, percentil)
-    return df.loc[:, l_selected_features]
+    print(f"Columnas mas importantes: {l_selected_features}")
+
+    return l_selected_features # pd.concat([df.loc[:, l_selected_features], df.loc[:, ['odds_loc', 'odds_emp', 'odds_vis', var_resp]]], axis=1)
 
 def eliminar_columnas_correlacionadas(df_correlacion, variable_objetivo, umbral):
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
@@ -150,17 +152,19 @@ def eliminar_columnas_correlacionadas(df_correlacion, variable_objetivo, umbral)
 
                 # Busco correlacion de cada columna con variable objetivo
                 col1, col2 = df_corr.columns[i], df_corr.columns[j]
-                print(col1, col2)
+                # print(col1, col2)
                 corr_col1, corr_col2 = df_corr_var_obj.loc[col1], df_corr_var_obj.loc[col2]
-                print(corr_col1, corr_col2)
+                # print(corr_col1, corr_col2)
 
                 # Elimino aquella columna con menor correlacion con la variable objetivo
                 if corr_col2 > corr_col1:
                     columnas_eliminar.add(col1)
-                    print(f"Variable a eliminar: {col1}")
+                    # print(f"Variable a eliminar: {col1}")
                 else:
                     columnas_eliminar.add(col2)
-                    print(f"Variable a eliminar: {col2}")
+                    # print(f"Variable a eliminar: {col2}")
+
+    print(f"Columnas a eliminar por correlacion: {columnas_eliminar}")
     return list(columnas_eliminar)
 
 def prueba():

@@ -145,7 +145,45 @@ class DataPreparation:
 
         return df
 
-    def clean_data(self, df=None, treat_nan="drop", export=False):  # tengo que limpiar los datos antes de seleccionar porque no le pueden entrar NaN ni columnas no numericas. A su vez, tengo que eliminar las columnas que no sirven para el modelo puesto que puede que me hagan borrar mas registros al tener mas nan values.
+    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, export=False):
+        """
+        Selecciona las variables relevantes del dataframe.
+        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
+        :return: Dataframe con las variables seleccionadas. (DataFrame)
+        """
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df is None:
+            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx')
+
+        warnings.filterwarnings('ignore')
+        start = time.time()
+        print("\nSeleccionado datos...")
+
+        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+
+        # Codifico variables categoricas a numericas (es de clean_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
+        df = clean_data.convert_columns_to_int(df)
+
+        # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
+        df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
+        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df_correlacion, 'equipo_ganador', thr_corr)
+        df = df.drop(l_columnas_a_eliminar, axis=1)
+
+        # Selecciono las variables mas importantes
+        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
+        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
+
+        end = time.time()
+        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
+
+        if export:
+            df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
+
+        return df
+
+    def clean_data(self, df=None, treat_nan='drop', export=False):
         """
         Limpia los datos de un dataframe. Elimina variables que no se usan para analizar los datos, remueve NaNs y
         convierte variables str a int.
@@ -155,16 +193,10 @@ class DataPreparation:
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
         if df is None:
-            df = pd.read_excel('data_preparation/data/df_constructed.xlsx')
+            df = pd.read_excel('data_preparation/data/df_selected.xlsx')
 
         start = time.time()
         print("\nLimpiando los datos...")
-
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles) --> Deberia ir en select data... pero necesito ejecutarla antes de convert to int.
-        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
-
-        # Convertir variables categoricas string a categoricas numericas (antes de nan por fillna_with_ml pues necesita col int)
-        df = clean_data.convert_columns_to_int(df)
 
         # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
         df = clean_data.treat_nan_values(df, type=treat_nan)
@@ -176,37 +208,6 @@ class DataPreparation:
             df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
 
         return df
-
-    def select_data(self, df=None, export=False):  # Implementar feature selection...
-        """
-        Selecciona las variables relevantes del dataframe.
-        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe con las variables seleccionadas. (DataFrame)
-        """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        if df is None:
-            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_cleaned.xlsx')
-
-        start = time.time()
-        print("\nSeleccionado datos...")
-
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
-
-        # No usaré la matriz de correlacion puesto que haré feature selection??
-
-        # Elimino variables no son importantes
-        df = select_data.feature_selection(df, self.var_resp, percentil=0.7)
-
-        end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
-
-        return df
-
 
 class Modeling:
 
@@ -224,7 +225,7 @@ class Modeling:
         print("\nGenerando datasets de entrenamiento y testeo...")
         if df is None:
             # Levanto dataset ya preparado
-            df = pd.read_excel('data_preparation/data/df_selected.xlsx')  # Cambiar a cleaned...
+            df = pd.read_excel('data_preparation/data/df_selected.xlsx')
 
         # Definicion de variables
         oversampler = RandomOverSampler()
@@ -316,7 +317,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
 
@@ -340,6 +341,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
+        thr_corr = 0.6  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
+        perc_fs = 0.7  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
 
         print(" Data preparation ".center(120, "#"))
 
@@ -347,8 +350,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
         # df = prepare.integrate_data(df_part, df_jug, export=True)
         # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.clean_data(treat_nan=treat_nan, export=True)
-        prepare.select_data(df, export=False)
+        df = prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, export=True)
+        prepare.clean_data(df, treat_nan=treat_nan, export=True)
 
     if modeling is True:
 
