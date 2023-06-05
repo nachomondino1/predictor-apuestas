@@ -57,7 +57,7 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
         scores.append(accuracy)
 
         df_res = df_train[start:end]  # Chequear si es lo mismo que df_test
-        df_res['y_pred'] = y_pred  # Guardo las predicciones
+        df_res['y_pred'] = y_pred  # Guardo las predicciones  # /Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/build_model.py:60: SettingWithCopyWarning:  A value is trying to be set on a copy of a slice from a DataFrame. Try using .loc[row_indexer,col_indexer] = value instead See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy df_res['y_pred'] = y_pred  # Guardo las predicciones
         roi = calculate_ROI(df_res, var_resp, 'y_pred')
         rois.append(roi)
         # print(f'Fold {i} --> Precision: {accuracy:.1f}%  ROI: {roi:.1f}%')

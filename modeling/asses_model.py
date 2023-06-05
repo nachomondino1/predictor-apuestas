@@ -18,8 +18,9 @@ def calculate_ROI(df_result, var_resp, var_pred):  # NO SE QUE NRO LE CORRESPOND
     ingresos = 0
     inversion = len(df_result)  # Suponiendo 1 euro por cada partido del df_test
 
-    # Elimino los registros del dataset de testeo que no tienen cuotas
-    df_result = df_result.dropna(subset=['odds_loc', 'odds_emp', 'odds_vis']).reset_index(drop=True)  # no puede haber nan en las odds puesto que es lo que determina el rendimiento del modelo
+    # Elimino los registros del dataset de testeo que no tienen cuotas --> Ya no es necesario puesto uso fill_na_with_ml
+    # df_result = df_result.dropna(subset=['odds_loc', 'odds_emp', 'odds_vis']).reset_index(drop=True)  # no puede haber nan en las odds puesto que es lo que determina el rendimiento del modelo
+    df_result = df_result.reset_index(drop=True)
 
     # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
     # df_correct = df_result[df_result[var_resp] == df_result[var_pred]]
