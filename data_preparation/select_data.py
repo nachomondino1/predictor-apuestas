@@ -113,32 +113,74 @@ def select_best_features_from_all_models(df_importance, percentil):
     l_selected_features = list(df_normalized.loc[df_normalized['suma_de_imp'] > valor_percentil].index)
     return l_selected_features
 
-def feature_selection(df, var_resp, percentil, best_params=True, k=10):
+def feature_selection(df, var_resp, percentil):
 
     # Definicion de varibles
-    df_importance = pd.DataFrame(columns=['analisis_uni', 'arbol', 'random'], index=df.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1).columns)  # que cada analisis devuelva las features y su importancia y guardarlo en un Dataframe...
-    dt = DecisionTreeClassifier(max_depth=38)
+    df_importance = pd.DataFrame(columns=['analisis_uni', 'random'], index=df.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1).columns)  # que cada analisis devuelva las features y su importancia y guardarlo en un Dataframe...
+    # dt = DecisionTreeClassifier(max_depth=38)
     rf = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
 
     # Obtengo importancia de cada variable segun distintos analisis
     d1 = analisis_univariable(df, var_resp)  # Opción 1: Análisis univariable con tests estadísticos
-    d2 = machine_learning_model(df, var_resp, dt, best_params, k)  # Opcion 2: Arbol
-    d3 = machine_learning_model(df, var_resp, rf,  best_params, k) # Opcion 3: Random Forest
+    # d2 = machine_learning_model(df, var_resp, dt, best_params, k)  # Opcion 2: Arbol
+    d3 = machine_learning_model(df, var_resp, rf,  best_params=True, k=10) # Opcion 3: Random Forest
 
     # Guardo resultados en DataFrame
     df_importance['analisis_uni'] = df_importance.index.map(d1)
-    df_importance['arbol'] = df_importance.index.map(d2)
+    # df_importance['arbol'] = df_importance.index.map(d2) # El arbol es un subconjunto de random_forest y da muy similar
     df_importance['random'] = df_importance.index.map(d3)
 
     # Selecciono variables mas importantes
     l_selected_features = select_best_features_from_all_models(df_importance, percentil)
     return df.loc[:, l_selected_features]
 
+def eliminar_columnas_correlacionadas(df_correlacion, variable_objetivo, umbral):
+    columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
+
+    # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
+    df_corr = df_correlacion.drop(variable_objetivo, axis=1).drop(variable_objetivo, axis=0).abs()
+    df_corr_var_obj = df_correlacion[variable_objetivo].drop(variable_objetivo, axis=0).abs()
+
+    # Recorrer las columnas de la matriz de correlación
+    for i in range(len(df_corr.columns)):
+        for j in range(i+1, len(df_corr.columns)):
+
+            # Si hay alta correlacion
+            if df_corr.iloc[i, j] > umbral:
+
+                # Busco correlacion de cada columna con variable objetivo
+                col1, col2 = df_corr.columns[i], df_corr.columns[j]
+                print(col1, col2)
+                corr_col1, corr_col2 = df_corr_var_obj.loc[col1], df_corr_var_obj.loc[col2]
+                print(corr_col1, corr_col2)
+
+                # Elimino aquella columna con menor correlacion con la variable objetivo
+                if corr_col2 > corr_col1:
+                    columnas_eliminar.add(col1)
+                    print(f"Variable a eliminar: {col1}")
+                else:
+                    columnas_eliminar.add(col2)
+                    print(f"Variable a eliminar: {col2}")
+    return list(columnas_eliminar)
+
 def prueba():
     warnings.filterwarnings('ignore')
 
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_cleaned.xlsx')
 
-    df = feature_selection(df, 'equipo_ganador')
+    # No usaré la matriz de correlacion puesto que haré feature selection??
+    df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
+    # df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx', index=X.columns)
 
-prueba()
+    l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df_correlacion, 'equipo_ganador', 0.6)
+    print(l_columnas_a_eliminar)
+    df = df.drop(l_columnas_a_eliminar, axis=1)
+
+    # df = feature_selection(df, 'equipo_ganador', percentil=0.7)
+
+# prueba()
+
+# Me temo que no esta bueno tratar los nan antes de eliminar variables correlacionadas puesto que trabajo con muchos valores no verdaderos a la hora de eliminar variables y puedo eliminar una variable que no deberia o viceversa.
+# En comun: dif_gol, dif_valor_aus, dif_pases_comp_segun_ult_part, dif_remates_segun_ult_part, dif_valor_sup, dif_valor_tit, dif_rat_sup
+# Solo con trat nan: dif_posesion_segun_ult_part
+# Solo sin trat nan: 'dif_ataques_segun_ult_part', 'dif_pases_segun_ult_part'
