@@ -51,12 +51,12 @@ class DataPreparation:
         start = time.time()
         print("\nFormateando los datos...")
 
-        # Entidad partido: fecha de string a datetime, posesion de str a float
+        # Entidad partido: fecha, posesion y es_copa
         df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M') # Fundamental para poder ordenar el df por 'fecha' # A pesar de transformalo en la extraccion, lo vuelve a entender como str y no como dt
         df_part = format_data.convert_posesion_to_int(df_part)
         df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
 
-        # Entidad jugador: fecha de string a datetime y convierto valor de mercado en entero
+        # Entidad jugador: fecha y valor de mercado
         df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
         df_jug = format_data.convert_valor_mercado_to_int(df_jug)
 
@@ -69,6 +69,37 @@ class DataPreparation:
 
         return df_part, df_jug
 
+    def clean_data(self, df_part=None, df_jug=None, export=False):
+        """
+        Limpia los datos de un dataframe.
+        :param df: Dataframe de los datos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
+        :return: Dataframe limpiado. (DataFrame)
+        """
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        if df_part is None and df_jug is None:
+            df_part = pd.read_excel('./data_preparation/data/df_part_formated.xlsx')
+            df_jug = pd.read_excel('./data_preparation/data/df_jug_formated.xlsx')
+
+        start = time.time()
+        print("\nLimpiando los datos...")
+
+        # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
+        df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+
+        # Remuevo strings adicionales en los nombres de los equipos
+        df_part = clean_data.clean_teams_names(df_part)
+
+        end = time.time()
+        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
+
+        if export:
+            df_part.to_excel('./data_preparation/data/df_part_cleaned.xlsx', index=False)
+            df_jug.to_excel('./data_preparation/data/df_jug_cleaned.xlsx', index=False)
+
+        return df_part,df_jug
+
     def integrate_data(self, df_part=None, df_jug=None, export=False):  # 42.6 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
@@ -79,20 +110,14 @@ class DataPreparation:
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
         if df_part is None and df_jug is None:
-            df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_part_formated.xlsx')
-            df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_jug_formated.xlsx')
+            df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_part_cleaned.xlsx')
+            df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_jug_cleaned.xlsx')
 
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-        df_part = clean_data.remove_strings_from_teams(df_part)  # remuevo strings adicionales en los nombres de los equipos
-        df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_part = clean_data.change_teams_names(df_part)  # e.g. atl. tucuman --> atletico tucuman
-
         # Integro entidad partido y jugador
-        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)
+        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)  # Podria traer mas funciones en vez de solo llamar a una...
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -145,7 +170,7 @@ class DataPreparation:
 
         return df
 
-    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, export=False):
+    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, treat_nan='drop', export=False):
         """
         Selecciona las variables relevantes del dataframe.
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -163,8 +188,8 @@ class DataPreparation:
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
-        # Codifico variables categoricas a numericas (es de clean_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df = clean_data.convert_columns_to_int(df)
+        # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
+        df = format_data.convert_columns_to_int(df)
 
         # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
         df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
@@ -175,37 +200,14 @@ class DataPreparation:
         l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
         df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
 
+        # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
+        df = clean_data.treat_nan_values(df, type=treat_nan)
+
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
-
-        return df
-
-    def clean_data(self, df=None, treat_nan='drop', export=False):
-        """
-        Limpia los datos de un dataframe. Elimina variables que no se usan para analizar los datos, remueve NaNs y
-        convierte variables str a int.
-        :param df: Dataframe de los datos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe limpiado. (DataFrame)
-        """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        if df is None:
-            df = pd.read_excel('data_preparation/data/df_selected.xlsx')
-
-        start = time.time()
-        print("\nLimpiando los datos...")
-
-        # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
-        df = clean_data.treat_nan_values(df, type=treat_nan)
-
-        end = time.time()
-        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df.to_excel('./data_preparation/data/df_cleaned.xlsx', index=False)
 
         return df
 
@@ -347,17 +349,17 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        # df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
-        # df = prepare.integrate_data(df_part, df_jug, export=True)
-        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, export=True)
-        prepare.clean_data(df, treat_nan=treat_nan, export=True)
+        df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
+        df_part, df_jug = prepare.clean_data(df_part, df_jug, export=True)
+        df = prepare.integrate_data(df_part, df_jug, export=True)
+        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
+        df = prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=True)
 
     if modeling is True:
 
         # Hiperparametros
-        best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
-        k = 5  # Numero de folds
+        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
+        k = 10  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                      xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # num_class = len(y.unique()) Depende del numero de clases...
