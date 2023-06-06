@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
+
 
 def convert_posesion_to_int(df):
     """
@@ -40,6 +42,23 @@ def convert_valor_mercado_to_int(df):
             return None
 
     df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
+    return df
+
+def convert_columns_to_int(df):
+    # Convertir variables categoricas string a categoricas numericas
+    le = LabelEncoder()
+
+    # Por variable string
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = le.fit_transform(df[col])
+
+        # Verificar si la variable es "equipo_ganador"
+        if col == "equipo_ganador":
+            etiquetas = le.classes_
+            codigos = le.transform(etiquetas)
+            df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
+            df_etiquetas.to_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/etiquetas_equipo_ganador.xlsx", index=False)
+
     return df
 
 def prueba():
