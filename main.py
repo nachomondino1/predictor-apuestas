@@ -213,7 +213,7 @@ class Modeling:
         self.var_resp = var_resp
         self.var_pred = var_pred
 
-    def generate_test_design(self, df=None, export=True):
+    def generate_test_design(self, df=None, porc_corte=0.8, export=True):
         """
         Balancea el dataset y separa en conjuntos de entrenamiento y testeo
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -229,7 +229,7 @@ class Modeling:
         oversampler = RandomOverSampler()
 
         # Shuffle dataset
-        df = pd.DataFrame(shuffle(df))  # df = df.sample(frac=1).reset_index(drop=True)
+        df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
         print(f"Shape dataframe original: {df.shape}")
 
         # Balanceamos segun variable respuesta     # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
@@ -238,7 +238,7 @@ class Modeling:
         print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
 
         # Separo conjunto de datos en train y test
-        df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=0.8)
+        df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
         print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
 
         if export:
@@ -277,7 +277,7 @@ class Modeling:
 
         if export:
             df_models.to_excel('./modeling/data/df_modelos.xlsx')
-            pickle.dump(best_model, open("modelo.pkl", "wb"))
+            pickle.dump(best_model, open("./modeling/data/modelo.pkl", "wb"))
 
         return best_model
 
@@ -339,9 +339,9 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if data_prep is True:
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-        treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         thr_corr = 0.6  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         perc_fs = 0.7  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+        treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
@@ -354,6 +354,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if modeling is True:
 
         # Hiperparametros
+        porc_corte = 0.8  # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
         best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
         k = 2  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
@@ -369,7 +370,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(export=False)
+        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=False)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k)
         modeler.assess_model(best_model, df_test)
 
