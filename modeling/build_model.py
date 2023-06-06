@@ -85,8 +85,9 @@ def select_best_hiperparameters(X_train, y_train, model, k):
         'SVC': {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'], 'decision_function_shape': ['ovo', 'ovr']},
         'MLPClassifier': {'activation': ['identity', 'logistic', 'tanh', 'relu'], 'solver': ['lbfgs', 'sgd', 'adam'],
                 'learning_rate': ['learning_rate', 'invscaling', 'adaptive'], 'max_iter': [200, 300],
-                'hidden_layer_sizes': [(64), (128), (64, 32)]}
-    }
+                'hidden_layer_sizes': [(64), (128), (64, 32)]},
+         'GradientBoostingClassifier': {'learning_rate': [0.1, 0.05, 0.01], 'n_estimators': [100, 200, 300], 'max_depth': [None, 5, 7, 20, 30]}
+         }
 
     # Crear el objeto GridSearchCV
     grid_search = GridSearchCV(model, d[model_name], cv=k)

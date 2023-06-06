@@ -104,7 +104,7 @@ def select_best_features_from_all_models(df_importance, percentil):
 
     # Calcular la suma de columnas para cada fila
     df_normalized['suma_de_imp'] = df_normalized.sum(axis=1)
-    df_normalized.to_excel('./df_normalized.xlsx')
+    # df_normalized.to_excel('./df_normalized.xlsx')
 
     # Calculo percentil
     valor_percentil = df_normalized['suma_de_imp'].quantile(percentil)
@@ -172,19 +172,16 @@ def prueba():
 
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_cleaned.xlsx')
 
-    # No usaré la matriz de correlacion puesto que haré feature selection??
+    # Elimino variables correlacionadas
     df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
-    # df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx', index=X.columns)
-
     l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df_correlacion, 'equipo_ganador', 0.6)
-    print(l_columnas_a_eliminar)
     df = df.drop(l_columnas_a_eliminar, axis=1)
+    print(l_columnas_a_eliminar)
 
     # df = feature_selection(df, 'equipo_ganador', percentil=0.7)
 
-# prueba()
+    # Exporto datasets
+    df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx', index=True)
 
-# Me temo que no esta bueno tratar los nan antes de eliminar variables correlacionadas puesto que trabajo con muchos valores no verdaderos a la hora de eliminar variables y puedo eliminar una variable que no deberia o viceversa.
-# En comun: dif_gol, dif_valor_aus, dif_pases_comp_segun_ult_part, dif_remates_segun_ult_part, dif_valor_sup, dif_valor_tit, dif_rat_sup
-# Solo con trat nan: dif_posesion_segun_ult_part
-# Solo sin trat nan: 'dif_ataques_segun_ult_part', 'dif_pases_segun_ult_part'
+
+# prueba()

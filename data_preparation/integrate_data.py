@@ -1,7 +1,6 @@
 # Juntar entidades jugadores, partido y atrib_jugadores
 import pandas as pd
 from fuzzywuzzy import fuzz
-from data_preparation import clean_data
 import warnings
 
 
@@ -105,7 +104,7 @@ def player_data_in_match(df_part, df_jug):
             df_jug_encontrados.to_excel('./ver_jug_encontrados.xlsx', index=False)
     return df_part
 
-def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):  # Probar funcion?
+def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):
     """
     Encuentra coincidencias de jugadores en un dataframe.
     :param df_jug: DataFrame que contiene los datos de los jugadores.
@@ -153,16 +152,9 @@ def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, yea
 
 def prueba():
     # Levanto datasets
-    df_part = pd.read_excel("./data/df_part_formated.xlsx")
-    df_jug = pd.read_excel("./data/df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
+    df_part = pd.read_excel("./data/df_part_cleaned.xlsx")
+    df_jug = pd.read_excel("./data/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(df_part.head())
-
-    # Preparo las columnas con texto como los nombres de equipos y los nombre de jugadores (lo hago aqui y no en clean_data porque uso variables strings para integrar datos)
-    df_part = clean_data.prepare_text_columns(df_part)
-    df_jug = clean_data.prepare_text_columns(df_jug)
-
-    # Cambio nombre de algunos equipos para facilitar integracion
-    df_part = clean_data.change_teams_names(df_part)
 
     # Integro datasets
     df_integrated = player_data_in_match(df_part, df_jug)

@@ -20,7 +20,7 @@ def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar
 
     return df
 
-def clean_teams_names(df):  # Funcion verificada
+def clean_teams_names(df):
     """
     Limpia y cambia el nombre de algunos equipos en el dataframe.
     :param df: Dataframe con columnas "equipo_loc" y "equipo_vis"

@@ -24,9 +24,10 @@ from sklearn.neural_network import MLPClassifier
 # Assess model
 from modeling.asses_model import calculate_ROI, confusion_matrix
 from sklearn.metrics import accuracy_score
+import pickle
 
 
-class DataPreparation:
+class DataPreparation:  # 17.4 min
 
     def __init__(self, var_resp):
         self.var_resp = var_resp
@@ -66,7 +67,7 @@ class DataPreparation:
 
         return df_part, df_jug
 
-    def clean_data(self, df_part=None, df_jug=None, export=False): # 0.0 min
+    def clean_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
         """
         Limpia los datos de un dataframe.
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -276,6 +277,7 @@ class Modeling:
 
         if export:
             df_models.to_excel('./modeling/data/df_modelos.xlsx')
+            pickle.dump(best_model, open("modelo.pkl", "wb"))
 
         return best_model
 
@@ -314,7 +316,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
 
@@ -352,8 +354,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if modeling is True:
 
         # Hiperparametros
-        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
-        k = 10  # Numero de folds
+        best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
+        k = 2  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
                      xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # num_class = len(y.unique()) Depende del numero de clases...
@@ -367,7 +369,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(export=True)
+        df_train, df_test = modeler.generate_test_design(export=False)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k)
         modeler.assess_model(best_model, df_test)
 
