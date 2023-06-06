@@ -7,15 +7,14 @@ from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-from dspy.data_preparation import clean_data as cd  # Para categorizar variables numericas
 # Modeling
 # Generate test design
 from dspy.modeling import test_design
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.utils import shuffle
 # Build model
-from modeling import build_model, asses_model
-from sklearn.tree import DecisionTreeClassifier, plot_tree
+from modeling import build_model
+from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 import lightgbm as lgb  # Gradient Boosting
@@ -32,7 +31,7 @@ class DataPreparation:
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def format_data(self, df_part=None, df_jug=None, export=False):  # 0.2 min
+    def format_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
         """
         Arreglo el data type de algunas variables
         :param df_part: Dataframe de los datos de los partidos. (DataFrame)
@@ -42,8 +41,6 @@ class DataPreparation:
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
         if df_part is None and df_jug is None:
-            # df_part = pd.read_excel('data_understanding/collect_data/data/entidad_partido_argentina.xlsx')
-            # df_jug = pd.read_excel('data_understanding/collect_data/data/entidad_jugadores.xlsx')
             df_part = pd.read_excel('data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
             df_jug = pd.read_excel('data_understanding/collect_data/data_seg/entidad_jugadores.xlsx')
             df_jug = df_jug[df_jug['pais'] == 'argentina']  # Selecciono solo jugadores de argentina para hacer mas rapido...
@@ -69,10 +66,11 @@ class DataPreparation:
 
         return df_part, df_jug
 
-    def clean_data(self, df_part=None, df_jug=None, export=False):
+    def clean_data(self, df_part=None, df_jug=None, export=False): # 0.0 min
         """
         Limpia los datos de un dataframe.
-        :param df: Dataframe de los datos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe limpiado. (DataFrame)
         """
@@ -100,7 +98,7 @@ class DataPreparation:
 
         return df_part,df_jug
 
-    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 42.6 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -117,7 +115,7 @@ class DataPreparation:
         print("\nIntegrando los datos...")
 
         # Integro entidad partido y jugador
-        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)  # Podria traer mas funciones en vez de solo llamar a una...
+        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -127,7 +125,7 @@ class DataPreparation:
 
         return df_integrated
 
-    def construct_data(self, df=None, N_ULT_PART = 5, export=False):  # 4.2 min
+    def construct_data(self, df=None, N_ULT_PART = 5, export=False):  # 2.7 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
         :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -145,22 +143,19 @@ class DataPreparation:
         # Ordeno por campo 'fecha'
         # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)  # Todos son ascending=True salvo historial_entre_si_segun_localia
 
-        # Construct data
-        df = construct_data.determinar_equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
+        # Construyo variable respuesta: "equipo_gandor"
+        df = construct_data.determinar_equipo_ganador(df)
 
+        # Construyo variables historicas
+        l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
+        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
+        df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Diferencia de gol
+        df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # Rendimieento del equipo
+        df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
-        l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_variables_a_prom)
-
-        df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
-
-        df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
-
-        # Calculo diferencias para las variables promedio de los jugadores
+        # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
-
-        df = construct_data.n_dias_ult_partido(df)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -170,7 +165,7 @@ class DataPreparation:
 
         return df
 
-    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, treat_nan='drop', export=False):
+    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, treat_nan='drop', export=False):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -196,7 +191,7 @@ class DataPreparation:
         l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df_correlacion, 'equipo_ganador', thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
-        # Selecciono las variables mas importantes
+        # Selecciono las variables mas importantes (feature selection)
         l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
         df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
 
@@ -319,7 +314,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, False
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
 
@@ -345,7 +340,6 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         thr_corr = 0.6  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         perc_fs = 0.7  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
-
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
@@ -353,7 +347,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         df_part, df_jug = prepare.clean_data(df_part, df_jug, export=True)
         df = prepare.integrate_data(df_part, df_jug, export=True)
         df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=True)
+        prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=True)
 
     if modeling is True:
 
