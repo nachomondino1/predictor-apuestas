@@ -2,6 +2,7 @@
 import pandas as pd
 from fuzzywuzzy import fuzz
 import warnings
+import time
 
 
 def player_data_in_match(df_part, df_jug):
@@ -15,8 +16,12 @@ def player_data_in_match(df_part, df_jug):
     # Definicion de variables
     l_titularidad = ['tit', 'sup', 'aus']  # tengo que agregar 'sup_ing' pero se debe procesar con sup...
     l_condicion = ['loc', 'vis']
-    df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
     warnings.filterwarnings('ignore')
+
+    # Levanto dataset de jugadores ya buscados, o bien, lo creo
+    df_jug_encontrados = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated_jug_encontrados.xlsx')
+    if len(df_jug_encontrados) == 0:
+        df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -101,7 +106,7 @@ def player_data_in_match(df_part, df_jug):
 
             # Elimino variables
             df_part = df_part.drop(l_col_to_preprocess, axis=1)
-            df_jug_encontrados.to_excel('./ver_jug_encontrados.xlsx', index=False)
+            df_jug_encontrados.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated_jug_encontrados.xlsx', index=False)
     return df_part
 
 def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):
@@ -151,13 +156,20 @@ def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, yea
     return match_data['edad'], match_data['altura'], match_data['overall_rating'], match_data['valor_mercado'], match_data['str_encont']
 
 def prueba():
+    start = time.time()
+    print("\nIntegrando los datos...")
+
     # Levanto datasets
-    df_part = pd.read_excel("./data/df_part_cleaned.xlsx")
-    df_jug = pd.read_excel("./data/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
+    df_part = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_part_cleaned.xlsx")
+    df_jug = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(df_part.head())
 
     # Integro datasets
     df_integrated = player_data_in_match(df_part, df_jug)
-    df_integrated.to_excel('./df_integrated.xlsx', index=False)
+    df_integrated.to_excel('/Users/nachomondino/Desktop/df_integrated.xlsx', index=False)
 
-# prueba()
+    end = time.time()
+    print(f"Integracion de datos en {(end - start) / 60:.1f} minutos")
+
+
+prueba()
