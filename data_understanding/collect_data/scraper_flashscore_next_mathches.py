@@ -2,12 +2,11 @@
 import pandas as pd
 import datetime
 import time
-import random
 import warnings
-from dspy.data_understanding.web_scraping.selenium import Crawler
-# import main   # no es muy bueno. porque se corre main... a menos que comente main() de main.py... lo que no va a suceder...
 import pickle
+from dspy.data_understanding.web_scraping.selenium import Crawler
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
+from dspy.data_understanding.describe_data import getting_to_know_data
 
 
 class DataPreparation:  # 17.4 min
@@ -15,68 +14,28 @@ class DataPreparation:  # 17.4 min
     def __init__(self, var_resp):
         self.var_resp = var_resp
 
-    def format_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
-        """
-        Arreglo el data type de algunas variables
-        :param df_part: Dataframe de los datos de los partidos. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataset generado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe formateado. (DataFrame)
-        """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_jugadores.xlsx') if df_jug is None else df_jug
-        df_jug = df_jug[df_jug['pais'] == 'argentina']  # Selecciono solo jugadores de argentina para hacer mas rapido...
-
-        start = time.time()
-        print("\nFormateando los datos...")
-
-        # Entidad partido: fecha, posesion y es_copa
-        df_part = format_data.convert_fecha_to_datetime(df_part,string_format='%d.%m.%Y %H:%M')  # Fundamental para poder ordenar el df por 'fecha' # A pesar de transformalo en la extraccion, lo vuelve a entender como str y no como dt
-
-        # Entidad jugador: fecha y valor de mercado
-        df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
-        df_jug = format_data.convert_valor_mercado_to_int(df_jug)
-
-        end = time.time()
-        print(f"Formateo de datos en {(end - start) / 60:.1f} minutos")
-
-        if export:
-            df_part.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_part_formated.xlsx',index=False)
-            df_jug.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_jug_formated.xlsx',index=False)
-
-        return df_part, df_jug
-
-    def clean_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
+    def clean_data(self, df_part=None, export=False):  # 0.0 min
         """
         Limpia los datos de un dataframe.
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe limpiado. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
         df_part = pd.read_excel('./data_preparation/data/df_part_formated.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel('./data_preparation/data/df_jug_formated.xlsx') if df_jug is None else df_jug
 
-        start = time.time()
         print("\nLimpiando los datos...")
 
         # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
         df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
         # Remuevo strings adicionales en los nombres de los equipos
         df_part = clean_data.clean_teams_names(df_part)
 
-        end = time.time()
-        print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
-
         if export:
             df_part.to_excel('./data_preparation/data/df_part_cleaned.xlsx', index=False)
-            df_jug.to_excel('./data_preparation/data/df_jug_cleaned.xlsx', index=False)
 
-        return df_part, df_jug
+        return df_part
 
     def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
         """
@@ -119,24 +78,20 @@ class DataPreparation:  # 17.4 min
         l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases',
                         'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART / 2))
-
-        print(df)
-        print(df.columns)
-
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART,l_var=l_estad_part)  # Estadisticas del partido
         df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Diferencia de gol
-        df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # Rendimieento del equipo
+        df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # Rendimiento del equipo
         df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
-        df = construct_data.calculate_dif_col_jugadores(df)
+        df = construct_data.calculate_dif_col_jugadores(df)  # No tengo datos de jugadores...  df[nombre_col_dif] = df[nombre_col_loc] - df[nombre_col_vis]  KeyError: 'prom_edad_jug_tit_loc'
 
         if export:
             df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
 
         return df
 
-    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, treat_nan='drop', export=False):  # 1.3 minutos
+    def select_data(self, df=None, treat_nan='drop', export=False):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -144,43 +99,34 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        df = pd.read_excel(
-            '/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx') if df is None else df
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx') if df is None else df
 
         warnings.filterwarnings('ignore')
-        start = time.time()
         print("\nSeleccionado datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        df.index = df['id']
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
 
-        # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
-        df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
-        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df_correlacion, 'equipo_ganador',
-                                                                              thr_corr)
-        df = df.drop(l_columnas_a_eliminar, axis=1)
-
-        # Selecciono las variables mas importantes (feature selection)
-        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp,
-                                                            percentil=perc_fs)  # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
-        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
+        # Selecciono las variables mas importantes (feature selection) --> Levanto df?
+        df_test = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/df_test.xlsx')
+        l_selected_features = df_test.columns
+        df = df.loc[:, l_selected_features]
+        print(df.shape)
+        print(df.columns)
 
         # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
         df = clean_data.treat_nan_values(df, type=treat_nan)
-
-        end = time.time()
-        print(f"Seleccion de datos en {(end - start) / 60:.1f} minutos")
 
         if export:
             df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
 
         return df
 
-
-def extract_flashscore():
+def extract_flashscore(n_dias_max):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -230,7 +176,7 @@ def extract_flashscore():
 
             # POR PARTIDO (c/u identificado con un id)
             cont_part = 0
-            for id in l_ids[:10]:
+            for id in l_ids:
 
                 start = time.time()
 
@@ -248,12 +194,15 @@ def extract_flashscore():
                 # EXTRACCION DE CAMPOS
                 fecha_str = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
                 fecha_dt = datetime.datetime.strptime(fecha_str, "%d.%m.%Y %H:%M")
+                # print(fecha_dt, fecha_act)
+                dif_fecha = (fecha_dt - fecha_act).days  # Ojo que si falta 1 dia y 23 hs, lo toma como 1...
+                # print(dif_fecha)
 
                 # Si el partido aun no se jugo (extraia partidos de la Copa de la Liga profesional 2023 la cual aun no se jugo pero ya esta el fixture... tampoco es tan grave solo esta la jornada 1)
-                if fecha_dt > fecha_act:
+                if dif_fecha < n_dias_max:
 
                     # Extraigo campos de hoja "Resumen"
-                    d_nueva_fila['fecha'] = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)# fecha_dt
+                    d_nueva_fila['fecha'] = fecha_dt
                     d_nueva_fila['equipo_loc'] = crawler.extract_tag(xpath='.//div[starts-with(@class, "duelParticipant__home")]', text=True, sec_wait=SEC_WAIT)
                     d_nueva_fila['equipo_vis'] = crawler.extract_tag(xpath='.//div[starts-with(@class, "duelParticipant__away")]', text=True, sec_wait=SEC_WAIT)
                     d_nueva_fila['arbitro'] = crawler.extract_tag(xpath='.//div[@class="mi__data"]//span[contains(text(), "Árbitro")]/following-sibling::span', text=True, sec_wait=SEC_WAIT)
@@ -329,7 +278,6 @@ def extract_flashscore():
                         d_nueva_fila['odds_loc'] = extract_cuota(crawler, SEC_WAIT, i=1)
                         d_nueva_fila['odds_emp'] = extract_cuota(crawler, SEC_WAIT, i=2)
                         d_nueva_fila['odds_vis'] = extract_cuota(crawler, SEC_WAIT, i=3)
-                        print(d_nueva_fila['odds_loc'], d_nueva_fila['odds_emp'], d_nueva_fila['odds_vis'])
 
                     # GUARDADO DE DATOS EN DATAFRAME
                     df = pd.concat([df, pd.DataFrame(d_nueva_fila, index=[0])])
@@ -369,45 +317,71 @@ def extract_cuota(crawler, SEC_WAIT, i):  # Puedo volver a la anterior, solo fal
 
 def prueba():
 
-    # Levanto dataset de partidos viejos (pues los necesito para construir variables historicas)
-    df_part_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
-    # no deberia levantar todos los registros... es solo los ultumos 5 de cada equipo...
-
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare = DataPreparation(var_resp)
 
     # Hiperparametros
+    n_dias_a_prox_part = 3  # Numero de dias maximo para partido a recolectar
+    n_anios_df_part = 7  # Numero de ultimos años a tomar de los partidos ya recolectados (si es muy bajo, por ej 3, no llega a construir la variable "historial_entre_si" pues hay un numero de part min...
+
     N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-    thr_corr = 0.6  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-    perc_fs = 0.7  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
     treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
 
-    # Recolecto nuevos partidos
+    ## DATA UNDERSTANDING
+    print(" Data Understanding ".center(120, "#"))
+    # Collect initial data
     try:
         df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_next_partido_argentina.xlsx')
     except:
-        df_part = extract_flashscore()
+        df_part = extract_flashscore(n_dias_max=n_dias_a_prox_part)
+
+    # Asegurarse de que la columna de fecha esté en el formato adecuado (por ejemplo, datetime)
+    df_part['fecha'] = pd.to_datetime(df_part['fecha'])
+    l_ids = list(df_part['id'])
+
+    # Describe data
+    getting_to_know_data(df_part)
+
+    ## DATA PREPARATION
+    print(" Data preparation ".center(120, "#"))
+
+    df_part = prepare.clean_data(df_part, export=False)
+    df_part = prepare.integrate_data(df_part, export=False)
+
+    # Levanto dataset de partidos viejos (pues los necesito para construir variables historicas)  Y # Filtrar el DataFrame para seleccionar los registros dentro de los últimos 3 años # no deberia levantar todos los registros... es solo los ultumos 5 de cada equipo...
+    df_part_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx')  # Lo tengo que levantar integrado para tener las variables de jugadores... como "prom_edad_jug_tit_loc"
+    fecha_limite = datetime.datetime.now() - datetime.timedelta(days=365 * n_anios_df_part)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
+    df_part_old_filt = df_part_old[df_part_old['fecha'] >= fecha_limite]
+
+    # Creo variable equipo_ganador para que poder calcular historial_entre_si y forma_reciente
+    df_part_old_filt = construct_data.determinar_equipo_ganador(df_part_old_filt)  # --> a df_part no le construyo equipo_ganador...
 
     # Agrego dataframe viejo para poder calcular variables historicas...
-    df_part = pd.concat([df_part_old, df_part], axis=0).reset_index(drop=True)
-    print(df_part)
-    # df_part.to_excel('/Users/nachomondino/Desktop/prueba.xlsx', index=False)
+    df = pd.concat([df_part_old_filt, df_part], axis=0).reset_index(drop=True)  # Funciona bien
 
-    # Preparo el dataset para el analisis
-    print(" Data preparation ".center(120, "#"))
-    df_part, df_jug = prepare.format_data(df_part, export=False)
-    df_part, df_jug = prepare.clean_data(df_part, df_jug, export=False)
-    df = prepare.integrate_data(df_part, df_jug, export=False)  # Falla en historial_entre si -->  equipo_ganador = df.loc[l_idxs[k], 'equipo_ganador']  # {'Local', 'Empate', 'Visitante} --> no hay equipo_ganador en el nuevo df...
     df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=False)
-    df = prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=False)
 
+    df = prepare.select_data(df, treat_nan=treat_nan, export=False)
+
+    # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
+    df = df[df.index.isin(l_ids)] # df = df[df.id.isin(l_ids)]  # Funciona... shape = (5, 119)
+    print(df.shape)
+
+    df = df.drop('equipo_ganador', axis=1)
     df.to_excel('/Users/nachomondino/Desktop/entidad_partido_argentina_next_matches.xlsx', index=False)
 
-    # Modeling    # No lo tengo que modelar... solo predecir... y despues analizar los resultados una vez concluida la fecha...
+    ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
+    df_test_without_odds = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
     loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/modelo.pkl", "rb"))
-    y_pred = loaded_model.predict(df.drop(var_resp, axis=1))
-    df['y_pred'] = y_pred
-    df.to_excel('/Users/nachomondino/Desktop/entidad_partido_argentina_next_matches_pred.xlsx', index=False)
+    y_pred = loaded_model.predict(df_test_without_odds)
+    df_res = df.copy()
+    df_res['y_pred'] = y_pred
+    df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
+
 
 prueba()
+
+# Tal vez, para no rellenar automaticamente las variables de jugadores (como dif_rat_tit, dif_edad_sup, dif_rat_aus)
+# por no tener las formaciones antes del partido, podria tomar el rating de cada equipo segun su ultimo partido?
+# Y considerar bajas?
