@@ -315,6 +315,31 @@ def extract_cuota(crawler, SEC_WAIT, i):  # Puedo volver a la anterior, solo fal
             cuota = None
     return cuota
 
+def rellenar_player_data(df_part, df_part_old):
+    # Tal vez, para no rellenar automaticamente las variables de jugadores (como dif_rat_tit, dif_edad_sup, dif_rat_aus)
+    # por no tener las formaciones antes del partido, podria tomar el rating de cada equipo segun su ultimo partido?
+    # Y considerar bajas?
+
+    l_var = ['dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+
+    # Por partido
+    for i in range(len(df_part)):
+
+        l_equipos = [df_part.loc[i, 'equipo_loc'], df_part.loc[i, 'equipo_vis']]
+
+        # Por equipo
+        for equipo in l_equipos:
+
+            # Busco el ultimo partido del equipo  # Suponiendo que df_part_old esta ordenado decrecientemente
+            indice = df_part_old[(df_part_old['equipo_loc'] == equipo) | (df_part_old['equipo_vis'] == equipo)].index[0]
+
+            df_part_old
+            # Buscar ultimo partido del equipo
+            # En dicho partido, extraer: ['dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+
+            # Guardar ['dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus'] en nuevo partido...
+    pass
+
 def prueba():
 
     # Definicion de variables
@@ -356,6 +381,8 @@ def prueba():
 
     # Creo variable equipo_ganador para que poder calcular historial_entre_si y forma_reciente
     df_part_old_filt = construct_data.determinar_equipo_ganador(df_part_old_filt)  # --> a df_part no le construyo equipo_ganador...
+
+    rellenar_player_data(df_part)
 
     # Agrego dataframe viejo para poder calcular variables historicas...
     df = pd.concat([df_part_old_filt, df_part], axis=0).reset_index(drop=True)  # Funciona bien
