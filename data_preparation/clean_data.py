@@ -10,7 +10,7 @@ def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar
     :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
     '''
     # Convertir variables categoricas string a categoricas numericas
-    for var in df.select_dtypes(include=['object']).columns:
+    for var in df.drop('id', axis=1).select_dtypes(include=['object']).columns:
 
         prepare_text = TextPreparation(textos=df[var])
         prepare_text.to_lower()
