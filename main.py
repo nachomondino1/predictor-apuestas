@@ -51,7 +51,7 @@ class DataPreparation:  # 17.4 min
         # Entidad partido: fecha, posesion y es_copa
         df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
         df_part = format_data.convert_posesion_to_int(df_part)
-        df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
+        # df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
 
         # Entidad jugador: fecha y valor de mercado
         df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
@@ -182,8 +182,7 @@ class DataPreparation:  # 17.4 min
         df = format_data.convert_columns_to_int(df)
 
         # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
-        df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
-        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df_correlacion, 'equipo_ganador', thr_corr)
+        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
@@ -262,7 +261,7 @@ class Modeling:
         for modelo in l_modelos:
 
             # print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, self.pais, best_params, k)  # Le paso pais por df_etiquetas...
+            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, best_params, k)  # Le paso pais por df_etiquetas...?
             df_models.loc[len(df_models)] = [model, cv_accuracy, cv_roi]
 
         # Selecciono el mejor modelo
@@ -287,22 +286,20 @@ class Modeling:
         """
         print("\nEvaluando modelo con datos de prueba...")
 
-        # Quito odds y variable respuesta de df_test
+        # Quito cuotas de casas de apuestas y variable respuesta de df_test
         df_test_pred = df_test.copy().drop([self.var_resp, 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
 
         # Predecir las etiquetas para los datos de prueba
         y_pred = model.predict(df_test_pred)  # es un numpy array
 
-        # Asignar las predicciones a una nueva columna en df_test
-        df_test[self.var_pred] = y_pred  # Agrego y_pred a df_test para poder calcular ROI
+        # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
+        df_test[self.var_pred] = y_pred
 
-        # Calculo metricas
+        # Calculo metricas e imprimo resultados
         test_accuracy = accuracy_score(df_test[self.var_resp], df_test[self.var_pred]) * 100
-        roi = calculate_ROI(df_test, self.var_resp, self.var_pred, pais=self.pais)
-
-        # Imprimo resultados
+        roi = calculate_ROI(df_test, self.var_resp, self.var_pred)
         print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
-        confusion_matrix(df_test, self.var_resp, self.var_pred)
+        confusion_matrix(df_test, self.var_resp, self.var_pred)  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
 
         if export:
             df_test.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
@@ -313,10 +310,9 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, True, False
-    modeling_prueba = False
+    data_unders, data_prep, modeling = False, False, False
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"
+    pais = "argentina"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
     prepare, modeler = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
 
@@ -338,8 +334,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if data_prep is True:
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-        thr_corr = 0.6  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-        perc_fs = 0.7  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
+        perc_fs = 0.6  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
         treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         print(" Data preparation ".center(120, "#"))
 
@@ -368,33 +364,23 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
         print(" Modeling ".center(120, "#"))
 
+        df = pd.read_excel('/Users/nachomondino/Desktop/df_selected_train.xlsx')  # --> entreno modelo con una parte de df_selected...
+        print(df.shape)
+
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=export)
+        df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
         modeler.assess_model(best_model, df_test)
 
+    modeling_prueba = True  # Cambio a True cuando corro solo prediccion con los datos de 2023...
+    # Al df_selected lo separo en dos --> uno sera mi df_train y el otro sera mi df_test...
+
     if modeling_prueba:  # La cagada es que tengo que el modelo fue entrenado con ciertas variables y el nuevo df debe tener esas mismas...
 
-        # Levanto dataset y modelo
-        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_ing/df_constructed.xlsx')
-        loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/modelo.pkl", "rb"))
-
-        # Selecciono las variables con las que fue entrenado el modelo
-        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
-
-        # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df = format_data.convert_columns_to_int(df)
-
-        # Selecciono las variables mas importantes (feature selection) --> Levanto df?
-        df_test = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/df_test.xlsx')
-        l_selected_features = df_test.columns
-        df = df.loc[:, l_selected_features]
-        print(df.shape)
-        print(df.columns)
-
-        # Tratamiento de NaN values
-        df = df.dropna()
-        print(df.shape)
+        # Levanto dataset de testeo y modelo
+        df = pd.read_excel('/Users/nachomondino/Desktop/df_selected_test.xlsx')  # '/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_ing/df_constructed.xlsx')
+        print(df.shape)  # Tiene que ser 700
+        loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/modelo.pkl", "rb"))
 
         modeler.assess_model(loaded_model, df, export=False)
 
