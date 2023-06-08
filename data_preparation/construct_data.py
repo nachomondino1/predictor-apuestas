@@ -319,5 +319,6 @@ def prueba():
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
-
-# prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()

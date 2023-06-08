@@ -27,9 +27,12 @@ def extract_flashscore():
 
     # POR PAIS
     for pais in df_comp['pais'].unique()[:1]:
+        pais = "inglaterra"
 
         # Filtro competiciones por pais
-        df_comp_pais = df_comp[df_comp['pais'] == pais]
+        # df_comp_pais = df_comp[df_comp['pais'] == pais]
+        l_comp = ['premier league']
+        l_cat = ['Liga']
         print(f' PAIS: {pais} '.center(120, '#'))
 
         '''  # Para cuando intente no recolectar los partidos ya extraidos
@@ -41,7 +44,8 @@ def extract_flashscore():
         '''
 
         # POR COMPETICION
-        for competicion, categoria in zip(df_comp_pais['nombre'], df_comp_pais['categoria']):
+        # for competicion, categoria in zip(df_comp_pais['nombre'], df_comp_pais['categoria']):
+        for competicion, categoria in zip(l_comp, l_cat):
 
             # Obtengo datos de la competicion
             print(f' Competicion: {competicion} '.center(120, '+'))
@@ -86,7 +90,7 @@ def extract_flashscore():
                     id = id[id.rfind('_') + 1:]  # paso de "g_1_fshvzbls" a "fshvzbls"
 
                     # Reinicio diccionario en el que guardar la nueva fila
-                    d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': True if categoria == "Copa" else False}
+                    d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': 1 if categoria == "Copa" else 0}
                     cont_part += 1
                     print(f" Partido {cont_part} de {len(l_items)}. Recolectado el {cont_part / len(l_items) * 100:.0f}% ".center(120, "."))
 
@@ -104,8 +108,7 @@ def extract_flashscore():
                     if fecha_dt < fecha_act:
 
                         # Extraigo campos de hoja "Resumen"
-                        d_nueva_fila['fecha'] = fecha_dt
-                        d_nueva_fila['fecha'] = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
+                        d_nueva_fila['fecha'] = fecha_dt  # d_nueva_fila['fecha'] = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
                         d_nueva_fila['equipo_loc'] = crawler.extract_tag(xpath='.//div[starts-with(@class, "duelParticipant__home")]', text=True, sec_wait=SEC_WAIT)
                         d_nueva_fila['equipo_vis'] = crawler.extract_tag(xpath='.//div[starts-with(@class, "duelParticipant__away")]', text=True, sec_wait=SEC_WAIT)
                         d_nueva_fila['goles_loc'] = crawler.extract_tag(xpath='.//div[@class="detailScore__wrapper"]/span[1]', text=True, sec_wait=SEC_WAIT)
@@ -230,10 +233,10 @@ def extract_cuota(crawler, SEC_WAIT, i):  # Puedo volver a la anterior, solo fal
             cuota = None
     return cuota
 
-def prueba():
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     extract_flashscore()
 
-# prueba()
 
 # Puedo eficientizar el codigo (en entrenadores y demas) agregando la posibilidad de un xpath alternativo en extract_tag...
 # Solucionar el tema de que cuando falla un campo, tengo que volver a extraer tod@... Dar la posibildiad de recorrer los ids ya extraidos y extraer de nuevo el campo que falló

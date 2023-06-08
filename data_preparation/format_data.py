@@ -45,6 +45,9 @@ def convert_valor_mercado_to_int(df):
     return df
 
 def convert_columns_to_int(df):
+
+    pais = df['pais'].unique()[0]
+
     # Convertir variables categoricas string a categoricas numericas
     le = LabelEncoder()
 
@@ -57,7 +60,7 @@ def convert_columns_to_int(df):
             etiquetas = le.classes_
             codigos = le.transform(etiquetas)
             df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
-            df_etiquetas.to_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/etiquetas_equipo_ganador.xlsx", index=False)
+            df_etiquetas.to_excel(f"/Users/nachomondino/Documents/GitHub/predictor-puestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx", index=False)
 
     return df
 
@@ -78,4 +81,6 @@ def prueba():
     df_part.to_excel('/Users/nachomondino/Desktop/df_part_formated.xlsx', index=False)
     df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_formated.xlsx', index=False)
 
-# prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()

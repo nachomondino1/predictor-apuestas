@@ -21,13 +21,14 @@ from modeling.asses_model import calculate_ROI
 # from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 
-def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
+def train_model(df_train, var_resp, model, pais, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
     # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
     df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
 
     # Dividir los datos en conjunto de entrenamiento y prueba
     X_train, y_train = df_train_without_odds.drop(var_resp, axis=1), df_train_without_odds[var_resp]
+    print(X_train.columns)  # no deberia tener "equipo_ganador"
 
     # Verificar si se deben buscar los mejores hiperparámetros
     if best_params:
@@ -52,13 +53,14 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
         # Realizar predicciones en el conjunto de validación
         y_pred = model.predict(X_test_fold)
 
-        # Calcular la precisión y el roi en el conjunto de validación y agregarla a la lista de scores
-        accuracy = accuracy_score(y_test_fold, y_pred) * 100
-        scores.append(accuracy)
+        # Guardo predicciones
+        df_res = X_test_fold.copy()
+        df_res['y_pred'] = y_pred
 
-        df_res = df_train[start:end]  # Chequear si es lo mismo que df_test
-        df_res['y_pred'] = y_pred  # Guardo las predicciones  # /Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/build_model.py:60: SettingWithCopyWarning:  A value is trying to be set on a copy of a slice from a DataFrame. Try using .loc[row_indexer,col_indexer] = value instead See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy df_res['y_pred'] = y_pred  # Guardo las predicciones
-        roi = calculate_ROI(df_res, var_resp, 'y_pred')
+        # Calcular la precisión y el roi en el conjunto de validación
+        accuracy = accuracy_score(y_test_fold, y_pred) * 100
+        roi = calculate_ROI(df_res, var_resp, 'y_pred', pais)
+        scores.append(accuracy)
         rois.append(roi)
         # print(f'Fold {i} --> Precision: {accuracy:.1f}%  ROI: {roi:.1f}%')
 
@@ -136,5 +138,6 @@ def prueba():
 
     print(f"\nEl mejor modelo es: {best_model}")
 
-
-# prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()

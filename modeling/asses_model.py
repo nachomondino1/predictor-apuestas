@@ -3,7 +3,7 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 
 
-def calculate_ROI(df_result, var_resp, var_pred):  # NO SE QUE NRO LE CORRESPONDE A QUE CLASE (E.G. SI LOCAL ES 2, 1, 0) --> al parecer lo solucione...
+def calculate_ROI(df_result, var_resp, var_pred, pais): # NO SE QUE NRO LE CORRESPONDE A QUE CLASE (E.G. SI LOCAL ES 2, 1, 0) --> al parecer lo solucione...
     """
     Calcula ROI comparando las predicciones del modelo y los resultados reales.
     :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
@@ -12,7 +12,7 @@ def calculate_ROI(df_result, var_resp, var_pred):  # NO SE QUE NRO LE CORRESPOND
     :return: ROI del modelo. (float)
     """
     # Levanto etiquetas y codigo de la variable respuesta
-    df_etiquetas = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/etiquetas_equipo_ganador.xlsx')
+    df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx')
 
     # Definicion de variables
     ingresos = 0
@@ -99,7 +99,9 @@ def prueba():
     # confusion_matrix(df, var_resp, var_pred)
     # df_cm.to_excel('/Users/nachomondino/Desktop/cm.xlsx')
 
-# prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()
 
 
 ''' Funciones de caro

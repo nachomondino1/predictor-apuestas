@@ -29,8 +29,9 @@ import pickle
 
 class DataPreparation:  # 17.4 min
 
-    def __init__(self, var_resp):
+    def __init__(self, var_resp, pais):
         self.var_resp = var_resp
+        self.pais = pais
 
     def format_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
         """
@@ -41,16 +42,14 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe formateado. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        if df_part is None and df_jug is None:
-            df_part = pd.read_excel('data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
-            df_jug = pd.read_excel('data_understanding/collect_data/data_seg/entidad_jugadores.xlsx')
-            df_jug = df_jug[df_jug['pais'] == 'argentina']  # Selecciono solo jugadores de argentina para hacer mas rapido...
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/{self.pais}/entidad_partido.xlsx') if df_part is None else df_part
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/{self.pais}/entidad_jugadores.xlsx') if df_jug is None else df_jug
 
         start = time.time()
         print("\nFormateando los datos...")
 
         # Entidad partido: fecha, posesion y es_copa
-        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M') # Fundamental para poder ordenar el df por 'fecha' # A pesar de transformalo en la extraccion, lo vuelve a entender como str y no como dt
+        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
         df_part = format_data.convert_posesion_to_int(df_part)
         df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
 
@@ -62,8 +61,8 @@ class DataPreparation:  # 17.4 min
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part.to_excel('./data_preparation/data/df_part_formated.xlsx', index=False)
-            df_jug.to_excel('./data_preparation/data/df_jug_formated.xlsx', index=False)
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
+            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
 
         return df_part, df_jug
 
@@ -76,9 +75,8 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe limpiado. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        if df_part is None and df_jug is None:
-            df_part = pd.read_excel('./data_preparation/data/df_part_formated.xlsx')
-            df_jug = pd.read_excel('./data_preparation/data/df_jug_formated.xlsx')
+        df_part = pd.read_excel(f'./data_preparation/data/{self.pais}/df_part_formated.xlsx') if df_part is None else df_part
+        df_jug = pd.read_excel(f'./data_preparation/data/{self.pais}/df_jug_formated.xlsx') if df_jug is None else df_jug
 
         start = time.time()
         print("\nLimpiando los datos...")
@@ -94,12 +92,12 @@ class DataPreparation:  # 17.4 min
         print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part.to_excel('./data_preparation/data/df_part_cleaned.xlsx', index=False)
-            df_jug.to_excel('./data_preparation/data/df_jug_cleaned.xlsx', index=False)
+            df_part.to_excel(f'./data_preparation/data/{self.pais}/df_part_cleaned.xlsx', index=False)
+            df_jug.to_excel(f'./data_preparation/data/{self.pais}/df_jug_cleaned.xlsx', index=False)
 
         return df_part,df_jug
 
-    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)  # Problema para integrar brasil y uruguay
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -107,10 +105,8 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe integrado. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        if df_part is None and df_jug is None:
-            df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_part_cleaned.xlsx')
-            df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_jug_cleaned.xlsx')
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_part_cleaned.xlsx') if df_part is None else df_part
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_jug_cleaned.xlsx') if df_jug is None else df_jug
 
         start = time.time()
         print("\nIntegrando los datos...")
@@ -122,11 +118,11 @@ class DataPreparation:  # 17.4 min
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_integrated.to_excel('./data_preparation/data/df_integrated.xlsx', index=False)
+            df_integrated.to_excel(f'./data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
 
         return df_integrated
 
-    def construct_data(self, df=None, N_ULT_PART = 5, export=False):  # 2.7 minutos
+    def construct_data(self, df=None, N_ULT_PART=5, export=False):  # 2.7 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
         :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -135,8 +131,7 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe construido. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        if df is None:
-            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx')
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_integrated.xlsx') if df is None else df
 
         start = time.time()
         print("\nConstruyendo nuevos datos...")
@@ -162,7 +157,7 @@ class DataPreparation:  # 17.4 min
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel('./data_preparation/data/df_constructed.xlsx', index=False)
+            df.to_excel(f'./data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
 
         return df
 
@@ -174,8 +169,7 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        if df is None:
-            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx')
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_constructed.xlsx') if df is None else df
 
         warnings.filterwarnings('ignore')
         start = time.time()
@@ -203,15 +197,16 @@ class DataPreparation:  # 17.4 min
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel('./data_preparation/data/df_selected.xlsx', index=False)
+            df.to_excel(f'./data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
 
         return df
 
 class Modeling:
 
-    def __init__(self, var_resp, var_pred):
+    def __init__(self, var_resp, var_pred, pais):
         self.var_resp = var_resp
         self.var_pred = var_pred
+        self.pais = pais
 
     def generate_test_design(self, df=None, porc_corte=0.8, export=True):
         """
@@ -223,7 +218,7 @@ class Modeling:
         print("\nGenerando datasets de entrenamiento y testeo...")
         if df is None:
             # Levanto dataset ya preparado
-            df = pd.read_excel('data_preparation/data/df_selected.xlsx')
+            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_selected.xlsx')
 
         # Definicion de variables
         oversampler = RandomOverSampler()
@@ -232,18 +227,18 @@ class Modeling:
         df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
         print(f"Shape dataframe original: {df.shape}")
 
-        # Balanceamos segun variable respuesta     # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
+        # Balanceamos segun variable respuesta   --> no es el problema. Las precisiones son peores sin el pero   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
         X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
         df_balanced = pd.concat([X_bal, y_bal], axis=1)
         print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
 
-        # Separo conjunto de datos en train y test
+        # Separo conjunto de datos en train y test --> tampoco es el problema...
         df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
         print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
 
         if export:
-            df_train.to_excel('./modeling/data/df_train.xlsx', index=False)
-            df_test.to_excel('./modeling/data/df_test.xlsx', index=False)
+            df_train.to_excel(f'./modeling/data/{self.pais}/df_train.xlsx', index=False)
+            df_test.to_excel(f'./modeling/data/{self.pais}/df_test.xlsx', index=False)
 
         return df_train, df_test
 
@@ -267,7 +262,7 @@ class Modeling:
         for modelo in l_modelos:
 
             # print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, best_params, k)
+            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, self.pais, best_params, k)  # Le paso pais por df_etiquetas...
             df_models.loc[len(df_models)] = [model, cv_accuracy, cv_roi]
 
         # Selecciono el mejor modelo
@@ -276,8 +271,8 @@ class Modeling:
         print(f"El mejor modelo es: {best_model} con ROI: {best_roi:.1f}% y precision: {best_accuracy:.1f}%")
 
         if export:
-            df_models.to_excel('./modeling/data/df_modelos.xlsx')
-            pickle.dump(best_model, open("./modeling/data/modelo.pkl", "wb"))
+            df_models.to_excel(f'./modeling/data/{self.pais}/df_modelos.xlsx')
+            pickle.dump(best_model, open(f"./modeling/data/{self.pais}/modelo.pkl", "wb"))
 
         return best_model
 
@@ -292,23 +287,25 @@ class Modeling:
         """
         print("\nEvaluando modelo con datos de prueba...")
 
-        # Quito odds de df_test para evitar error
-        df_test_without_odds = df_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+        # Quito odds y variable respuesta de df_test
+        df_test_pred = df_test.copy().drop([self.var_resp, 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
 
         # Predecir las etiquetas para los datos de prueba
-        y_pred = model.predict(df_test_without_odds.drop(self.var_resp, axis=1))  # es un numpy array
+        y_pred = model.predict(df_test_pred)  # es un numpy array
+
+        # Asignar las predicciones a una nueva columna en df_test
+        df_test[self.var_pred] = y_pred  # Agrego y_pred a df_test para poder calcular ROI
 
         # Calculo metricas
-        test_accuracy = accuracy_score(df_test[self.var_resp], y_pred) * 100
-        df_test['y_pred'] = y_pred  # Agrego y_pred a df_test para poder calcular ROI
-        roi = calculate_ROI(df_test, self.var_resp, self.var_pred)
+        test_accuracy = accuracy_score(df_test[self.var_resp], df_test[self.var_pred]) * 100
+        roi = calculate_ROI(df_test, self.var_resp, self.var_pred, pais=self.pais)
 
         # Imprimo resultados
         print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
         confusion_matrix(df_test, self.var_resp, self.var_pred)
 
         if export:
-            df_test.to_excel('/Users/nachomondino/Desktop/df_results.xlsx')
+            df_test.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
 
         return test_accuracy, roi
 
@@ -316,9 +313,12 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, False
+    modeling_prueba = False
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    prepare, modeler = DataPreparation(var_resp), Modeling(var_resp, var_pred)
+    pais = "argentina"
+    export = True
+    prepare, modeler = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
 
     if data_unders is True:
 
@@ -329,7 +329,6 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         df_part = scraper_flashscore.extract_flashscore()  # Tengo que ver que no se corran igual por no comentar la funcion en su archivo...
         df_jug = scraper_sofifa.extract_sofifa
         print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
-
 
         # Describe data (quiero describir los datos igual aunque no los extraiga...)
         print(" Describiendo datos... ")
@@ -345,11 +344,11 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(export=True)  # df_part, df_jug,
-        df_part, df_jug = prepare.clean_data(df_part, df_jug, export=True)
-        df = prepare.integrate_data(df_part, df_jug, export=True)
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=True)
+        df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
+        df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
+        df = prepare.integrate_data(df_part, df_jug, export=export)
+        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
@@ -370,8 +369,35 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=False)
-        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k)
+        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=export)
+        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
         modeler.assess_model(best_model, df_test)
 
-main()
+    if modeling_prueba:  # La cagada es que tengo que el modelo fue entrenado con ciertas variables y el nuevo df debe tener esas mismas...
+
+        # Levanto dataset y modelo
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_ing/df_constructed.xlsx')
+        loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/modelo.pkl", "rb"))
+
+        # Selecciono las variables con las que fue entrenado el modelo
+        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+
+        # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
+        df = format_data.convert_columns_to_int(df)
+
+        # Selecciono las variables mas importantes (feature selection) --> Levanto df?
+        df_test = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/df_test.xlsx')
+        l_selected_features = df_test.columns
+        df = df.loc[:, l_selected_features]
+        print(df.shape)
+        print(df.columns)
+
+        # Tratamiento de NaN values
+        df = df.dropna()
+        print(df.shape)
+
+        modeler.assess_model(loaded_model, df, export=False)
+
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    main()

@@ -183,5 +183,6 @@ def prueba():
     # Exporto datasets
     df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx', index=True)
 
-
-# prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()

@@ -33,8 +33,8 @@ def extract_sofifa():
         print(f" Fecha de actualizacion del fifa: {fecha} ".center(120, "#"))
 
         # POR PAIS
-        for pais in df_comp['pais'].unique()[:-1]:  # Evito "Sudamerica"
-
+        # for pais in df_comp['pais'].unique()[:-1]:  # Evito "Sudamerica"
+        for pais in ['england']:
             print(f" PAÍS: {pais} ".center(120, "-"))
 
             # Remuevo busqueda anterior
@@ -118,9 +118,11 @@ def extract_sofifa():
         df_jug.to_excel(f'./data_seg/entidad_jugadores_{fecha}.xlsx')
 
     # Exporto dataset final y cierro webdriver
-    df_jug.to_excel(f'./entidad_jugadores.xlsx')
+    df_jug.to_excel('./entidad_jugadores_england.xlsx')
     crawler.driver.close()
 
     return df_jug
 
-# extract_sofifa()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    extract_sofifa()

@@ -10,7 +10,7 @@ def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar
     :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
     '''
     # Convertir variables categoricas string a categoricas numericas
-    for var in df.drop('id', axis=1).select_dtypes(include=['object']).columns:
+    for var in df.select_dtypes(include=['object']).columns:  # drop('id', axis=1)
 
         prepare_text = TextPreparation(textos=df[var])
         prepare_text.to_lower()
@@ -98,4 +98,6 @@ def prueba():
     df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_cleaned.xlsx', index=False)
 
 
-# prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()

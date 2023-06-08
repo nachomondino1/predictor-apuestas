@@ -79,4 +79,6 @@ def extract_cuota(crawler, SEC_WAIT, i):  # Puedo volver a la anterior, solo fal
             cuota = None
     return cuota
 
-extract_bad_fields_flashscore()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    extract_bad_fields_flashscore()

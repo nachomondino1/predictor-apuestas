@@ -407,7 +407,9 @@ def prueba():
     df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
 
 
-prueba()
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    prueba()
 
 # Tal vez, para no rellenar automaticamente las variables de jugadores (como dif_rat_tit, dif_edad_sup, dif_rat_aus)
 # por no tener las formaciones antes del partido, podria tomar el rating de cada equipo segun su ultimo partido?
