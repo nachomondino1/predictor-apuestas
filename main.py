@@ -226,13 +226,18 @@ class Modeling:
         df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
         print(f"Shape dataframe original: {df.shape}")
 
-        # Balanceamos segun variable respuesta   --> no es el problema. Las precisiones son peores sin el pero   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
-        X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
-        df_balanced = pd.concat([X_bal, y_bal], axis=1)
-        print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
+        # # Balanceamos segun variable respuesta   --> no es el problema. Las precisiones son peores sin el pero   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
+        # X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
+        # df_balanced = pd.concat([X_bal, y_bal], axis=1)
+        # print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
+
+        # Shuffle dataset  --> para evitar que todos los partidos creados artificialmente vayan en df_test...
+        # df_balanced = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
+        # print(f"Shape dataframe original: {df_balanced.shape}")
 
         # Separo conjunto de datos en train y test --> tampoco es el problema...
-        df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
+        # df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
+        df_train, df_test = test_design.separate_train_and_test(df, porc_corte=porc_corte)
         print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
 
         if export:
@@ -310,7 +315,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, False, False
+    data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "argentina"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
@@ -364,15 +369,35 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
         print(" Modeling ".center(120, "#"))
 
-        df = pd.read_excel('/Users/nachomondino/Desktop/df_selected_train.xlsx')  # --> entreno modelo con una parte de df_selected...
-        print(df.shape)
+
+        # Levanto df_selected
+        df_selected = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
+
+        # Sin shuffle (bien) --> prec train = 84.2%  prec_test = 85.6%
+        # df_train, df_test = test_design.separate_train_and_test(df_selected, porc_corte=porc_corte)
+
+        # Sin shuffle separando sin separate_train_and_test() (mal)  --> prec train = 79.5%  prec_test = 46.2%
+        corte = int(len(df_selected) * 0.8)
+        df_train, df_test = df_selected.loc[:corte, :], df_selected.loc[corte:, :]
+
+        # Con shuffle (bien) --> prec train = 84.2%   prec_test = 86.6%
+        # df_selected_shuf = pd.DataFrame(shuffle(df_selected)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
+        # df_train, df_test = test_design.separate_train_and_test(df_selected_shuf, porc_corte=porc_corte)
+
+        print(df_train.shape)
+        print(df_test.shape)
+
+        # df_train = pd.read_excel('/Users/nachomondino/Desktop/df_selected_train.xlsx')  # --> entreno modelo con una parte de df_selected...
+        # print(df_train.shape)
+        # df_test = pd.read_excel('/Users/nachomondino/Desktop/df_selected_test.xlsx')  # '/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_ing/df_constructed.xlsx')
+
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
+        # df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
         modeler.assess_model(best_model, df_test)
 
-    modeling_prueba = True  # Cambio a True cuando corro solo prediccion con los datos de 2023...
+    modeling_prueba = False  # Cambio a True cuando corro solo prediccion con los datos de 2023...
     # Al df_selected lo separo en dos --> uno sera mi df_train y el otro sera mi df_test...
 
     if modeling_prueba:  # La cagada es que tengo que el modelo fue entrenado con ciertas variables y el nuevo df debe tener esas mismas...
@@ -383,6 +408,11 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/modelo.pkl", "rb"))
 
         modeler.assess_model(loaded_model, df, export=False)
+
+
+    # df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
+    # df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
+    # df.to_excel('/Users/nachomondino/Desktop/df_selected_shuf.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
