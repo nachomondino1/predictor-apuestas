@@ -245,6 +245,33 @@ class Modeling:
 
         return df_train, df_test
 
+    def train(self, df_train):
+
+        # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
+        df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+        print(df_train_without_odds.shape)
+
+        # Dividir los datos en conjunto de entrenamiento y prueba
+        df_train_fold, df_test_fold = test_design.separate_train_and_test(df_train_without_odds, porc_corte=0.8)
+        print(df_train_fold.shape)
+        print(df_test_fold.shape)
+
+        X_train, y_train = df_train_fold.drop(self.var_resp, axis=1), df_train_fold[self.var_resp]
+        X_test, y_test = df_test_fold.drop(self.var_resp, axis=1), df_test_fold[self.var_resp]
+
+        model = DecisionTreeClassifier(max_depth=30)
+
+        model.fit(X_train, y_train)
+
+        # Realizar predicciones en el conjunto de validación
+        y_pred = model.predict(X_test)
+
+        # Calcular la precisión y el roi en el conjunto de validación
+        accuracy = accuracy_score(y_test, y_pred) * 100
+        print("Precision con datos de prueba:", accuracy)
+
+        return model
+
     def select_best_model(self, df_train, l_modelos, best_params=False, k=10, export=True):
         """
         Selecciona el mejor modelo a partir de la precision
@@ -316,7 +343,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     # Definicion de variables
     data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "inglaterra"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
     prepare, modeler = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
 
@@ -343,10 +370,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         print(" Data preparation ".center(120, "#"))
 
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/entidad_partido_inglaterra.xlsx')
-
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(df_part, export=export)  # df_part, df_jug,
+        df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
         df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
         df = prepare.integrate_data(df_part, df_jug, export=export)
         df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
@@ -355,7 +380,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.9  # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
+        porc_corte = 0.01 # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
         best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
         k = 2  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
@@ -369,25 +394,12 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                      ]
         print(" Modeling ".center(120, "#"))
 
-        # Levanto df_selected
-        df_selected = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
-
-        # Sin shuffle separando sin separate_train_and_test() (mal)  --> prec train = 79.5%  prec_test = 46.2%
-        print("Sin hacer shuffle antes de separar en train y test (es decir, no uso separate_train_and_test() puesto que esta ya tiene el shuffle incorporado)")
-        corte = int(len(df_selected) * 0.9)
-        df_train, df_test = df_selected.loc[:corte, :], df_selected.loc[corte:, :]
-
-        # Con shuffle (bien) --> prec train = 84.2%  prec_test = 85.6%
-        # print("Haciendo shuffle antes de separar en train y test (es decir, puedo usar solo uso separate_train_and_test() o inclusive hacer un shuffle antes)")
-        # df_train, df_test = test_design.separate_train_and_test(df_selected, porc_corte=porc_corte)
-
-        print('Dataset original: ', df_selected.shape)
-        print('Dataset train shape: ', df_train.shape)
-        print('Dataset test shape: ', df_test.shape)
+        df_selected = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_selected.xlsx')
 
         # Analizo los datos
-        # df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
-        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=False)
+        df_train, df_test = modeler.generate_test_design(df_selected, porc_corte=porc_corte, export=False)
+        best_model = modeler.train(df_train)
+        # best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=False)
         modeler.assess_model(best_model, df_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
