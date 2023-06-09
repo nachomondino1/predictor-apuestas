@@ -2,23 +2,21 @@ import pandas as pd
 from dspy.data_preparation.text_preparation import TextPreparation
 from sklearn.ensemble import RandomForestRegressor
 
-
-def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
+def prepare_text_columns(df, l_col_to_except):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
     '''
     Prepara el texto de las columnas que contengan strings.
     :param df: Dataframe.
     :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
     '''
-    # Convertir variables categoricas string a categoricas numericas
-    for var in df.select_dtypes(include=['object']).columns:  # drop('id', axis=1)
+    # Creo objeto de la clase
+    tp = TextPreparation(df, l_col_to_except)
 
-        prepare_text = TextPreparation(textos=df[var])
-        prepare_text.to_lower()
-        prepare_text.delete_accent()
-        prepare_text.delete_special_characters()
-        df[var] = prepare_text.textos
-
-    return df
+    # Uso metodos de la clase
+    tp.to_lower()
+    tp.delete_accent()
+    tp.delete_special_characters()
+    tp.delete_punctuation()  # no se... antes no lo hacia porque extrai los nombre en el tipo "N.Genez"
+    return tp.df
 
 def clean_teams_names(df):
     """
@@ -27,14 +25,17 @@ def clean_teams_names(df):
     :return: Dataframe con nombres de equipos modificados y limpios
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
-    df['equipo_loc'] = df['equipo_loc'].str.replace('vencedor', '').str.replace('equipo que avanza', '').str.strip()
-    df['equipo_vis'] = df['equipo_vis'].str.replace('vencedor', '').str.replace('equipo que avanza', '').str.strip()
+    df['equipo_loc'] = df['equipo_loc'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
+    df['equipo_vis'] = df['equipo_vis'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
 
-    # Cambiar nombres de equipos
-    d = {'gimnasia l.p.': 'gimnasia la plata', 'atl. tucuman': 'atletico tucuman', 'argentinos jrs.': 'argentinos juniors',
-         'boca jrs.': 'boca juniors', 'estudiantes l.p.': 'estudiantes'}
+    # Quitar abreviaturas en nombres de equipos (NO FUNCIONA...)
+    d_abrev_team_names = {'l p ': 'la plata', 'atl ': 'atletico ', ' jrs': ' juniors', ' utd': ' united'}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
+    df['equipo_loc'] = df['equipo_loc'].replace(d_abrev_team_names, regex=True).str.strip()
+    df['equipo_vis'] = df['equipo_vis'].replace(d_abrev_team_names, regex=True).str.strip()
 
-    for equipo_part, equipo_jug in d.items():
+    # Reemplazo nombres enteros de equipos para que sea igual a los de la entidad jugador
+    d_team_names = {'qpr': 'queens park rangers',  'wolves': 'wolverhampton', 'west brom': 'west bromwich albion'}
+    for equipo_part, equipo_jug in d_team_names.items():
         df['equipo_loc'] = df['equipo_loc'].replace(equipo_part, equipo_jug)
         df['equipo_vis'] = df['equipo_vis'].replace(equipo_part, equipo_jug)
 
@@ -84,12 +85,13 @@ def treat_nan_values(df, type):
 
 def prueba():
     # Levanto dataset
-    df_part = pd.read_excel('data/df_part_formated.xlsx')
-    df_jug =pd.read_excel('data/df_jug_formated.xlsx')
+    df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/inglaterra/df_part_formated.xlsx')
+    df_jug =pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/inglaterra/df_jug_formated.xlsx')
 
     # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-    df_part = prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-    df_jug = prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+    l_col_to_except = ['id', 'temporada']
+    df_part = prepare_text_columns(df_part, l_col_to_except)
+    df_jug = prepare_text_columns(df_jug, l_col_to_except)
 
     # Remuevo strings adicionales en los nombres de los equipos
     df_part = clean_teams_names(df_part)
@@ -101,3 +103,24 @@ def prueba():
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     prueba()
+
+
+"""
+def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
+    '''
+    Prepara el texto de las columnas que contengan strings.
+    :param df: Dataframe.
+    :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
+    '''
+    # Convertir variables categoricas string a categoricas numericas
+    for var in df.select_dtypes(include=['object']).columns:  # drop('id', axis=1)
+
+        prepare_text = TextPreparation(textos=df[var])
+        prepare_text.to_lower()
+        prepare_text.delete_accent()
+        prepare_text.delete_special_characters()
+        prepare_text.delete_punctuation()  # no se... antes no lo hacia porque extrai los nombre en el tipo "N.Genez"
+        df[var] = prepare_text.textos
+
+    return df
+"""
