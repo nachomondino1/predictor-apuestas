@@ -8,6 +8,65 @@ from modeling.build_model import train_model
 import warnings
 from sklearn.preprocessing import scale
 
+
+def eliminar_columnas_correlacionadas(df, var_resp, umbral):
+
+    columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
+
+    # Calculo matriz de correlacion
+    df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
+
+    # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
+    df_corr = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0)
+    df_corr_var_obj = df_correlacion[var_resp].drop(var_resp, axis=0)
+
+    # Recorrer las columnas de la matriz de correlación
+    for i in range(len(df_corr.columns)):
+        for j in range(i+1, len(df_corr.columns)):
+
+            # Si hay alta correlacion
+            if df_corr.iloc[i, j] > umbral:
+
+                # Busco correlacion de cada columna con variable objetivo
+                col1, col2 = df_corr.columns[i], df_corr.columns[j]
+                # print(col1, col2)
+                corr_col1, corr_col2 = df_corr_var_obj.loc[col1], df_corr_var_obj.loc[col2]
+                # print(corr_col1, corr_col2)
+
+                # Elimino aquella columna con menor correlacion con la variable objetivo
+                if corr_col2 > corr_col1:
+                    columnas_eliminar.add(col1)
+                    # print(f"Variable a eliminar: {col1}")
+                else:
+                    columnas_eliminar.add(col2)
+                    # print(f"Variable a eliminar: {col2}")
+
+    print(f"Columnas a eliminar por correlacion: {columnas_eliminar}")
+    return list(columnas_eliminar)
+
+def feature_selection(df, var_resp, percentil):
+
+    # Definicion de varibles
+    df_importance = pd.DataFrame(columns=['analisis_uni', 'random'], index=df.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1).columns)  # que cada analisis devuelva las features y su importancia y guardarlo en un Dataframe...
+    # dt = DecisionTreeClassifier(max_depth=38)
+    rf = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
+
+    # Obtengo importancia de cada variable segun distintos analisis
+    d1 = analisis_univariable(df, var_resp)  # Opción 1: Análisis univariable con tests estadísticos
+    # d2 = machine_learning_model(df, var_resp, dt, best_params, k)  # Opcion 2: Arbol
+    d3 = machine_learning_model(df, var_resp, rf,  best_params=True, k=5) # Opcion 3: Random Forest
+
+    # Guardo resultados en DataFrame
+    df_importance['analisis_uni'] = df_importance.index.map(d1)
+    # df_importance['arbol'] = df_importance.index.map(d2) # El arbol es un subconjunto de random_forest y da muy similar
+    df_importance['random'] = df_importance.index.map(d3)
+
+    # Selecciono variables mas importantes
+    l_selected_features = select_best_features_from_all_models(df_importance, percentil)
+    print(f"Columnas mas importantes: {l_selected_features}")
+
+    return l_selected_features # pd.concat([df.loc[:, l_selected_features], df.loc[:, ['odds_loc', 'odds_emp', 'odds_vis', var_resp]]], axis=1)
+
 def analisis_univariable(df, var_resp):
 
     # Definicion de variables
@@ -50,7 +109,7 @@ def analisis_univariable(df, var_resp):
     graficar_importancia_atrib(l_features, l_scores)
     return d
 
-def machine_learning_model(df, var_resp, modelo, best_params=True, k=10):
+def machine_learning_model(df, var_resp, modelo, best_params=True, k=10):  # Lo dejo en funcion? Si ya llama a train_model...
 
     # Definicion de variables
     d = {}
@@ -72,7 +131,6 @@ def machine_learning_model(df, var_resp, modelo, best_params=True, k=10):
 
 def graficar_importancia_atrib(l_features, l_importance):
 
-    # Crear gráfico de barras
     # Crear figura
     fig = go.Figure()  # fig = go.Figure(data=go.Bar(x=l_features, y=l_importance, orientation='h'))
 
@@ -112,60 +170,6 @@ def select_best_features_from_all_models(df_importance, percentil):
     # Seleccionar los índices donde el valor de la columna "suma_de_imp" es mayor al umbral
     l_selected_features = list(df_normalized.loc[df_normalized['suma_de_imp'] > valor_percentil].index)
     return l_selected_features
-
-def feature_selection(df, var_resp, percentil):
-
-    # Definicion de varibles
-    df_importance = pd.DataFrame(columns=['analisis_uni', 'random'], index=df.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1).columns)  # que cada analisis devuelva las features y su importancia y guardarlo en un Dataframe...
-    # dt = DecisionTreeClassifier(max_depth=38)
-    rf = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
-
-    # Obtengo importancia de cada variable segun distintos analisis
-    d1 = analisis_univariable(df, var_resp)  # Opción 1: Análisis univariable con tests estadísticos
-    # d2 = machine_learning_model(df, var_resp, dt, best_params, k)  # Opcion 2: Arbol
-    d3 = machine_learning_model(df, var_resp, rf,  best_params=True, k=5) # Opcion 3: Random Forest
-
-    # Guardo resultados en DataFrame
-    df_importance['analisis_uni'] = df_importance.index.map(d1)
-    # df_importance['arbol'] = df_importance.index.map(d2) # El arbol es un subconjunto de random_forest y da muy similar
-    df_importance['random'] = df_importance.index.map(d3)
-
-    # Selecciono variables mas importantes
-    l_selected_features = select_best_features_from_all_models(df_importance, percentil)
-    print(f"Columnas mas importantes: {l_selected_features}")
-
-    return l_selected_features # pd.concat([df.loc[:, l_selected_features], df.loc[:, ['odds_loc', 'odds_emp', 'odds_vis', var_resp]]], axis=1)
-
-def eliminar_columnas_correlacionadas(df_correlacion, variable_objetivo, umbral):
-    columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
-
-    # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
-    df_corr = df_correlacion.drop(variable_objetivo, axis=1).drop(variable_objetivo, axis=0).abs()
-    df_corr_var_obj = df_correlacion[variable_objetivo].drop(variable_objetivo, axis=0).abs()
-
-    # Recorrer las columnas de la matriz de correlación
-    for i in range(len(df_corr.columns)):
-        for j in range(i+1, len(df_corr.columns)):
-
-            # Si hay alta correlacion
-            if df_corr.iloc[i, j] > umbral:
-
-                # Busco correlacion de cada columna con variable objetivo
-                col1, col2 = df_corr.columns[i], df_corr.columns[j]
-                # print(col1, col2)
-                corr_col1, corr_col2 = df_corr_var_obj.loc[col1], df_corr_var_obj.loc[col2]
-                # print(corr_col1, corr_col2)
-
-                # Elimino aquella columna con menor correlacion con la variable objetivo
-                if corr_col2 > corr_col1:
-                    columnas_eliminar.add(col1)
-                    # print(f"Variable a eliminar: {col1}")
-                else:
-                    columnas_eliminar.add(col2)
-                    # print(f"Variable a eliminar: {col2}")
-
-    print(f"Columnas a eliminar por correlacion: {columnas_eliminar}")
-    return list(columnas_eliminar)
 
 def prueba():
     warnings.filterwarnings('ignore')

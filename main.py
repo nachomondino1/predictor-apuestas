@@ -176,18 +176,22 @@ class DataPreparation:  # 17.4 min
         print("\nSeleccionado datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+        # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'pais'], axis=1)
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
 
         # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
-        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
+        # l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
+        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df.drop('temporada', axis=1), self.var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
-        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
+        # l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
+        l_selected_features = select_data.feature_selection(df.dropna().drop('temporada', axis=1), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
+        # df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
+        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp, 'temporada']]
 
         # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
         df = clean_data.treat_nan_values(df, type=treat_nan)
@@ -227,17 +231,15 @@ class Modeling:
         print(f"Shape dataframe original: {df.shape}")
 
         # # Balanceamos segun variable respuesta   --> no es el problema. Las precisiones son peores sin el pero   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
-        # X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
-        # df_balanced = pd.concat([X_bal, y_bal], axis=1)
-        # print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
+        X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
+        df_balanced = pd.concat([X_bal, y_bal], axis=1)
+        print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
 
-        # Shuffle dataset  --> para evitar que todos los partidos creados artificialmente vayan en df_test...
-        # df_balanced = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
-        # print(f"Shape dataframe original: {df_balanced.shape}")
+        # Shuffle dataset (si bien separate_train_and_test() hará shuffle, me quiero asegurar siempre de evitar cualquier sesgo tras el agregado de filas por el balanceo)
+        df_balanced = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
 
         # Separo conjunto de datos en train y test --> tampoco es el problema...
-        # df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
-        df_train, df_test = test_design.separate_train_and_test(df, porc_corte=porc_corte)
+        df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
         print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
 
         if export:
@@ -317,7 +319,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     # Definicion de variables
     data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "inglaterra"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
     prepare, modeler = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
 
@@ -345,16 +347,16 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
-        df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
-        df = prepare.integrate_data(df_part, df_jug, export=export)
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
-        prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
+        # df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
+        # df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
+        # df = prepare.integrate_data(df_part, df_jug, export=export)
+        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.8  # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
+        porc_corte = 0.9  # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
         best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
         k = 2  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
@@ -366,53 +368,44 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                      GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
                      # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
                      ]
-
         print(" Modeling ".center(120, "#"))
 
-
         # Levanto df_selected
-        df_selected = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
+        df_selected = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
 
-        # Sin shuffle (bien) --> prec train = 84.2%  prec_test = 85.6%
-        # df_train, df_test = test_design.separate_train_and_test(df_selected, porc_corte=porc_corte)
+        # Balanceamos segun variable respuesta
+        oversampler = RandomOverSampler()
+        y_temp = df_selected['temporada']
+        X, y = df_selected.drop([var_resp, 'temporada'], axis=1), df_selected[var_resp]
+        X_bal, y_bal = oversampler.fit_resample(X, y)
+        df_balanced = pd.concat([X_bal, y_bal], axis=1)
+        df_balanced['temporada'] = y_temp
+
+        # Luego de hacer un shuffle, separo train y test segun temporada y luego elimino la variable
+        df_selected_shuf = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
+        df_train = df_selected_shuf[df_selected_shuf['temporada'] <= 2]
+        df_test = df_selected_shuf[df_selected_shuf['temporada'] == 3]
+        df_train = df_train.drop('temporada', axis=1)
+        df_test = df_test.drop('temporada', axis=1)
 
         # Sin shuffle separando sin separate_train_and_test() (mal)  --> prec train = 79.5%  prec_test = 46.2%
-        corte = int(len(df_selected) * 0.8)
-        df_train, df_test = df_selected.loc[:corte, :], df_selected.loc[corte:, :]
+        # print("Sin hacer shuffle antes de separar en train y test (es decir, no uso separate_train_and_test() puesto que esta ya tiene el shuffle incorporado)")
+        # corte = int(len(df_selected) * 0.9)
+        # df_train, df_test = df_selected.loc[:corte, :], df_selected.loc[corte:, :]
 
-        # Con shuffle (bien) --> prec train = 84.2%   prec_test = 86.6%
+        # Con shuffle (bien) --> prec train = 84.2%  prec_test = 85.6%          # Con shuffle (bien) --> prec train = 84.2%   prec_test = 86.6%
+        # print("Haciendo shuffle antes de separar en train y test (es decir, puedo usar solo uso separate_train_and_test() o inclusive hacer un shuffle antes)")
+        # df_train, df_test = test_design.separate_train_and_test(df_selected, porc_corte=porc_corte)
         # df_selected_shuf = pd.DataFrame(shuffle(df_selected)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
         # df_train, df_test = test_design.separate_train_and_test(df_selected_shuf, porc_corte=porc_corte)
-
-        print(df_train.shape)
-        print(df_test.shape)
-
-        # df_train = pd.read_excel('/Users/nachomondino/Desktop/df_selected_train.xlsx')  # --> entreno modelo con una parte de df_selected...
-        # print(df_train.shape)
-        # df_test = pd.read_excel('/Users/nachomondino/Desktop/df_selected_test.xlsx')  # '/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_ing/df_constructed.xlsx')
-
+        print('Dataset original: ', df_selected.shape)
+        print('Dataset train shape: ', df_train.shape)
+        print('Dataset test shape: ', df_test.shape)
 
         # Analizo los datos
         # df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
         modeler.assess_model(best_model, df_test)
-
-    modeling_prueba = False  # Cambio a True cuando corro solo prediccion con los datos de 2023...
-    # Al df_selected lo separo en dos --> uno sera mi df_train y el otro sera mi df_test...
-
-    if modeling_prueba:  # La cagada es que tengo que el modelo fue entrenado con ciertas variables y el nuevo df debe tener esas mismas...
-
-        # Levanto dataset de testeo y modelo
-        df = pd.read_excel('/Users/nachomondino/Desktop/df_selected_test.xlsx')  # '/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_ing/df_constructed.xlsx')
-        print(df.shape)  # Tiene que ser 700
-        loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/modelo.pkl", "rb"))
-
-        modeler.assess_model(loaded_model, df, export=False)
-
-
-    # df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
-    # df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
-    # df.to_excel('/Users/nachomondino/Desktop/df_selected_shuf.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

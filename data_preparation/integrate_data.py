@@ -5,7 +5,7 @@ import warnings
 import time
 
 
-def player_data_in_match(df_part, df_jug):
+def player_data_in_match(df_part, df_jug):  # Fallo para inglaterra?, uruguay y brasil... por que? # Revisa fechas en los que hay datos de jugadores solo de river y boca (antes de 2014 creo)
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de edad, overall rating,  valor de mercado y altura del equipo titular,
@@ -14,16 +14,17 @@ def player_data_in_match(df_part, df_jug):
     :return:
     """
     # Definicion de variables
-    pais = df_jug['pais'].unique()[0]
+    pais = df_part['pais'].unique()[0]
     l_titularidad = ['tit', 'sup', 'aus']  # tengo que agregar 'sup_ing' pero se debe procesar con sup...
     l_condicion = ['loc', 'vis']
     warnings.filterwarnings('ignore')
 
     # Levanto dataset de jugadores ya buscados, o bien, lo creo
-    # df_jug_encontrados = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated_jug_encontrados.xlsx')
-    # largo_orig = len(df_jug_encontrados)  # Para no exportar el dataframe de jugadores encontrados en cada iteracion. A la larga falla.
-    # if largo_orig == 0:
-    df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+    try:  # Creo que no funciona...
+        df_jug_encontrados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx')
+    except:
+        df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+    largo_orig = len(df_jug_encontrados)
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -109,9 +110,9 @@ def player_data_in_match(df_part, df_jug):
             # Elimino variables recien procesadas
             df_part = df_part.drop(l_col_to_preprocess, axis=1)
 
-            # Exporto dataframe de jugadores encontrados solo si se encontraron nuevos jugadores
-            # if len(df_jug_encontrados) > largo_orig:
-            df_jug_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx', index=False)
+    # Exporto dataframe de jugadores encontrados solo si se encontraron nuevos jugadores
+    if len(df_jug_encontrados) > largo_orig:
+        df_jug_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx', index=False)
     return df_part
 
 def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):
@@ -164,14 +165,16 @@ def prueba():
     start = time.time()
     print("\nIntegrando los datos...")
 
+    pais = 'inglaterra'
+
     # Levanto datasets
-    df_part = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_uruguay/df_part_cleaned.xlsx")
-    df_jug = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data_uruguay/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
+    df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_cleaned.xlsx")
+    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(df_part.head())
 
     # Integro datasets
     df_integrated = player_data_in_match(df_part, df_jug)
-    df_integrated.to_excel('/Users/nachomondino/Desktop/df_integrated.xlsx', index=False)
+    df_integrated.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
 
     end = time.time()
     print(f"Integracion de datos en {(end - start) / 60:.1f} minutos")

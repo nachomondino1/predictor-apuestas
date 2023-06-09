@@ -65,7 +65,7 @@ def extract_flashscore():
             print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
             # POR PAGINA (TEMPORADA) DE PAGINACION
-            for url_temp in l_urls_temporadas:
+            for url_temp in l_urls_temporadas[4:5]:  # solo 2018/19
 
                 # Ingreso a pagina de temporada e imprimo año de la temporada
                 crawler.driver.get(url_temp)
@@ -205,10 +205,10 @@ def extract_flashscore():
                         print(f"Partido recolectado en {(end - start):.1f} segundos")
 
                 # Guardo partidos no extraidos de la temporada (por seguridad)
-                df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/{competicion_form}_{temp_year.replace("/","_")}_{pais}.xlsx', index=False)
+                df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/{competicion_form}_{temp_year.replace("/","_")}_{pais}.xlsx', index=False)
 
         # Guardado de archivo excel en computadora
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_partido_{pais}_prueba.xlsx',index=False)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/{pais}/entidad_partido_prueba.xlsx',index=False)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
@@ -240,3 +240,7 @@ if __name__ == "__main__":
 
 # Puedo eficientizar el codigo (en entrenadores y demas) agregando la posibilidad de un xpath alternativo en extract_tag...
 # Solucionar el tema de que cuando falla un campo, tengo que volver a extraer tod@... Dar la posibildiad de recorrer los ids ya extraidos y extraer de nuevo el campo que falló
+
+
+# Podria poner la extraccion de datos, campos mal extraidos y proximos partidos junto en el mismo archivo...
+# Poner argumentos en extract_flashscore...

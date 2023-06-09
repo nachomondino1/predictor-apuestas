@@ -46,8 +46,6 @@ def convert_valor_mercado_to_int(df):
 
 def convert_columns_to_int(df):
 
-    pais = df['pais'].unique()[0]
-
     # Convertir variables categoricas string a categoricas numericas
     le = LabelEncoder()
 
@@ -60,7 +58,7 @@ def convert_columns_to_int(df):
             etiquetas = le.classes_
             codigos = le.transform(etiquetas)
             df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
-            df_etiquetas.to_excel(f"/Users/nachomondino/Documents/GitHub/predictor-puestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx", index=False)
+            df_etiquetas.to_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_etiquetas_equipo_ganador.xlsx", index=False)
 
     return df
 

@@ -1,34 +1,19 @@
 import pandas as pd
 import numpy as np
 import warnings
-
-# Seleccion de hiperparametros
-from sklearn.model_selection import GridSearchCV
-
-# Modelos (solo lo uso para pruebas)
-# from sklearn.tree import DecisionTreeClassifier, plot_tree
-# import xgboost as xgb  # XGBoost
-# from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-# import lightgbm as lgb  # Gradient Boosting
-# from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
-# from sklearn.svm import SVC  # SVM
-# from sklearn.neural_network import MLPClassifier
-
-# Metricas
-from sklearn.metrics import accuracy_score
-from modeling.asses_model import calculate_ROI
-
+from sklearn.model_selection import GridSearchCV  # Seleccion de hiperparametros
+from sklearn.metrics import accuracy_score  # Metrica de precision
+from modeling.asses_model import calculate_ROI  # Metrica de roi
 # from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 
-def train_model(df_train, var_resp, model, pais, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
+def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
     # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
     df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
 
     # Dividir los datos en conjunto de entrenamiento y prueba
     X_train, y_train = df_train_without_odds.drop(var_resp, axis=1), df_train_without_odds[var_resp]
-    print(X_train.columns)  # no deberia tener "equipo_ganador"
 
     # Verificar si se deben buscar los mejores hiperparámetros
     if best_params:
@@ -53,13 +38,13 @@ def train_model(df_train, var_resp, model, pais, best_params=False, k=5):  # ant
         # Realizar predicciones en el conjunto de validación
         y_pred = model.predict(X_test_fold)
 
-        # Guardo predicciones
-        df_res = X_test_fold.copy()
+        # Guardo predicciones  # Podria llegar a haber estado mal antes, veremos si la precision baja...
+        df_res = df_train[start:end]  # Necesito y_real y confirmo que es igual a pd.concat([X_test_fold, y_test_fold], axis=1) pero con las odds
         df_res['y_pred'] = y_pred
 
         # Calcular la precisión y el roi en el conjunto de validación
         accuracy = accuracy_score(y_test_fold, y_pred) * 100
-        roi = calculate_ROI(df_res, var_resp, 'y_pred', pais)
+        roi = calculate_ROI(df_res, var_resp, 'y_pred')
         scores.append(accuracy)
         rois.append(roi)
         # print(f'Fold {i} --> Precision: {accuracy:.1f}%  ROI: {roi:.1f}%')
@@ -107,15 +92,23 @@ def select_best_hiperparameters(X_train, y_train, model, k):
 
 def prueba():
 
+    from sklearn.tree import DecisionTreeClassifier, plot_tree
+    import xgboost as xgb  # XGBoost
+    from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+    import lightgbm as lgb  # Gradient Boosting
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
+    from sklearn.svm import SVC  # SVM
+    from sklearn.neural_network import MLPClassifier
+
     # Levanto dataset
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_selected_manual.xlsx')
 
     warnings.filterwarnings("ignore")
     best_acurracy = 0
     l_modelos = [DecisionTreeClassifier(max_depth=30),
-                 # RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
-                 # xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
-                 # LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
+                 RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
+                 xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=len(y.unique()), max_depth=20),
+                 LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
                  SVC(kernel='rbf', decision_function_shape='ovo'),
                  MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling',
                                max_iter=300),
