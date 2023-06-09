@@ -49,8 +49,8 @@ class DataPreparation:  # 17.4 min
         print("\nFormateando los datos...")
 
         # Entidad partido: fecha, posesion y es_copa
-        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
-        df_part = format_data.convert_posesion_to_int(df_part)
+        # df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        df_part = format_data.convert_posesion_to_int(df_part)  # Podria usar la limpieza de punct de tp y luego convertir a int64 pero as al pedo
         # df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
 
         # Entidad jugador: fecha y valor de mercado
@@ -82,8 +82,8 @@ class DataPreparation:  # 17.4 min
         print("\nLimpiando los datos...")
 
         # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-        df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_part = clean_data.prepare_text_columns(df_part, l_col_to_except=['id', 'temporada'])  # df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id'])  # df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
         # Remuevo strings adicionales en los nombres de los equipos
         df_part = clean_data.clean_teams_names(df_part)
@@ -92,12 +92,12 @@ class DataPreparation:  # 17.4 min
         print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part.to_excel(f'./data_preparation/data/{self.pais}/df_part_cleaned.xlsx', index=False)
-            df_jug.to_excel(f'./data_preparation/data/{self.pais}/df_jug_cleaned.xlsx', index=False)
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_part_cleaned.xlsx', index=False)
+            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_jug_cleaned.xlsx', index=False)
 
         return df_part,df_jug
 
-    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)  # Problema para integrar brasil y uruguay
+    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -118,7 +118,7 @@ class DataPreparation:  # 17.4 min
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_integrated.to_excel(f'./data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
+            df_integrated.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
 
         return df_integrated
 
@@ -157,7 +157,7 @@ class DataPreparation:  # 17.4 min
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel(f'./data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
+            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
 
         return df
 
@@ -176,22 +176,19 @@ class DataPreparation:  # 17.4 min
         print("\nSeleccionado datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
-        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'pais'], axis=1)
+        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
 
         # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
-        # l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
-        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df.drop('temporada', axis=1), self.var_resp, thr_corr)
+        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        # l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
-        l_selected_features = select_data.feature_selection(df.dropna().drop('temporada', axis=1), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
-        # df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
-        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp, 'temporada']]
+        # df.to_excel('/Users/nachomondino/Desktop/df_selected_antes_drop_na.xlsx', index=False)
+        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
+        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
 
         # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
         df = clean_data.treat_nan_values(df, type=treat_nan)
@@ -200,7 +197,7 @@ class DataPreparation:  # 17.4 min
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel(f'./data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
+            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
 
         return df
 
@@ -346,12 +343,14 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         print(" Data preparation ".center(120, "#"))
 
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/entidad_partido_inglaterra.xlsx')
+
         # Preparo el dataset para el analisis
-        # df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
-        # df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
-        # df = prepare.integrate_data(df_part, df_jug, export=export)
-        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
-        prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
+        df_part, df_jug = prepare.format_data(df_part, export=export)  # df_part, df_jug,
+        df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
+        df = prepare.integrate_data(df_part, df_jug, export=export)
+        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
@@ -373,38 +372,22 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # Levanto df_selected
         df_selected = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')  # --> entreno modelo con una parte de df_selected...
 
-        # Balanceamos segun variable respuesta
-        oversampler = RandomOverSampler()
-        y_temp = df_selected['temporada']
-        X, y = df_selected.drop([var_resp, 'temporada'], axis=1), df_selected[var_resp]
-        X_bal, y_bal = oversampler.fit_resample(X, y)
-        df_balanced = pd.concat([X_bal, y_bal], axis=1)
-        df_balanced['temporada'] = y_temp
-
-        # Luego de hacer un shuffle, separo train y test segun temporada y luego elimino la variable
-        df_selected_shuf = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
-        df_train = df_selected_shuf[df_selected_shuf['temporada'] <= 2]
-        df_test = df_selected_shuf[df_selected_shuf['temporada'] == 3]
-        df_train = df_train.drop('temporada', axis=1)
-        df_test = df_test.drop('temporada', axis=1)
-
         # Sin shuffle separando sin separate_train_and_test() (mal)  --> prec train = 79.5%  prec_test = 46.2%
-        # print("Sin hacer shuffle antes de separar en train y test (es decir, no uso separate_train_and_test() puesto que esta ya tiene el shuffle incorporado)")
-        # corte = int(len(df_selected) * 0.9)
-        # df_train, df_test = df_selected.loc[:corte, :], df_selected.loc[corte:, :]
+        print("Sin hacer shuffle antes de separar en train y test (es decir, no uso separate_train_and_test() puesto que esta ya tiene el shuffle incorporado)")
+        corte = int(len(df_selected) * 0.9)
+        df_train, df_test = df_selected.loc[:corte, :], df_selected.loc[corte:, :]
 
-        # Con shuffle (bien) --> prec train = 84.2%  prec_test = 85.6%          # Con shuffle (bien) --> prec train = 84.2%   prec_test = 86.6%
+        # Con shuffle (bien) --> prec train = 84.2%  prec_test = 85.6%
         # print("Haciendo shuffle antes de separar en train y test (es decir, puedo usar solo uso separate_train_and_test() o inclusive hacer un shuffle antes)")
         # df_train, df_test = test_design.separate_train_and_test(df_selected, porc_corte=porc_corte)
-        # df_selected_shuf = pd.DataFrame(shuffle(df_selected)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
-        # df_train, df_test = test_design.separate_train_and_test(df_selected_shuf, porc_corte=porc_corte)
+
         print('Dataset original: ', df_selected.shape)
         print('Dataset train shape: ', df_train.shape)
         print('Dataset test shape: ', df_test.shape)
 
         # Analizo los datos
         # df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
-        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
+        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=False)
         modeler.assess_model(best_model, df_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

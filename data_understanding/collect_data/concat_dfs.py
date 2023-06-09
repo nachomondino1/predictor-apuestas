@@ -1,9 +1,9 @@
 import pandas as pd
 
 # Levanto datasets a concatenar
-df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/liga-profesional_2022_argentina.xlsx')
-df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/liga-profesional_2017_2018_argentina.xlsx')
-df_3 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/liga-profesional_2003_2004_argentina.xlsx')
+df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/inglaterra/entidad_partido.xlsx')
+df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/premier-league_2018_2019_inglaterra.xlsx')
+df_3 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/premier-league_2006_2007_inglaterra.xlsx')
 
 # Imprimo caracteristicas de cada dataframe a concatenar
 print(df_1.head(1))
@@ -20,4 +20,4 @@ df_concat = pd.concat([df_1, df_2, df_3], axis=0)
 print(df_concat.head(1))
 print(df_concat.shape)
 
-df_concat.to_excel('./data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx', index=False)
+df_concat.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/entidad_partido_inglaterra.xlsx', index=False)
