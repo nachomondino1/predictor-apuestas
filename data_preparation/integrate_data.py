@@ -4,6 +4,14 @@ from fuzzywuzzy import fuzz
 import warnings
 import time
 
+# Si uso los datos de jugadores de una sola liga a la vez, podria sacar la condicion del equipo?. En arg, tal vez es mas dificil no? por fernandez, diaz, etc
+# Tiene un par de problemas con algunos nombres en especifico como:
+# moreno alex <--> Alexandre Moreno Lopera
+# white ben <--> Benjamin White
+# casemiro <--> carlos henrique venancio casimiro
+# aguerd naif <--> nayef aguerd
+# lucas paqueta <--> Lucas Tolentino Coelho de Lima
+# willock joseph <--> joe willock
 
 def player_data_in_match(df_part, df_jug):  # Fallo para inglaterra?, uruguay y brasil... por que? # Revisa fechas en los que hay datos de jugadores solo de river y boca (antes de 2014 creo)
     """
@@ -20,11 +28,15 @@ def player_data_in_match(df_part, df_jug):  # Fallo para inglaterra?, uruguay y 
     warnings.filterwarnings('ignore')
 
     # Levanto dataset de jugadores ya buscados, o bien, lo creo
-    try:  # Creo que no funciona...
-        df_jug_encontrados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx')
-    except:
-        df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
-    largo_orig = len(df_jug_encontrados)
+    # try:  # cuidado que si mejoras la extraccion, el cambio puede que no se vea puesto que levanta el df_jug_encontrado viejo...
+    #     df_jug_encontrados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx')
+    # except:
+    df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+    # largo_orig = len(df_jug_encontrados)
+
+    # Prueba
+    df_jug_encontrados_viejo = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx')
+    print(len(df_jug_encontrados_viejo))
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -65,6 +77,32 @@ def player_data_in_match(df_part, df_jug):  # Fallo para inglaterra?, uruguay y 
                         print(f'\t- Año: {year_ent_part}')
                         print('\nBuscando jugador en entidad partido...')
 
+                        # PRUEBA
+                        jugador_encontrado_viejo = df_jug_encontrados_viejo[
+                            (df_jug_encontrados_viejo['nombre'] == nombre_jug_ent_part) &
+                            (df_jug_encontrados_viejo['equipo'] == equipo_jug_ent_part) &
+                            (df_jug_encontrados_viejo['anio'] == year_ent_part)].head(1)
+
+                        print("\nResultados viejos")
+                        # Si el jugador no fue encontrado aun
+                        if jugador_encontrado_viejo.empty:
+                            print("El jugador no habia sido encontrado. Lo tendria que buscar...")
+
+                        # Si el jugador ya fue encontrado
+                        else:
+                            # No lo vuelvo a buscar sino que llamo los resultados de la anterior busqueda
+                            edad = jugador_encontrado_viejo['edad'].values[0]
+                            altura = jugador_encontrado_viejo['altura'].values[0]
+                            overall_rating = jugador_encontrado_viejo['overall_rating'].values[0]
+                            valor_mercado = jugador_encontrado_viejo['valor_mercado'].values[0]
+                            str_encontrado = jugador_encontrado_viejo['str_encont'].values[0]
+                            print('El jugador habia sido encontrado, uso datos ya buscados')
+
+                            # Obtengo datos del jugador (overall_rating, edad, altura, valor de mercado)
+                            print(
+                                f"Mejor coincidencia vieja: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}, Valor mercado: {valor_mercado}, Jugador encontrado: {str_encontrado}")
+
+                        print("\nResultados nuevos")
                         jugador_encontrado = df_jug_encontrados[
                             (df_jug_encontrados['nombre'] == nombre_jug_ent_part) &
                             (df_jug_encontrados['equipo'] == equipo_jug_ent_part) &
@@ -87,7 +125,7 @@ def player_data_in_match(df_part, df_jug):  # Fallo para inglaterra?, uruguay y 
                             print('Evité nueva busqueda, uso datos ya buscados')
 
                         # Obtengo datos del jugador (overall_rating, edad, altura, valor de mercado)
-                        print(f"\nMejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}, Valor mercado: {valor_mercado}, Jugador encontrado: {str_encontrado}")
+                        print(f"Mejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}, Valor mercado: {valor_mercado}, Jugador encontrado: {str_encontrado}")
 
                         if edad is not None:
                             l_prom_edad.append(edad)
@@ -111,8 +149,8 @@ def player_data_in_match(df_part, df_jug):  # Fallo para inglaterra?, uruguay y 
             df_part = df_part.drop(l_col_to_preprocess, axis=1)
 
     # Exporto dataframe de jugadores encontrados solo si se encontraron nuevos jugadores
-    if len(df_jug_encontrados) > largo_orig:
-        df_jug_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx', index=False)
+    # if len(df_jug_encontrados) > largo_orig:
+    df_jug_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx', index=False)
     return df_part
 
 def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):
@@ -168,13 +206,19 @@ def prueba():
     pais = 'inglaterra'
 
     # Levanto datasets
-    df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_cleaned.xlsx")
-    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
-    print(df_part.head())
+    # df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_cleaned.xlsx")
+    # df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
+    df_part = pd.read_excel('/Users/nachomondino/Desktop/df_part_cleaned.xlsx')
+    df_jug = pd.read_excel('/Users/nachomondino/Desktop/df_jug_cleaned.xlsx', index_col=0)
+    print(df_part.head(1))
+    print(df_jug.head(1))
 
     # Integro datasets
     df_integrated = player_data_in_match(df_part, df_jug)
     df_integrated.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
+
+    # cuidado que si mejoras la extraccion, el cambio puede que no se vea puesto que levanta el df_jug_encontrado viejo...
+    # estaria bueno poder elegir cuando exportar el archivo de df_jug_encont?
 
     end = time.time()
     print(f"Integracion de datos en {(end - start) / 60:.1f} minutos")
