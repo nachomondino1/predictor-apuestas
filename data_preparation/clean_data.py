@@ -15,7 +15,7 @@ def prepare_text_columns(df, l_col_to_except):  # Podria agregar un l_except_col
     tp.to_lower()
     tp.delete_accent()
     tp.delete_special_characters()
-    tp.delete_punctuation()  # no se... antes no lo hacia porque extrai los nombre en el tipo "N.Genez"
+    tp.delete_punctuation()
     return tp.df
 
 def clean_teams_names(df):
@@ -103,24 +103,3 @@ def prueba():
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     prueba()
-
-
-"""
-def prepare_text_columns(df):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
-    '''
-    Prepara el texto de las columnas que contengan strings.
-    :param df: Dataframe.
-    :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
-    '''
-    # Convertir variables categoricas string a categoricas numericas
-    for var in df.select_dtypes(include=['object']).columns:  # drop('id', axis=1)
-
-        prepare_text = TextPreparation(textos=df[var])
-        prepare_text.to_lower()
-        prepare_text.delete_accent()
-        prepare_text.delete_special_characters()
-        prepare_text.delete_punctuation()  # no se... antes no lo hacia porque extrai los nombre en el tipo "N.Genez"
-        df[var] = prepare_text.textos
-
-    return df
-"""
