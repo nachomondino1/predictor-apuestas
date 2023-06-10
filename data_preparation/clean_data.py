@@ -29,7 +29,7 @@ def clean_teams_names(df):
     df['equipo_vis'] = df['equipo_vis'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
 
     # Quitar abreviaturas en nombres de equipos (NO FUNCIONA...)
-    d_abrev_team_names = {'l p ': 'la plata', 'atl ': 'atletico ', ' jrs': ' juniors', ' utd': ' united'}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
+    d_abrev_team_names = {' l p': ' la plata', 'atl ': 'atletico ', ' jrs': ' juniors', ' utd': ' united'}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
     df['equipo_loc'] = df['equipo_loc'].replace(d_abrev_team_names, regex=True).str.strip()
     df['equipo_vis'] = df['equipo_vis'].replace(d_abrev_team_names, regex=True).str.strip()
 
