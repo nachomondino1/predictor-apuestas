@@ -24,7 +24,9 @@ def player_data_in_match(df_part, df_jug):
         df_jug_encontrados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx')
     except:
         df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
-    largo_orig = len(df_jug_encontrados)
+    df_jug_buscados = df_jug_encontrados.copy()  # Razon de inclusion: evito que no se realicen cambios cuando en hago una mejora en integrate_data. No la hace puesto que df_jug_encontrados antes guaradaba a todos los jugadores a pesar de no habarle encontrado match. Si la nueva version encontraba match, no lo iba a usar puesto que el jugador ya aparecia en df_jug_encontrados...
+    df_jug_no_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+    largo = len(df_jug_buscados)
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -35,7 +37,7 @@ def player_data_in_match(df_part, df_jug):
             # Defino pattern y con el, selecciono las variables a procesar
             pattern = f'jug_{titularidad}_[a-z]*[_]*{condicion}_[0-9]+'  # CAMBIE EL PATTERN PARA QUE SUP Y SUP_ING SEAN PROCESADOS JUNTOS. VERIFICAR QUE FUNCIONA..
             l_col_to_preprocess = df_part.filter(regex=pattern, axis=1).columns.tolist()  #LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
-            # print(f'Columnas a procesar: {l_col_to_preprocess}')
+            print(f'Columnas a procesar: {l_col_to_preprocess}')
 
             # Por partido (fila) en entidad partido
             for i in range(len(df_part)):
@@ -43,7 +45,7 @@ def player_data_in_match(df_part, df_jug):
                 # Obtengo equipo y año del partido
                 equipo_jug_ent_part = df_part.loc[i, 'equipo_loc'] if condicion == 'loc' else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
                 year_ent_part = df_part.loc[i, 'fecha'].year   # e.g. 2023
-                # print(f' Partido Nº: {i} '.center(120, '#'))
+                print(f' Partido Nº: {i} '.center(120, '#'))
 
                 # Reinicio variables
                 l_prom_edad, l_prom_alt, l_prom_rating, l_prom_valor = [], [], [], []
@@ -58,37 +60,50 @@ def player_data_in_match(df_part, df_jug):
                     if isinstance(nombre_jug_ent_part, str):
 
                         # QUITAR UNA VEZ QUE SE QUE FUNCIONA...
-                        # print(f' {nombre_jug_ent_part} '.center(100, '-'))
-                        # print(f' JUGADOR EN ENTIDAD PARTIDO: ')
-                        # print(f'\t- Nombre: {nombre_jug_ent_part}')
-                        # print(f'\t- Equipo: {equipo_jug_ent_part}')
-                        # print(f'\t- Año: {year_ent_part}')
-                        # print('\nBuscando jugador en entidad partido...')
+                        print(f' {nombre_jug_ent_part} '.center(100, '-'))
+                        print(f' JUGADOR EN ENTIDAD PARTIDO: ')
+                        print(f'\t- Nombre: {nombre_jug_ent_part}')
+                        print(f'\t- Equipo: {equipo_jug_ent_part}')
+                        print(f'\t- Año: {year_ent_part}')
+                        print('\nBuscando jugador en entidad partido...')
 
-                        jugador_encontrado = df_jug_encontrados[
-                            (df_jug_encontrados['nombre'] == nombre_jug_ent_part) &
-                            (df_jug_encontrados['equipo'] == equipo_jug_ent_part) &
-                            (df_jug_encontrados['anio'] == year_ent_part)].head(1)
+                        jugador_buscado = df_jug_buscados[
+                            (df_jug_buscados['nombre'] == nombre_jug_ent_part) &
+                            (df_jug_buscados['equipo'] == equipo_jug_ent_part) &
+                            (df_jug_buscados['anio'] == year_ent_part)].head(1)
 
-                        # Si el jugador no fue encontrado aun
-                        if jugador_encontrado.empty:
+                        # Si el jugador no fue buscado aun
+                        if jugador_buscado.empty:
+
                             # Busco coincidencia en df_jug
                             edad, altura, overall_rating, valor_mercado, str_encontrado = find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part)
-                            df_jug_encontrados = df_jug_encontrados.append({'nombre': nombre_jug_ent_part, 'equipo': equipo_jug_ent_part, 'anio': year_ent_part, 'edad': edad, 'altura': altura, 'overall_rating': overall_rating, 'valor_mercado': valor_mercado, 'str_encont': str_encontrado}, ignore_index=True)
+                            d_data = {'nombre': nombre_jug_ent_part, 'equipo': equipo_jug_ent_part, 'anio': year_ent_part, 'edad': edad, 'altura': altura, 'overall_rating': overall_rating, 'valor_mercado': valor_mercado, 'str_encont': str_encontrado}
 
-                        # Si el jugador ya fue encontrado
+                            # Si encontró el jugador
+                            if edad is not None:
+                                # Lo guardo como encontrado
+                                df_jug_encontrados = df_jug_encontrados.append(d_data, ignore_index=True)
+                            # Si no encontró el jugador
+                            else:
+                                df_jug_no_encontrados = df_jug_no_encontrados.append(d_data, ignore_index=True)
+
+                            # Guardo jugador como buscado por mas que no lo haya encontrado
+                            df_jug_buscados = df_jug_buscados.append(d_data, ignore_index=True)
+
+                        # Si el jugador ya fue buscado
                         else:
                             # No lo vuelvo a buscar sino que llamo los resultados de la anterior busqueda
-                            edad = jugador_encontrado['edad'].values[0]
-                            altura = jugador_encontrado['altura'].values[0]
-                            overall_rating = jugador_encontrado['overall_rating'].values[0]
-                            valor_mercado = jugador_encontrado['valor_mercado'].values[0]
-                            str_encontrado = jugador_encontrado['str_encont'].values[0]
-                            # print('Evité nueva busqueda, uso datos ya buscados')
+                            edad = jugador_buscado['edad'].values[0]
+                            altura = jugador_buscado['altura'].values[0]
+                            overall_rating = jugador_buscado['overall_rating'].values[0]
+                            valor_mercado = jugador_buscado['valor_mercado'].values[0]
+                            str_encontrado = jugador_buscado['str_encont'].values[0]
+                            print('Evité nueva busqueda, uso datos ya buscados')
 
-                        # Obtengo datos del jugador (overall_rating, edad, altura, valor de mercado)
-                        # print(f"Mejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}, Valor mercado: {valor_mercado}, Jugador encontrado: {str_encontrado}")
+                        # Imprimo resultados de busqueda
+                        print(f"Mejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}, Valor mercado: {valor_mercado}, Jugador encontrado: {str_encontrado}")
 
+                        # Solo si se encontró al jugador, guardo datos para calculo de promedio
                         if edad is not None:
                             l_prom_edad.append(edad)
                             l_prom_alt.append(altura)
@@ -101,7 +116,7 @@ def player_data_in_match(df_part, df_jug):
                     df_part.loc[i, f'prom_alt_jug_{titularidad}_{condicion}'] = sum(l_prom_alt) / len(l_prom_alt)
                     df_part.loc[i, f'prom_rat_jug_{titularidad}_{condicion}'] = sum(l_prom_rating) / len(l_prom_rating)
                     df_part.loc[i, f'prom_valor_jug_{titularidad}_{condicion}'] = sum(l_prom_valor) / len(l_prom_valor)
-                    # print(f'\nPromedio de edad: {sum(l_prom_edad) / len(l_prom_edad)} \nPromedio de altura: {sum(l_prom_alt) / len(l_prom_alt)} \nPromedio de rating: {sum(l_prom_rating) / len(l_prom_rating)} \nPromedio de valor: {sum(l_prom_valor) / len(l_prom_valor)} ')
+                    print(f'\nPromedio de edad: {sum(l_prom_edad) / len(l_prom_edad)} \nPromedio de altura: {sum(l_prom_alt) / len(l_prom_alt)} \nPromedio de rating: {sum(l_prom_rating) / len(l_prom_rating)} \nPromedio de valor: {sum(l_prom_valor) / len(l_prom_valor)} ')
 
                 except ZeroDivisionError:
                     # print("Aparentemente no hay datos de jugadores para el partido")
@@ -111,10 +126,10 @@ def player_data_in_match(df_part, df_jug):
             df_part = df_part.drop(l_col_to_preprocess, axis=1)
 
     # Exporto dataframe de jugadores encontrados solo si se encontraron nuevos jugadores
-    if len(df_jug_encontrados) > largo_orig:
-        nuevos_jug = len(df_jug_encontrados)  - largo_orig
-        print(f"Reemplazo dataset de jugadores encontrados puesto que se encontraron {nuevos_jug} nuevos jugadores...")
+    if len(df_jug_encontrados) > largo:
+        print(f"Reemplazo datos puesto que se tienen {len(df_jug_encontrados) - largo} jugadores nuevos")
         df_jug_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx', index=False)
+    df_jug_no_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_no_encontrados.xlsx',index=False)
     return df_part
 
 def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):
@@ -167,13 +182,11 @@ def prueba():
     start = time.time()
     print("\nIntegrando los datos...")
 
-    pais = 'inglaterra'
+    pais = 'argentina'
 
     # Levanto datasets
-    # df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_cleaned.xlsx")
-    # df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
-    df_part = pd.read_excel('/Users/nachomondino/Desktop/df_part_cleaned.xlsx')
-    df_jug = pd.read_excel('/Users/nachomondino/Desktop/df_jug_cleaned.xlsx', index_col=0)
+    df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_cleaned.xlsx")
+    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(df_part.head(1))
     print(df_jug.head(1))
 
