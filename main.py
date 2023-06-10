@@ -245,33 +245,6 @@ class Modeling:
 
         return df_train, df_test
 
-    def train(self, df_train):
-
-        # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
-        df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        print(df_train_without_odds.shape)
-
-        # Dividir los datos en conjunto de entrenamiento y prueba
-        df_train_fold, df_test_fold = test_design.separate_train_and_test(df_train_without_odds, porc_corte=0.8)
-        print(df_train_fold.shape)
-        print(df_test_fold.shape)
-
-        X_train, y_train = df_train_fold.drop(self.var_resp, axis=1), df_train_fold[self.var_resp]
-        X_test, y_test = df_test_fold.drop(self.var_resp, axis=1), df_test_fold[self.var_resp]
-
-        model = DecisionTreeClassifier(max_depth=30)
-
-        model.fit(X_train, y_train)
-
-        # Realizar predicciones en el conjunto de validación
-        y_pred = model.predict(X_test)
-
-        # Calcular la precisión y el roi en el conjunto de validación
-        accuracy = accuracy_score(y_test, y_pred) * 100
-        print("Precision con datos de prueba:", accuracy)
-
-        return model
-
     def select_best_model(self, df_train, l_modelos, best_params=False, k=10, export=True):
         """
         Selecciona el mejor modelo a partir de la precision
@@ -337,7 +310,6 @@ class Modeling:
 
         return test_accuracy, roi
 
-
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
@@ -394,12 +366,9 @@ def main():  # La idea es poner toda el camino de los datos aqui...
                      ]
         print(" Modeling ".center(120, "#"))
 
-        df_selected = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_selected.xlsx')
-
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(df_selected, porc_corte=porc_corte, export=False)
-        best_model = modeler.train(df_train)
-        # best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=False)
+        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=False)
+        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=False)
         modeler.assess_model(best_model, df_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
