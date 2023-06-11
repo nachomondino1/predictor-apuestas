@@ -34,7 +34,8 @@ def clean_teams_names(df):
     df['equipo_vis'] = df['equipo_vis'].replace(d_abrev_team_names, regex=True).str.strip()
 
     # Reemplazo nombres enteros de equipos para que sea igual a los de la entidad jugador
-    d_team_names = {'qpr': 'queens park rangers',  'wolves': 'wolverhampton', 'west brom': 'west bromwich albion'}
+    d_team_names = {'estudiantes la plata': 'estudiantes',
+        'qpr': 'queens park rangers',  'wolves': 'wolverhampton', 'west brom': 'west bromwich albion'}
     for equipo_part, equipo_jug in d_team_names.items():
         df['equipo_loc'] = df['equipo_loc'].replace(equipo_part, equipo_jug)
         df['equipo_vis'] = df['equipo_vis'].replace(equipo_part, equipo_jug)
