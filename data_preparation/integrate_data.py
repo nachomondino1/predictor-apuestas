@@ -23,9 +23,9 @@ def player_data_in_match(df_part, df_jug):
     try:  # cuidado que si mejoras la extraccion, el cambio puede que no se vea puesto que levanta el df_jug_encontrado viejo...
         df_jug_encontrados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx')
     except:
-        df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+        df_jug_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'fecha', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
     df_jug_buscados = df_jug_encontrados.copy()  # Razon de inclusion: evito que no se realicen cambios cuando en hago una mejora en integrate_data. No la hace puesto que df_jug_encontrados antes guaradaba a todos los jugadores a pesar de no habarle encontrado match. Si la nueva version encontraba match, no lo iba a usar puesto que el jugador ya aparecia en df_jug_encontrados...
-    df_jug_no_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'anio', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+    df_jug_no_encontrados = pd.DataFrame(columns=['nombre', 'equipo', 'fecha', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
     largo = len(df_jug_buscados)
 
     # Por titularidad (Titular, suplente o ausente)
@@ -40,11 +40,11 @@ def player_data_in_match(df_part, df_jug):
             print(f'Columnas a procesar: {l_col_to_preprocess}')
 
             # Por partido (fila) en entidad partido
-            for i in range(len(df_part)):
+            for i, row in df_part.iterrows():  # for i in range(len(df_part)):
 
                 # Obtengo equipo y año del partido
-                equipo_jug_ent_part = df_part.loc[i, 'equipo_loc'] if condicion == 'loc' else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
-                year_ent_part = df_part.loc[i, 'fecha'].year   # e.g. 2023
+                equipo_jug_ent_part = row['equipo_loc'] if condicion == 'loc' else row['equipo_vis']  # equipo_jug_ent_part = df_part.loc[i, 'equipo_loc'] if condicion == 'loc' else df_part.loc[i, 'equipo_vis']  # DEPENDERA DE SI ES LOCAL O VIS...
+                fecha_ent_part = row['fecha']   # year_ent_part = df_part.loc[i, 'fecha'].year   # e.g. 2023
                 print(f' Partido Nº: {i} '.center(120, '#'))
 
                 # Reinicio variables
@@ -64,20 +64,20 @@ def player_data_in_match(df_part, df_jug):
                         print(f' JUGADOR EN ENTIDAD PARTIDO: ')
                         print(f'\t- Nombre: {nombre_jug_ent_part}')
                         print(f'\t- Equipo: {equipo_jug_ent_part}')
-                        print(f'\t- Año: {year_ent_part}')
+                        print(f'\t- Fecha: {fecha_ent_part}')
                         print('\nBuscando jugador en entidad partido...')
 
                         jugador_buscado = df_jug_buscados[
                             (df_jug_buscados['nombre'] == nombre_jug_ent_part) &
                             (df_jug_buscados['equipo'] == equipo_jug_ent_part) &
-                            (df_jug_buscados['anio'] == year_ent_part)].head(1)
+                            (df_jug_buscados['fecha'] == fecha_ent_part)].head(1)
 
                         # Si el jugador no fue buscado aun
                         if jugador_buscado.empty:
 
                             # Busco coincidencia en df_jug
-                            edad, altura, overall_rating, valor_mercado, str_encontrado = find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part)
-                            d_data = {'nombre': nombre_jug_ent_part, 'equipo': equipo_jug_ent_part, 'anio': year_ent_part, 'edad': edad, 'altura': altura, 'overall_rating': overall_rating, 'valor_mercado': valor_mercado, 'str_encont': str_encontrado}
+                            edad, altura, overall_rating, valor_mercado, str_encontrado = find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, fecha_ent_part)
+                            d_data = {'nombre': nombre_jug_ent_part, 'equipo': equipo_jug_ent_part, 'fecha': fecha_ent_part, 'edad': edad, 'altura': altura, 'overall_rating': overall_rating, 'valor_mercado': valor_mercado, 'str_encont': str_encontrado}
 
                             # Si encontró el jugador
                             if edad is not None:
@@ -132,7 +132,7 @@ def player_data_in_match(df_part, df_jug):
     df_jug_no_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_jug_no_encontrados.xlsx',index=False)
     return df_part
 
-def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, year_ent_part):
+def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, fecha_ent_part):  # Tiene que ser datetime...
     """
     Encuentra coincidencias de jugadores en un dataframe.
     :param df_jug: DataFrame que contiene los datos de los jugadores.
@@ -153,7 +153,8 @@ def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, yea
         return True
 
     # Selecciono los datos de jugadores del año del partido
-    df_jug_filt = df_jug[df_jug['fecha'].dt.year == year_ent_part]
+    # df_jug_filt = df_jug[df_jug['fecha'].dt.year == year_ent_part]
+    df_jug_filt = df_jug[df_jug['fecha'] == search_fecha_actualizacion(df_jug, fecha_ent_part)]
 
     # Selecciono los datos de jugadores segun los nombres de jugadores mas parecidos al buscado
     palabras_clave_nombre = nombre_jug_ent_part.split()
@@ -177,6 +178,43 @@ def find_player_in_ent_jug(df_jug, nombre_jug_ent_part, equipo_jug_ent_part, yea
             match_data['str_encont'] = df_jug_filt.iloc[0]['nombre']
 
     return match_data['edad'], match_data['altura'], match_data['overall_rating'], match_data['valor_mercado'], match_data['str_encont']
+
+def search_fecha_actualizacion(df, fecha_part):  # Verificar funcionamiento
+
+    # Si el partido es de Dic 2021, deberá escoger el fifa 22 puesto dic es posterior a Sept y luego como diciembre es anterior a ene, la primera actualizacion.
+    # Si el partido es de Jun 2022, deberá escoger el fifa 22 puesto jun es anterior a Sept y luego como jun es posterio a ene, la ultima actualizacion.
+
+    year_part = fecha_part.year  # e.g. "2021"
+    mes_part = fecha_part.month  # e.g. "Dic"
+
+    # Si es posterior a Septiembre
+    if mes_part >= 9:  # Dic 2021 entraria aqui
+
+        year_str = str(year_part+1)[-2:]  # Ultimos dos "22"
+        fifa_str = f"FIFA {year_str}"  # FIFA 22
+
+        # Selecciono posibles fechas de actualizion segun el fifa
+        l_posibles_fechas = df[df['fifa'] == fifa_str]['fecha'].unique() # [18 ago 2022, 16 Ago 2021]
+
+        # Elijo la primera fecha de actualizacion (pues es si o si es anterior a enero)
+        fecha = min(l_posibles_fechas)
+
+    # Si es anterior a Septiembre
+    else:  # Jun 2021 entraria aqui
+
+        year_str = str(year_part)[-2:]  # Ultimos dos "21"
+        fifa_str = f"FIFA {year_str}"  # FIFA 21
+
+        # Selecciono posibles fechas de actualizion segun el fifa
+        l_posibles_fechas = df[df['fifa'] == fifa_str]['fecha'].unique()
+
+        # Elijo la ultima fecha de actualizacion (pues si o si es posterior a enero)
+        fecha = max(l_posibles_fechas)
+
+    print(f"Para el partido jugado en {mes_part}/{year_part}, el fifa que le corresponde es {fifa_str} y la actualizacion {fecha}")
+    return fecha
+
+
 
 def prueba():
     start = time.time()

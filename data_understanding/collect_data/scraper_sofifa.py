@@ -9,10 +9,10 @@ def extract_sofifa():
     """
     # DEFINCION DE PARAMETROS & VARIABLES
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/entidad_competicion.xlsx')
-    df_jug = pd.DataFrame(columns=['id_jugador', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
+    df_jug = pd.DataFrame(columns=['id_jugador', 'fifa', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
     crawler = Crawler(headless=True, path=None)
     d_pais_a_seleccionar = {'brazil': 'brasil'}  # Por diferencias entre nombres de paises entre Flashscore y Sofifa
-    l_paises = ['argentina', 'uruguay']
+    l_paises = ['argentina']
 
     # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados
     crawler.driver.get('https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg')
@@ -22,29 +22,30 @@ def extract_sofifa():
     l_tag_years = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][1]/div/a')
     l_urls_years = [tag.get_attribute('href') for tag in l_tag_years]
 
-    # POR AÑO O FIFA (e.g. Fifa 23, fifa 22, fifa 21, ..., fifa 07)
+    # POR FIFA (e.g. Fifa 23, fifa 22, fifa 21, ..., fifa 07)
     for url_year in l_urls_years[::-1]:
 
         # Ingreso a pagina del año o fifa
         crawler.driver.get(url_year)
-        print(f" Url pagina: {url_year} ")
 
         # Obtengo urls de las paginas de la paginacion (c/pagina es una actualizacion de un fifa)
         crawler.click_boton(xpath='.//h2//div[@class="dropdown"][2]/a')  # Ver si hace click, tal vez ni hace falta
         l_tags_act_year = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][2]/div/a[not(contains(text(), "World Cup"))]')  # Ojo con la actualizacion World Cup 2022...
         l_urls_act_year = [tag.get_attribute('href') for tag in l_tags_act_year]
         l_urls_act_year_sel = [l_urls_act_year[0], l_urls_act_year[-1]]  # Selecciono unicamente la primera y la ultima actualizacion
-        print("Lista de urls de actualizaciones fifa seleccionadas: ", l_urls_act_year)
+
+        # Extraigo fifa
+        fifa = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][1]', text=True)  # Fifa 21
+        print(f" FIFA: {fifa} ".center(120, "#"))
 
         # POR ACTUALIZACION EN DICHO FIFA (e.g. Jun 7, 2023;  Apr 17, 2023; etc)
         for url_year_act in l_urls_act_year_sel:
 
             crawler.driver.get(url_year_act)
-            print(f" Url actualizacion: {url_year_act} ")
 
             # Extraigo fecha de la actualizacion e.g. May 16, 2023
             fecha_str = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)  # e.g. May 16, 2023
-            print(f" Fecha de actualizacion del fifa: {fecha_str} ".center(120, "#"))
+            print(f" Fecha de actualizacion: {fecha_str} ".center(120, "+"))
 
             # POR PAIS
             # for pais in df_comp['pais'].unique()[:-1]:  # Evito "Sudamerica"
@@ -91,6 +92,7 @@ def extract_sofifa():
                                 # Extraigo datos del jugador
                                 d_data = {}
                                 d_data['id_jugador'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pi"]', text=True)
+                                d_data['fifa'] = fifa
                                 d_data['fecha'] = fecha_str
                                 d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a', attribute="aria-label") # Nombre corto (e.g. l. gonzalez pirez) d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a/div[@class="ellipsis"]', text=True)
                                 d_data['edad'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ae"]', text=True)
