@@ -5,7 +5,7 @@ import time
 import warnings
 import random
 import pickle
-from dspy.data_understanding.web_scraping.selenium import Crawler
+from data_understanding import collect_initial_data
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 from dspy.data_understanding.describe_data import getting_to_know_data
 
@@ -202,6 +202,7 @@ def prueba():
         df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/argentina/entidad_next_partido.xlsx')
     except:
         df_part = extract_flashscore(n_dias_max=n_dias_a_prox_part)
+        df_part = collect_initial_data.extract_proximos_partidos()
     '''
 
     # Levanto dataset con los ultimos 15 partidos de la liga argentina
