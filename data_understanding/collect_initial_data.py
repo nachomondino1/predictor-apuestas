@@ -9,139 +9,136 @@ import warnings
 from tqdm import tqdm
 
 
+def select_liga_as_filter(crawler, pais):
+    """
+    Poner el pais como filtro para obtener los jugadores solo de la liga de dicho pais
+    :param crawler:
+    :param pais:
+    :return:
+    """
+    # Definicion de variables
+    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/df_competencias.xlsx')
+    d_pais = {'brasil': 'brazil'}  # Por diferencias entre nombres de paises entre Flashscore y Sofifa. # Por ejemplo, en flashscore aparece 'Brasil' mientras que en Sofifa aparece Brazil
+
+    # Selecciono competicion mas importante del pais
+    pais_a_buscar = d_pais[pais] if pais in d_pais.keys() else pais
+    comp_a_buscar = df_comp[df_comp['pais'] == pais]['nombre'][0]
+
+    # Remuevo busqueda de la competicion buscada para el anterior pais (no es necesaria creo)
+    # boton_remover_busqueda = crawler.extract_tag(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]//preceding-sibling::div//button', sec_wait=3)
+    # crawler.click_boton(boton_remover_busqueda)
+
+    # Busco competicion
+    input_league = crawler.extract_tag(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]')
+    input_league.send_keys(comp_a_buscar)  # AHORA: "Liga Profesional" ya no puedo usar el pais..  ANTES:  "[Argentina] Liga Profesional"
+
+    # Si encontró resultados a la busqueda
+    if len(crawler.extract_tags(xpath=f'.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]')) > 0:  # AHORA: e.g. Liga profesional  ANTES: e.g. [Argentina] Liga profesional
+
+        # Busco el boton para la liga requerida segun el pais buscado
+        boton_liga_a_selec = crawler.extract_tag(xpath=f'.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]/img[@title="{pais_a_buscar.capitalize()}"]')  # AHORA: e.g. Liga profesional  ANTES: e.g. [Argentina] Liga profesional
+
+        # Hago click en la liga
+        if crawler.click_boton(boton_liga_a_selec) is False:
+            print(f'Sofifa no encontró resultados a nuestra busqueda. Es posible que no exista la liga de {pais}.')
+
 def extract_jugadores_sofifa(l_paises):  # Si bien puede extraer varios paises, creo que lo usare para un solo a la vez. De todas maneras dejo la funcion para multiples paises.
     """
     Obtengo datos de jugadores mediante scrapear sofifa.com
     """
     # DEFINCION DE PARAMETROS & VARIABLES
-    df_jug = pd.DataFrame(columns=['id_jugador', 'fifa', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
     crawler = Crawler(headless=True, path=None)
-    d_pais_a_seleccionar = {'brazil': 'brasil'}  # Por diferencias entre nombres de paises entre Flashscore y Sofifa
+    df_jug = pd.DataFrame(columns=['id_jugador', 'fifa', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
 
-    # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados
+    # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados (edad, altura, or, pot, valor_merc, etc)
     crawler.driver.get('https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg')
 
     # Obtengo urls de las paginas de la paginacion (c/pagina es un año o fifa)
-    crawler.click_boton(xpath='.//h2//div[@class="dropdown"][1]/a')  # Ver si hace click, tal vez ni hace falta
-    l_tag_years = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][1]/div/a')
+    l_tag_years = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][1]/div/a')   # NO HACE FALTE HACER CLICK PREVIO EN LA FLECHITA -->  # boton_selec_fifa = crawler.extract_tag(xpath='.//h2//div[@class="dropdown"][1]/a')   # crawler.click_boton(boton_selec_fifa)  # Hace falta?
     l_urls_years = [tag.get_attribute('href') for tag in l_tag_years]
 
-    # POR FIFA (e.g. Fifa 23, fifa 22, fifa 21, ..., fifa 07)
-    for url_year in l_urls_years[::-1]:
+    # Por pais
+    for pais in l_paises:
+        print(f" PAÍS: {pais} ".center(120, "#"))
 
-        # Ingreso a pagina del año o fifa
-        crawler.driver.get(url_year)
+        # POR FIFA (e.g. Fifa 23, fifa 22, fifa 21, ..., fifa 07)
+        for url_year in l_urls_years[::-1]:
 
-        # Obtengo urls de las paginas de la paginacion (c/pagina es una actualizacion de un fifa)
-        crawler.click_boton(xpath='.//h2//div[@class="dropdown"][2]/a')  # Ver si hace click, tal vez ni hace falta
-        l_tags_act_year = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][2]/div/a[not(contains(text(), "World Cup"))]')  # Ojo con la actualizacion World Cup 2022...
-        l_urls_act_year = [tag.get_attribute('href') for tag in l_tags_act_year]
-        l_urls_act_year_sel = [l_urls_act_year[0], l_urls_act_year[-1]]  # Selecciono unicamente la primera y la ultima actualizacion
+            # Ingreso a pagina del año o fifa
+            crawler.driver.get(url_year)
 
-        # Extraigo fifa
-        fifa = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][1]', text=True)  # Fifa 21
-        print(f" FIFA: {fifa} ".center(120, "#"))
+            # Obtengo urls de las paginas de la paginacion (c/pagina es una actualizacion de un fifa)
+            l_tags_act_year = crawler.extract_tags(xpath='.//h2//div[@class="dropdown"][2]/div/a[not(contains(text(), "World Cup"))]')  # Ojo con la actualizacion World Cup 2022...  # NO HACE FALTA HACER CLICK EN FLECHITA ANTES -->  #   boton_selec_act_fifa =  crawler.extract_tag(xpath='.//h2//div[@class="dropdown"][2]/a')  # Ver si hace click, tal vez ni hace falta  # crawler.click_boton(boton_selec_act_fifa)
+            l_urls_act_year = [tag.get_attribute('href') for tag in l_tags_act_year]
+            l_urls_act_year_sel = [l_urls_act_year[0], l_urls_act_year[-1]]  # Selecciono unicamente la primera y la ultima actualizacion
+            fifa = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][1]', text=True)  # Fifa 21
+            print(f" FIFA: {fifa} ".center(120, "+"))
 
-        # POR ACTUALIZACION EN DICHO FIFA (e.g. Jun 7, 2023;  Apr 17, 2023; etc)
-        for url_year_act in l_urls_act_year_sel:
+            # POR ACTUALIZACION EN DICHO FIFA (e.g. Jun 7, 2023;  Apr 17, 2023; etc)
+            for url_year_act in l_urls_act_year_sel:
 
-            crawler.driver.get(url_year_act)
+                # Ingreso a pagina de la actualizacion y obtengo la fecha
+                crawler.driver.get(url_year_act)
+                fecha_str = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)  # e.g. May 16, 2023
+                print(f" Fecha de actualizacion: {fecha_str} ".center(120, "-"))
 
-            # Extraigo fecha de la actualizacion e.g. May 16, 2023
-            fecha_str = crawler.extract_tag(xpath='.//h2/div[@class="dropdown"][2]', text=True)  # e.g. May 16, 2023
-            print(f" Fecha de actualizacion: {fecha_str} ".center(120, "+"))
+                # Selecciono la liga del pais como filtro
+                select_liga_as_filter(crawler, pais)
 
-            # POR PAIS
-            for pais in l_paises:
-                print(f" PAÍS: {pais} ".center(120, "-"))
+                # Clickeo en "buscar"
+                boton_sumbit = crawler.extract_tag(xpath='.//button[text()="Submit"]')
+                crawler.click_boton(boton_sumbit)
 
-                # Remuevo busqueda anterior
-                crawler.click_boton(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]//preceding-sibling::div//button', sec_wait=3)
+                # POR PAGINA CON LISTADO DE JUGADORES
+                while True:
 
-                # Cargo pais como filtro
-                input_league = crawler.extract_tag(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]')
-                input_league.send_keys(pais)  # "[Argentina] Liga Profesional"
+                    # Obtengo tags de jugadores
+                    l_tag_jugadores = crawler.extract_tags(xpath='.//table[@class="table table-hover persist-area"]/tbody/tr')
+                    print(f"Cantidad de jugadores: {len(l_tag_jugadores)}")
 
-                # Extraigo la liga que segun sofifa se asemeja mas a nuestra busqueda
-                liga_a_seleccionar = crawler.extract_tag(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")][1]', text=True)  # e.g. [Argentina] Liga profesional
+                    # Por jugador
+                    for tag in l_tag_jugadores:
+                        # Extraigo datos del jugador
+                        d_data = {}
+                        d_data['id_jugador'] = crawler.extract_tag(tag_inicial=tag,xpath='.//td[@data-col="pi"]', text=True)
+                        d_data['fifa'] = fifa
+                        d_data['fecha'] = fecha_str
+                        d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a', attribute="aria-label")  # Nombre corto (e.g. l. gonzalez pirez) d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a/div[@class="ellipsis"]', text=True)
+                        d_data['edad'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ae"]', text=True)
+                        d_data['altura'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="hi"]', text=True)
+                        d_data['pie_habil'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pf"]', text=True)
+                        d_data['overall_rating'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="oa"]', text=True)
+                        d_data['potencial'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pt"]', text=True)
+                        d_data['equipo_actual'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/div[@class="ellipsis"]/a', text=True)
+                        d_data['valor_mercado'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="vl"]', text=True)
+                        d_data['sueldo'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="wg"]', text=True)
+                        d_data['pais'] = pais
 
-                # Si encontro resultados para nuestro input
-                if liga_a_seleccionar.lower() != "no results found":
+                        # Formateo campo altura # e.g. 193cm / 6'4" --> 193
+                        d_data['altura'] = d_data['altura'].split('cm')[0]
 
-                    # Selecciono la liga que mas se asemeja a mi input (cuidado: puede no existar la liga para dicho fifa)
-                    input_league.send_keys(Keys.ENTER)  # Tengo que dar enter
+                        # Guardo los datos del jugador para dicho año
+                        nueva_fila_df = pd.DataFrame([d_data])
+                        df_jug = pd.concat([df_jug, nueva_fila_df], ignore_index=True)
+                        print(d_data)
 
-                    pais_a_seleccionar = liga_a_seleccionar[liga_a_seleccionar.find('[')+1: liga_a_seleccionar.find(']')].lower()  # e.g. [Argentina] Liga profesional
-                    if pais_a_seleccionar in d_pais_a_seleccionar.keys():  # Por ejemplo, en flashscore aparece 'Brasil' mientras que en Sofifa aparece Brazil
-                        pais_a_seleccionar = d_pais_a_seleccionar[pais_a_seleccionar]
-                    print(f"Pais a seleccionar: {pais_a_seleccionar}")
+                    # Clickeo en boton "Next" para recorrer todas las paginas
+                    boton_next = crawler.extract_tag(xpath='.//div[@class="pagination"]//span[contains(@class, "right")]//parent::a')
+                    if crawler.click_boton(boton_next) is False:
+                        print('Ya no hay mas boton "Next". Es decir, ya no hay mas jugadores en la liga.')
+                        break
 
-                    # Si la liga a seleccionar corresponde a la del pais
-                    if pais in pais_a_seleccionar:
+            # Exporto datos del fifa (Por seguridad)
+            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/entidad_jugadores_{fifa}.xlsx')
 
-                        # Clickeo en buscar jugadores
-                        crawler.click_boton(xpath='.//button[text()="Submit"]')
+        # Exporto dataset final
+        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
 
-                        # POR PAGINA CON LISTADO DE JUGADORES
-                        while True:
-
-                            # Obtengo tags de jugadores
-                            l_tag_jugadores = crawler.extract_tags(xpath='.//table[@class="table table-hover persist-area"]/tbody/tr')
-                            print(f"Cantidad de jugadores: {len(l_tag_jugadores)}")
-
-                            # Por jugador
-                            for tag in l_tag_jugadores:
-
-                                # Extraigo datos del jugador
-                                d_data = {}
-                                d_data['id_jugador'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pi"]', text=True)
-                                d_data['fifa'] = fifa
-                                d_data['fecha'] = fecha_str
-                                d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a', attribute="aria-label") # Nombre corto (e.g. l. gonzalez pirez) d_data['nombre'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/a/div[@class="ellipsis"]', text=True)
-                                d_data['edad'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ae"]', text=True)
-                                d_data['altura'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="hi"]', text=True)
-                                d_data['pie_habil'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pf"]', text=True)
-                                d_data['overall_rating'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="oa"]', text=True)
-                                d_data['potencial'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="pt"]', text=True)
-                                d_data['equipo_actual'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@class="col-name"]/div[@class="ellipsis"]/a', text=True)
-                                d_data['valor_mercado'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="vl"]', text=True)
-                                d_data['sueldo'] = crawler.extract_tag(tag_inicial=tag, xpath='.//td[@data-col="wg"]', text=True)
-                                d_data['pais'] = pais
-
-                                # Formateo campo altura # e.g. 193cm / 6'4" --> 193
-                                d_data['altura'] = d_data['altura'].split('cm')[0]
-
-                                # Guardo los datos del jugador para dicho año
-                                nueva_fila_df = pd.DataFrame([d_data])
-                                df_jug = pd.concat([df_jug, nueva_fila_df], ignore_index=True)
-                                print(d_data)
-
-                            # Clickeo en boton "Next" para recorrer todas las paginas
-                            if crawler.click_boton(xpath='.//div[@class="pagination"]//span[contains(@class, "right")]//parent::a') is False:
-                                print('Ya no hay mas boton "Next". Es decir, ya no hay mas jugadores en la liga.')
-                                break
-
-                    # Si la liga a seleccionar no corresponde a la del pais
-                    else:
-                        print(f'Sofifa encontró la liga {liga_a_seleccionar} la cual no corresponde a nuestra busqueda {pais}. Es posible que no exista la liga de {pais} en el fifa del año {fecha_str}')
-
-                # Si no encontro resultados para nuestro input ("No results found")
-                else:
-                    print(f'Sofifa no encontró resultados a nuestra busqueda. Es posible que no exista la liga de {pais} en el fifa del año {fecha_str}')
-
-                    # Seleccionar el texto cargado en el input y lo borro
-                    input_league.send_keys(Keys.SHIFT + Keys.HOME)
-                    input_league.send_keys(Keys.DELETE)
-
-                # Exporto datos de la actualizacion (Por seguridad)
-                df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/entidad_jugadores_{fecha_str}.xlsx')
-
-    # Exporto dataset final y cierro webdriver
-    df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/entidad_jugadores.xlsx')
+    # Cierro webdriver
     crawler.driver.close()
     return df_jug
 
-def extract_partidos_flashscore(l_paises):  # Cambiar argumentos...
+def extract_partidos_flashscore(l_paises):  # Funciona ok?
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -175,7 +172,8 @@ def extract_partidos_flashscore(l_paises):  # Cambiar argumentos...
             print(url)
 
             # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
-            crawler.click_boton(xpath='.//button[@id="onetrust-accept-btn-handler"]')
+            boton_cookies = crawler.extract_tag(xpath='.//button[@id="onetrust-accept-btn-handler"]')
+            crawler.click_boton(boton_cookies)
 
             # Extraigo links de temporadas (años)
             l_tag_temporadas = crawler.extract_tags(xpath='.//section[@id="tournament-page-archiv"]//div[@class="archive__row"]/div[@class="archive__season"]/a')
@@ -191,7 +189,10 @@ def extract_partidos_flashscore(l_paises):  # Cambiar argumentos...
                 print(f" {temp_year} ".center(120, "-"))
 
                 # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
-                crawler.click_boton(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=SEC_WAIT_LONG * 3, repeat_click=True)  # Si hace click, es None. Si falla, es un str  # A veces me tira (y no entiendo por qué): selenium.common.exceptions.StaleElementReferenceException: Message: stale element reference: stale element not found
+                while True:
+                    boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=SEC_WAIT_LONG * 3)
+                    if crawler.click_boton(boton_mostrar) is False:
+                        break
 
                 # Extraigo partidos (items) y sus ids
                 l_items = crawler.extract_tags(xpath='.//div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]')
@@ -202,7 +203,7 @@ def extract_partidos_flashscore(l_paises):  # Cambiar argumentos...
                 progress_bar = tqdm(total=len(l_ids), ncols=80)
 
                 # POR PARTIDO (c/u identificado con un id)
-                for cont_part, id in enumerate(l_ids, start=1):  #  Evito contador manual en for id in l_ids:
+                for cont_part, id in enumerate(l_ids, start=1):  # Si no uso cont_part: for id in l_ids:
 
                     # Definicion de variables
                     progress_bar.update(1)
@@ -252,7 +253,7 @@ def extract_partidos_flashscore(l_paises):  # Cambiar argumentos...
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
 
-def extract_proximos_partidos_flashcore(l_paises, n_dias_max):
+def extract_proximos_partidos_flashcore(l_paises, n_dias_max):  # Funciona ok
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -281,15 +282,15 @@ def extract_proximos_partidos_flashcore(l_paises, n_dias_max):
             competicion_form = competicion.replace(" ", "-")  # formateo competicion para las rutas de archivo y urls
 
             # Ingreso a pagina
-            url = f'https://www.flashscore.es/futbol/{pais}/{competicion_form}/resultados/'
+            url = f'https://www.flashscore.es/futbol/{pais}/{competicion_form}/partidos/'
             crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
             print(url)
 
             # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
-            crawler.click_boton(xpath='.//button[@id="onetrust-accept-btn-handler"]')
+            boton_cookies = crawler.extract_tag(xpath='.//button[@id="onetrust-accept-btn-handler"]')
+            crawler.click_boton(boton_cookies)
 
-            # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
-            # crawler.click_boton(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=SEC_WAIT_LONG*3, repeat_click=True)  # Si hace click, es None. Si falla, es un str  # A veces me tira (y no entiendo por qué): selenium.common.exceptions.StaleElementReferenceException: Message: stale element reference: stale element not found
+            # Click en boton "Mostrar mas partidos"? No hace falta...
 
             # Obtengo temporada
             # No tiene sentido extraer todas las temporadas puesto que solo necesito la ultima...
@@ -301,15 +302,11 @@ def extract_proximos_partidos_flashcore(l_paises, n_dias_max):
             print(f"Cantidad de items (partidos): {len(l_items)}")
 
             # POR PARTIDO (c/u identificado con un id)
-            cont_part = 0
             for id in l_ids:
 
-                start = time.time()
                 # Definicion de variables
                 id = id[id.rfind('_') + 1:]  # Quito lo que no es del id (e.g. paso de "g_1_fshvzbls" a "fshvzbls")
                 d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': 1 if categoria == "Copa" else 0}  # Reinicio diccionario en el que guardar la nueva fila
-                cont_part += 1
-                print(f" Partido {cont_part} de {len(l_items)}. Recolectado el {cont_part / len(l_items) * 100:.0f}% ".center(120, "."))
 
                 # Ingreso a pagina de informacion del partido
                 crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
@@ -317,9 +314,9 @@ def extract_proximos_partidos_flashcore(l_paises, n_dias_max):
                 # EXTRACCION DE CAMPOS
                 fecha_str = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
                 fecha_dt = datetime.datetime.strptime(fecha_str, "%d.%m.%Y %H:%M")
-                print(fecha_dt, fecha_act)
                 dif_fecha = (fecha_dt - fecha_act).days  # Ojo que si falta 1 dia y 23 hs, lo toma como 1...
-                print(dif_fecha)
+                # print(fecha_dt, fecha_act)
+                # print(dif_fecha)
 
                 # Si el partido aun no se jugo (extraia partidos de la Copa de la Liga profesional 2023 la cual aun no se jugo pero ya esta el fixture... tampoco es tan grave solo esta la jornada 1)
                 if dif_fecha < n_dias_max:
@@ -338,16 +335,18 @@ def extract_proximos_partidos_flashcore(l_paises, n_dias_max):
 
                     # GUARDADO DE DATOS EN DATAFRAME
                     df = pd.concat([df, pd.DataFrame(d_nueva_fila, index=[0])])
-                    print(df.iloc[-1])
+                    # print(df.iloc[-1])
 
-                    end = time.time()
-                    print(f"Partido recolectado en {(end - start):.1f} segundos")
+                else:
+                    # Si los partidos a extraer estan ordenados por fecha como siempre, dejo de intentar extraerlos
+                    break
 
         # Guardado datos (a nivel pais)
         df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_next_partidos.xlsx', index=False)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
+    return df
 
 def reextract_campos_especificos_flashscore(pais, l_var):  # Re hacer para poder elegir que field recolectar nuevamente...
 
@@ -472,7 +471,8 @@ class FlashscoreCrawler(Crawler):
                          'Jugadores ausentes': 'aus'}
 
         # Hago click en hoja "Formaciones"
-        if super().click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Formaciones"]', sec_wait=SEC_WAIT) is not False:
+        boton_formaciones =super().extract_tag(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Formaciones"]', sec_wait=SEC_WAIT)
+        if super().click_boton(boton_formaciones) is not False:
 
             time.sleep(random.uniform(SEC_WAIT + 3, SEC_WAIT_LONG + 3))  # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
 
@@ -517,9 +517,10 @@ class FlashscoreCrawler(Crawler):
                           'pases_comp': 'Pases completados', 'offsides': 'Fueras de juego', 'ataques': 'Ataques',
                           'ataques_pelig': 'Ataques peligrosos'}
 
-        if super().click_boton(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Estadísticas"]', sec_wait=SEC_WAIT_LONG) is not False:
+        boton_estadisticas = super().extract_tag(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Estadísticas"]', sec_wait=SEC_WAIT_LONG)
+        if super().click_boton(boton_estadisticas) is not False:
 
-            time.sleep(random.uniform(SEC_WAIT + 3,SEC_WAIT_LONG + 3))  # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
+            time.sleep(random.uniform(SEC_WAIT + 3, SEC_WAIT_LONG + 3))  # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
 
             # Por estadistica (posesion, remates, etc)
             for estadistica in d_estadisticas.keys():
@@ -569,7 +570,7 @@ if __name__ == "__main__":
     l_paises = ['argentina']
 
     # Extraigo partidos
-    extract_partidos_flashscore(l_paises)
+    # extract_partidos_flashscore(l_paises)
 
     # Extraigo jugadores
-    # extract_jugadores_sofifa(l_paises)
+    extract_jugadores_sofifa(l_paises)
