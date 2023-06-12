@@ -183,19 +183,19 @@ def rellenar_player_data(df_part, df_part_old):
 def main():
 
     # Definicion de variables
+    pais = 'argentina'
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare = DataPreparation(var_resp)
-    data_unders, data_prep, modeling = False, True, True
+    data_unders, data_prep, modeling = False, False, True
 
     ## DATA UNDERSTANDING
     if data_unders:
         # Hiperparametros
-        n_dias_a_prox_part = 3  # Numero de dias maximo para partido a recolectar
+        n_dias_a_prox_part = 1  # Numero de dias maximo para partido a recolectar
 
         print(" Data Understanding ".center(120, "#"))
-
         # Collect initial data
-        df_part = collect_initial_data.extract_proximos_partidos(n_dias_a_prox_part)
+        df_part = collect_initial_data.extract_proximos_partidos_flashcore([pais], n_dias_max=n_dias_a_prox_part)
 
         # Describe data
         getting_to_know_data(df_part)
@@ -209,8 +209,8 @@ def main():
         export = True
 
         # Levanto dataset con los ultimos 15 partidos de la liga argentina
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/entidad_next_partido.xlsx')
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_jug_cleaned.xlsx')
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_next_partido.xlsx')
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx')
 
         ## DATA PREPARATION
         print(" Data preparation ".center(120, "#"))
@@ -224,7 +224,7 @@ def main():
     if modeling:
         # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
 
-        # df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
+        df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
 
         ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
         df_test_pred = df.copy().drop(['equipo_ganador', 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
@@ -238,6 +238,11 @@ def main():
         df_res = df.copy()
         df_res['y_pred'] = y_pred
         df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
+
+        # Traduzco predicciones numericas a etiquetas
+        df = format_data.target_to_object(df_res, pais)
+        df.to_excel('/Users/nachomondino/Desktop/predicciones_trad.xlsx')
+
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
