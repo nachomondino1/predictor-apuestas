@@ -62,6 +62,17 @@ def convert_columns_to_int(df):
 
     return df
 
+def target_to_object(df, pais):
+
+    # Levanto df_etiquetas
+    etiquetas_file_path = f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx"
+    df_etiquetas = pd.read_excel(etiquetas_file_path)
+
+    # Reemplazo codigos por etiquetas
+    codigo_etiqueta_dict = dict(zip(df_etiquetas['Código'], df_etiquetas['Etiqueta']))
+    df['y_pred_etiqueta'] = df['y_pred'].replace(codigo_etiqueta_dict)
+    return df
+
 def prueba():
     # Levanto datasets
     df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
