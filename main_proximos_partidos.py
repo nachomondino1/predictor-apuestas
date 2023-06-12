@@ -180,104 +180,68 @@ def rellenar_player_data(df_part, df_part_old):
             # Guardar ['dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus'] en nuevo partido...
     pass
 
-def prueba():
+def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare = DataPreparation(var_resp)
-
-    # Hiperparametros
-    n_dias_a_prox_part = 3  # Numero de dias maximo para partido a recolectar
-    n_anios_df_part = 7  # Numero de ultimos años a tomar de los partidos ya recolectados (si es muy bajo, por ej 3, no llega a construir la variable "historial_entre_si" pues hay un numero de part min...
-
-    N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-    treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
-    export = True
+    data_unders, data_prep, modeling = False, True, True
 
     ## DATA UNDERSTANDING
-    print(" Data Understanding ".center(120, "#"))
-    '''
-    # Collect initial data
-    try:
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/argentina/entidad_next_partido.xlsx')
-    except:
-        df_part = extract_flashscore(n_dias_max=n_dias_a_prox_part)
-        df_part = collect_initial_data.extract_proximos_partidos()
-    '''
+    if data_unders:
+        # Hiperparametros
+        n_dias_a_prox_part = 3  # Numero de dias maximo para partido a recolectar
 
-    # Levanto dataset con los ultimos 15 partidos de la liga argentina
-    df_part = pd.read_excel('/Users/nachomondino/Desktop/entidad_next_partido.xlsx')
-    df_jug = pd.read_excel('/Users/nachomondino/Desktop/df_jug_cleaned.xlsx')
-    # l_ids = list(df_part['id'])
+        print(" Data Understanding ".center(120, "#"))
 
-    # Describe data
-    getting_to_know_data(df_part)
+        # Collect initial data
+        df_part = collect_initial_data.extract_proximos_partidos(n_dias_a_prox_part)
 
-    ## DATA PREPARATION
-    print(" Data preparation ".center(120, "#"))
+        # Describe data
+        getting_to_know_data(df_part)
 
-    # no le hago format porque ya extraigo la fecha en formato datetime, la copa como 1 o 0 y no tengo posesion_loc ni posesion_vis
-    df_part = prepare.clean_data(df_part, export=export)
-    df = prepare.integrate_data(df_part, df_jug, export=True)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
+    if data_prep:
 
-    '''
-    # TENGO QUE LEVANTAR DF_PART VIEJO PARA PODER CONSTRUIR VARIABLES HISTORICAS... --> lo voy a hacer dentro de construct_data...
-    # Levanto dataset de partidos viejos (pues los necesito para construir variables historicas)  Y # Filtrar el DataFrame para seleccionar los registros dentro de los últimos 3 años # no deberia levantar todos los registros... es solo los ultumos 5 de cada equipo...
-    df_part_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx')  # Lo tengo que levantar integrado para tener las variables de jugadores... como "prom_edad_jug_tit_loc"
-    fecha_limite = datetime.datetime.now() - datetime.timedelta(days=365 * n_anios_df_part)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
-    df_part_old_filt = df_part_old[df_part_old['fecha'] >= fecha_limite]
+        # Hiperparametros
+        n_anios_df_part = 7  # Numero de ultimos años a tomar de los partidos ya recolectados (si es muy bajo, por ej 3, no llega a construir la variable "historial_entre_si" pues hay un numero de part min...
+        N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+        treat_nan = 'fillna_with_ml'  # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
+        export = True
 
-    # Creo variable equipo_ganador para que poder calcular historial_entre_si y forma_reciente
-    df_part_old_filt = construct_data.determinar_equipo_ganador(df_part_old_filt)  # --> a df_part no le construyo equipo_ganador...
+        # Levanto dataset con los ultimos 15 partidos de la liga argentina
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/entidad_next_partido.xlsx')
+        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_jug_cleaned.xlsx')
 
-    rellenar_player_data(df_part)
+        ## DATA PREPARATION
+        print(" Data preparation ".center(120, "#"))
 
-    # Agrego dataframe viejo para poder calcular variables historicas...
-    df = pd.concat([df_part_old_filt, df_part], axis=0).reset_index(drop=True)  # Funciona bien
-    '''
+        # no le hago format porque ya extraigo la fecha en formato datetime, la copa como 1 o 0 y no tengo posesion_loc ni posesion_vis
+        df_part = prepare.clean_data(df_part, export=export)
+        df = prepare.integrate_data(df_part, df_jug, export=True)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
+        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        df = prepare.select_data(df, treat_nan=treat_nan, export=export)
 
-    df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+    if modeling:
+        # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
 
+        # df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
 
-    #  VER SI PUEDO SELECCIONAR..
-    df = prepare.select_data(df, treat_nan=treat_nan, export=export)
+        ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
+        df_test_pred = df.copy().drop(['equipo_ganador', 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
+        print(df_test_pred.shape)
 
-    '''
-    # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
-    df = df[df.index.isin(l_ids)] # df = df[df.id.isin(l_ids)]  # Funciona... shape = (5, 119)
-    print(df.shape)
+        loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/modelo.pkl", "rb"))
 
-    df = df.drop('equipo_ganador', axis=1)
-    df.to_excel('/Users/nachomondino/Desktop/entidad_partido_argentina_next_matches.xlsx', index=False)
+        y_pred = loaded_model.predict(df_test_pred)
 
-    ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
-    df_test_without_odds = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-    loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/modelo.pkl", "rb"))
-    y_pred = loaded_model.predict(df_test_without_odds)
-    df_res = df.copy()
-    df_res['y_pred'] = y_pred
-    df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
-    '''
-
-    # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
-
-    ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
-    df_test_pred = df.copy().drop(['equipo_ganador', 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
-    print(df_test_pred.shape)
-
-    loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/modelo.pkl", "rb"))
-
-    y_pred = loaded_model.predict(df_test_pred)
-
-    # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
-    df_res = df.copy()
-    df_res['y_pred'] = y_pred
-    df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
-
+        # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
+        df_res = df.copy()
+        df_res['y_pred'] = y_pred
+        df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    prueba()
+    main()
 
 # Tal vez, para no rellenar automaticamente las variables de jugadores (como dif_rat_tit, dif_edad_sup, dif_rat_aus)
 # por no tener las formaciones antes del partido, podria tomar el rating de cada equipo segun su ultimo partido?
