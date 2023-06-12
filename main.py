@@ -3,7 +3,7 @@ import pandas as pd
 import time
 import warnings
 # Data understanding
-from data_understanding.collect_data import scraper_sofifa, scraper_flashscore
+from data_understanding import collect_initial_data
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
@@ -42,16 +42,16 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe formateado. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/{self.pais}/entidad_partido.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/{self.pais}/entidad_jugadores.xlsx') if df_jug is None else df_jug
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{self.pais}/entidad_partido.xlsx') if df_part is None else df_part
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{self.pais}/entidad_jugadores.xlsx') if df_jug is None else df_jug
 
         start = time.time()
         print("\nFormateando los datos...")
 
         # Entidad partido: fecha, posesion y es_copa
-        # df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
         df_part = format_data.convert_posesion_to_int(df_part)  # Podria usar la limpieza de punct de tp y luego convertir a int64 pero as al pedo
-        # df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
+        df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
 
         # Entidad jugador: fecha y valor de mercado
         df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
@@ -325,14 +325,14 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
         # Collect initial data
         print(" Recolectando datos... ")
-        df_part = scraper_flashscore.extract_flashscore()  # Tengo que ver que no se corran igual por no comentar la funcion en su archivo...
-        df_jug = scraper_sofifa.extract_sofifa
-        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
+        # df_part = collect_initial_data.extract_partidos()         df_part = scraper_flashscore.extract_flashscore()  # Tengo que ver que no se corran igual por no comentar la funcion en su archivo...
+        # df_jug = collect_initial_data.extract_jugadores()
+        # print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
         # Describe data (quiero describir los datos igual aunque no los extraiga...)
         print(" Describiendo datos... ")
-        getting_to_know_data(df_part)
-        getting_to_know_data(df_jug)
+        # getting_to_know_data(df_part)
+        # getting_to_know_data(df_jug)
 
     if data_prep is True:
         # Hiperparametros
@@ -352,7 +352,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.01 # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
+        porc_corte = 0.8 # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
         best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
         k = 2  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
@@ -367,8 +367,8 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=False)
-        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=False)
+        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=export)
+        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
         modeler.assess_model(best_model, df_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
