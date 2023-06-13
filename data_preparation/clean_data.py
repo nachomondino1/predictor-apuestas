@@ -42,48 +42,6 @@ def clean_teams_names(df):
 
     return df
 
-def treat_nan_values(df, type):
-    columnas_con_nan = df.columns[df.isna().any()].tolist()
-
-    # Crear una copia del dataframe original
-    df_filled = df.copy()
-
-    # OPCION 1: Eliminar cualquier registro con al menos un nan
-    if type == "drop":
-        df_filled = df.dropna().reset_index()  # inplace=True  # df = df.dropna(subset=['dif_forma']).reset_index()  # Elimina filas con al menos un valor nulo en dif_gol (primeros partidos)
-
-    # OPCION 2: Llenar los valores faltantes con el valor más frecuente en cada columna
-    elif type == "fillna_with_mode":
-        for col in columnas_con_nan:
-            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
-
-    # OPCION 3: Llenar los valores faltantes con ML
-    elif type == "fillna_with_ml":
-
-        # Iterar sobre las columnas con valores faltantes
-        for col in columnas_con_nan:
-
-            # Dividir el dataframe en conjunto de entrenamiento y prueba
-            X_train = df_filled.loc[df[col].notnull()].drop(columns=columnas_con_nan)
-            y_train = df_filled.loc[df[col].notnull(), col]
-            X_test = df_filled.loc[df[col].isnull()].drop(columns=columnas_con_nan)
-
-            # Crear un modelo RandomForestRegressor
-            model = RandomForestRegressor()
-
-            # Entrenar el modelo
-            model.fit(X_train, y_train)
-
-            # Predecir los valores faltantes
-            predicted_values = model.predict(X_test)
-
-            # Rellenar los valores faltantes en el dataframe
-            df_filled.loc[df[col].isnull(), col] = predicted_values
-
-    # Imprimir el dataframe después de la imputación
-    return df_filled
-
-
 def prueba():
     # Levanto dataset
     df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/inglaterra/df_part_formated.xlsx')

@@ -134,6 +134,11 @@ class DataPreparation:  # 17.4 min
         df.index = df['id']
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
+        # Tratamiento de NaN values
+        df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
+        df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
+        df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
 
@@ -141,11 +146,6 @@ class DataPreparation:  # 17.4 min
         df_test = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/df_test.xlsx')
         l_selected_features = df_test.columns
         df = df.loc[:, l_selected_features]
-        print(df.shape)
-        print(df.columns)
-
-        # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
-        df = clean_data.treat_nan_values(df, type=treat_nan)
 
         # Vuelvo a seleccionar ultimos n registros
         df_new = df.tail(n_reg)
@@ -205,7 +205,7 @@ def main():
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         treat_nan = 'fillna_with_ml'  # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
-        export = True
+        export = False
 
         # Levanto dataset con los ultimos 15 partidos de la liga argentina
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_next_partido.xlsx')
@@ -218,7 +218,7 @@ def main():
         df_part = prepare.clean_data(df_part, export=export)
         df = prepare.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
-        df = prepare.select_data(df, treat_nan=treat_nan, export=export)
+        df = prepare.select_data(df, treat_nan=treat_nan, export=True)
 
     if modeling:
         # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
@@ -236,11 +236,10 @@ def main():
         # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
         df_res = df.copy()
         df_res['y_pred'] = y_pred
-        df_res.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
 
         # Traduzco predicciones numericas a etiquetas
         df = format_data.target_to_object(df_res, pais)
-        df.to_excel('/Users/nachomondino/Desktop/predicciones_trad.xlsx')
+        df.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

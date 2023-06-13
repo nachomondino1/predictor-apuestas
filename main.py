@@ -175,21 +175,15 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nSeleccionado datos...")
 
-        # Para no borrar registros utiles que no tienen alguna columna en especifico como ataques_pelig, borro columnas con mas nan
-        print(df.shape)
-        # si no borra columnas que tienen mucho nan por ser nan en partidos viejos
-        df = df.dropna(subset=['arbitro', 'odds_loc']) # Si conviene, conviene hacerlo antes o despues?
-        df = select_data.eliminar_columnas_nan(df, 0.5)
-        print(df.shape)
-
-        # Elimino registros sin estadisticas ni formaciones (mucho NaN)
-        print(df.shape)
-        df = df.dropna() # Si conviene, conviene hacerlo antes o despues?
-        df.to_excel('/Users/nachomondino/Desktop/df_selected_dsp_drop_na.xlsx', index=False)
-        print(df.shape)
-
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+
+        # Tratamiento de NaN values
+        df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
+        df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
+        # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
+        df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+        # df = select_data.fill_nan_values(df, type='ml')
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
@@ -199,12 +193,8 @@ class DataPreparation:  # 17.4 min
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        # df.to_excel('/Users/nachomondino/Desktop/df_selected_antes_drop_na.xlsx', index=False)
-        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)   # Le paso el df sin NaN values para evitar ""ValueError: Input X contains NaN.".  Pero no hago fillna() puesto que introduce sesgo
+        l_selected_features = select_data.feature_selection(df, self.var_resp, percentil=perc_fs)
         df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
-
-        # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
-        # df = clean_data.treat_nan_values(df, type=treat_nan)
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -326,7 +316,7 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "argentina"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
@@ -352,7 +342,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         perc_fs = 0.5  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
-        treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
+        treat_nan = 'ml'  # Relleno de nan values: mode o _ml  (si se hace)
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
@@ -365,22 +355,22 @@ def main():  # La idea es poner toda el camino de los datos aqui...
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.8 # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...  --> ENCONTRÉ FALLA
-        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
-        k = 10  # Numero de folds
+        porc_corte = 0.8  # Probar si con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%... como sucedia antes...
+        best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
+        k = 2  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),  # Tarda cdo hago best_params y k=10
-                     xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # num_class = len(y.unique()) Depende del numero de clases...
+                     xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # Tarda aun mas cdo hago best_params y k=10 # num_class = len(y.unique()) Depende del numero de clases...
                      LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
                      SVC(kernel='rbf', decision_function_shape='ovo'),  # --> tarda mas de 1 hora
                      MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling', max_iter=300),
-                     GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)
+                     GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)  # Tarda mucho mucho (+1 hora) cdo hago best_params y k=10
                      # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
                      ]
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(porc_corte=porc_corte, export=export)
+        df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
         best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
         modeler.assess_model(best_model, df_test)
 
