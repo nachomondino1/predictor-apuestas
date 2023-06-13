@@ -128,7 +128,7 @@ def feature_selection(df, var_resp, percentil):  # Esto tene que ser el main, es
 
     # Obtengo importancia de cada variable segun distintos analisis
     d1 = fs.modelos_estadisticos()  # Opción 1: Análisis univariable con tests estadísticos
-    d2 = fs.machine_learning_model(rf,  best_params=False, k=2) # Opcion 2: Random Forest
+    d2 = fs.machine_learning_model(rf,  best_params=True, k=10) # Opcion 2: Random Forest
     d3 = fs.pca()  # Opcion 3: pca
 
     # Guardo resultados en DataFrame

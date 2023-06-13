@@ -4,8 +4,6 @@ from fuzzywuzzy import fuzz
 import warnings
 import time
 from tqdm import tqdm
-import datetime
-from dateutil.relativedelta import relativedelta
 
 
 def player_data_in_match(df_part, df_jug):

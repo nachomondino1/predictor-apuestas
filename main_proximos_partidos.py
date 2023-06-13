@@ -116,28 +116,29 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
+        # Si no han pasado un dataset utilizo un dataframe guardado
+        df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx') if df_new is None else df_new
+
+        # Definicion de variables
+        warnings.filterwarnings('ignore')
+        print("\nSeleccionado datos...")
         n_reg = len(df_new)
 
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        # df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx') if df is None else df
-
         # Levanto dataset viejo para poder calcular variables historicas en el nuevo df
-        df_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
+        df_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_constructed.xlsx')
 
         # Concateno df_new y df_old
         df = pd.concat([df_old, df_new], axis=0).reset_index(drop=True)  # Funciona bien
-
-        warnings.filterwarnings('ignore')
-        print("\nSeleccionado datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df.index = df['id']
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
-        # Tratamiento de NaN values
-        df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
+        # Tratamiento de NaN values --> hace falta aqui? loo hago antes de concatenarlo?
+        df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan
         df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
         df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+        # Ojo que por ahi elimino alguno/s de los proximos partidos
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
@@ -204,7 +205,7 @@ def main():
 
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-        treat_nan = 'fillna_with_ml'  # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
+        treat_nan = 'ml'  # Relleno de nan values: 'mode' o 'ml'
         export = False
 
         # Levanto dataset con los ultimos 15 partidos de la liga argentina
@@ -217,7 +218,7 @@ def main():
         # no le hago format porque ya extraigo la fecha en formato datetime, la copa como 1 o 0 y no tengo posesion_loc ni posesion_vis
         df_part = prepare.clean_data(df_part, export=export)
         df = prepare.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
         df = prepare.select_data(df, treat_nan=treat_nan, export=True)
 
     if modeling:

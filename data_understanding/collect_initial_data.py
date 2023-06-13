@@ -138,7 +138,7 @@ def extract_jugadores_sofifa(l_paises):  # Si bien puede extraer varios paises, 
     crawler.driver.close()
     return df_jug
 
-def extract_partidos_flashscore(l_paises):  # Funciona ok?
+def extract_partidos_flashscore(l_paises):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -162,26 +162,22 @@ def extract_partidos_flashscore(l_paises):  # Funciona ok?
         # POR COMPETICION
         for competicion, categoria in zip(df_comp['nombre'], df_comp['categoria']):
 
-            # Obtengo datos de la competicion
-            print(f' Competicion: {competicion} '.center(120, '+'))
-            competicion_form = competicion.replace(" ", "-")  # formateo competicion para las rutas de archivo y urls
-
             # Ingreso a pagina
+            competicion_form = competicion.replace(" ", "-")  # formateo competicion para las rutas de archivo y urls
             url = f'https://www.flashscore.es/futbol/{pais}/{competicion_form}/archivo/'
             crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
+            print(f' Competicion: {competicion} '.center(120, '+'))
             print(url)
 
             # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
-            boton_cookies = crawler.extract_tag(xpath='.//button[@id="onetrust-accept-btn-handler"]')
-            crawler.click_boton(boton_cookies)
+            crawler.accept_cookies()
 
-            # Extraigo links de temporadas (años)
-            l_tag_temporadas = crawler.extract_tags(xpath='.//section[@id="tournament-page-archiv"]//div[@class="archive__row"]/div[@class="archive__season"]/a')
-            l_urls_temporadas = [tag.get_attribute('href') for tag in l_tag_temporadas]
+            # Extraigo urls de las distintas temporadas de la competicion (años)
+            l_urls_temporadas = crawler.extract_urls_temporadas()
             print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
-            # POR TEMPORADA (PAGINA DE PAGINACION)
-            for url_temp in l_urls_temporadas:
+            # POR TEMPORADA
+            for url_temp in l_urls_temporadas:  # De mas reciente a menos reciente
 
                 # Ingreso a pagina de temporada e imprimo año de la temporada
                 crawler.driver.get(url_temp)
@@ -205,14 +201,14 @@ def extract_partidos_flashscore(l_paises):  # Funciona ok?
                 # POR PARTIDO (c/u identificado con un id)
                 for cont_part, id in enumerate(l_ids, start=1):  # Si no uso cont_part: for id in l_ids:
 
-                    # Definicion de variables
-                    progress_bar.update(1)
-                    id = id[id.rfind('_') + 1:]  # Quito lo que no es del id (e.g. paso de "g_1_fshvzbls" a "fshvzbls")
-                    d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais,'es_copa': 1 if categoria == "Copa" else 0}  # Reinicio diccionario en el que guardar la nueva fila
-                    # print(f" Partido {cont_part} de {len(l_items)}. Recolectado el {cont_part / len(l_items) * 100:.0f}% ".center(120, "."))
+                    progress_bar.update(1)  # print(f" Partido {cont_part} de {len(l_items)}. Recolectado el {cont_part / len(l_items) * 100:.0f}% ".center(120, "."))
 
                     # Ingreso a pagina de informacion del partido
+                    id = id[id.rfind('_') + 1:]  # Quito lo que no es del id (e.g. paso de "g_1_fshvzbls" a "fshvzbls")
                     crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
+
+                    # Reinicio diccionario en el que guardar datos del nuevo partido
+                    d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais,'es_copa': 1 if categoria == "Copa" else 0}
 
                     # EXTRACCION DE CAMPOS
                     fecha_str = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
@@ -252,6 +248,7 @@ def extract_partidos_flashscore(l_paises):  # Funciona ok?
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
+    return df_part
 
 def extract_proximos_partidos_flashcore(l_paises, n_dias_max):  # Funciona ok
     """
@@ -287,8 +284,7 @@ def extract_proximos_partidos_flashcore(l_paises, n_dias_max):  # Funciona ok
             print(url)
 
             # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
-            boton_cookies = crawler.extract_tag(xpath='.//button[@id="onetrust-accept-btn-handler"]')
-            crawler.click_boton(boton_cookies)
+            crawler.accept_cookies()
 
             # Click en boton "Mostrar mas partidos"? No hace falta...
 
@@ -433,6 +429,17 @@ class FlashscoreCrawler(Crawler):
         self.child_driver = self.driver
         # Definir SEC_WAIT, SEC_WAIT_LONG como atrib..
 
+    def accept_cookies(self):
+        # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
+        boton_cookies = super().extract_tag(xpath='.//button[@id="onetrust-accept-btn-handler"]')
+        super().click_boton(boton_cookies)
+
+    def extract_urls_temporadas(self):
+
+        l_tag_temporadas = super().extract_tags(xpath='.//section[@id="tournament-page-archiv"]//div[@class="archive__row"]/div[@class="archive__season"]/a')
+        l_urls_temporadas = [tag.get_attribute('href') for tag in l_tag_temporadas]
+        return l_urls_temporadas
+
     def extract_resumen(self, l_fields):
 
         SEC_WAIT, SEC_WAIT_LONG = 0.2, 1.5
@@ -570,7 +577,7 @@ if __name__ == "__main__":
     l_paises = ['argentina']
 
     # Extraigo partidos
-    # extract_partidos_flashscore(l_paises)
+    df = extract_partidos_flashscore(l_paises)
 
     # Extraigo jugadores
-    extract_jugadores_sofifa(l_paises)
+    # extract_jugadores_sofifa(l_paises)

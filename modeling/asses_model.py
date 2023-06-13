@@ -12,7 +12,7 @@ def calculate_ROI(df_result, var_resp, var_pred): # NO SE QUE NRO LE CORRESPONDE
     :return: ROI del modelo. (float)
     """
     # Levanto etiquetas y codigo de la variable respuesta
-    df_etiquetas = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_etiquetas_equipo_ganador.xlsx')
+    df_etiquetas = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_etiquetas_equipo_ganador.xlsx')
 
     # Definicion de variables
     ingresos = 0
