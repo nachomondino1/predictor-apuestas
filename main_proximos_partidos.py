@@ -95,7 +95,7 @@ class DataPreparation:  # 17.4 min
         # Construyo variables historicas
         l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART / 2))
-        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART,l_var=l_estad_part)  # Estadisticas del partido
+        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
         df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Diferencia de gol
         df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # Rendimiento del equipo
         df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
@@ -186,7 +186,7 @@ def main():
     pais = 'argentina'
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     prepare = DataPreparation(var_resp)
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, True
 
     ## DATA UNDERSTANDING
     if data_unders:
@@ -203,7 +203,6 @@ def main():
     if data_prep:
 
         # Hiperparametros
-        n_anios_df_part = 7  # Numero de ultimos años a tomar de los partidos ya recolectados (si es muy bajo, por ej 3, no llega a construir la variable "historial_entre_si" pues hay un numero de part min...
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         treat_nan = 'fillna_with_ml'  # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         export = True
@@ -217,20 +216,20 @@ def main():
 
         # no le hago format porque ya extraigo la fecha en formato datetime, la copa como 1 o 0 y no tengo posesion_loc ni posesion_vis
         df_part = prepare.clean_data(df_part, export=export)
-        df = prepare.integrate_data(df_part, df_jug, export=True)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
+        df = prepare.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
         df = prepare.select_data(df, treat_nan=treat_nan, export=export)
 
     if modeling:
         # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
 
-        df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
+        # df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
 
         ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
         df_test_pred = df.copy().drop(['equipo_ganador', 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
         print(df_test_pred.shape)
 
-        loaded_model = pickle.load(open("/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/modelo.pkl", "rb"))
+        loaded_model = pickle.load(open(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/{pais}/modelo.pkl", "rb"))
 
         y_pred = loaded_model.predict(df_test_pred)
 

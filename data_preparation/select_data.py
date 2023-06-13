@@ -11,6 +11,18 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 
+def eliminar_columnas_nan(df, umbral):
+    # Calcula la proporción de NaN en cada columna
+    prop_nan = df.isna().mean()
+
+    # Identifica las columnas con una proporción de NaN mayor al umbral
+    columnas_eliminar = prop_nan[prop_nan > umbral].index
+
+    # Elimina las columnas identificadas del DataFrame
+    df_sin_nan = df.drop(columnas_eliminar, axis=1)
+    print(f"Columnas a eliminar por mas del {umbral*100:.0f}% de nan: {columnas_eliminar}")
+    return df_sin_nan
+
 def eliminar_columnas_correlacionadas(df, var_resp, umbral):
 
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar

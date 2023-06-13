@@ -175,6 +175,19 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nSeleccionado datos...")
 
+        # Para no borrar registros utiles que no tienen alguna columna en especifico como ataques_pelig, borro columnas con mas nan
+        print(df.shape)
+        # si no borra columnas que tienen mucho nan por ser nan en partidos viejos
+        df = df.dropna(subset=['arbitro', 'odds_loc']) # Si conviene, conviene hacerlo antes o despues?
+        df = select_data.eliminar_columnas_nan(df, 0.5)
+        print(df.shape)
+
+        # Elimino registros sin estadisticas ni formaciones (mucho NaN)
+        print(df.shape)
+        df = df.dropna() # Si conviene, conviene hacerlo antes o despues?
+        df.to_excel('/Users/nachomondino/Desktop/df_selected_dsp_drop_na.xlsx', index=False)
+        print(df.shape)
+
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
@@ -191,7 +204,7 @@ class DataPreparation:  # 17.4 min
         df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
 
         # Tratamiento de NaN values (drop, fillna con moda, fillna con random forest)
-        df = clean_data.treat_nan_values(df, type=treat_nan)
+        # df = clean_data.treat_nan_values(df, type=treat_nan)
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -338,25 +351,25 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-        perc_fs = 0.6  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+        perc_fs = 0.5  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
         treat_nan = 'fillna_with_ml' # Tratamiento de nan values: dropna, fillna_with_mode, fillna_with_ml
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
-        df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
-        df = prepare.integrate_data(df_part, df_jug, export=export)
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
-        prepare.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
+        # df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
+        # df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
+        # df = prepare.integrate_data(df_part, df_jug, export=export)
+        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        df = prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.8 # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...
-        best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
-        k = 2  # Numero de folds
+        porc_corte = 0.8 # Con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%...  --> ENCONTRÉ FALLA
+        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
+        k = 10  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
-                     RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),
+                     RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),  # Tarda cdo hago best_params y k=10
                      xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # num_class = len(y.unique()) Depende del numero de clases...
                      LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
                      SVC(kernel='rbf', decision_function_shape='ovo'),  # --> tarda mas de 1 hora
