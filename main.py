@@ -35,7 +35,8 @@ class DataPreparation:  # 17.4 min
 
     def format_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
         """
-        Arreglo el data type de algunas variables
+        Arreglo el data type de algunas variables.
+
         :param df_part: Dataframe de los datos de los partidos. (DataFrame)
         :param df_jug: Dataframe de los datos de los jugadores. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataset generado. True para exportar, False de lo contrario. (bool)
@@ -49,7 +50,7 @@ class DataPreparation:  # 17.4 min
         print("\nFormateando los datos...")
 
         # Entidad partido: fecha, posesion y es_copa
-        df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        # df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
         df_part = format_data.convert_posesion_to_int(df_part)  # Podria usar la limpieza de punct de tp y luego convertir a int64 pero as al pedo
         df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
 
@@ -69,6 +70,7 @@ class DataPreparation:  # 17.4 min
     def clean_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
         """
         Limpia los datos de un dataframe.
+
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
@@ -100,6 +102,7 @@ class DataPreparation:  # 17.4 min
     def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
+
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
@@ -125,6 +128,7 @@ class DataPreparation:  # 17.4 min
     def construct_data(self, df=None, N_ULT_PART=5, export=False):  # 2.7 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
+
         :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param N_ULT_PART: Número de últimos partidos a considerar para el cálculo de variables. (int)
         :param export: Booleano para indicar si se debe exportar el dataframe construido. True para exportar, False de lo contrario. (bool)
@@ -146,8 +150,7 @@ class DataPreparation:  # 17.4 min
         l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
-        df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Diferencia de gol
-        df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # Rendimieento del equipo
+        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)  # Segun diferencia de gol y puntos
         df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
@@ -164,6 +167,7 @@ class DataPreparation:  # 17.4 min
     def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, treat_nan='drop', export=False):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
+
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe con las variables seleccionadas. (DataFrame)
@@ -179,22 +183,24 @@ class DataPreparation:  # 17.4 min
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
         # Tratamiento de NaN values
-        df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-        df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
-        # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
-        df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
-        # df = select_data.fill_nan_values(df, type='ml')
+        df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
+        df = clean_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df = format_data.convert_columns_to_int(df)
+        df, df_etiquetas = format_data.convert_columns_to_int(df)
+        df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
         # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
         l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        l_selected_features = select_data.feature_selection(df, self.var_resp, percentil=perc_fs)
+        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)
         df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
+
+        # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
+        df = clean_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+        # df = select_data.fill_nan_values(df, type='ml')
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -214,6 +220,7 @@ class Modeling:
     def generate_test_design(self, df=None, porc_corte=0.8, export=True):
         """
         Balancea el dataset y separa en conjuntos de entrenamiento y testeo
+
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
@@ -230,17 +237,17 @@ class Modeling:
         df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
         print(f"Shape dataframe original: {df.shape}")
 
-        # # Balanceamos segun variable respuesta   --> no es el problema. Las precisiones son peores sin el pero   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
+        # Balanceamos segun variable respuesta   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
         X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
         df_balanced = pd.concat([X_bal, y_bal], axis=1)
         print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
 
-        # Shuffle dataset (si bien separate_train_and_test() hará shuffle, me quiero asegurar siempre de evitar cualquier sesgo tras el agregado de filas por el balanceo)
+        # Shuffle dataset  # si bien separate_train_and_test() hará shuffle, me quiero asegurar siempre de evitar cualquier sesgo tras el agregado de filas por el balanceo
         df_balanced = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
 
         # Separo conjunto de datos en train y test --> tampoco es el problema...
         df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
-        print(f"Shape de df_train y df_test : {df_train.shape} {df_test.shape}")
+        print(f"Shape df_train: {df_train.shape} \nShape df_test:{df_test.shape}")
 
         if export:
             df_train.to_excel(f'./modeling/data/{self.pais}/df_train.xlsx', index=False)
@@ -250,7 +257,8 @@ class Modeling:
 
     def select_best_model(self, df_train, l_modelos, best_params=False, k=10, export=True):
         """
-        Selecciona el mejor modelo a partir de la precision
+        Selecciona el mejor modelo a partir de la precision.
+
         :param df_train: Dataframe de entrenamiento. (DataFrame)
         :param l_modelos: Lista de nombres de modelos a probar. (Lista)
         :param best_params: Booleano para indicar si se deben buscar los mejores hiperparametros para cada modelo. True
@@ -262,13 +270,14 @@ class Modeling:
         # Definicion de variables
         warnings.filterwarnings("ignore")
         df_models = pd.DataFrame(columns=['model', 'cv_accuracy', 'cv_roi'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
+        self.df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
         print("\nSeleccionando el mejor modelo...")
 
         # Entreno modelos
         for modelo in l_modelos:
 
             # print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, best_params, k)  # Le paso pais por df_etiquetas...?
+            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, self.df_etiquetas, best_params, k)  # Le paso pais por df_etiquetas...?
             df_models.loc[len(df_models)] = [model, cv_accuracy, cv_roi]
 
         # Selecciono el mejor modelo
@@ -284,12 +293,12 @@ class Modeling:
 
     def assess_model(self, model, df_test, export=True):
         """
-        # Hago prediccion aca? y calculo metricas?
+        Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
-        :param model: Modelo de Machine Learning. (sklearn.ensemble)
-        :param df_test: Dataframe de testeo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
-        :return: Precision del modelo y roi en el conjunto de testeo. (int) y (float)
+        :param model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
+        :param df_test: DataFrame de prueba. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, False de lo contrario. (bool)
+        :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluando modelo con datos de prueba...")
 
@@ -304,7 +313,7 @@ class Modeling:
 
         # Calculo metricas e imprimo resultados
         test_accuracy = accuracy_score(df_test[self.var_resp], df_test[self.var_pred]) * 100
-        roi = calculate_ROI(df_test, self.var_resp, self.var_pred)
+        roi = calculate_ROI(df_test, self.var_resp, self.var_pred, self.df_etiquetas) * 100
         print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
         confusion_matrix(df_test, self.var_resp, self.var_pred)  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
 
@@ -316,11 +325,11 @@ class Modeling:
 def main():  # La idea es poner toda el camino de los datos aqui...
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, True, True
+    data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"  # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina" # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
-    prepare, modeler = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
+    dp, mo = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
 
     if data_unders is True:
 
@@ -346,11 +355,11 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        # df_part, df_jug = prepare.format_data(export=export)  # df_part, df_jug,
-        # df_part, df_jug = prepare.clean_data(df_part, df_jug, export=export)
-        # df = prepare.integrate_data(df_part, df_jug, export=export)
-        # df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
-        df = prepare.select_data(thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
+        # df_part, df_jug = dp.format_data(export=export)  # df_part, df_jug,
+        # df_part, df_jug = dp.clean_data(df_part, df_jug, export=export)
+        # df = dp.integrate_data(df_part, df_jug, export=export)
+        df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
+        df = dp.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
@@ -370,9 +379,9 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = modeler.generate_test_design(df, porc_corte=porc_corte, export=export)
-        best_model = modeler.select_best_model(df_train, l_modelos, best_params, k, export=export)
-        modeler.assess_model(best_model, df_test)
+        df_train, df_test = mo.generate_test_design(porc_corte=porc_corte, export=export)
+        best_model = mo.select_best_model(df_train, l_modelos, best_params, k, export=export)
+        mo.assess_model(best_model, df_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

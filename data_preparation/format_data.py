@@ -44,33 +44,74 @@ def convert_valor_mercado_to_int(df):
     df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
     return df
 
-def convert_columns_to_int(df):
+def convert_columns_to_int(df, df_etiquetas=None):  #Funciona?
+    """
+    Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores originales y enteros correspondientes.
 
-    # Convertir variables categoricas string a categoricas numericas
-    le = LabelEncoder()
+    :param df: DataFrame que contiene las variables a convertir.
+    :param pais: País para el cual se realiza la conversión.
+    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
+    """
+    # Si aun no tengo un sistema de codificacion
+    if df_etiquetas is None:
 
-    # Por variable string
-    for col in df.select_dtypes(include=['object']).columns:
-        df[col] = le.fit_transform(df[col])
+        # Convertir variables categóricas string a categóricas numéricas
+        le = LabelEncoder()
+        df_etiquetas = pd.DataFrame(columns=['variable', 'valor_orig', 'valor_int'])
 
-        # Verificar si la variable es "equipo_ganador"
-        if col == "equipo_ganador":
-            etiquetas = le.classes_
-            codigos = le.transform(etiquetas)
-            df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
-            df_etiquetas.to_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_etiquetas_equipo_ganador.xlsx", index=False)
+        # Por variable string
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = le.fit_transform(df[col])
 
-    return df
+            l_valor_orig = le.classes_
+            l_valor_int = le.transform(l_valor_orig)
 
-def target_to_object(df, pais):
+            # Guardo en dataframe
+            for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
+                df_etiquetas.loc[len(df_etiquetas)] = [col, valor_orig, valor_int]
 
-    # Levanto df_etiquetas
-    etiquetas_file_path = f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx"
-    df_etiquetas = pd.read_excel(etiquetas_file_path)
+        return df, df_etiquetas
+
+    # Si ya tengo un sistema de codificacion
+    else:
+        # Por variable a codificar
+        for col in df_etiquetas['variable'].unique():
+
+            l_valor_orig = df_etiquetas[df_etiquetas['variable'] == col]['valor_orig']
+            l_valor_int = df_etiquetas[df_etiquetas['variable'] == col]['valor_int']
+
+            # Guardo en dataframe
+            for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
+                df[col] = df[col].replace(valor_orig, valor_int)
+
+        return df
+
+def target_to_object(df, df_etiquetas):
 
     # Reemplazo codigos por etiquetas
-    codigo_etiqueta_dict = dict(zip(df_etiquetas['Código'], df_etiquetas['Etiqueta']))
-    df['y_pred_etiqueta'] = df['y_pred'].replace(codigo_etiqueta_dict)
+    df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == 'equipo_ganador']
+    l_valor_orig = list(df_etiquetas_filt['valor_orig'])
+    l_valor_int = list(df_etiquetas_filt['valor_int'])
+    mapping = dict(zip(l_valor_int, l_valor_orig))
+    df['y_pred_etiqueta'] = df['y_pred'].map(mapping)
+    return df
+
+def revert_columns_from_int(df, df_etiquetas, columns=None):  # Podria reemplazar target_to_object() pero no puedo usar columns = ['y_pred']
+    """
+    Convierte las variables numéricas a sus valores originales utilizando el DataFrame df_etiquetas.
+
+    :param df: DataFrame que contiene las variables a revertir.
+    :param df_etiquetas: DataFrame que contiene las etiquetas originales y los valores enteros correspondientes.
+    :return: DataFrame con las variables revertidas a sus valores originales.
+    """
+    columns = df_etiquetas['variable'].unique() if columns is None else columns
+
+    for col in columns:
+        df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == col]
+        l_valor_orig = list(df_etiquetas_filt['valor_orig'])  # list() Para evitar TypeError: 'numpy.int64' object is not iterable
+        l_valor_int = list(df_etiquetas_filt['valor_int'])
+        mapping = dict(zip(l_valor_int, l_valor_orig))
+        df[col] = df[col].map(mapping)
     return df
 
 def prueba():
@@ -93,3 +134,102 @@ def prueba():
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     prueba()
+
+
+'''
+def convert_columns_to_int_new(df):  # sin la opcion de darle el sistema de codificacion...
+    """
+    Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores originales y enteros correspondientes.
+
+    :param df: DataFrame que contiene las variables a convertir.
+    :param pais: País para el cual se realiza la conversión.
+    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
+    """
+    # Convertir variables categóricas string a categóricas numéricas
+    le = LabelEncoder()
+    df_etiquetas = pd.DataFrame(columns=['variable', 'valor_orig', 'valor_int'])
+
+    # Por variable string
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = le.fit_transform(df[col])
+
+        l_valor_orig = le.classes_
+        l_valor_int = le.transform(l_valor_orig)
+
+        # Guardo en dataframe
+        for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
+
+            df_etiquetas.loc[len(df_etiquetas)] = [col, valor_orig, valor_int]
+
+    return df, df_etiquetas
+
+
+def convert_columns_to_int_current(df, pais):
+
+    # Convertir variables categoricas string a categoricas numericas
+    le = LabelEncoder()
+    df_etiquetas = pd.DataFrame(columns=['variable', 'valor_orig', 'valor_int'])
+
+    # Por variable string
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = le.fit_transform(df[col])
+
+        valor_orig = le.classes_
+        valor_int = le.transform(valor_orig)
+
+
+        df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
+
+        # Verificar si la variable es "equipo_ganador"
+        """
+        if col == "equipo_ganador":
+            etiquetas = le.classes_
+            codigos = le.transform(etiquetas)
+            df_etiquetas = pd.DataFrame({"Etiqueta": etiquetas, "Código": codigos})
+            df_etiquetas.to_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx", index=False)
+        """
+
+    return df
+
+def target_to_object(df, pais):
+
+    # Levanto df_etiquetas
+    etiquetas_file_path = f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx"
+    df_etiquetas = pd.read_excel(etiquetas_file_path)
+
+    # Reemplazo codigos por etiquetas
+    codigo_etiqueta_dict = dict(zip(df_etiquetas['Código'], df_etiquetas['Etiqueta']))
+    df['y_pred_etiqueta'] = df['y_pred'].replace(codigo_etiqueta_dict)
+    return df
+    
+def revert_columns_from_int(df, df_etiquetas, columns=None):  # Reemplazaria target_to_object()
+    """
+    Convierte las variables numéricas a sus valores originales utilizando el DataFrame df_etiquetas.
+
+    :param df: DataFrame que contiene las variables a revertir.
+    :param df_etiquetas: DataFrame que contiene las etiquetas originales y los valores enteros correspondientes.
+    :return: DataFrame con las variables revertidas a sus valores originales.
+    """
+    columns = df_etiquetas['variable'].unique() if columns is None else columns
+
+    for col in columns:
+        df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == col]
+        l_valor_orig = df_etiquetas_filt['valor_orig'].values[0]
+        l_valor_int = df_etiquetas_filt['valor_int'].values[0]
+        mapping = dict(zip(l_valor_int, l_valor_orig))
+        df[col] = df[col].map(mapping)
+
+    return df
+    
+def target_to_object(df, pais):
+
+    # Levanto df_etiquetas
+    etiquetas_file_path = f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas_equipo_ganador.xlsx"
+    df_etiquetas = pd.read_excel(etiquetas_file_path)
+
+    # Reemplazo codigos por etiquetas
+    codigo_etiqueta_dict = dict(zip(df_etiquetas['Código'], df_etiquetas['Etiqueta']))
+    df['y_pred_etiqueta'] = df['y_pred'].replace(codigo_etiqueta_dict)
+    return df
+
+'''

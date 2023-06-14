@@ -9,77 +9,7 @@ import warnings
 from sklearn.preprocessing import scale
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-
-# TRATAMIENTO DE NAN VALUES
-def fill_nan_values(df, type):
-    columnas_con_nan = df.columns[df.isna().any()].tolist()
-
-    # Crear una copia del dataframe original
-    df_filled = df.copy()
-
-    # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
-    if type == "mode":
-        for col in columnas_con_nan:
-            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
-
-    # OPCION 2: Llenar los valores faltantes con ML
-    elif type == "ml":
-
-        # Iterar sobre las columnas con valores faltantes
-        for col in columnas_con_nan:
-
-            # Dividir el dataframe en conjunto de entrenamiento y prueba
-            X_train = df_filled.loc[df[col].notnull()].drop(columns=columnas_con_nan)
-            y_train = df_filled.loc[df[col].notnull(), col]
-            X_test = df_filled.loc[df[col].isnull()].drop(columns=columnas_con_nan)
-
-            # Crear un modelo RandomForestRegressor
-            model = RandomForestRegressor()
-
-            # Entrenar el modelo
-            model.fit(X_train, y_train)
-
-            # Predecir los valores faltantes
-            predicted_values = model.predict(X_test)
-
-            # Rellenar los valores faltantes en el dataframe
-            df_filled.loc[df[col].isnull(), col] = predicted_values
-
-    # Imprimir el dataframe después de la imputación
-    return df_filled
-
-def eliminar_filas_nan(df, umbral):
-    """
-    Elimina las filas de un DataFrame que contienen un porcentaje alto de valores NaN.
-
-    Args:
-        df (pandas.DataFrame): DataFrame de entrada.
-        umbral (float): Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una fila.
-
-    Returns:
-        pandas.DataFrame: DataFrame resultante después de eliminar las filas con valores NaN.
-
-    """
-    # Elimino filas segun umbral
-    porcentaje_nan = df.isnull().mean(axis=1)  # Calcula el porcentaje de valores NaN en cada fila
-    filas_a_eliminar = porcentaje_nan[porcentaje_nan > umbral].index  # Obtiene las filas que superan el umbral
-    print(f"Se eliminó el {len(filas_a_eliminar)/len(df)*100:.0f}% de filas, quedan {len(df) - len(filas_a_eliminar)} filas.")
-
-    # Elimino filas segun umbral
-    df_filtrado = df.drop(filas_a_eliminar)  # Elimina las filas con valores NaN
-    return df_filtrado
-
-def eliminar_columnas_nan(df, umbral):
-    # Calcula la proporción de NaN en cada columna
-    prop_nan = df.isna().mean()
-
-    # Identifica las columnas con una proporción de NaN mayor al umbral
-    columnas_eliminar = prop_nan[prop_nan > umbral].index
-
-    # Elimina las columnas identificadas del DataFrame
-    df_sin_nan = df.drop(columnas_eliminar, axis=1)
-    print(f"Columnas a eliminar por mas del {umbral*100:.0f}% de nan: {list(columnas_eliminar)}")
-    return df_sin_nan
+from modeling.build_model import select_best_hiperparameters
 
 # CORRELACION
 def eliminar_columnas_correlacionadas(df, var_resp, umbral):
@@ -193,13 +123,30 @@ class FeatureSelection():
         self.graficar_importancia_atrib(l_features, l_scores)
         return d
 
+    def train_model(self, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
+
+        # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
+        df_train_without_odds = self.df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+
+        # Dividir los datos en conjunto de entrenamiento y prueba
+        X_train, y_train = df_train_without_odds.drop(self.var_resp, axis=1), df_train_without_odds[self.var_resp]
+
+        # Verificar si se deben buscar los mejores hiperparámetros
+        if best_params:
+            model = select_best_hiperparameters(X_train, y_train, model, k)
+
+        # Entrenar el modelo final con todos los datos de entrenamiento
+        model.fit(X_train, y_train)
+        return model
+
     def machine_learning_model(self, modelo, best_params=True, k=10):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
 
         # Definicion de variables
         d = {}
 
         # Entreno modelo
-        model, accuracy, roi = train_model(self.df, self.var_resp, modelo, best_params=best_params, k=k)
+        # model, accuracy, roi = train_model(self.df, self.var_resp, modelo, best_params=best_params, k=k)
+        model = self.train_model(modelo, best_params, k)
 
         # Defino variables y su importancia
         l_features = self.df.drop(['odds_loc', 'odds_emp', 'odds_vis', self.var_resp], axis=1).columns
@@ -294,7 +241,7 @@ class FeatureSelection():
 def prueba():
     warnings.filterwarnings('ignore')
 
-    from data_preparation import format_data
+    from data_preparation import format_data, clean_data
 
     var_resp = 'equipo_ganador'
     pais = 'argentina'
@@ -308,30 +255,21 @@ def prueba():
     df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
     # TRATAMIENTO DE NAN VALUES
-    # Cuand conviene eliminar NaN values? Antes de el analisis de correelacion, antes de construir datos, antes de cuando?
     # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-    df = eliminar_filas_nan(df, umbral=0.5)
+    df = clean_data.eliminar_filas_nan(df, umbral=0.5)
 
     prop_nan = df.isna().mean()
     print(prop_nan)
 
     # 2º elimino columnas con mucho NaN
-    df = eliminar_columnas_nan(df, umbral=0.2)
+    df = clean_data.eliminar_columnas_nan(df, umbral=0.2)
 
     prop_nan = df.isna().mean()
     print(prop_nan)
     print(df.shape)
 
-    df_2 = df.copy()
-
     # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
-    n_filas_antes_drop = df.shape[0]
-    df = df.dropna()
-    n_filas_dsp_drop = df.shape[0]
-    print(f"Se eliminó el {100 - (n_filas_dsp_drop / n_filas_antes_drop * 100):.0f}% de filas, quedan {n_filas_dsp_drop} filas.")
-
-    df_3 = eliminar_filas_nan(df_2, umbral=0)  # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
-
+    df = clean_data.eliminar_filas_nan(df, umbral=0)
     df.to_excel('/Users/nachomondino/Desktop/df_selected_dsp_drop_na.xlsx', index=False)
 
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)

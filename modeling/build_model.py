@@ -7,7 +7,7 @@ from modeling.asses_model import calculate_ROI  # Metrica de roi
 # from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 
-def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
+def train_model(df_train, var_resp, model, df_etiquetas, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
 
     # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
     df_train_without_odds = df_train.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
@@ -44,7 +44,7 @@ def train_model(df_train, var_resp, model, best_params=False, k=5):  # antes rec
 
         # Calcular la precisión y el roi en el conjunto de validación
         accuracy = accuracy_score(y_test_fold, y_pred) * 100
-        roi = calculate_ROI(df_res, var_resp, 'y_pred')
+        roi = calculate_ROI(df_res, var_resp, 'y_pred', df_etiquetas) * 100
         scores.append(accuracy)
         rois.append(roi)
         # print(f'Fold {i} --> Precision: {accuracy:.1f}%  ROI: {roi:.1f}%')

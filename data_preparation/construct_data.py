@@ -3,7 +3,7 @@ import time
 import math
 
 
-def determinar_equipo_ganador(df):  # Se podria simplificar con?: df['equipo_ganador'] = np.where(df['goles_loc'] > df['goles_vis'], 'Local', np.where(df['goles_loc'] < df['goles_vis'], 'Visitante', 'Empate'))
+def determinar_equipo_ganador(df):
     """
     Se determina el 'equipo_ganador' a partir de los goles que hizo cada equipo
     :param df: Dataframe. Unidad de analisis: partido. Columnas: entre ellas goles_loc y goles_vis
@@ -21,11 +21,12 @@ def determinar_equipo_ganador(df):  # Se podria simplificar con?: df['equipo_gan
 
 def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar la variable en los ultimos partidos, no para sumar..
     """
-    Determina la cantidad de goles anotados y recibidos en los ultimos partidos
+    Obtiene el promedio de las estadisticas en los ultimos partidos
+
     :param df: Dataframe.
     :param n_ult_part: Integer. Numero de partidos de los cuales obtener los goles
     :param variable: String. Nombre de variable a promediar
-    :return: Dataframe con columnas goles_ult_part_loc y goles_ult_part_vis.
+    :return: Dataframe con estadisticas promediadas
     """
     # Ordeno por fecha descendiente
     df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
@@ -71,9 +72,8 @@ def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar l
         df[f'dif_{variable}_segun_ult_part'] = df[f'prom_{variable}_ult_part_loc'] - df[f'prom_{variable}_ult_part_vis']
 
         # Elimino columnas utilizadas para calcular tanto el promedio como la diferencia
-        # df = df.drop(columns=[f'{variable}_loc', f'{variable}_vis', f'prom_{variable}_ult_part_loc', f'prom_{variable}_ult_part_vis'])
+        df = df.drop(columns=[f'{variable}_loc', f'{variable}_vis', f'prom_{variable}_ult_part_loc', f'prom_{variable}_ult_part_vis'])
     return df
-
 
 def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # quiero poner historial_entre_si segun localia. Es decir, para el partido River-Boca quiero poner el historial de los ultimos 5 River-Boca en el monumental (y no en los estadios)
     """
@@ -146,7 +146,6 @@ def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # qu
                 else:
                     break
     return df
-
 
 def rendimiento_equipo(df, n_ult_part, peso_puntos):  # funciona perfecto la normalizacion
     """

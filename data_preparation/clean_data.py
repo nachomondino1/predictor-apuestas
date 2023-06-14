@@ -25,7 +25,7 @@ def clean_teams_names(df):
     :return: Dataframe con nombres de equipos modificados y limpios
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
-    df['equipo_loc'] = df['equipo_loc'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
+    df['equipo_loc'] = df['equipo_loc'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()  # no funcionó en main_next_matches.py
     df['equipo_vis'] = df['equipo_vis'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
 
     # Quitar abreviaturas en nombres de equipos (NO FUNCIONA...)
@@ -41,6 +41,77 @@ def clean_teams_names(df):
         df['equipo_vis'] = df['equipo_vis'].replace(equipo_part, equipo_jug)
 
     return df
+
+# TRATAMIENTO DE NAN VALUES
+def fill_nan_values(df, type):
+    columnas_con_nan = df.columns[df.isna().any()].tolist()
+
+    # Crear una copia del dataframe original
+    df_filled = df.copy()
+
+    # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
+    if type == "mode":
+        for col in columnas_con_nan:
+            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+
+    # OPCION 2: Llenar los valores faltantes con ML
+    elif type == "ml":
+
+        # Iterar sobre las columnas con valores faltantes
+        for col in columnas_con_nan:
+
+            # Dividir el dataframe en conjunto de entrenamiento y prueba
+            X_train = df_filled.loc[df[col].notnull()].drop(columns=columnas_con_nan)
+            y_train = df_filled.loc[df[col].notnull(), col]
+            X_test = df_filled.loc[df[col].isnull()].drop(columns=columnas_con_nan)
+
+            # Crear un modelo RandomForestRegressor
+            model = RandomForestRegressor()
+
+            # Entrenar el modelo
+            model.fit(X_train, y_train)
+
+            # Predecir los valores faltantes
+            predicted_values = model.predict(X_test)
+
+            # Rellenar los valores faltantes en el dataframe
+            df_filled.loc[df[col].isnull(), col] = predicted_values
+
+    # Imprimir el dataframe después de la imputación
+    return df_filled
+
+def eliminar_filas_nan(df, umbral):
+    """
+    Elimina las filas de un DataFrame que contienen un porcentaje alto de valores NaN.
+
+    Args:
+        df (pandas.DataFrame): DataFrame de entrada.
+        umbral (float): Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una fila.
+
+    Returns:
+        pandas.DataFrame: DataFrame resultante después de eliminar las filas con valores NaN.
+
+    """
+    # Elimino filas segun umbral
+    porcentaje_nan = df.isnull().mean(axis=1)  # Calcula el porcentaje de valores NaN en cada fila
+    filas_a_eliminar = porcentaje_nan[porcentaje_nan > umbral].index  # Obtiene las filas que superan el umbral
+    print(f"Se eliminó el {len(filas_a_eliminar)/len(df)*100:.0f}% de filas, quedan {len(df) - len(filas_a_eliminar)} filas.")
+
+    # Elimino filas segun umbral
+    df_filtrado = df.drop(filas_a_eliminar)  # Elimina las filas con valores NaN
+    return df_filtrado
+
+def eliminar_columnas_nan(df, umbral):
+    # Calcula la proporción de NaN en cada columna
+    prop_nan = df.isna().mean()
+
+    # Identifica las columnas con una proporción de NaN mayor al umbral
+    columnas_eliminar = prop_nan[prop_nan > umbral].index
+
+    # Elimina las columnas identificadas del DataFrame
+    df_sin_nan = df.drop(columnas_eliminar, axis=1)
+    print(f"Columnas a eliminar por mas del {umbral*100:.0f}% de nan: {list(columnas_eliminar)}")
+    return df_sin_nan
 
 def prueba():
     # Levanto dataset

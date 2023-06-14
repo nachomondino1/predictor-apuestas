@@ -1,11 +1,21 @@
 import pandas as pd
 
+
+'''
+import math
+
 # Demostracion de por que falla construct data en la construccion de variables historicas...
 # No calcula la cuenta cuando hay nan...
 n_ult_part = 5
 l = [1, 2, 3, None, 5]
+l = [None, None, None, None, None]
 
-print(sum(l) / n_ult_part)
+l_sin_nan = list(filter(lambda x: x is not None and not math.isnan(x), l))  # l_sin_nan = list(filter(lambda x: not math.isnan(x), l))
+
+print(l_sin_nan)
+
+print(sum(l_sin_nan) / n_ult_part)
+'''
 
 '''
 pais = 'argentina'
@@ -50,13 +60,16 @@ print(fecha_dt.month)
 '''
 
 
-''' concatenar df_seg...
+# concatenar df_seg...
 import pandas as pd
+from data_preparation import format_data
 
 # Levanto datasets a concatenar
-df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/inglaterra/entidad_partido.xlsx')
-df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/premier-league_2018_2019_inglaterra.xlsx')
-df_3 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/premier-league_2006_2007_inglaterra.xlsx')
+df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/data_seg/liga_profesional.xlsx')
+df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/data_seg/entidad_partido.xlsx')
+# df_3 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/premier-league_2006_2007_inglaterra.xlsx')
+
+df_1 = format_data.convert_fecha_to_datetime(df_1,string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
 
 # Imprimo caracteristicas de cada dataframe a concatenar
 print(df_1.head(1))
@@ -65,13 +78,14 @@ print(df_1.shape)
 print(df_2.head(1))
 print(df_2.shape)
 
-print(df_3.head(1))
-print(df_3.shape)
+# print(df_3.head(1))
+# print(df_3.shape)
 
 # Concateno dataframes
-df_concat = pd.concat([df_1, df_2, df_3], axis=0)
+# df_concat = pd.concat([df_1, df_2, df_3], axis=0)
+df_concat = pd.concat([df_1, df_2], axis=0)
+
 print(df_concat.head(1))
 print(df_concat.shape)
 
-df_concat.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data/data_seg/entidad_partido_inglaterra.xlsx', index=False)
-'''
+df_concat.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/entidad_partido.xlsx', index=False)

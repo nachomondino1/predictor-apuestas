@@ -12,8 +12,9 @@ from dspy.data_understanding.describe_data import getting_to_know_data
 
 class DataPreparation:  # 17.4 min
 
-    def __init__(self, var_resp):
+    def __init__(self, var_resp, pais):
         self.var_resp = var_resp
+        self.pais = pais
 
     def clean_data(self, df_part=None, export=False):  # 0.0 min
         """
@@ -23,7 +24,7 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe limpiado. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        df_part = pd.read_excel('./data_preparation/data/df_part_formated.xlsx') if df_part is None else df_part
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{self.pais}/entidad_next_partido.xlsx') if df_part is None else df_part
 
         print("\nLimpiando los datos...")
 
@@ -34,7 +35,7 @@ class DataPreparation:  # 17.4 min
         df_part = clean_data.clean_teams_names(df_part)
 
         if export:
-            df_part.to_excel('/Users/nachomondino/Desktop/df_part_cleaned_next_matches.xlsx', index=False)
+            df_part.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_part_cleaned_next_matches.xlsx', index=False)
 
         return df_part
 
@@ -46,7 +47,7 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe integrado. (DataFrame)
         """
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_part_cleaned.xlsx') if df_part is None else df_part
+        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_part_cleaned_next_matches.xlsx') if df_part is None else df_part
         df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_jug_cleaned.xlsx') if df_jug is None else df_jug
 
         start = time.time()
@@ -59,11 +60,11 @@ class DataPreparation:  # 17.4 min
         print(f"Integracion de datos en {(end - start) / 60:.1f} minutos")
 
         if export:
-            df_integrated.to_excel('/Users/nachomondino/Desktop/df_integrated_next_matches.xlsx', index=False)
+            df_integrated.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_integrated_next_matches.xlsx', index=False)
 
         return df_integrated
 
-    def construct_data(self, df_new=None, N_ULT_PART=5, export=False):  # 2.7 minutos
+    def construct_data(self, df_new=None, N_ULT_PART=5, export=False):  # 1.6 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
         :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -72,7 +73,10 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe construido. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        # df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx') if df is None else df
+        # df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_integrated.xlsx') if df is None else df
+
+        start = time.time()
+        print("\nConstruyendo datos...")
 
         n_reg = len(df_new)
 
@@ -96,8 +100,7 @@ class DataPreparation:  # 17.4 min
         l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART / 2))
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
-        df = construct_data.promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Diferencia de gol
-        df = construct_data.forma_reciente(df, n_part=N_ULT_PART)  # Rendimiento del equipo
+        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
         df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
@@ -105,8 +108,13 @@ class DataPreparation:  # 17.4 min
 
         # Vuelvo a seleccionar ultimos n registros
         df_new = df.tail(n_reg)
+
+        end = time.time()
+        print(f"Construcción de datos en {(end - start) / 60:.1f} minutos")
+
         if export:
-            df_new.to_excel('/Users/nachomondino/Desktop/df_constructed_next_matches.xlsx', index=False)
+            df_new.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_constructed_next_matches.xlsx', index=False)
+
         return df_new
 
     def select_data(self, df_new=None, treat_nan='drop', export=False):  # 1.3 minutos
@@ -117,7 +125,7 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx') if df_new is None else df_new
+        df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_constructed_next_matches.xlsx') if df_new is None else df_new
         df = df_new.copy()
 
         # Definicion de variables
@@ -145,21 +153,23 @@ class DataPreparation:  # 17.4 min
         # Ojo que por ahi elimino alguno/s de los proximos partidos
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df = format_data.convert_columns_to_int(df)
+        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+        df = format_data.convert_columns_to_int(df, df_etiquetas)  # CUIDADO! NO USAR "df = format_data.convert_columns_to_int(df)" PUESTO QUE PUEDE USAR UN SISTEMA DE CODIFICACION ≠ AL QUE SE USO PARA ENTRENAR AL MODELO...
+        # df.to_excel('/Users/nachomondino/Desktop/df_codificacion_next_matches.xlsx')  #  Comprobé que codifica bien
 
-        # Selecciono las variables utilizadas en el modelo (feature selection) --> Levanto df?
+        # Selecciono las variables que necesita el modelo
         df_test = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/df_test.xlsx')
         l_selected_features = list(df_test.drop(self.var_resp, axis=1).columns)
         df = df.loc[:, l_selected_features]
 
-        # Borrro nan una vez que seleccione las columnas... (MOMENTANEAMENTE, PARA EVITAR TENER QUE LEVANTAR DF_OLD PARA RELLENAR NAN EN DIF_RAT_TIT...
-        df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+        # Borro nan una vez que seleccione las columnas... (MOMENTANEAMENTE, PARA EVITAR TENER QUE LEVANTAR DF_OLD PARA RELLENAR NAN EN DIF_RAT_TIT...
+        df = clean_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
 
         # Vuelvo a seleccionar ultimos n registros
         # df_new = df.tail(n_reg)
 
         if export:
-            df.to_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx')
+            df.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_part_selected_next_matches.xlsx')
 
         return df
 
@@ -193,8 +203,9 @@ def main():
     # Definicion de variables
     pais = 'argentina'
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    prepare = DataPreparation(var_resp)
-    data_unders, data_prep, modeling = False, True, True
+    dp = DataPreparation(var_resp, pais)
+    data_unders, data_prep, modeling = False, False, True
+    export = True
 
     ## DATA UNDERSTANDING
     if data_unders:
@@ -213,25 +224,23 @@ def main():
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         treat_nan = 'ml'  # Relleno de nan values: 'mode' o 'ml'
-        export = False
 
         # Levanto dataset con los ultimos 15 partidos de la liga argentina
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_next_partido.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx')
 
         ## DATA PREPARATION
         print(" Data preparation ".center(120, "#"))
 
         # no le hago format porque ya extraigo la fecha en formato datetime, la copa como 1 o 0 y no tengo posesion_loc ni posesion_vis
-        df_part = prepare.clean_data(df_part, export=export)
-        df = prepare.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
-        df = prepare.construct_data(df, N_ULT_PART=N_ULT_PART, export=True)
-        df = prepare.select_data(df, treat_nan=treat_nan, export=True)
+        df_part = dp.clean_data(export=export)
+        df = dp.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
+        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
+        df = dp.select_data(treat_nan=treat_nan, export=export)
 
     if modeling:
         # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
 
-        # df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_part_selected_next_matches.xlsx', index_col=0)
 
         ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
         df_test_pred = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
@@ -246,8 +255,9 @@ def main():
         df_res['y_pred'] = y_pred
 
         # Traduzco predicciones numericas a etiquetas
-        df = format_data.target_to_object(df_res, pais)
-        df.to_excel('/Users/nachomondino/Desktop/predicciones.xlsx')
+        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas.xlsx')
+        df = format_data.target_to_object(df_res, df_etiquetas)  # df = format_data.target_to_object(df_res, pais)
+        df.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/predicciones.xlsx')
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

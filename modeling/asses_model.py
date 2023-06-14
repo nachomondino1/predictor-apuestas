@@ -1,9 +1,10 @@
 import pandas as pd
 from sklearn import metrics
 import matplotlib.pyplot as plt
+from data_preparation import format_data
 
 
-def calculate_ROI(df_result, var_resp, var_pred): # NO SE QUE NRO LE CORRESPONDE A QUE CLASE (E.G. SI LOCAL ES 2, 1, 0) --> al parecer lo solucione...
+def calculate_ROI(df_result, var_resp, var_pred, df_etiquetas): # NO SE QUE NRO LE CORRESPONDE A QUE CLASE (E.G. SI LOCAL ES 2, 1, 0) --> al parecer lo solucione...
     """
     Calcula ROI comparando las predicciones del modelo y los resultados reales.
     :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
@@ -11,9 +12,6 @@ def calculate_ROI(df_result, var_resp, var_pred): # NO SE QUE NRO LE CORRESPONDE
     :param var_pred: Nombre de la variable con la predicción del modelo. (str)
     :return: ROI del modelo. (float)
     """
-    # Levanto etiquetas y codigo de la variable respuesta
-    df_etiquetas = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_etiquetas_equipo_ganador.xlsx')
-
     # Definicion de variables
     ingresos = 0
     inversion = len(df_result)  # Suponiendo 1 euro por cada partido del df_test
@@ -21,10 +19,27 @@ def calculate_ROI(df_result, var_resp, var_pred): # NO SE QUE NRO LE CORRESPONDE
     # Elimino los registros del dataset de testeo que no tienen cuotas --> Ya no es necesario puesto uso fill_na_with_ml
     # df_result = df_result.dropna(subset=['odds_loc', 'odds_emp', 'odds_vis']).reset_index(drop=True)  # no puede haber nan en las odds puesto que es lo que determina el rendimiento del modelo
     df_result = df_result.reset_index(drop=True)
+    # print(df_result.shape)
 
     # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    # df_correct = df_result[df_result[var_resp] == df_result[var_pred]]
+    df_correct = df_result[df_result[var_resp] == df_result[var_pred]]
+    # print(df_correct.shape)
 
+    # Convierto variable respuesta a etiqueta
+    df_correct = format_data.revert_columns_from_int(df_correct, df_etiquetas, columns=[var_resp])
+    # print(df_correct[var_resp])
+
+    # Por registro
+    for idx in df_correct.index:
+
+        etiqueta = df_correct.loc[idx, var_resp]
+
+        # Obtengo el ingreso obtenido segun la etiqueta
+        ingreso = df_result.loc[idx, 'odds_loc'] if etiqueta == "Local" else df_result.loc[idx, 'odds_emp'] if etiqueta == "Empate" else df_result.loc[idx, 'odds_vis']  # Vefificada
+        ingresos += ingreso
+        # print(f"Ganamos ${ingreso}")
+
+    '''        
     # Por registro
     for i in range(len(df_result)):
 
@@ -35,16 +50,18 @@ def calculate_ROI(df_result, var_resp, var_pred): # NO SE QUE NRO LE CORRESPONDE
         if y_real == y_pred:
 
             # Obtengo etiqueda a partir del codigo
-            idx = df_etiquetas[df_etiquetas['Código'] == y_real].index[0]
-            etiqueta = df_etiquetas.loc[idx, 'Etiqueta']
+            # idx = df_etiquetas[df_etiquetas['Código'] == y_real].index[0]
+            # etiqueta = df_etiquetas.loc[idx, 'Etiqueta']
+            
 
             # Obtengo el ingreso obtenido segun la etiqueta
             ingreso = df_result.loc[i, 'odds_loc'] if etiqueta == "Local" else df_result.loc[i, 'odds_emp'] if etiqueta == "Empate" else df_result.loc[i, 'odds_vis']  # Vefificada
             ingresos += ingreso
             # print(f"Ganamos ${ingreso}")
+    '''
 
     # Calculo el ROI e imprimo resultados
-    roi = (ingresos - inversion) / inversion * 100
+    roi = (ingresos - inversion) / inversion
     # print(f" RESULTADOS ".center(120, "#"))
     # print(f"Dinero invertido: ${inversion}")
     # print(f"Dinero luego de apuestas: ${ingresos}")
