@@ -4,7 +4,6 @@ import math
 
 
 def determinar_equipo_ganador(df):  # Se podria simplificar con?: df['equipo_ganador'] = np.where(df['goles_loc'] > df['goles_vis'], 'Local', np.where(df['goles_loc'] < df['goles_vis'], 'Visitante', 'Empate'))
-
     """
     Se determina el 'equipo_ganador' a partir de los goles que hizo cada equipo
     :param df: Dataframe. Unidad de analisis: partido. Columnas: entre ellas goles_loc y goles_vis
@@ -17,8 +16,9 @@ def determinar_equipo_ganador(df):  # Se podria simplificar con?: df['equipo_gan
         ng1, ng2 = df.loc[i, 'goles_loc'], df.loc[i, 'goles_vis']
 
         # Guardo equipo ganador
-        df.loc[i, 'equipo_ganador'] = 'Local' if ng1 > ng2 else 'Empate' if ng1==ng2 else "Visitante"  # 1 if ng1 > ng2 else 0 if ng1==ng2 else -1
+        df.loc[i, 'equipo_ganador'] = 'Local' if ng1 > ng2 else 'Empate' if ng1==ng2 else "Visitante"
     return df
+
 
 def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar la variable en los ultimos partidos, no para sumar..
     """
@@ -47,24 +47,25 @@ def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar l
                 # Definicion de variables
                 is_equipo_loc = df_team.loc[idx, 'equipo_loc'] == equipo
                 loc_o_vis = 'loc' if is_equipo_loc else 'vis'
-                nombre_variable = f'{variable}_{loc_o_vis}'
-                nombre_nueva_col = f'prom_{variable}_ult_part_{loc_o_vis}'
 
                 # Si ya tengo los suficientes partidos para determinar la variable
                 if len(l) == n_ult_part:
 
                     # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                    l_sin_nan = list(filter(lambda x: not math.isnan(x), l))
+                    l_sin_nan = list(filter(lambda x: not math.isnan(x), l))  # Y si es None?
 
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, nombre_nueva_col] = sum(l_sin_nan) / n_ult_part
-                    # print('Con valores agregados:', list(df.loc[idx]))
+                    # Si no eliminé todos los elementos
+                    if len(l_sin_nan) >= 0.6 * n_ult_part:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
+
+                        # Guardo el valor promedio de la variable en los ultimos n_part
+                        df.loc[idx, f'prom_{variable}_ult_part_{loc_o_vis}'] = sum(l_sin_nan) / len(l_sin_nan)
+                        # print('Con valores agregados:', list(df.loc[idx]))
 
                     # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
                     l = l[1:]
 
                 # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-                l.append(df.loc[idx, nombre_variable] if is_equipo_loc else df.loc[idx, nombre_variable])
+                l.append(df.loc[idx, f'{variable}_{loc_o_vis}'] if is_equipo_loc else df.loc[idx, f'{variable}_{loc_o_vis}'])
                 # print(f'{variable} ultimos partidos: {l}')
 
         # Calculo diferencia entre variables promedio para el equipo local y para el equipo vis
@@ -98,19 +99,22 @@ def promedio_dif_gol_ult_part(df, n_ult_part):  # Con promedio_ult_part() funcio
             # Definicion de variables
             is_equipo_loc = df_team.loc[idx, 'equipo_loc'] == equipo
             loc_o_vis = 'loc' if is_equipo_loc else 'vis'
-            nombre_nueva_col = f'dif_gol_ult_part_{loc_o_vis}'
 
             # Si ya tengo los suficientes partidos para determinar los goles del equipo
             if len(l_dif_goles) == n_ult_part:
 
-                # Quito nan de lista para que no falle la cuenta y de nan
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_dif_goles))
+                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
+                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_dif_goles))  # Y si es None?
 
-                df.loc[idx, nombre_nueva_col] = sum(l_sin_nan)  # SE USA ASI? es una funcion lambda...
+                # Si no eliminé todos los elementos
+                if len(l_sin_nan) >= 0.6 * n_ult_part:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
+
+                    # Guardo el valor promedio de la variable en los ultimos n_part
+                    df.loc[idx, f'dif_gol_ult_part_{loc_o_vis}'] = sum(l_sin_nan)
+                    # print('Con valores agregados:', list(df.loc[idx]))
 
                 # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
                 l_dif_goles = l_dif_goles[1:]
-                # print('con valores agregados:', list(df.loc[idx]))
 
             # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
             dif_gol = df.loc[idx, 'goles_loc'] - df.loc[idx, 'goles_vis'] if is_equipo_loc else df.loc[idx, 'goles_vis'] - df.loc[idx, 'goles_loc']
@@ -181,11 +185,11 @@ def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # qu
 
                 l_idxs_cargados.append(list(l_idxs))
 
-                # Guardo historial del partido j
-                if len(l_historiales) >= n_part_hist_min:
+                # Quito nan de lista para que no falle la cuenta y de nan
+                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_historiales))
 
-                    # Quito nan de lista para que no falle la cuenta y de nan
-                    l_sin_nan = list(filter(lambda x: not math.isnan(x), l_historiales))
+                # Guardo historial del partido j
+                if len(l_sin_nan) >= 0.6 * n_ult_part:
 
                     df.loc[l_idxs[j], 'historial_entre_si'] = sum(l_sin_nan)
                     # print(l_historiales)
@@ -196,7 +200,7 @@ def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # qu
                     break
     return df
 
-def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo que ver el nombre de la variable...
+def forma_reciente(df, n_ult_part):  # Es igual a promedio_ult_part no mas que tengo que ver el nombre de la variable...
     # Requiere de dataframe ordenado por fecha decreciente
     # Tengo que agregar forma de cada equipo y puntaje antes de cada partido.
 
@@ -222,28 +226,23 @@ def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo
             # Definicion de variables
             resultado = df_team.loc[idx, 'equipo_ganador']
             is_equipo_loc = df_team.loc[idx, 'equipo_loc'] == equipo
+            loc_o_vis = 'loc' if is_equipo_loc else 'vis'
 
-            # Si ya tengo los suficientes partidos para determinar la forma del equipo
-            if len(l_puntos) == n_part:
+            # Si ya tengo los suficientes partidos para determinar los goles del equipo
+            if len(l_puntos) == n_ult_part:
 
-                # Quito nan de lista para que no falle la cuenta y de nan
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_puntos))
+                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
+                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_puntos))  # Y si es None?
 
-                # Si el equipo es local
-                if is_equipo_loc:
+                # Si no eliminé todos los elementos
+                if len(l_sin_nan) >= 0.6 * n_ult_part:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
 
-                    # Guardo forma del equipo local
-                    df.loc[idx, 'forma_loc'] = sum(l_sin_nan)
+                    # Guardo el valor promedio de la variable en los ultimos n_part
+                    df.loc[idx, f'forma_{loc_o_vis}'] = sum(l_sin_nan)
+                    # print('Con valores agregados:', list(df.loc[idx]))
 
-                # Si el equipo es visitante
-                else:
-
-                    # Guardo forma del equipo visitante
-                    df.loc[idx, 'forma_vis'] = sum(l_sin_nan)
-
-                # Elimino puntos del ultimo partido (para tener siempre los ultimos <n_part> partidos)
+                # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
                 l_puntos = l_puntos[1:]
-                # print(list(df.loc[idx]))
 
             # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
             puntos = puntos_loc(resultado) if is_equipo_loc else puntos_vis(resultado)
@@ -254,7 +253,7 @@ def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo
     df['dif_forma'] = df['forma_loc'] - df['forma_vis']
 
     # Elimino variables
-    df = df.drop(columns=['forma_loc', 'forma_vis'], axis=1)
+    # df = df.drop(columns=['forma_loc', 'forma_vis'], axis=1)
     return df
 
 def n_dias_ult_partido(df):  # Peopuesta por Chat GPT
@@ -283,9 +282,6 @@ def n_dias_ult_partido(df):  # Peopuesta por Chat GPT
 
     return df
 
-def suma_overall_rating_ausentes(df):
-    pass
-
 def calculate_dif_col_jugadores(df):
     l_titularidad = ['tit', 'sup', 'aus']
     l_var_jug = ['edad', 'alt', 'rat', 'valor']
@@ -303,39 +299,39 @@ def calculate_dif_col_jugadores(df):
             df = df.drop([nombre_col_loc, nombre_col_vis], axis=1)
     return df
 
+def suma_overall_rating_ausentes(df):
+    pass
+
 def prueba():
     # Definicion de variables
     N_ULT_PART = 5
 
     # Levanto dataset
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_integrated.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
     print(df.head())
 
     start = time.time()
-    # Construct data
-    df = determinar_equipo_ganador(df)  # Determino columna "equipo_ganador" segun goles_loc y goles_vis
 
+    # Construyo variable respuesta: "equipo_gandor"
+    df = determinar_equipo_ganador(df)
+
+    # Construyo variables historicas
+    l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp',
+                    'offsides', 'ataques', 'ataques_pelig']
     df = historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART / 2))
+    df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
+    df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Diferencia de gol
+    df = forma_reciente(df, n_ult_part=N_ULT_PART)  # Rendimiento del equipo
+    df = n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
-    l_variables_a_prom = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases',
-                          'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-    df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_variables_a_prom)
-
-    df = promedio_dif_gol_ult_part(df, n_ult_part=N_ULT_PART)  # Determino diferencia de gol de cada uno  de los equipos en los ultimos partidos
-
-    df = forma_reciente(df, n_part=N_ULT_PART)  # df = derive_forma_ponderada(df, n_part=N_ULT_PART)
-
-    # Calculo diferencias para las variables promedio de los jugadores
+    # Construyo variables de diferencias para las variables promedio de los jugadores
     df = calculate_dif_col_jugadores(df)
-
-    df = n_dias_ult_partido(df)
-    # df = convert_odds_to_prob(df)
     # df = numero_lesionados(df)  # Determino numero de lesionados segun cantidad de lesionados
 
-
-    df.to_excel('./data/df_constructed.xlsx')
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
+
+    df.to_excel('/Users/nachomondino/Desktop/df_constructed_prueba.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
