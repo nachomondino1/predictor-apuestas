@@ -1,5 +1,7 @@
 import pandas as pd
 import time
+import math
+
 
 def determinar_equipo_ganador(df):  # Se podria simplificar con?: df['equipo_ganador'] = np.where(df['goles_loc'] > df['goles_vis'], 'Local', np.where(df['goles_loc'] < df['goles_vis'], 'Visitante', 'Empate'))
 
@@ -51,8 +53,11 @@ def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar l
                 # Si ya tengo los suficientes partidos para determinar la variable
                 if len(l) == n_ult_part:
 
+                    # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
+                    l_sin_nan = list(filter(lambda x: not math.isnan(x), l))
+
                     # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, nombre_nueva_col] = sum(l) / n_ult_part
+                    df.loc[idx, nombre_nueva_col] = sum(l_sin_nan) / n_ult_part
                     # print('Con valores agregados:', list(df.loc[idx]))
 
                     # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
@@ -98,7 +103,10 @@ def promedio_dif_gol_ult_part(df, n_ult_part):  # Con promedio_ult_part() funcio
             # Si ya tengo los suficientes partidos para determinar los goles del equipo
             if len(l_dif_goles) == n_ult_part:
 
-                df.loc[idx, nombre_nueva_col] = sum(l_dif_goles)
+                # Quito nan de lista para que no falle la cuenta y de nan
+                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_dif_goles))
+
+                df.loc[idx, nombre_nueva_col] = sum(l_sin_nan)  # SE USA ASI? es una funcion lambda...
 
                 # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
                 l_dif_goles = l_dif_goles[1:]
@@ -175,7 +183,11 @@ def historial_entre_si_segun_localia(df, n_ult_part, n_part_hist_min = 2):  # qu
 
                 # Guardo historial del partido j
                 if len(l_historiales) >= n_part_hist_min:
-                    df.loc[l_idxs[j], 'historial_entre_si'] = sum(l_historiales)
+
+                    # Quito nan de lista para que no falle la cuenta y de nan
+                    l_sin_nan = list(filter(lambda x: not math.isnan(x), l_historiales))
+
+                    df.loc[l_idxs[j], 'historial_entre_si'] = sum(l_sin_nan)
                     # print(l_historiales)
                     # print(f"Historial cargado: {sum(l_historiales)}")
 
@@ -214,14 +226,20 @@ def forma_reciente(df, n_part):  # Es igual a promedio_ult_part no mas que tengo
             # Si ya tengo los suficientes partidos para determinar la forma del equipo
             if len(l_puntos) == n_part:
 
+                # Quito nan de lista para que no falle la cuenta y de nan
+                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_puntos))
+
                 # Si el equipo es local
                 if is_equipo_loc:
+
                     # Guardo forma del equipo local
-                    df.loc[idx, 'forma_loc'] = sum(l_puntos)
+                    df.loc[idx, 'forma_loc'] = sum(l_sin_nan)
+
                 # Si el equipo es visitante
                 else:
+
                     # Guardo forma del equipo visitante
-                    df.loc[idx, 'forma_vis'] = sum(l_puntos)
+                    df.loc[idx, 'forma_vis'] = sum(l_sin_nan)
 
                 # Elimino puntos del ultimo partido (para tener siempre los ultimos <n_part> partidos)
                 l_puntos = l_puntos[1:]

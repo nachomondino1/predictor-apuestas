@@ -1,5 +1,13 @@
 import pandas as pd
 
+# Demostracion de por que falla construct data en la construccion de variables historicas...
+# No calcula la cuenta cuando hay nan...
+n_ult_part = 5
+l = [1, 2, 3, None, 5]
+
+print(sum(l) / n_ult_part)
+
+'''
 pais = 'argentina'
 l_paises = ['argentina', 'inglaterra']
 
@@ -10,7 +18,7 @@ df = df_comp[df_comp['pais'].isin(l_paises)]
 
 for competicion, categoria in zip(df['nombre'], df['categoria']):
     print(competicion, categoria)
-
+'''
 
 ''' # Probando integracion de datos con +1 fecha de act por fifa
 from data_preparation import format_data, clean_data, integrate_data

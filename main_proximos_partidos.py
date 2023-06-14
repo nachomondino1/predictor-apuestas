@@ -80,8 +80,8 @@ class DataPreparation:  # 17.4 min
         df_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
 
         # Filtro dataset old por fecha para evitar levantar todos los datos y minimizar tiempo de computo. Solo requiero ultimos 5 part de cada equipo...
-        # fecha_limite = datetime.datetime.now() - datetime.timedelta(days=365 * n_anios_df_part)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
-        # df_part_old_filt = df_part_old[df_part_old['fecha'] >= fecha_limite]
+        # fecha_limite = datetime.datetime.now() - datetime.timedelta(days=365 * 5)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
+        # df_old = df_old[df_old['fecha'] >= fecha_limite]
 
         # Creo variable equipo_ganador para que poder calcular historial_entre_si y forma_reciente
         df_old = construct_data.determinar_equipo_ganador(df_old)  # --> a df_part no le construyo equipo_ganador...
@@ -118,43 +118,50 @@ class DataPreparation:  # 17.4 min
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
         df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/df_constructed.xlsx') if df_new is None else df_new
+        df = df_new.copy()
 
         # Definicion de variables
         warnings.filterwarnings('ignore')
         print("\nSeleccionado datos...")
-        n_reg = len(df_new)
+        # n_reg = len(df_new)
+
+
+        # TENGO QUE USAR DF_OLD SOLO PARA CALCULAR DIF_RAT_TIT POR LOS EQUIPOS QUE NO ESTAN EN EL FIFA?
 
         # Levanto dataset viejo para poder calcular variables historicas en el nuevo df
-        df_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_constructed.xlsx')
+        # df_old = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_constructed.xlsx')
 
         # Concateno df_new y df_old
-        df = pd.concat([df_old, df_new], axis=0).reset_index(drop=True)  # Funciona bien
+        # df = pd.concat([df_old, df_new], axis=0).reset_index(drop=True)  # Funciona bien
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df.index = df['id']
-        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
+        df.index = df['id']  # Despues lo saco?
+        # df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)  # No hace falta, las quito al seleccionor despues...
 
         # Tratamiento de NaN values --> hace falta aqui? loo hago antes de concatenarlo?
-        df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan
-        df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
-        df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+        # df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan
+        # df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
+        # df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
         # Ojo que por ahi elimino alguno/s de los proximos partidos
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df = format_data.convert_columns_to_int(df)
 
-        # Selecciono las variables mas importantes (feature selection) --> Levanto df?
+        # Selecciono las variables utilizadas en el modelo (feature selection) --> Levanto df?
         df_test = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/argentina/df_test.xlsx')
-        l_selected_features = df_test.columns
+        l_selected_features = list(df_test.drop(self.var_resp, axis=1).columns)
         df = df.loc[:, l_selected_features]
 
+        # Borrro nan una vez que seleccione las columnas... (MOMENTANEAMENTE, PARA EVITAR TENER QUE LEVANTAR DF_OLD PARA RELLENAR NAN EN DIF_RAT_TIT...
+        df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
+
         # Vuelvo a seleccionar ultimos n registros
-        df_new = df.tail(n_reg)
+        # df_new = df.tail(n_reg)
 
         if export:
-            df_new.to_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx')
+            df.to_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx')
 
-        return df_new
+        return df
 
 def rellenar_player_data(df_part, df_part_old):
     # Tal vez, para no rellenar automaticamente las variables de jugadores (como dif_rat_tit, dif_edad_sup, dif_rat_aus)
@@ -227,7 +234,7 @@ def main():
         # df = pd.read_excel('/Users/nachomondino/Desktop/df_part_selected_next_matches.xlsx', index_col=0)
 
         ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
-        df_test_pred = df.copy().drop(['equipo_ganador', 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
+        df_test_pred = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
         print(df_test_pred.shape)
 
         loaded_model = pickle.load(open(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/{pais}/modelo.pkl", "rb"))
