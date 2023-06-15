@@ -1,15 +1,16 @@
 # Importo librerias
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import SelectKBest, f_classif, chi2
-from sklearn.tree import DecisionTreeClassifier
-import plotly.graph_objects as go
-from modeling.build_model import train_model
 import warnings
-from sklearn.preprocessing import scale
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 from modeling.build_model import select_best_hiperparameters
+from sklearn.feature_selection import SelectKBest, f_classif, chi2  # modelos estadisticos
+from sklearn.feature_selection import f_regression  # via
+from sklearn.feature_selection import RFE  # rfe
+from sklearn.linear_model import LinearRegression  # rfe
+from sklearn.linear_model import Lasso  # Lasso
+from sklearn.ensemble import RandomForestClassifier  # Random forest
+from sklearn.preprocessing import scale
+import plotly.graph_objects as go
+
 
 # CORRELACION
 def eliminar_columnas_correlacionadas(df, var_resp, umbral):
@@ -48,56 +49,27 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
     return list(columnas_eliminar)
 
 # SELECCION DE VARIABLES IMPORTANTES
-def feature_selection(df, var_resp, percentil):  # Esto tene que ser el main, es decir, lo que va ir en select_data en main (como representacion de la seleccion de var mas imp)
-
-    fs = FeatureSelection(df, var_resp)
-
-    # Definicion de varibles
-    df_importance = pd.DataFrame(columns=['analisis_uni', 'random', 'pca'], index=df.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1).columns)  # que cada analisis devuelva las features y su importancia y guardarlo en un Dataframe...
-    rf = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
-
-    # Obtengo importancia de cada variable segun distintos analisis
-    d1 = fs.modelos_estadisticos()  # Opción 1: Análisis univariable con tests estadísticos
-    d2 = fs.machine_learning_model(rf,  best_params=True, k=10) # Opcion 2: Random Forest
-    d3 = fs.pca()  # Opcion 3: pca
-
-    # Guardo resultados en DataFrame
-    df_importance['analisis_uni'] = df_importance.index.map(d1)
-    df_importance['random'] = df_importance.index.map(d2)
-    df_importance['pca'] = df_importance.index.map(d3)
-
-    # Selecciono variables mas importantes
-    l_selected_features = fs.select_best_features_from_all_models(df_importance, percentil)
-    print(f"Columnas mas importantes: {l_selected_features}")
-
-    return l_selected_features # pd.concat([df.loc[:, l_selected_features], df.loc[:, ['odds_loc', 'odds_emp', 'odds_vis', var_resp]]], axis=1)
-
 class FeatureSelection():
 
     def __init__(self, df, var_resp):
-        self.df = df
         self.var_resp = var_resp
-
-        # Podria guardar los votos aqui dentro... y crear df_importance...
+        self.X = df.drop(['odds_loc', 'odds_emp', 'odds_vis', self.var_resp], axis=1)
+        self.y = df[self.var_resp]
 
     def modelos_estadisticos(self):
 
         # Definicion de variables
-        d = {}
         l_features, l_scores = [], []
 
-        df = self.df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        X, y = df.drop([self.var_resp], axis=1), df[self.var_resp]
-
         # Selecciono variables numericas y categoricas
-        numeric_vars = X.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        categorical_vars = X.select_dtypes(include='object').columns.tolist()
+        numeric_vars = self.X.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        categorical_vars = self.X.select_dtypes(include='object').columns.tolist()
 
         # Variables predictoras numéricas
         if len(numeric_vars) > 0:
-            numeric_X = X[numeric_vars].clip(lower=0)  # Asegurar que los valores sean no negativos
+            numeric_X = self.X[numeric_vars].clip(lower=0)  # Asegurar que los valores sean no negativos
             numeric_selector = SelectKBest(score_func=f_classif, k='all')  # Utiliza ANOVA o f-score, selecciona las 3 mejores características
-            numeric_selector.fit_transform(numeric_X, y)  # numeric_X_selected
+            numeric_selector.fit_transform(numeric_X, self.y)  # numeric_X_selected
             numeric_selected_features = [numeric_vars[i] for i in range(len(numeric_vars)) if numeric_selector.get_support()[i]]
             numeric_scores = numeric_selector.scores_
 
@@ -106,9 +78,9 @@ class FeatureSelection():
 
         # Variables predictoras categóricas
         if len(categorical_vars) > 0:
-            categorical_X = X[categorical_vars]
+            categorical_X = self.X[categorical_vars]
             categorical_selector = SelectKBest(score_func=chi2, k='all')  # Utiliza chi-cuadrado, selecciona las 3 mejores características
-            categorical_selector.fit_transform(categorical_X, y)  # categorical_X_selected
+            categorical_selector.fit_transform(categorical_X, self.y)  # categorical_X_selected
             categorical_selected_features = [categorical_vars[i] for i in range(len(categorical_vars)) if categorical_selector.get_support()[i]]
             categorical_scores = categorical_selector.scores_
 
@@ -116,85 +88,78 @@ class FeatureSelection():
             l_scores += list(categorical_scores)
 
         # Guardo resultados
-        for feature, score in zip(l_features, l_scores):
-            d[feature] = score
+        df_importance = pd.DataFrame({'importance': l_scores}, index=l_features)
+        # print("Resultados estadisticos: \n", df_importance)
 
         # Grafico variables y su importancia
-        self.graficar_importancia_atrib(l_features, l_scores)
-        return d
+        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        return df_importance
 
-    def train_model(self, model, best_params=False, k=5):  # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
+    def random_forest(self, best_params=True, k=10):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
 
-        # Elimino variables de cuotas puesto que no las usare para entrenar sino que solo para calcular el roi   # Iba en generate test design pero lo traje para ver si puedo calcular el roi
-        df_train_without_odds = self.df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-
-        # Dividir los datos en conjunto de entrenamiento y prueba
-        X_train, y_train = df_train_without_odds.drop(self.var_resp, axis=1), df_train_without_odds[self.var_resp]
+        # Defino modelo
+        model = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
 
         # Verificar si se deben buscar los mejores hiperparámetros
         if best_params:
-            model = select_best_hiperparameters(X_train, y_train, model, k)
+            model = select_best_hiperparameters(self.X, self.y, model, k)
 
         # Entrenar el modelo final con todos los datos de entrenamiento
-        model.fit(X_train, y_train)
-        return model
-
-    def machine_learning_model(self, modelo, best_params=True, k=10):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
-
-        # Definicion de variables
-        d = {}
-
-        # Entreno modelo
-        # model, accuracy, roi = train_model(self.df, self.var_resp, modelo, best_params=best_params, k=k)
-        model = self.train_model(modelo, best_params, k)
-
-        # Defino variables y su importancia
-        l_features = self.df.drop(['odds_loc', 'odds_emp', 'odds_vis', self.var_resp], axis=1).columns
-        l_importance = model.feature_importances_
+        model.fit(self.X, self.y)
 
         # Guardo resultados
-        for feature, importance in zip(l_features, l_importance):
-            d[feature] = importance
+        df_importance = pd.DataFrame({'importance': model.feature_importances_}, index=self.X.columns)
 
         # Grafico variables y su importancia
-        self.graficar_importancia_atrib(l_features, l_importance)
-        return d
+        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        return df_importance
 
-    def pca(self):  # Podria llamarlo desde ml model?
-        # Separar las variables independientes (X) y la variable objetivo (y)
-        df = self.df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        X, y = df.drop([self.var_resp], axis=1), df[self.var_resp]
+    def via(self):
+        scores, _ = f_regression(self.X, self.y)
+        df_importance = pd.DataFrame({'importance': scores}, index=self.X.columns)
+        # print("Resultados via: \n", df_importance)
+        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        return df_importance
 
-        # Estandarizar las variables independientes
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+    def rfe(self):
 
-        # Aplicar PCA
-        pca = PCA()
-        pca.fit_transform(X_scaled)
+        n_features = 1  # Número deseado de características seleccionadas hasta que se eliminan las menos relevantes
+        model = LinearRegression()
+        rfe = RFE(estimator=model, n_features_to_select=n_features)
 
-        # Obtener la importancia de las variables a través de los componentes principales
-        importance = pd.DataFrame(pca.components_.T, columns=['PC{}'.format(i) for i in range(1, pca.n_components_ + 1)], index=X.columns)
+        X_selected = rfe.fit_transform(self.X, self.y)
 
-        # Convertir el DataFrame de importancia a un diccionario
-        importance_dict = importance.to_dict('index')
-        importance_dict = {variable: list(importance_dict[variable].values())[0] for variable in importance_dict}
+        df_importance = pd.DataFrame({'rank': rfe.ranking_}, index=self.X.columns)
 
-        # Grafico variables y su importancia
-        l_features = list(importance_dict.keys())
-        l_scores = list(importance_dict.values())
-        self.graficar_importancia_atrib(l_features, l_scores)
-        return importance_dict
+        # Convierto ranking en importancia (a mayor ranking, menor importancia)
+        df_importance['importance'] = df_importance['rank'].apply(lambda x: len(self.X.columns) - x + 1)
+        # print("Resultados rfe: \n", df_importance)
 
-    def graficar_importancia_atrib(self, l_features, l_importance):
+        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        return df_importance
 
+    def lasso_selection(self):
+
+        lasso = Lasso(alpha=0.01)  # con 0.05: 11 variables son cero # 0.15: 14 var # con 0.01: 4 var
+        lasso.fit(self.X, self.y)
+
+        df_importance = pd.DataFrame({'coeficiente': lasso.coef_}, index=self.X.columns)
+
+        # Convierto coeficiente en importancia (a mayor coef en valor abs, mas importancia)
+        df_importance['importance'] = df_importance['coeficiente'].apply(lambda x: abs(x))  #x es coef
+        print("Resultados lasso: \n", df_importance)
+
+        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        return df_importance
+
+    def graficar_importancia_atrib(self, x, y):
         # Crear figura
-        fig = go.Figure()  # fig = go.Figure(data=go.Bar(x=l_features, y=l_importance, orientation='h'))
+        fig = go.Figure()
 
         # Agregar barras al gráfico
         fig.add_trace(go.Bar(
-            x=l_importance,
-            y=l_features,
+            x=x,
+            y=y,
             orientation='h'
         ))
 
@@ -205,37 +170,46 @@ class FeatureSelection():
             yaxis_title='Características',
             yaxis=dict(autorange="reversed")  # Invertir el orden de las características
         )
-
         # Rotar etiquetas en el eje x
         fig.update_layout(xaxis_tickangle=-45)
 
         # Mostrar el gráfico
         fig.show()
 
-    def select_best_features_from_all_models(self, df_importance, percentil):  # Sistema de ponderacion con peso minimo definido por “Porcentaje de peso máximo"
+    def normalize_importances(self, df_importance):
 
         # Normalizar cada columna del DataFrame --> para poder sumar las importancias de cada metodo
         df_normalized = pd.DataFrame(scale(df_importance), columns=df_importance.columns, index=df_importance.index)
 
         # Calcular la suma de columnas para cada fila
         df_normalized['suma_de_imp'] = df_normalized.sum(axis=1)
-        # df_normalized.to_excel('./df_normalized.xlsx')
 
         # Re-escalo la variable "suma_de_imp" para que sea de 0 a 1 y facilitar la seleccion de variables
-        max_value = df_normalized['suma_de_imp'].max()
-        min_value = df_normalized['suma_de_imp'].min()
-        def normalize_value(value):
-            return (value - min_value) / (max_value - min_value)
-        df_normalized['suma_de_imp_norm'] = df_normalized['suma_de_imp'].apply(normalize_value)
+        df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
+        # df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
+        return df_normalized
 
-        # Calculo peso minimo de una variable para ser considerada como importante
-        peso_maximo = df_normalized['suma_de_imp_norm'].max()
-        peso_minimo = peso_maximo * percentil
-        # print(f"Peso maximo: {peso_maximo} \nPeso minimo necesario: {peso_minimo}")
-        # print(df_normalized)
+    def select_best_features(self, umbral):
 
-        # Seleccionar los índices donde el valor de la columna "suma_de_imp" es mayor al umbral
-        l_selected_features = list(df_normalized.loc[df_normalized['suma_de_imp_norm'] > peso_minimo].index)
+        df_importance = pd.DataFrame(index=self.X.columns)
+
+        # Detemino importancia de cada variable para cada modelo
+        df_importance['mod_estadisticos'] = self.modelos_estadisticos()['importance']
+        df_importance['via'] = self.via()['importance']
+        df_importance['rfe'] = self.rfe()['importance']
+        df_importance['lasso'] = self.lasso_selection()['importance']
+        df_importance['random_forest'] = self.random_forest(best_params=False, k=2)['importance']
+        # df_importance.to_excel('/Users/nachomondino/Desktop/df_importance_prueba.xlsx')
+
+        # Normalizo importancias para poder sumarlas
+        df_normalized = self.normalize_importances(df_importance)
+
+        # Selecciono las variables mas importantes segun umbral
+        l_selected_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] > df_normalized['suma_de_imp_norm'].max() * umbral].index.tolist()
+
+        # Grafico importancias teniendo en cuenta todos los modelos
+        self.graficar_importancia_atrib(x=df_normalized['suma_de_imp_norm'], y=df_normalized.index)
+        print(f"Columnas consideradas como las mas importantes: {l_selected_features}")
         return l_selected_features
 
 def prueba():
@@ -245,8 +219,8 @@ def prueba():
 
     var_resp = 'equipo_ganador'
     pais = 'argentina'
-    thr_corr = 0.7  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
-    perc_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+    thr_corr = 0.6  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
+    umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
     # Levanto dataset de prueba
     df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed.xlsx')
@@ -268,20 +242,21 @@ def prueba():
     print(prop_nan)
     print(df.shape)
 
-    # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
-    df = clean_data.eliminar_filas_nan(df, umbral=0)
-    df.to_excel('/Users/nachomondino/Desktop/df_selected_dsp_drop_na.xlsx', index=False)
-
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-    df = format_data.convert_columns_to_int(df)
+    df, df_etiquetas = format_data.convert_columns_to_int(df)
 
     # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
     l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df, var_resp, thr_corr)
     df = df.drop(l_columnas_a_eliminar, axis=1)
 
     # Selecciono las variables mas importantes (feature selection)
-    l_selected_features = feature_selection(df, var_resp, percentil=perc_fs)
-    df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', var_resp]]
+    fs = FeatureSelection(df.dropna(), var_resp)
+    l_selected_features = fs.select_best_features(umbral=umbral_fs)
+    columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', var_resp]
+    df = df.filter(columns_to_select)
+
+    # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
+    df = clean_data.eliminar_filas_nan(df, umbral=0)
 
     df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
 

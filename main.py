@@ -18,7 +18,7 @@ from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 import lightgbm as lgb  # Gradient Boosting
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 # Assess model
@@ -164,7 +164,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df=None, thr_corr=0.6, perc_fs=0.5, treat_nan='drop', export=False):  # 1.3 minutos
+    def select_data(self, df=None, thr_corr=0.6, umbral_fs=0.5, treat_nan='drop', export=False):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -195,8 +195,10 @@ class DataPreparation:  # 17.4 min
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        l_selected_features = select_data.feature_selection(df.dropna(), self.var_resp, percentil=perc_fs)
-        df = df.loc[:, l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]]
+        fs = select_data.FeatureSelection(df.dropna(), self.var_resp)
+        l_selected_features = fs.select_best_features(umbral=umbral_fs)
+        columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
+        df = df.filter(columns_to_select)
 
         # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
         df = clean_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
@@ -277,7 +279,7 @@ class Modeling:
         for modelo in l_modelos:
 
             # print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, self.df_etiquetas, best_params, k)  # Le paso pais por df_etiquetas...?
+            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, self.df_etiquetas, best_params, k)
             df_models.loc[len(df_models)] = [model, cv_accuracy, cv_roi]
 
         # Selecciono el mejor modelo
@@ -337,20 +339,20 @@ def main():  # La idea es poner toda el camino de los datos aqui...
 
         # Collect initial data
         print(" Recolectando datos... ")
-        # df_part = collect_initial_data.extract_partidos()         df_part = scraper_flashscore.extract_flashscore()  # Tengo que ver que no se corran igual por no comentar la funcion en su archivo...
-        # df_jug = collect_initial_data.extract_jugadores()
-        # print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
+        df_part = collect_initial_data.extract_partidos_flashscore(l_paises=[pais])
+        df_jug = collect_initial_data.extract_jugadores_sofifa(l_paises=[pais])
+        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
         # Describe data (quiero describir los datos igual aunque no los extraiga...)
         print(" Describiendo datos... ")
-        # getting_to_know_data(df_part)
-        # getting_to_know_data(df_jug)
+        getting_to_know_data(df_part)
+        getting_to_know_data(df_jug)
 
     if data_prep is True:
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-        perc_fs = 0.3  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+        umbral_fs = 0.3  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
         treat_nan = 'ml'  # Relleno de nan values: mode o _ml  (si se hace)
         print(" Data preparation ".center(120, "#"))
 
@@ -359,13 +361,13 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # df_part, df_jug = dp.clean_data(df_part, df_jug, export=export)
         # df = dp.integrate_data(df_part, df_jug, export=export)
         df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
-        df = dp.select_data(df, thr_corr=thr_corr, perc_fs=perc_fs, treat_nan=treat_nan, export=export)
+        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.8  # Probar si con 0.005 (usa solo 20 registros para entrenar) obtiene una precision del 65% y un roi del 100%... como sucedia antes...
-        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
+        porc_corte = 0.1  # Ahora si que da baja la precision (como deberia) al usar porc_corte bajas de 0.1 o 0.01
+        best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
         k = 3  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),  # Tarda cdo hago best_params y k=10
@@ -381,7 +383,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # Analizo los datos
         df_train, df_test = mo.generate_test_design(porc_corte=porc_corte, export=export)
         best_model = mo.select_best_model(df_train, l_modelos, best_params, k, export=export)
-        mo.assess_model(best_model, df_test)
+        mo.assess_model(best_model, df_test, export=export)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
