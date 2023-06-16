@@ -56,7 +56,7 @@ class FeatureSelection():
         self.X = df.drop(['odds_loc', 'odds_emp', 'odds_vis', self.var_resp], axis=1)
         self.y = df[self.var_resp]
 
-    def modelos_estadisticos(self):
+    def modelos_estadisticos(self, graf=False):
 
         # Definicion de variables
         l_features, l_scores = [], []
@@ -87,69 +87,85 @@ class FeatureSelection():
             l_features += categorical_selected_features
             l_scores += list(categorical_scores)
 
-        # Guardo resultados
+        # Obtengo importancias por variable
         df_importance = pd.DataFrame({'importance': l_scores}, index=l_features)
         # print("Resultados estadisticos: \n", df_importance)
 
         # Grafico variables y su importancia
-        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        if graf:
+            self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+
         return df_importance
 
-    def random_forest(self, best_params=True, k=5):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
-
-        # Defino modelo
-        model = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
+    def random_forest(self, k=3, graf=False):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
 
         # Verificar si se deben buscar los mejores hiperparámetros
-        if best_params:
-            model = select_best_hiperparameters(self.X, self.y, model, k)
+        model, best_params = select_best_hiperparameters(RandomForestClassifier(), self.X, self.y, k=k)
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(self.X, self.y)
 
-        # Guardo resultados
+        # Obtengo importancias por variable
         df_importance = pd.DataFrame({'importance': model.feature_importances_}, index=self.X.columns)
 
         # Grafico variables y su importancia
-        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        if graf:
+            self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+
         return df_importance
 
-    def via(self):
+    def via(self, graf=False):
+
+        # Entreno modelo
         scores, _ = f_regression(self.X, self.y)
+
+        # Obtengo importancias por variable
         df_importance = pd.DataFrame({'importance': scores}, index=self.X.columns)
         # print("Resultados via: \n", df_importance)
-        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+
+        if graf:
+            self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+
         return df_importance
 
-    def rfe(self):
+    def rfe(self, graf=False):
 
+        # Definicion de variables
         n_features = 1  # Número deseado de características seleccionadas hasta que se eliminan las menos relevantes
         model = LinearRegression()
         rfe = RFE(estimator=model, n_features_to_select=n_features)
 
+        # Entreno modelo
         X_selected = rfe.fit_transform(self.X, self.y)
 
+        # Obtengo importancias por variable
         df_importance = pd.DataFrame({'rank': rfe.ranking_}, index=self.X.columns)
 
         # Convierto ranking en importancia (a mayor ranking, menor importancia)
         df_importance['importance'] = df_importance['rank'].apply(lambda x: len(self.X.columns) - x + 1)
         # print("Resultados rfe: \n", df_importance)
 
-        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        if graf:
+            self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+
         return df_importance
 
-    def lasso_selection(self):
+    def lasso_selection(self, graf=False):
 
+        # Entreno modelo
         lasso = Lasso(alpha=0.01)  # con 0.05: 11 variables son cero # 0.15: 14 var # con 0.01: 4 var
         lasso.fit(self.X, self.y)
 
+        # Obtengo importancias por variable
         df_importance = pd.DataFrame({'coeficiente': lasso.coef_}, index=self.X.columns)
 
         # Convierto coeficiente en importancia (a mayor coef en valor abs, mas importancia)
         df_importance['importance'] = df_importance['coeficiente'].apply(lambda x: abs(x))  #x es coef
         # print("Resultados lasso: \n", df_importance)
 
-        # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+        if graf:
+            self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
+
         return df_importance
 
     def graficar_importancia_atrib(self, x, y):
@@ -191,13 +207,14 @@ class FeatureSelection():
     def select_best_features(self, umbral):
 
         df_importance = pd.DataFrame(index=self.X.columns)
+        graficar = False
 
         # Detemino importancia de cada variable para cada modelo
-        df_importance['mod_estadisticos'] = self.modelos_estadisticos()['importance']
-        df_importance['via'] = self.via()['importance']
-        df_importance['rfe'] = self.rfe()['importance']
-        df_importance['lasso'] = self.lasso_selection()['importance']
-        df_importance['random_forest'] = self.random_forest()['importance']
+        df_importance['mod_estadisticos'] = self.modelos_estadisticos(graf=graficar)['importance']
+        df_importance['via'] = self.via(graf=graficar)['importance']
+        df_importance['rfe'] = self.rfe(graf=graficar)['importance']
+        df_importance['lasso'] = self.lasso_selection(graf=graficar)['importance']
+        df_importance['random_forest'] = self.random_forest(graf=graficar)['importance']
         # df_importance.to_excel('/Users/nachomondino/Desktop/df_importance_prueba.xlsx')
 
         # Normalizo importancias para poder sumarlas
