@@ -86,17 +86,7 @@ def convert_columns_to_int(df, df_etiquetas=None):  #Funciona?
 
         return df
 
-def target_to_object(df, df_etiquetas):
-
-    # Reemplazo codigos por etiquetas
-    df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == 'equipo_ganador']
-    l_valor_orig = list(df_etiquetas_filt['valor_orig'])
-    l_valor_int = list(df_etiquetas_filt['valor_int'])
-    mapping = dict(zip(l_valor_int, l_valor_orig))
-    df['y_pred_etiqueta'] = df['y_pred'].map(mapping)
-    return df
-
-def revert_columns_from_int(df, df_etiquetas, columns=None):  # Podria reemplazar target_to_object() pero no puedo usar columns = ['y_pred']
+def revert_columns_from_int(df, df_etiquetas, columns=None):
     """
     Convierte las variables numéricas a sus valores originales utilizando el DataFrame df_etiquetas.
 
@@ -107,11 +97,14 @@ def revert_columns_from_int(df, df_etiquetas, columns=None):  # Podria reemplaza
     columns = df_etiquetas['variable'].unique() if columns is None else columns
 
     for col in columns:
-        df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == col]
+
+        col_etiquetas = col if col != 'y_pred' else 'equipo_ganador'
+        df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == col_etiquetas]
         l_valor_orig = list(df_etiquetas_filt['valor_orig'])  # list() Para evitar TypeError: 'numpy.int64' object is not iterable
         l_valor_int = list(df_etiquetas_filt['valor_int'])
         mapping = dict(zip(l_valor_int, l_valor_orig))
         df[col] = df[col].map(mapping)
+
     return df
 
 def prueba():

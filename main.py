@@ -9,8 +9,7 @@ from dspy.data_understanding.describe_data import getting_to_know_data
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 # Modeling
 # Generate test design
-from dspy.modeling import test_design
-from imblearn.over_sampling import RandomOverSampler
+from modeling import generate_test_design
 from sklearn.utils import shuffle
 # Build model
 from modeling import build_model
@@ -22,7 +21,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 # Assess model
-from modeling.asses_model import calculate_ROI, confusion_matrix
+from modeling.asses_model import calculate_roi, confusion_matrix
 from sklearn.metrics import accuracy_score
 import pickle
 
@@ -213,12 +212,19 @@ class DataPreparation:  # 17.4 min
 
 class Modeling:
 
-    def __init__(self, var_resp, var_pred, pais):
+    def __init__(self, df, var_resp, var_pred, pais):
+        if not isinstance(var_resp, str) or not isinstance(var_pred, str):
+            raise TypeError("Los parámetros var_resp y var_pred deben ser cadenas de texto.")
+        if not isinstance(pais, str):
+            raise TypeError("El parámetro pais debe ser una cadena de texto.")
+
         self.var_resp = var_resp
         self.var_pred = var_pred
         self.pais = pais
+        self.X = df.drop(self.var_resp, axis=1)
+        self.y = df[self.var_resp]
 
-    def generate_test_design(self, df=None, porc_corte=0.8, export=True):
+    def generate_test_design(self, bal_type, test_val_size=0.7, test_size=0.5, export=True):
         """
         Balancea el dataset y separa en conjuntos de entrenamiento y testeo
 
@@ -227,36 +233,33 @@ class Modeling:
         :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
-        if df is None:
-            # Levanto dataset ya preparado
-            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_selected.xlsx')
+        print(f"Shape dataframe original: {self.X.shape}")
 
-        # Definicion de variables
-        oversampler = RandomOverSampler()
+        # Balanceo dataset
+        X_bal, y_bal = generate_test_design.balance_dataset(self.X, self.y, type=bal_type)
 
-        # Shuffle dataset
-        df = pd.DataFrame(shuffle(df)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
-        print(f"Shape dataframe original: {df.shape}")
+        # Shuffle dataset  # me quiero asegurar siempre de evitar cualquier sesgo tras el agregado de filas por el balanceo
+        X_bal_shuf, y_bal_shuf = shuffle(X_bal, y_bal, random_state=42)
+        print(f"Shape dataframe luego de balanceo: {X_bal_shuf.shape}")
 
-        # Balanceamos segun variable respuesta   # df = clean_data.balance_dataset(df, var_resp=self.var_resp)
-        X_bal, y_bal = oversampler.fit_resample(df.drop(self.var_resp, axis=1), df[self.var_resp])
-        df_balanced = pd.concat([X_bal, y_bal], axis=1)
-        print(f"Shape dataframe luego de balanceo: {df_balanced.shape}")
+        # Separo conjunto de datos en train, validation y test
+        X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X_bal_shuf, y_bal_shuf, test_val_size, test_size)
 
-        # Shuffle dataset  # si bien separate_train_and_test() hará shuffle, me quiero asegurar siempre de evitar cualquier sesgo tras el agregado de filas por el balanceo
-        df_balanced = pd.DataFrame(shuffle(df_balanced)).reset_index(drop=True)  # df = df.sample(frac=1).reset_index(drop=True)
-
-        # Separo conjunto de datos en train y test --> tampoco es el problema...
-        df_train, df_test = test_design.separate_train_and_test(df_balanced, porc_corte=porc_corte)
-        print(f"Shape df_train: {df_train.shape} \nShape df_test:{df_test.shape}")
+        # Quito odds de train y val (de test no porque necesito calcular roi)
+        X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+        X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+        print(f'Train: {X_train.shape} {y_train.shape}')
+        print(f'Val: {X_val.shape} {y_val.shape}')
+        print(f'Test: {X_test.shape} {y_test.shape}')
 
         if export:
-            df_train.to_excel(f'./modeling/data/{self.pais}/df_train.xlsx', index=False)
-            df_test.to_excel(f'./modeling/data/{self.pais}/df_test.xlsx', index=False)
+            X_train.to_excel(f'./modeling/data/{self.pais}/X_train.xlsx', index=False)
+            X_val.to_excel(f'./modeling/data/{self.pais}/X_val.xlsx', index=False)
+            X_test.to_excel(f'./modeling/data/{self.pais}/X_test.xlsx', index=False)
 
-        return df_train, df_test
+        return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def select_best_model(self, df_train, l_modelos, best_params=False, k=10, export=True):
+    def select_best_model(self, X_train, y_train, X_val, y_val, k=10, export=True):
         """
         Selecciona el mejor modelo a partir de la precision.
 
@@ -270,21 +273,42 @@ class Modeling:
         """
         # Definicion de variables
         warnings.filterwarnings("ignore")
-        df_models = pd.DataFrame(columns=['model', 'cv_accuracy', 'cv_roi'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
-        self.df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+        df_models = pd.DataFrame(columns=['model', 'best_params', 'model_trained', 'cv_accuracy'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
+        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
+                     SVC(), MLPClassifier(), GradientBoostingClassifier()]
         print("\nSeleccionando el mejor modelo...")
 
-        # Entreno modelos
+        # Por modelo
         for modelo in l_modelos:
 
-            # print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            model, cv_accuracy, cv_roi = build_model.train_model(df_train, self.var_resp, modelo, self.df_etiquetas, best_params, k)
-            df_models.loc[len(df_models)] = [model, cv_accuracy, cv_roi]
+            # Find best hiperparameters
+            print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
+            print("Buscando mejores hiperparametros...")
+            model_best_params, best_params = build_model.select_best_hiperparameters(modelo, X_val, y_val, k)
+            print(f"Mejores hiperparametros: {best_params}")
+
+            # Entreno el modelo
+            print("Entrenando modelo...")
+            model_best_params.fit(X_train, y_train)
+
+            # Evaluo el modelo con Cross Validation
+            print("Evaluo modelo con Cross Validation...")
+            # Opcion 1: Sin libreria
+            cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
+            print(f"\n SIN LIBRERIA: Precision promedio de validación cruzada: {cv_accuracy:.1f}%")
+            # Opcion 2: Con libreria
+            from sklearn.model_selection import cross_val_score
+            cv_scores = cross_val_score(model_best_params, X_train, y_train, cv=k)
+            mean_cv_score = cv_scores.mean() * 100
+            print(f"\n LIBRERIA: Precision promedio de validación cruzada: {mean_cv_score:.1f}%")
+
+            df_models.loc[len(df_models)] = [modelo, best_params, model_best_params, cv_accuracy]
 
         # Selecciono el mejor modelo
-        idx = df_models[df_models['cv_roi'] == max(df_models['cv_roi'])].index[0]
-        best_model, best_accuracy, best_roi = df_models.loc[idx, 'model'], df_models.loc[idx, 'cv_accuracy'], df_models.loc[idx, 'cv_roi']
-        print(f"El mejor modelo es: {best_model} con ROI: {best_roi:.1f}% y precision: {best_accuracy:.1f}%")
+        idx = df_models[df_models['cv_accuracy'] == max(df_models['cv_accuracy'])].index[0]
+        best_model, best_accuracy = df_models.loc[idx, 'model_trained'], df_models.loc[idx, 'cv_accuracy']
+        print(df_models)
+        print(f"El mejor modelo es: {best_model} con precision: {best_accuracy:.1f}%")
 
         if export:
             df_models.to_excel(f'./modeling/data/{self.pais}/df_modelos.xlsx')
@@ -292,7 +316,7 @@ class Modeling:
 
         return best_model
 
-    def assess_model(self, model, df_test, export=True):
+    def assess_model(self, model, X_test, y_test, export=True):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -302,35 +326,44 @@ class Modeling:
         :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluando modelo con datos de prueba...")
+        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
         # Quito cuotas de casas de apuestas y variable respuesta de df_test
-        df_test_pred = df_test.copy().drop([self.var_resp, 'odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
+        X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
 
         # Predecir las etiquetas para los datos de prueba
-        y_pred = model.predict(df_test_pred)  # es un numpy array
+        y_pred = model.predict(X_test_without_odds)  # es un numpy array
 
+        # Calculo precision
+        test_accuracy = accuracy_score(y_test, y_pred) * 100
+
+        # Calculo roi y matriz de confusion
         # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
-        df_test[self.var_pred] = y_pred
+        df_results = X_test.copy().loc[:, ['odds_loc', 'odds_emp', 'odds_vis']]
+        df_results[self.var_resp] = y_test
+        df_results[self.var_pred] = y_pred
 
-        # Calculo metricas e imprimo resultados
-        test_accuracy = accuracy_score(df_test[self.var_resp], df_test[self.var_pred]) * 100
-        roi = calculate_ROI(df_test, self.var_resp, self.var_pred, self.df_etiquetas) * 100
+        # Convierto variable respuesta y variable predicha en etiqueta
+        df_results_etiquetas = format_data.revert_columns_from_int(df_results, df_etiquetas, columns=[self.var_resp, self.var_pred])
+
+        # Calculo roi e imprimo matriz de confusion
+        roi = calculate_roi(df_results_etiquetas, self.var_resp, self.var_pred) * 100
         print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
-        confusion_matrix(df_test, self.var_resp, self.var_pred)  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
+        confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
 
         if export:
-            df_test.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
+            df_results.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
 
         return test_accuracy, roi
 
-def main():  # La idea es poner toda el camino de los datos aqui...
+def main():
 
     # Definicion de variables
     data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina" # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
-    dp, mo = DataPreparation(var_resp, pais), Modeling(var_resp, var_pred, pais)
+    dp = DataPreparation(var_resp, pais)
 
     if data_unders is True:
 
@@ -356,33 +389,28 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        # df_part, df_jug = dp.format_data(export=export)  # df_part, df_jug,
-        # df_part, df_jug = dp.clean_data(df_part, df_jug, export=export)
-        # df = dp.integrate_data(df_part, df_jug, export=export)
-        # df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
+        df_part, df_jug = dp.format_data(export=export)  # df_part, df_jug,
+        df_part, df_jug = dp.clean_data(df_part, df_jug, export=export)
+        df = dp.integrate_data(df_part, df_jug, export=export)
+        df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
         df = dp.select_data(thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
+        df = df.dropna()  # no hice dropna en la seleccion
+        mo = Modeling(df, var_resp, var_pred, pais)
 
         # Hiperparametros
-        porc_corte = 0.8  # Ahora si que da baja la precision (como deberia) al usar porc_corte bajas de 0.1 o 0.01
-        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
-        k = 3  # Numero de folds
-        l_modelos = [DecisionTreeClassifier(max_depth=30),
-                     RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),  # Tarda cdo hago best_params y k=10
-                     xgb.XGBClassifier(n_estimators=50, objective='multi:softmax', num_class=3, max_depth=20),  # Tarda aun mas cdo hago best_params y k=10 # num_class = len(y.unique()) Depende del numero de clases...
-                     LogisticRegression(multi_class='multinomial', penalty='l2', C=0.1, solver='lbfgs', max_iter=500),
-                     SVC(kernel='rbf', decision_function_shape='ovo'),  # --> tarda mas de 1 hora
-                     MLPClassifier(hidden_layer_sizes=128, activation='tanh', solver='adam', learning_rate='invscaling', max_iter=300),
-                     GradientBoostingClassifier(learning_rate=0.1, n_estimators=200, max_depth=7)  # Tarda mucho mucho (+1 hora) cdo hago best_params y k=10
-                     # self.red_neuronal(n_folds_cv=10, n_epochs=1000, batches=256),
-                     ]
+        bal_type = 'over'  # ['over', 'over_and_under' ,'under']
+        test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
+        test_size = 0.5  # Porcentaje de test_val_size destinado a test.
+        k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
         print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
-        df_train, df_test = mo.generate_test_design(porc_corte=porc_corte, export=export)
-        best_model = mo.select_best_model(df_train, l_modelos, best_params, k, export=export)
-        mo.assess_model(best_model, df_test, export=export)
+        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size)
+        best_model = mo.select_best_model(X_train, y_train, X_val, y_val, k)
+        mo.assess_model(best_model, X_test, y_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
