@@ -28,11 +28,13 @@ import pickle
 
 class DataPreparation:  # 17.4 min
 
-    def __init__(self, var_resp, pais):
+    def __init__(self, df_part, df_jug, var_resp, pais):
+        self.df_part = df_part
+        self.df_jug = df_jug
         self.var_resp = var_resp
         self.pais = pais
 
-    def format_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
+    def format_data(self, df_part, df_jug, export=True):  # 0.0 min
         """
         Arreglo el data type de algunas variables.
 
@@ -41,10 +43,6 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataset generado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe formateado. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{self.pais}/entidad_partido.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{self.pais}/entidad_jugadores.xlsx') if df_jug is None else df_jug
-
         start = time.time()
         print("\nFormateando los datos...")
 
@@ -66,7 +64,7 @@ class DataPreparation:  # 17.4 min
 
         return df_part, df_jug
 
-    def clean_data(self, df_part=None, df_jug=None, export=False):  # 0.0 min
+    def clean_data(self, df_part, df_jug, export=True):  # 0.0 min
         """
         Limpia los datos de un dataframe.
 
@@ -75,10 +73,6 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe limpiado. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        df_part = pd.read_excel(f'./data_preparation/data/{self.pais}/df_part_formated.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel(f'./data_preparation/data/{self.pais}/df_jug_formated.xlsx') if df_jug is None else df_jug
-
         start = time.time()
         print("\nLimpiando los datos...")
 
@@ -98,7 +92,7 @@ class DataPreparation:  # 17.4 min
 
         return df_part,df_jug
 
-    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -107,9 +101,6 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe integrado. (DataFrame)
         """
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_part_cleaned.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_jug_cleaned.xlsx') if df_jug is None else df_jug
-
         start = time.time()
         print("\nIntegrando los datos...")
 
@@ -124,7 +115,7 @@ class DataPreparation:  # 17.4 min
 
         return df_integrated
 
-    def construct_data(self, df=None, N_ULT_PART=5, export=False):  # 2.7 minutos
+    def construct_data(self, df, N_ULT_PART=5, export=True):  # 2.7 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -133,9 +124,6 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe construido. True para exportar, False de lo contrario. (bool)
         :return: Dataframe construido. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_integrated.xlsx') if df is None else df
-
         start = time.time()
         print("\nConstruyendo nuevos datos...")
 
@@ -163,7 +151,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df=None, thr_corr=0.6, umbral_fs=0.5, treat_nan='drop', export=False):  # 1.3 minutos
+    def select_data(self, df, thr_corr=0.6, umbral_fs=0.5, treat_nan='drop', export=True):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -171,9 +159,6 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_constructed.xlsx') if df is None else df
-
         warnings.filterwarnings('ignore')
         start = time.time()
         print("\nSeleccionado datos...")
@@ -200,8 +185,12 @@ class DataPreparation:  # 17.4 min
         df = df.filter(columns_to_select)
 
         # Elimino NaN values puesto que al modelo no le pueden entrar NaN values
-        df = clean_data.eliminar_filas_nan(df, umbral=0)  # Opcion 1: Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
-        # df = clean_data.fill_nan_values(df, type='ml') # Opcion 2: Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
+        if treat_nan == 'drop':
+            df = clean_data.eliminar_filas_nan(df, umbral=0)  # Opcion 1: Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
+        elif treat_nan == "ml" or 'mode':
+            df = clean_data.fill_nan_values(df, type=treat_nan) # Opcion 2: Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
+        else:
+            raise ValueError(f"Error: El tipo de eliminacion '{treat_nan}', no es una opcion")
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -362,8 +351,6 @@ def main():
     data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
-    export = True
-    dp = DataPreparation(var_resp, pais)
 
     if data_unders is True:
 
@@ -381,23 +368,28 @@ def main():
         getting_to_know_data(df_jug)
 
     if data_prep is True:
+        # Levanto datasets
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
+
+        dp = DataPreparation(df_part, df_jug, var_resp, pais)
+
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
-        treat_nan = 'ml'  # Relleno de nan values: mode o _ml  (si se hace)
+        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
         print(" Data preparation ".center(120, "#"))
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = dp.format_data(export=export)  # df_part, df_jug,
-        df_part, df_jug = dp.clean_data(df_part, df_jug, export=export)
-        df = dp.integrate_data(df_part, df_jug, export=export)
-        df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
-        df = dp.select_data(thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan, export=export)
+        df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
+        df_part, df_jug = dp.clean_data(df_part, df_jug)
+        df = dp.integrate_data(df_part, df_jug)
+        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
+        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan)
 
     if modeling is True:
         df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
-        df = df.dropna()  # no hice dropna en la seleccion
         mo = Modeling(df, var_resp, var_pred, pais)
 
         # Hiperparametros
