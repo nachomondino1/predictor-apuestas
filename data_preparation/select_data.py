@@ -95,7 +95,7 @@ class FeatureSelection():
         # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
         return df_importance
 
-    def random_forest(self, best_params=True, k=10):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
+    def random_forest(self, best_params=True, k=5):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
 
         # Defino modelo
         model = RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42)
@@ -147,7 +147,7 @@ class FeatureSelection():
 
         # Convierto coeficiente en importancia (a mayor coef en valor abs, mas importancia)
         df_importance['importance'] = df_importance['coeficiente'].apply(lambda x: abs(x))  #x es coef
-        print("Resultados lasso: \n", df_importance)
+        # print("Resultados lasso: \n", df_importance)
 
         # self.graficar_importancia_atrib(x=df_importance['importance'], y=df_importance.index)
         return df_importance
@@ -186,7 +186,6 @@ class FeatureSelection():
 
         # Re-escalo la variable "suma_de_imp" para que sea de 0 a 1 y facilitar la seleccion de variables
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
-        # df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
         return df_normalized
 
     def select_best_features(self, umbral):
@@ -198,11 +197,12 @@ class FeatureSelection():
         df_importance['via'] = self.via()['importance']
         df_importance['rfe'] = self.rfe()['importance']
         df_importance['lasso'] = self.lasso_selection()['importance']
-        df_importance['random_forest'] = self.random_forest(best_params=False, k=2)['importance']
+        df_importance['random_forest'] = self.random_forest()['importance']
         # df_importance.to_excel('/Users/nachomondino/Desktop/df_importance_prueba.xlsx')
 
         # Normalizo importancias para poder sumarlas
         df_normalized = self.normalize_importances(df_importance)
+        # df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
 
         # Selecciono las variables mas importantes segun umbral
         l_selected_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] > df_normalized['suma_de_imp_norm'].max() * umbral].index.tolist()

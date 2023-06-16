@@ -182,7 +182,7 @@ class DataPreparation:  # 17.4 min
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
-        # Tratamiento de NaN values
+        # Elimino filas y columnas con alto porcentaje de NaN values
         df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
         df = clean_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
 
@@ -190,7 +190,7 @@ class DataPreparation:  # 17.4 min
         df, df_etiquetas = format_data.convert_columns_to_int(df)
         df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
-        # Selecciono las variables con menor correlacion  # No usaré la matriz de correlacion puesto que haré feature selection??
+        # Elimino variables altamente correlacionadas
         l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
@@ -200,16 +200,15 @@ class DataPreparation:  # 17.4 min
         columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
         df = df.filter(columns_to_select)
 
-        # 3º Vuelvo a eliminar filas con NaN values puesto que al modelo no le pueden entrar NaN values. Alternativamente, podria rellenar los nans...
-        df = clean_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
-        # df = select_data.fill_nan_values(df, type='ml')
+        # Elimino NaN values puesto que al modelo no le pueden entrar NaN values
+        df = clean_data.eliminar_filas_nan(df, umbral=0)  # Opcion 1: Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
+        # df = clean_data.fill_nan_values(df, type='ml') # Opcion 2: Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
-
         return df
 
 class Modeling:
@@ -352,7 +351,7 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-        umbral_fs = 0.3  # Percentil de importancias para la seleccion de variables mas importantes  # Con 0.6: ['dt_vis', 'historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part', 'dif_offsides_segun_ult_part', 'dif_ataques_pelig_segun_ult_part', 'dif_edad_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']  Con 0.7: ['historial_entre_si', 'dif_posesion_segun_ult_part', 'dif_remates_a_puerta_segun_ult_part',  'dif_ataques_pelig_segun_ult_part', 'dif_rat_tit', 'dif_edad_sup', 'dif_rat_aus']
+        umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
         treat_nan = 'ml'  # Relleno de nan values: mode o _ml  (si se hace)
         print(" Data preparation ".center(120, "#"))
 
@@ -360,14 +359,14 @@ def main():  # La idea es poner toda el camino de los datos aqui...
         # df_part, df_jug = dp.format_data(export=export)  # df_part, df_jug,
         # df_part, df_jug = dp.clean_data(df_part, df_jug, export=export)
         # df = dp.integrate_data(df_part, df_jug, export=export)
-        df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
-        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan, export=export)
+        # df = dp.construct_data(N_ULT_PART=N_ULT_PART, export=export)
+        df = dp.select_data(thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan, export=export)
 
     if modeling is True:
 
         # Hiperparametros
-        porc_corte = 0.1  # Ahora si que da baja la precision (como deberia) al usar porc_corte bajas de 0.1 o 0.01
-        best_params = False  # True para hacer GridSearch para buscar los mejeres hiperparametros.
+        porc_corte = 0.8  # Ahora si que da baja la precision (como deberia) al usar porc_corte bajas de 0.1 o 0.01
+        best_params = True  # True para hacer GridSearch para buscar los mejeres hiperparametros.
         k = 3  # Numero de folds
         l_modelos = [DecisionTreeClassifier(max_depth=30),
                      RandomForestClassifier(n_estimators=200, max_depth = None, random_state=42),  # Tarda cdo hago best_params y k=10

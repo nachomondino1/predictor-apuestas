@@ -25,7 +25,7 @@ def clean_teams_names(df):
     :return: Dataframe con nombres de equipos modificados y limpios
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
-    df['equipo_loc'] = df['equipo_loc'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()  # no funcionó en main_next_matches.py
+    df['equipo_loc'] = df['equipo_loc'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
     df['equipo_vis'] = df['equipo_vis'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
 
     # Quitar abreviaturas en nombres de equipos (NO FUNCIONA...)
@@ -34,8 +34,8 @@ def clean_teams_names(df):
     df['equipo_vis'] = df['equipo_vis'].replace(d_abrev_team_names, regex=True).str.strip()
 
     # Reemplazo nombres enteros de equipos para que sea igual a los de la entidad jugador
-    d_team_names = {'estudiantes la plata': 'estudiantes',
-        'qpr': 'queens park rangers',  'wolves': 'wolverhampton', 'west brom': 'west bromwich albion'}
+    d_team_names = {'estudiantes la plata': 'estudiantes', 'qpr': 'queens park rangers',  'wolves': 'wolverhampton',
+                    'west brom': 'west bromwich albion'}
     for equipo_part, equipo_jug in d_team_names.items():
         df['equipo_loc'] = df['equipo_loc'].replace(equipo_part, equipo_jug)
         df['equipo_vis'] = df['equipo_vis'].replace(equipo_part, equipo_jug)
@@ -102,6 +102,17 @@ def eliminar_filas_nan(df, umbral):
     return df_filtrado
 
 def eliminar_columnas_nan(df, umbral):
+    """
+    Elimina las columnas de un DataFrame que contienen un porcentaje alto de valores NaN.
+
+    Args:
+        df (pandas.DataFrame): DataFrame de entrada.
+        umbral (float): Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una columna.
+
+    Returns:
+        pandas.DataFrame: DataFrame resultante después de eliminar las columnas con valores NaN.
+
+    """
     # Calcula la proporción de NaN en cada columna
     prop_nan = df.isna().mean()
 

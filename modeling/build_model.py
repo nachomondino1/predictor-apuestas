@@ -73,7 +73,9 @@ def select_best_hiperparameters(X_train, y_train, model, k):
         'MLPClassifier': {'activation': ['identity', 'logistic', 'tanh', 'relu'], 'solver': ['lbfgs', 'sgd', 'adam'],
                 'learning_rate': ['learning_rate', 'invscaling', 'adaptive'], 'max_iter': [200, 300],
                 'hidden_layer_sizes': [(64), (128), (64, 32)]},
-         'GradientBoostingClassifier': {'learning_rate': [0.1, 0.05, 0.01], 'n_estimators': [100, 200, 300], 'max_depth': [None, 5, 7, 20, 30]}
+         'GradientBoostingClassifier': {'learning_rate': [0.1, 0.05, 0.01], 'n_estimators': [100, 200, 300], 'max_depth': [None, 5, 7, 20, 30]},
+         'PCA': {'n_components': [2, 5, 10], 'whiten': [True, False], 'svd_solver': ['auto', 'full', 'randomized'],
+                 'iterated_power': [1, 2, 3],  'random_state': [42]}
          }
 
     # Crear el objeto GridSearchCV
@@ -121,7 +123,7 @@ def prueba():
 
         # Entreno modelo
         print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '#'))
-        model, cv_accuracy, test_accuracy = build_model(X, y, modelo, best_params=True, k=5) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
+        model, cv_accuracy, test_accuracy = train_model(df, 'equipo_ganador', modelo, best_params=True, k=5) # model = DecisionTreeClassifier()  # model2 = RandomForestClassifier(n_estimators=grid_search.best_params_['n_estimators'], max_depth=grid_search.best_params_['max_depth'], random_state=42)
 
         # Si es el mejor modelo hasta aqui
         if test_accuracy > best_acurracy:
