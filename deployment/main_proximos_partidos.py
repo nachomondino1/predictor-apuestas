@@ -240,7 +240,7 @@ def main():
     if modeling:
         # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
 
-        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_part_selected_next_matches.xlsx', index_col=0)
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/deployment/data_next_matches/df_part_selected_next_matches.xlsx', index_col=0)
 
         ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
         df_test_pred = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
@@ -256,8 +256,8 @@ def main():
 
         # Traduzco predicciones numericas a etiquetas
         df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas.xlsx')
-        df = format_data.target_to_object(df_res, df_etiquetas)  # df = format_data.target_to_object(df_res, pais)
-        df.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/predicciones.xlsx')
+        df = format_data.revert_columns_from_int(df_res, df_etiquetas, columns=['y_pred'])  # df = format_data.target_to_object(df_res, pais)
+        df.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/deployment/data_next_matches/predicciones.xlsx')
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
