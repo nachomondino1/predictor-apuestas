@@ -127,9 +127,6 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nConstruyendo nuevos datos...")
 
-        # Ordeno por campo 'fecha'
-        # df = df.sort_values(by='fecha', ascending=False, ignore_index=True)  # Todos son ascending=True salvo historial_entre_si_segun_localia
-
         # Construyo variable respuesta: "equipo_gandor"
         df = construct_data.determinar_equipo_ganador(df)
 
@@ -151,7 +148,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df, thr_corr=0.6, umbral_fs=0.5, treat_nan='drop', export=True):  # 1.3 minutos
+    def select_data(self, df, thr_corr=0.6, porc_nan_max=0.2 , umbral_fs=0.5, treat_nan='drop', export=True):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -168,7 +165,7 @@ class DataPreparation:  # 17.4 min
 
         # Elimino filas y columnas con alto porcentaje de NaN values
         df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-        df = clean_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
+        df = clean_data.eliminar_columnas_nan(df, umbral=porc_nan_max)  # 2º elimino columnas con mucho NaN
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -282,22 +279,15 @@ class Modeling:
 
             # Evaluo el modelo con Cross Validation
             print("Evaluo modelo con Cross Validation...")
-            # Opcion 1: Sin libreria
             cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-            print(f"\n SIN LIBRERIA: Precision promedio de validación cruzada: {cv_accuracy:.1f}%")
-            # Opcion 2: Con libreria
-            from sklearn.model_selection import cross_val_score
-            cv_scores = cross_val_score(model_best_params, X_train, y_train, cv=k)
-            mean_cv_score = cv_scores.mean() * 100
-            print(f"\n LIBRERIA: Precision promedio de validación cruzada: {mean_cv_score:.1f}%")
-
             df_models.loc[len(df_models)] = [modelo, best_params, model_best_params, cv_accuracy]
+            print(f"Precision promedio de validación cruzada: {cv_accuracy:.1f}% \n")
 
         # Selecciono el mejor modelo
         idx = df_models[df_models['cv_accuracy'] == max(df_models['cv_accuracy'])].index[0]
         best_model, best_accuracy = df_models.loc[idx, 'model_trained'], df_models.loc[idx, 'cv_accuracy']
         print(df_models)
-        print(f"El mejor modelo es: {best_model} con precision: {best_accuracy:.1f}%")
+        print(f"\nEl mejor modelo es: {best_model} con precision: {best_accuracy:.1f}%")
 
         if export:
             df_models.to_excel(f'./modeling/data/{self.pais}/df_modelos.xlsx')
@@ -348,11 +338,11 @@ class Modeling:
 def main():
 
     # Definicion de variables
-    data_unders, data_prep, modeling = False, False, True
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
 
-    if data_unders is True:
+    data_unders = False
+    if data_unders:
 
         print(" Data understanding ".center(120, "#"))
 
@@ -367,37 +357,46 @@ def main():
         getting_to_know_data(df_part)
         getting_to_know_data(df_jug)
 
-    if data_prep is True:
+    data_prep = False
+    if data_prep:
+
         # Levanto datasets
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed.xlsx')
 
+        # Creo objeto de clase DataPreparation
         dp = DataPreparation(df_part, df_jug, var_resp, pais)
-
+        print(" Data preparation ".center(120, "#"))
+        
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
         treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
-        print(" Data preparation ".center(120, "#"))
+        porc_nan_max = 0.2
 
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
         df_part, df_jug = dp.clean_data(df_part, df_jug)
         df = dp.integrate_data(df_part, df_jug)
         df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
-        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, treat_nan=treat_nan)
+        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=0.2, treat_nan=treat_nan)
 
-    if modeling is True:
+    modeling = False
+    if modeling:
+        # Levanto dataset para prueba
         df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
+
+        # Creo objeto de clase Modeling
         mo = Modeling(df, var_resp, var_pred, pais)
+        print(" Modeling ".center(120, "#"))
 
         # Hiperparametros
         bal_type = 'over'  # ['over', 'over_and_under' ,'under']
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
-        print(" Modeling ".center(120, "#"))
 
         # Analizo los datos
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size)
@@ -407,3 +406,81 @@ def main():
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     main()
+
+
+from itertools import product
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
+
+def find_best_hiperparameters(df_part, df_jug, var_resp, pais):
+
+    # Definicion de variables
+    df_res = pd.DataFrame()
+    best_accuracy = 0.0
+    dp = DataPreparation(df_part, df_jug, var_resp, pais)
+
+    # Definir la distribución de los hiperparámetros
+    # param_dist = {'bal_type': ['over', 'over_and_under','under'], 'test_val_size': [0.25, 0.3], 'test_size': [0.5], 'k': [5]}
+    param_dist = {'thr_corr': [0.6, 0.7, 0.8], 'umbral_fs': [0.2, 0.3, 0.4], 'treat_nan': ['drop', 'ml'],
+                  'porc_nan_max': [0.1, 0.2, 0.3]}
+
+    for n_ult_part in [5, 7, 10]:
+
+        # Levanto dataset integrado
+        # Hago el procesamiento de format a integrate una sola vez (o bien levanto df ya integrado) --> en reealidad creo que no... al pedo..
+        # df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
+        # df_part, df_jug = dp.clean_data(df_part, df_jug)
+        # df = dp.integrate_data(df_part, df_jug)
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
+
+        # Construyo datos
+        df = dp.construct_data(df, N_ULT_PART=n_ult_part, export=False)
+
+        # Por combinacion de parametros
+        for i, param_values in enumerate(product(*param_dist.values()), start=1):
+
+            print(f" Iteracion Nº {i} ".center(120, "#"))
+            thr_corr = param_values[0]
+            umbral_fs = param_values[1]
+            treat_nan = param_values[2]
+            porc_nan_max = param_values[3]
+            print(f"thr_corr: {thr_corr} ; umbral_fs: {umbral_fs} ; treat_nan: {treat_nan} ; porc_nan_max: {porc_nan_max}")
+
+            # Preparo el dataset para el analisis
+            df_sel = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=porc_nan_max, treat_nan=treat_nan, export=False)
+
+            # Shuffle
+            df_sel = shuffle(df_sel, random_state=42)
+
+            # Separo dataset en train y test
+            X, y = df_sel.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1), df_sel[var_resp]
+            print(X.shape, y.shape)
+
+            cv_scores = cross_val_score(RandomForestClassifier(), X, y, cv=5)
+            mean_cv_score = cv_scores.mean() * 100
+            print(f"Precision: {mean_cv_score}")
+
+            # Guardo datos en dataframe
+            row_data = {'N_ULT_PART': n_ult_part, 'thr_corr': thr_corr, 'umbral_fs': umbral_fs, 'porc_nan_max': porc_nan_max, 'treat_nan': treat_nan, 'X_shape': X.shape, 'y_shape': y.shape, 'precision': mean_cv_score}
+            df_res = df_res.append(row_data, ignore_index=True)
+            print(row_data)
+            print(df_res)
+            df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
+
+            # Verificar si la precisión actual es la mejor hasta ahora
+            if mean_cv_score > best_accuracy:
+                best_accuracy = mean_cv_score
+                best_hyperparameters = row_data
+
+    # Imprimir los hiperparámetros óptimos y la precisión correspondiente
+    print("Mejores hiperparámetros:", best_hyperparameters)
+    print("Precisión obtenida:", best_accuracy)
+    df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
+    return best_hyperparameters
+
+
+var_resp, var_pred = 'equipo_ganador', 'y_pred'
+pais = "argentina"
+df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
+df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
+find_best_hiperparameters(df_part, df_jug, var_resp, pais)
