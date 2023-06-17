@@ -3,9 +3,12 @@ import numpy as np
 import warnings
 from sklearn.model_selection import GridSearchCV  # Seleccion de hiperparametros
 from sklearn.metrics import accuracy_score  # Metrica de precision
+import time
 
 
 def select_best_hiperparameters(model, X, y, k):
+
+    start = time.time()
 
     # Definicion de variables
     d_params = {"DecisionTreeClassifier":
@@ -14,20 +17,25 @@ def select_best_hiperparameters(model, X, y, k):
                                            'n_estimators': [50, 100, 150, 200]},
                 'XGBClassifier': {'max_depth': [None, 5, 6, 7, 8, 10, 15, 20, 25, 30, 35],
                                   'n_estimators': [50, 100, 150, 200]},
-                'LogisticRegression': {'penalty': [None, 'l2'], 'C': [0.1, 1.0, 10.0],
+                'LogisticRegression': {'penalty': [None, 'l2'],
+                                       'C': [0.1, 1.0, 10.0],
                                        'solver': ['lbfgs', 'newton-cg', 'sag', 'saga', 'lbfgs'],
                                        'max_iter': [100, 500, 1000],
                                        'multi_class': ['multinomial']},
-                'SVC': {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'], 'decision_function_shape': ['ovo', 'ovr']},
-                'MLPClassifier': {'activation': ['identity', 'logistic', 'tanh', 'relu'],
+                'SVC': {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+                        'decision_function_shape': ['ovo', 'ovr']},
+                'MLPClassifier': {'activation': ['logistic', 'tanh', 'relu'],  # 'identity', 'sigmoid'
                                   'solver': ['lbfgs', 'sgd', 'adam'],
-                                  'learning_rate': ['learning_rate', 'invscaling', 'adaptive'], 'max_iter': [200, 300],
+                                  'learning_rate': ['constant', 'invscaling', 'adaptive'],  # 'learning_rate'
+                                  'max_iter': [300],  # 200
                                   'hidden_layer_sizes': [(64), (128), (64, 32)]},
-                'GradientBoostingClassifier': {'learning_rate': [0.1, 0.05, 0.01], 'n_estimators': [100, 200, 300],
-                                               'max_depth': [None, 5, 7, 20, 30]},
-                'PCA': {'n_components': [2, 5, 10], 'whiten': [True, False],
+                'GradientBoostingClassifier': {'learning_rate': [0.1, 0.05, 0.01],
+                                               'n_estimators': [100, 200, 300],
+                                               'max_depth': [5, 7, 20]},  # None, 30
+                'PCA': {'n_components': [2, 5, 10],
+                        'whiten': [True, False],
                         'svd_solver': ['auto', 'full', 'randomized'],
-                        'iterated_power': [1, 2, 3], 'random_state': [42]}
+                        'iterated_power': [1, 2, 3]}
                 }
 
     # Obtengo el nombre del modelo para poder buscar sus hiperparametros
@@ -42,6 +50,9 @@ def select_best_hiperparameters(model, X, y, k):
     # Obtener los mejores hiperparámetros y el modelo con dichos hiperparametros
     best_params = grid_search.best_params_
     model = grid_search.best_estimator_
+
+    end = time.time()
+    print(f"Seleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
     return model, best_params
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
@@ -69,7 +80,7 @@ def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que
         # Calcular la precisión en el conjunto de test
         accuracy = accuracy_score(y_test_fold, y_pred) * 100
         scores.append(accuracy)
-        print(f'Fold {i+1} --> Precision: {accuracy:.1f}%')
+        # print(f'Fold {i+1} --> Precision: {accuracy:.1f}%')
 
     # Calcular la precisión promedio de la validación cruzada
     cv_accuracy = np.mean(scores)

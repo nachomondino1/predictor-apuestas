@@ -45,7 +45,7 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
                     columnas_eliminar.add(col2)
                     # print(f"Variable a eliminar: {col2}")
 
-    print(f"Columnas a eliminar por correlacion: {columnas_eliminar}")
+    print(f"Columnas eliminadas por correlacion mayor a thr_corr={umbral*100:.0f}%: {columnas_eliminar}")
     return list(columnas_eliminar)
 
 # SELECCION DE VARIABLES IMPORTANTES
@@ -204,7 +204,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-    def select_best_features(self, umbral):
+    def select_best_features(self, umbral, graf=True):
 
         df_importance = pd.DataFrame(index=self.X.columns)
         graficar = False
@@ -225,8 +225,10 @@ class FeatureSelection():
         l_selected_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] > df_normalized['suma_de_imp_norm'].max() * umbral].index.tolist()
 
         # Grafico importancias teniendo en cuenta todos los modelos
-        self.graficar_importancia_atrib(x=df_normalized['suma_de_imp_norm'], y=df_normalized.index)
-        print(f"Columnas consideradas como las mas importantes: {l_selected_features}")
+        if graf:
+            self.graficar_importancia_atrib(x=df_normalized['suma_de_imp_norm'], y=df_normalized.index)
+
+        print(f"Columnas mas importantes por peso mayor a thr_fs={umbral*100:.0f}%: {l_selected_features}")
         return l_selected_features
 
 def prueba():
@@ -248,13 +250,11 @@ def prueba():
     # TRATAMIENTO DE NAN VALUES
     # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
     df = clean_data.eliminar_filas_nan(df, umbral=0.5)
-
     prop_nan = df.isna().mean()
     print(prop_nan)
 
     # 2º elimino columnas con mucho NaN
     df = clean_data.eliminar_columnas_nan(df, umbral=0.2)
-
     prop_nan = df.isna().mean()
     print(prop_nan)
     print(df.shape)

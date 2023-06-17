@@ -305,7 +305,7 @@ def n_dias_ult_partido(df):  # Peopuesta por Chat GPT
             df.loc[i, 'dias_desde_ultimo_partido_vis'] = dias_desde_ultimo_vis
 
     df['dif_dias_ult_part'] = df['dias_desde_ultimo_partido_loc'] - df['dias_desde_ultimo_partido_vis']
-    df.drop(['dias_desde_ultimo_partido_loc', 'dias_desde_ultimo_partido_vis'], axis=1)
+    df = df.drop(['dias_desde_ultimo_partido_loc', 'dias_desde_ultimo_partido_vis'], axis=1)
     return df
 
 def calculate_dif_col_jugadores(df):

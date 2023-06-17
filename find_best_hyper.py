@@ -1,3 +1,102 @@
+import pandas as pd
+from itertools import product
+from main import DataPreparation, Modeling
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
+
+def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
+
+    # Definicion de variables
+    df_res = pd.DataFrame()
+    best_accuracy = 0.0
+    dp = DataPreparation(df_part, df_jug, var_resp, pais)
+
+    # Hiperparametros de construct_data
+    param_construct = {'n_ult_part': [5, 10, 15]}  # n_ult_part --> mas tirando a 10
+
+    # Por combinacion de parametros
+    for i, param_values in enumerate(product(*param_construct.values()), start=1):
+
+        # Levanto dataset integrado
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
+
+        n_ult_part = param_values[0]
+
+        # Construyo datos
+        df = dp.construct_data(df, N_ULT_PART=n_ult_part, export=False)
+        df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_{n_ult_part}.xlsx')
+        print(f" Iteracion Nº {i} ".center(120, "#"))
+
+        # Hiperparametros de select_data
+        param_select = {'thr_corr': [0.7, 0.9, 0.5], 'thr_fs': [0.25, 0.15], 'thr_nan_col': [0.2, 0.35, 0.5]}  # thr_fs --> mas tirando a 0.2 # thr_corr --> medio indep # thr_nan_col --> mas tirando a 0.3
+
+        # Por combinacion de parametros
+        for j, param_values in enumerate(product(*param_select.values()), start=1):
+
+            thr_corr, thr_fs, thr_nan_col = param_values[0], param_values[1], param_values[2]
+            print(f" Iteracion Nº {i}.{j} ".center(120, "+"))
+            print(f"thr_corr: {thr_corr} ; thr_fs: {thr_fs} ; thr_nan_col: {thr_nan_col}")
+
+            # Preparo el dataset para el analisis
+            df_sel = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, thr_nan_col=thr_nan_col, export=False)
+            print(df_sel.shape)
+
+            # Creo objeto de clase Modeling con df_selected
+            mo = Modeling(df_sel, var_resp, var_pred, pais)
+
+            # Hiperparametros de modeling
+            param_dist_mod = {'bal_type': [None, 'over', 'under'], 'test_val_size': [0.2], 'test_size': [0.5], 'k': [5], 'treat_nan': ['drop', 'ml']}
+
+            # Por combinacion de parametros
+            for h, param_val in enumerate(product(*param_dist_mod.values()), start=1):
+
+                # Hiperparametros
+                bal_type, test_val_size, test_size, k, treat_nan = param_val[0], param_val[1], param_val[2], param_val[3], param_val[4]
+                print(f" Iteracion Nº {i}.{j}.{h} ".center(120, "-"))
+                print(f"bal_type: {bal_type} ; treat_nan: {treat_nan}")
+                print(f"test_val_size: {test_val_size} ; test_size: {test_size} ; k: {k}")
+
+                # Analizo los datos
+                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, treat_nan=treat_nan, export=False)
+                best_model, train_accuracy = mo.select_best_model(X_train, y_train, X_val, y_val, k, export=False)
+                test_accuracy, roi = mo.assess_model(best_model, X_test, y_test, export=False)
+                print(f"Precision test: {test_accuracy} ROI: {roi}")
+
+                # Guardo datos en dataframe
+                row_data = {'N_ULT_PART': n_ult_part, 'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                            'treat_nan': treat_nan, 'bal_type': bal_type, 'test_val_size': test_val_size,
+                            'test_size': test_size, 'X_train': X_train.shape, 'X_val': X_val.shape,
+                            'X_test': X_test.shape, "X_columns": X_train.columns, 'k': k, 'best_model': best_model,
+                            'precision_train': train_accuracy, 'precision_test': test_accuracy, 'roi': roi}
+                df_res = df_res.append(row_data, ignore_index=True)
+                print(row_data)
+                print(df_res)
+                df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod.xlsx', index=False)
+
+                # Verificar si la precisión actual es la mejor hasta ahora
+                if test_accuracy > best_accuracy:
+                    best_accuracy = test_accuracy
+                    best_hyperparameters = row_data
+
+    # Imprimir los hiperparámetros óptimos y la precisión correspondiente
+    print("Mejores hiperparámetros:", best_hyperparameters)
+    print("Precisión obtenida:", best_accuracy)
+    df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
+    return best_hyperparameters
+
+
+def main():
+    var_resp, var_pred = 'equipo_ganador', 'y_pred'
+    pais = "argentina"
+    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
+    df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
+    find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais)
+
+if __name__ == '__main__':
+    main()
+
+
+''' # Para ver si me falto hacer algun cambio en main.py
 # Importo librerias
 import pandas as pd
 import time
@@ -9,7 +108,6 @@ from dspy.data_understanding.describe_data import getting_to_know_data
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 # Modeling
 # Generate test design
-from sklearn.model_selection import train_test_split
 from modeling import generate_test_design
 from sklearn.utils import shuffle
 # Build model
@@ -48,12 +146,12 @@ class DataPreparation:  # 17.4 min
         print("\nFormateando los datos...")
 
         # Entidad partido: fecha, posesion y es_copa
-        df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        # df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
         df_part = format_data.convert_posesion_to_int(df_part)  # Podria usar la limpieza de punct de tp y luego convertir a int64 pero as al pedo
         df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
 
         # Entidad jugador: fecha y valor de mercado
-        df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')
+        df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
         df_jug = format_data.convert_valor_mercado_to_int(df_jug)
 
         end = time.time()
@@ -149,7 +247,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df, thr_corr=0.6, thr_nan_col=0.2 , thr_fs=0.5, export=True):  # 1.3 minutos
+    def select_data(self, df, thr_corr=0.6, porc_nan_max=0.2 , umbral_fs=0.5, treat_nan='drop', export=True):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -166,7 +264,7 @@ class DataPreparation:  # 17.4 min
 
         # Elimino filas y columnas con alto porcentaje de NaN values
         df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-        df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
+        df = clean_data.eliminar_columnas_nan(df, umbral=porc_nan_max)  # 2º elimino columnas con mucho NaN
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -178,7 +276,7 @@ class DataPreparation:  # 17.4 min
 
         # Selecciono las variables mas importantes (feature selection)
         fs = select_data.FeatureSelection(df.dropna(), self.var_resp)
-        l_selected_features = fs.select_best_features(umbral=thr_fs, graf=export)
+        l_selected_features = fs.select_best_features(umbral=umbral_fs)
         columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
         df = df.filter(columns_to_select)
 
@@ -197,12 +295,13 @@ class Modeling:
         if not isinstance(pais, str):
             raise TypeError("El parámetro pais debe ser una cadena de texto.")
 
-        self.df = df
         self.var_resp = var_resp
         self.var_pred = var_pred
         self.pais = pais
+        self.X = df.drop(self.var_resp, axis=1)
+        self.y = df[self.var_resp]
 
-    def generate_test_design(self, bal_type, test_val_size=0.2, test_size=0.5, treat_nan='drop', export=True):
+    def generate_test_design(self, bal_type, test_val_size=0.7, test_size=0.5, export=True):
         """
         Balancea el dataset y separa en conjuntos de entrenamiento y testeo
 
@@ -211,49 +310,17 @@ class Modeling:
         :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
-
-        X, y = self.df.drop(self.var_resp, axis=1), self.df[self.var_resp]  # Separar en X e y
-
-        # Eliminacion de NaN values --> conviene al principio... para separar en las proporciones que digo...
-        if treat_nan == 'drop':
-            df = pd.concat([X, y], axis=1)
-            df = clean_data.eliminar_filas_nan(df, umbral=0)  # Eliminar filas con valores nulos en X e y   # Opcion 1: Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
-            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separar en X e y
+        print(f"Shape dataframe original: {self.X.shape}")
 
         # Separo conjunto de datos en train, validation y test
-        X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size,random_state=42, shuffle=True)  # Divido todos los  datos en train y validacion + prueba
-        X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True) # Divido validacion + prueba en validacion y prueba
+        X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X_bal_shuf, y_bal_shuf, test_val_size, test_size)
 
-        # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
+        # Quito odds de train y val (de test no porque necesito calcular roi)
         X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
         X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-
         print(f'Train: {X_train.shape} {y_train.shape}')
         print(f'Val: {X_val.shape} {y_val.shape}')
         print(f'Test: {X_test.shape} {y_test.shape}')
-
-        # Balanceo el dataset de entrenamiento --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
-        if bal_type is not None:
-            X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
-            print(f"Shape X_train luego de balanceo: {X_train.shape}")
-
-        # Relleno nan --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
-        if treat_nan == "ml" or treat_nan == 'mode':
-            df_train = pd.concat([X_train, y_train], axis=1)  # Junto X_train e y_train
-            df_train = clean_data.fill_nan_values(df_train, type=treat_nan)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
-            X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]  # Vuelvo a separar en X_train e y_train
-            print(f"Se realizo el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
-
-            # Elimino NaN de df_val y df_test para evitar "ValueError: Input X contains NaN."
-            df_val = pd.concat([X_val, y_val], axis=1)
-            df_val = df_val.dropna()
-            X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]  # Separar en X e y
-            print(f"Se elimino NaN values en validacion. Shape X_val: {X_val.shape}")
-
-            df_test = pd.concat([X_test, y_test], axis=1)
-            df_test = df_test.dropna()
-            X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]  # Separar en X e y
-            print(f"Se elimino NaN values en test. Shape X_test: {X_test.shape}")
 
         if export:
             X_train.to_excel(f'./modeling/data/{self.pais}/X_train.xlsx', index=False)
@@ -277,10 +344,8 @@ class Modeling:
         # Definicion de variables
         warnings.filterwarnings("ignore")
         df_models = pd.DataFrame(columns=['model', 'best_params', 'model_trained', 'cv_accuracy'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
-        # l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
-        #              SVC(), MLPClassifier(), GradientBoostingClassifier()]
-        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), MLPClassifier()]
-        print("\nSeleccionando el mejor modelo...")
+        l_modelos = [xgb.XGBClassifier()] #, GradientBoostingClassifier()]
+        # print("\nSeleccionando el mejor modelo...")
 
         # Por modelo
         for modelo in l_modelos:
@@ -343,12 +408,12 @@ class Modeling:
         # Convierto variable respuesta y variable predicha en etiqueta
         df_results_etiquetas = format_data.revert_columns_from_int(df_results, df_etiquetas, columns=[self.var_resp, self.var_pred])
 
-        # Calculo roi
+        # Calculo roi e imprimo matriz de confusion
         roi = calculate_roi(df_results_etiquetas, self.var_resp, self.var_pred) * 100
         print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
+        # confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
 
         if export:
-            confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
             df_results.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
 
         return test_accuracy, roi
@@ -391,6 +456,7 @@ def main():
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
         porc_nan_max = 0.2
 
         # Preparo el dataset para el analisis
@@ -398,7 +464,7 @@ def main():
         df_part, df_jug = dp.clean_data(df_part, df_jug)
         df = dp.integrate_data(df_part, df_jug)
         df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
-        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=porc_nan_max)
+        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=0.2, treat_nan=treat_nan)
 
     modeling = False
     if modeling:
@@ -410,17 +476,101 @@ def main():
         print(" Modeling ".center(120, "#"))
 
         # Hiperparametros
+        bal_type = 'over'  # ['over', 'over_and_under' ,'under']
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
-        bal_type = 'over'  # ['over', 'over_and_under' ,'under']
-        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
 
         # Analizo los datos
-        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size, treat_nan=treat_nan)
-        best_model, best_accuracy = mo.select_best_model(X_train, y_train, X_val, y_val, k)
+        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size)
+        best_model = mo.select_best_model(X_train, y_train, X_val, y_val, k)
         mo.assess_model(best_model, X_test, y_test)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     main()
+
+'''
+
+
+'''
+
+from itertools import product
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
+
+def find_best_hiperparameters(df_part, df_jug, var_resp, pais):
+
+    # Definicion de variables
+    df_res = pd.DataFrame()
+    best_accuracy = 0.0
+    dp = DataPreparation(df_part, df_jug, var_resp, pais)
+
+    # Definir la distribución de los hiperparámetros
+    # param_dist = {'bal_type': ['over', 'over_and_under','under'], 'test_val_size': [0.25, 0.3], 'test_size': [0.5], 'k': [5]}
+    param_dist = {'thr_corr': [0.6, 0.7, 0.8], 'umbral_fs': [0.2, 0.3, 0.4], 'treat_nan': ['drop', 'ml'],
+                  'porc_nan_max': [0.1, 0.2, 0.3]}
+
+    for n_ult_part in [5, 7, 10]:
+
+        # Levanto dataset integrado
+        # Hago el procesamiento de format a integrate una sola vez (o bien levanto df ya integrado) --> en reealidad creo que no... al pedo..
+        # df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
+        # df_part, df_jug = dp.clean_data(df_part, df_jug)
+        # df = dp.integrate_data(df_part, df_jug)
+        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
+
+        # Construyo datos
+        df = dp.construct_data(df, N_ULT_PART=n_ult_part, export=False)
+
+        # Por combinacion de parametros
+        for i, param_values in enumerate(product(*param_dist.values()), start=1):
+
+            print(f" Iteracion Nº {i} ".center(120, "#"))
+            thr_corr = param_values[0]
+            umbral_fs = param_values[1]
+            treat_nan = param_values[2]
+            porc_nan_max = param_values[3]
+            print(f"thr_corr: {thr_corr} ; umbral_fs: {umbral_fs} ; treat_nan: {treat_nan} ; porc_nan_max: {porc_nan_max}")
+
+            # Preparo el dataset para el analisis
+            df_sel = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=porc_nan_max, treat_nan=treat_nan, export=False)
+
+            # Shuffle
+            df_sel = shuffle(df_sel, random_state=42)
+
+            # Separo dataset en train y test
+            X, y = df_sel.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1), df_sel[var_resp]
+            print(X.shape, y.shape)
+
+            cv_scores = cross_val_score(RandomForestClassifier(), X, y, cv=5)
+            mean_cv_score = cv_scores.mean() * 100
+            print(f"Precision: {mean_cv_score}")
+
+            # Guardo datos en dataframe
+            row_data = {'N_ULT_PART': n_ult_part, 'thr_corr': thr_corr, 'umbral_fs': umbral_fs, 'porc_nan_max': porc_nan_max, 'treat_nan': treat_nan, 'X_shape': X.shape, 'y_shape': y.shape, 'precision': mean_cv_score}
+            df_res = df_res.append(row_data, ignore_index=True)
+            print(row_data)
+            print(df_res)
+            df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
+
+            # Verificar si la precisión actual es la mejor hasta ahora
+            if mean_cv_score > best_accuracy:
+                best_accuracy = mean_cv_score
+                best_hyperparameters = row_data
+
+    # Imprimir los hiperparámetros óptimos y la precisión correspondiente
+    print("Mejores hiperparámetros:", best_hyperparameters)
+    print("Precisión obtenida:", best_accuracy)
+    df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
+    return best_hyperparameters
+
+
+var_resp, var_pred = 'equipo_ganador', 'y_pred'
+pais = "argentina"
+df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
+df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
+find_best_hiperparameters(df_part, df_jug, var_resp, pais)
+
+
+'''

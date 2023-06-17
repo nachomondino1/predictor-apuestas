@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
 
-def convert_posesion_to_int(df):
+def convert_posesion_to_int(df): # no tiene sentido que sea una funcion si son dos lineas
     """
     Transformo posesion de string a float
     :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
@@ -12,15 +12,6 @@ def convert_posesion_to_int(df):
     """
     df['posesion_loc'] = df['posesion_loc'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
-    return df
-
-def convert_fecha_to_datetime(df, string_format):
-    """
-    Transformo fecha de string a datetime
-    :param df: Dataframe. Con columna 'fecha' interpretada como string
-    :return: Dataframe. Con columna 'fecha' interpretada como datetime
-    """
-    df['fecha'] = pd.to_datetime(df['fecha'], format=string_format)
     return df
 
 def convert_valor_mercado_to_int(df):
@@ -44,7 +35,7 @@ def convert_valor_mercado_to_int(df):
     df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
     return df
 
-def convert_columns_to_int(df, df_etiquetas=None):  #Funciona?
+def convert_columns_to_int(df, df_etiquetas=None):
     """
     Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores originales y enteros correspondientes.
 
@@ -109,16 +100,17 @@ def revert_columns_from_int(df, df_etiquetas, columns=None):
 
 def prueba():
     # Levanto datasets
-    df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_partido_argentina.xlsx')
-    df_jug = pd.read_excel("/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/data_seg/entidad_jugadores.xlsx", index_col=0)
+    pais = 'argentina'
+    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
+    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx", index_col=0)
 
     # Entidad partido: fecha de string a datetime, posesion de str a float
-    df_part = convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')
+    df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M')  # df_part = convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')
     df_part = convert_posesion_to_int(df_part)
     df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
 
     # Entidad jugador: fecha de string a datetime y convierto valor de mercado en entero
-    df_jug = convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
+    df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')  # df_jug = convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
     df_jug = convert_valor_mercado_to_int(df_jug)
 
     df_part.to_excel('/Users/nachomondino/Desktop/df_part_formated.xlsx', index=False)

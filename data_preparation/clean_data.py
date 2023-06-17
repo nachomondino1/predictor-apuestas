@@ -1,11 +1,14 @@
 import pandas as pd
 from dspy.data_preparation.text_preparation import TextPreparation
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
 
-def prepare_text_columns(df, l_col_to_except):  # Podria agregar un l_except_columns para eevitar analizar alguna columna de strings que no quiera preparar...
+
+def prepare_text_columns(df, l_col_to_except):
     '''
     Prepara el texto de las columnas que contengan strings.
     :param df: Dataframe.
+    :param l_col_to_except: Lista. Columnas del tipo object que omitir en el procesamiento.
     :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
     '''
     # Creo objeto de la clase
@@ -44,35 +47,50 @@ def clean_teams_names(df):
 
 # TRATAMIENTO DE NAN VALUES
 def fill_nan_values(df, type):
-    columnas_con_nan = df.columns[df.isna().any()].tolist()
+
+    # Definivion de variables
+    l_columnas_con_nan = df.columns[df.isna().any()].tolist()
+    param_grid = {
+        'n_estimators': [100, 200, 300],
+        'max_depth': [None, 5, 10],
+        'min_samples_split': [2, 5, 10]
+    }
 
     # Crear una copia del dataframe original
     df_filled = df.copy()
 
-    # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
-    if type == "mode":
-        for col in columnas_con_nan:
+    for col in l_columnas_con_nan:
+
+        # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
+        if type == "mode":
             df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
 
-    # OPCION 2: Llenar los valores faltantes con ML
-    elif type == "ml":
-
-        # Iterar sobre las columnas con valores faltantes
-        for col in columnas_con_nan:
+        # OPCION 2: Llenar los valores faltantes con ML
+        elif type == "ml":
 
             # Dividir el dataframe en conjunto de entrenamiento y prueba
-            X_train = df_filled.loc[df[col].notnull()].drop(columns=columnas_con_nan)
+            X_train = df_filled.loc[df[col].notnull()].drop(columns=l_columnas_con_nan)
             y_train = df_filled.loc[df[col].notnull(), col]
-            X_test = df_filled.loc[df[col].isnull()].drop(columns=columnas_con_nan)
+            X_test = df_filled.loc[df[col].isnull()].drop(columns=l_columnas_con_nan)
 
             # Crear un modelo RandomForestRegressor
             model = RandomForestRegressor()
 
-            # Entrenar el modelo
-            model.fit(X_train, y_train)
+            # Realizar la búsqueda de cuadrícula para encontrar los mejores hiperparámetros
+            grid_search = GridSearchCV(model, param_grid, cv=3)
+            grid_search.fit(X_train, y_train)
+
+            # Obtener los mejores hiperparámetros encontrados
+            best_params = grid_search.best_params_
+
+            # Crear un nuevo modelo RandomForestRegressor con los mejores hiperparámetros
+            model_best = RandomForestRegressor(**best_params)
+
+            # Entrenar el modelo con los datos de entrenamiento
+            model_best.fit(X_train, y_train)
 
             # Predecir los valores faltantes
-            predicted_values = model.predict(X_test)
+            predicted_values = model_best.predict(X_test)
 
             # Rellenar los valores faltantes en el dataframe
             df_filled.loc[df[col].isnull(), col] = predicted_values
@@ -121,7 +139,7 @@ def eliminar_columnas_nan(df, umbral):
 
     # Elimina las columnas identificadas del DataFrame
     df_sin_nan = df.drop(columnas_eliminar, axis=1)
-    print(f"Columnas a eliminar por mas del {umbral*100:.0f}% de nan: {list(columnas_eliminar)}")
+    print(f"Columnas eliminadas por % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
     return df_sin_nan
 
 def prueba():

@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 '''
 import math
 
@@ -59,7 +58,7 @@ print(fecha_dt)
 print(fecha_dt.month)
 '''
 
-
+'''
 # concatenar df_seg...
 import pandas as pd
 from data_preparation import format_data
@@ -89,3 +88,4 @@ print(df_concat.head(1))
 print(df_concat.shape)
 
 df_concat.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/entidad_partido.xlsx', index=False)
+'''
