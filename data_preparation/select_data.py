@@ -45,7 +45,7 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
                     columnas_eliminar.add(col2)
                     # print(f"Variable a eliminar: {col2}")
 
-    print(f"Columnas eliminadas por correlacion mayor a thr_corr={umbral*100:.0f}%: {columnas_eliminar}")
+    print(f"Se eliminaron {len(columnas_eliminar)} columnas por tener una correlacion mayor a  thr_corr={umbral*100:.0f}%: {columnas_eliminar}")
     return list(columnas_eliminar)
 
 # SELECCION DE VARIABLES IMPORTANTES
@@ -97,10 +97,10 @@ class FeatureSelection():
 
         return df_importance
 
-    def random_forest(self, k=3, graf=False):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
+    def random_forest(self, k=5, graf=False):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
 
         # Verificar si se deben buscar los mejores hiperparámetros
-        model, best_params = select_best_hiperparameters(RandomForestClassifier(), self.X, self.y, k=k)
+        model = select_best_hiperparameters(RandomForestClassifier(), self.X, self.y, k=k)
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(self.X, self.y)
@@ -228,7 +228,13 @@ class FeatureSelection():
         if graf:
             self.graficar_importancia_atrib(x=df_normalized['suma_de_imp_norm'], y=df_normalized.index)
 
-        print(f"Columnas mas importantes por peso mayor a thr_fs={umbral*100:.0f}%: {l_selected_features}")
+        # Imprimo resultados
+        l_not_important_features = []
+        for col in self.X.columns:
+            if col not in l_selected_features:
+                l_not_important_features.append(col)
+        print(f"Se eliminaron {len(l_not_important_features)} columnas por tener un peso menor a thr_fs={umbral*100:.0f}%: {l_not_important_features}")
+        print(f"Las {len(l_selected_features)} columnas mas importantes por peso mayor a thr_fs={umbral*100:.0f}%: {l_selected_features}")
         return l_selected_features
 
 def prueba():

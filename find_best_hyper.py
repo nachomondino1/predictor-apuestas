@@ -1,18 +1,27 @@
+# Importo librerias
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import cross_val_score
+from modeling import build_model
+from sklearn.tree import DecisionTreeClassifier
+import xgboost as xgb  # XGBoost
+from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+import lightgbm as lgb  # Gradient Boosting
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC  # SVM
+from sklearn.neural_network import MLPClassifier
+
 
 def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
 
     # Definicion de variables
     df_res = pd.DataFrame()
     best_accuracy = 0.0
+    l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), MLPClassifier()]
     dp = DataPreparation(df_part, df_jug, var_resp, pais)
 
     # Hiperparametros de construct_data
-    param_construct = {'n_ult_part': [5, 10, 15]}  # n_ult_part --> mas tirando a 10
+    param_construct = {'n_ult_part': [3, 5, 10, 15]}  # n_ult_part --> mas tirando a 10
 
     # Por combinacion de parametros
     for i, param_values in enumerate(product(*param_construct.values()), start=1):
@@ -28,7 +37,7 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
         print(f" Iteracion Nº {i} ".center(120, "#"))
 
         # Hiperparametros de select_data
-        param_select = {'thr_corr': [0.7, 0.9, 0.5], 'thr_fs': [0.25, 0.15], 'thr_nan_col': [0.2, 0.35, 0.5]}  # thr_fs --> mas tirando a 0.2 # thr_corr --> medio indep # thr_nan_col --> mas tirando a 0.3
+        param_select = {'thr_corr': [0.7, 0.6, 0.5], 'thr_fs': [0.1, 0.2, 0.3], 'thr_nan_col': [0.2, 0.5, None]}  # thr_fs --> mas tirando a 0.2 # thr_corr --> medio indep # thr_nan_col --> 0.2 es casi lo mismo que 0.35 pues solo no borra historial_entre_si que igual no es tenida en cuenta nunca por feature_selection
 
         # Por combinacion de parametros
         for j, param_values in enumerate(product(*param_select.values()), start=1):
@@ -39,13 +48,12 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
 
             # Preparo el dataset para el analisis
             df_sel = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, thr_nan_col=thr_nan_col, export=False)
-            print(df_sel.shape)
 
             # Creo objeto de clase Modeling con df_selected
             mo = Modeling(df_sel, var_resp, var_pred, pais)
 
             # Hiperparametros de modeling
-            param_dist_mod = {'bal_type': [None, 'over', 'under'], 'test_val_size': [0.2], 'test_size': [0.5], 'k': [5], 'treat_nan': ['drop', 'ml']}
+            param_dist_mod = {'bal_type': [None, 'under', 'over'], 'test_val_size': [0.2], 'test_size': [0.5], 'k': [5], 'treat_nan': ['drop', 'ml']}  # bal_type =  'over', 'under'
 
             # Por combinacion de parametros
             for h, param_val in enumerate(product(*param_dist_mod.values()), start=1):
@@ -56,18 +64,37 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
                 print(f"bal_type: {bal_type} ; treat_nan: {treat_nan}")
                 print(f"test_val_size: {test_val_size} ; test_size: {test_size} ; k: {k}")
 
-                # Analizo los datos
-                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, treat_nan=treat_nan, export=False)
-                best_model, train_accuracy = mo.select_best_model(X_train, y_train, X_val, y_val, k, export=False)
-                test_accuracy, roi = mo.assess_model(best_model, X_test, y_test, export=False)
-                print(f"Precision test: {test_accuracy} ROI: {roi}")
+                df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_roi'])  # Datos del modelo y su precision y roi
+
+                # Generar el diseño de la prueba
+                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size, treat_nan=treat_nan)
+
+                # Por modelo
+                for modelo in l_modelos:
+
+                    # Entreno modelo y evaluo su rendimiento
+                    model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
+                    test_accuracy, test_roi = mo.assess_model(model_best_params, X_test, y_test, export=False)
+
+                    # Guardo modelo
+                    df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, test_accuracy, test_roi]
+
+                # Selecciono el mejor modelo
+                idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
+                best_model = df_models.loc[idx, 'model_trained']
+                best_model_train_prec = df_models.loc[idx, 'train_cv_accuracy']
+                best_model_test_prec = df_models.loc[idx, 'test_accuracy']
+                best_model_test_roi = df_models.loc[idx, 'test_roi']
+                print(f"\nEl mejor modelo es: {best_model} con: \n\t- Train Precision: {best_model_train_prec:.1f}% "
+                      f"\n\t- Test Precision: {best_model_test_prec:.1f}% \n\t- Test ROI: {best_model_test_roi:.1f}%\n")
 
                 # Guardo datos en dataframe
                 row_data = {'N_ULT_PART': n_ult_part, 'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr, 'thr_fs': thr_fs,
                             'treat_nan': treat_nan, 'bal_type': bal_type, 'test_val_size': test_val_size,
                             'test_size': test_size, 'X_train': X_train.shape, 'X_val': X_val.shape,
-                            'X_test': X_test.shape, "X_columns": X_train.columns, 'k': k, 'best_model': best_model,
-                            'precision_train': train_accuracy, 'precision_test': test_accuracy, 'roi': roi}
+                            'X_test': X_test.shape, "X_columns": list(X_train.columns), 'k': k, 'best_model': best_model,
+                            'train_accuracy': best_model_train_prec, 'test_accuracy': best_model_test_prec,
+                            'test_roi': best_model_test_roi}
                 df_res = df_res.append(row_data, ignore_index=True)
                 print(row_data)
                 print(df_res)
@@ -94,483 +121,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-''' # Para ver si me falto hacer algun cambio en main.py
-# Importo librerias
-import pandas as pd
-import time
-import warnings
-# Data understanding
-from data_understanding import collect_initial_data
-from dspy.data_understanding.describe_data import getting_to_know_data
-# Data preparation
-from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-# Modeling
-# Generate test design
-from modeling import generate_test_design
-from sklearn.utils import shuffle
-# Build model
-from modeling import build_model
-from sklearn.tree import DecisionTreeClassifier
-import xgboost as xgb  # XGBoost
-from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-import lightgbm as lgb  # Gradient Boosting
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.svm import SVC  # SVM
-from sklearn.neural_network import MLPClassifier
-# Assess model
-from modeling.asses_model import calculate_roi, confusion_matrix
-from sklearn.metrics import accuracy_score
-import pickle
-
-
-class DataPreparation:  # 17.4 min
-
-    def __init__(self, df_part, df_jug, var_resp, pais):
-        self.df_part = df_part
-        self.df_jug = df_jug
-        self.var_resp = var_resp
-        self.pais = pais
-
-    def format_data(self, df_part, df_jug, export=True):  # 0.0 min
-        """
-        Arreglo el data type de algunas variables.
-
-        :param df_part: Dataframe de los datos de los partidos. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataset generado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe formateado. (DataFrame)
-        """
-        start = time.time()
-        print("\nFormateando los datos...")
-
-        # Entidad partido: fecha, posesion y es_copa
-        # df_part = format_data.convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
-        df_part = format_data.convert_posesion_to_int(df_part)  # Podria usar la limpieza de punct de tp y luego convertir a int64 pero as al pedo
-        df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
-
-        # Entidad jugador: fecha y valor de mercado
-        df_jug = format_data.convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
-        df_jug = format_data.convert_valor_mercado_to_int(df_jug)
-
-        end = time.time()
-        print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
-            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
-
-        return df_part, df_jug
-
-    def clean_data(self, df_part, df_jug, export=True):  # 0.0 min
-        """
-        Limpia los datos de un dataframe.
-
-        :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe limpiado. (DataFrame)
-        """
-        start = time.time()
-        print("\nLimpiando los datos...")
-
-        # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-        df_part = clean_data.prepare_text_columns(df_part, l_col_to_except=['id', 'temporada'])  # df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id'])  # df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-
-        # Remuevo strings adicionales en los nombres de los equipos
-        df_part = clean_data.clean_teams_names(df_part)
-
-        end = time.time()
-        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_part_cleaned.xlsx', index=False)
-            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_jug_cleaned.xlsx', index=False)
-
-        return df_part,df_jug
-
-    def integrate_data(self, df_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
-        """
-        Integra los datos de partidos y jugadores en un solo dataframe.
-
-        :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe integrado. (DataFrame)
-        """
-        start = time.time()
-        print("\nIntegrando los datos...")
-
-        # Integro entidad partido y jugador
-        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)
-
-        end = time.time()
-        print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df_integrated.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
-
-        return df_integrated
-
-    def construct_data(self, df, N_ULT_PART=5, export=True):  # 2.7 minutos
-        """
-        Construye nuevos datos a partir de un dataframe existente.
-
-        :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param N_ULT_PART: Número de últimos partidos a considerar para el cálculo de variables. (int)
-        :param export: Booleano para indicar si se debe exportar el dataframe construido. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe construido. (DataFrame)
-        """
-        start = time.time()
-        print("\nConstruyendo nuevos datos...")
-
-        # Construyo variable respuesta: "equipo_gandor"
-        df = construct_data.determinar_equipo_ganador(df)
-
-        # Construyo variables historicas
-        l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-        df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
-        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
-        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)  # Segun diferencia de gol y puntos
-        df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
-
-        # Construyo variables de diferencias para las variables promedio de los jugadores
-        df = construct_data.calculate_dif_col_jugadores(df)
-
-        end = time.time()
-        print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
-
-        return df
-
-    def select_data(self, df, thr_corr=0.6, porc_nan_max=0.2 , umbral_fs=0.5, treat_nan='drop', export=True):  # 1.3 minutos
-        """
-        Selecciona las variables relevantes del dataframe.
-
-        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe con las variables seleccionadas. (DataFrame)
-        """
-        warnings.filterwarnings('ignore')
-        start = time.time()
-        print("\nSeleccionado datos...")
-
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
-
-        # Elimino filas y columnas con alto porcentaje de NaN values
-        df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-        df = clean_data.eliminar_columnas_nan(df, umbral=porc_nan_max)  # 2º elimino columnas con mucho NaN
-
-        # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df, df_etiquetas = format_data.convert_columns_to_int(df)
-        df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
-
-        # Elimino variables altamente correlacionadas
-        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
-        df = df.drop(l_columnas_a_eliminar, axis=1)
-
-        # Selecciono las variables mas importantes (feature selection)
-        fs = select_data.FeatureSelection(df.dropna(), self.var_resp)
-        l_selected_features = fs.select_best_features(umbral=umbral_fs)
-        columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
-        df = df.filter(columns_to_select)
-
-        end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
-        return df
-
-class Modeling:
-
-    def __init__(self, df, var_resp, var_pred, pais):
-        if not isinstance(var_resp, str) or not isinstance(var_pred, str):
-            raise TypeError("Los parámetros var_resp y var_pred deben ser cadenas de texto.")
-        if not isinstance(pais, str):
-            raise TypeError("El parámetro pais debe ser una cadena de texto.")
-
-        self.var_resp = var_resp
-        self.var_pred = var_pred
-        self.pais = pais
-        self.X = df.drop(self.var_resp, axis=1)
-        self.y = df[self.var_resp]
-
-    def generate_test_design(self, bal_type, test_val_size=0.7, test_size=0.5, export=True):
-        """
-        Balancea el dataset y separa en conjuntos de entrenamiento y testeo
-
-        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
-        """
-        print("\nGenerando datasets de entrenamiento y testeo...")
-        print(f"Shape dataframe original: {self.X.shape}")
-
-        # Separo conjunto de datos en train, validation y test
-        X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X_bal_shuf, y_bal_shuf, test_val_size, test_size)
-
-        # Quito odds de train y val (de test no porque necesito calcular roi)
-        X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        print(f'Train: {X_train.shape} {y_train.shape}')
-        print(f'Val: {X_val.shape} {y_val.shape}')
-        print(f'Test: {X_test.shape} {y_test.shape}')
-
-        if export:
-            X_train.to_excel(f'./modeling/data/{self.pais}/X_train.xlsx', index=False)
-            X_val.to_excel(f'./modeling/data/{self.pais}/X_val.xlsx', index=False)
-            X_test.to_excel(f'./modeling/data/{self.pais}/X_test.xlsx', index=False)
-
-        return X_train, X_val, X_test, y_train, y_val, y_test
-
-    def select_best_model(self, X_train, y_train, X_val, y_val, k=10, export=True):
-        """
-        Selecciona el mejor modelo a partir de la precision.
-
-        :param df_train: Dataframe de entrenamiento. (DataFrame)
-        :param l_modelos: Lista de nombres de modelos a probar. (Lista)
-        :param best_params: Booleano para indicar si se deben buscar los mejores hiperparametros para cada modelo. True
-        para buscar, False de lo contrario. (bool)
-        :param k: Numero de folds. (int)
-        :param export: Booleano para indicar si se debe exportar el dataframe. True para exportar, False de lo contrario. (bool)
-        :return: Mejor modelo. (sklearn.ensemble?)
-        """
-        # Definicion de variables
-        warnings.filterwarnings("ignore")
-        df_models = pd.DataFrame(columns=['model', 'best_params', 'model_trained', 'cv_accuracy'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
-        l_modelos = [xgb.XGBClassifier()] #, GradientBoostingClassifier()]
-        # print("\nSeleccionando el mejor modelo...")
-
-        # Por modelo
-        for modelo in l_modelos:
-
-            # Find best hiperparameters
-            print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            # print("Buscando mejores hiperparametros...")
-            model_best_params, best_params = build_model.select_best_hiperparameters(modelo, X_val, y_val, k)
-            print(f"Mejores hiperparametros: {best_params}")
-
-            # Entreno el modelo
-            # print("Entrenando modelo...")
-            model_best_params.fit(X_train, y_train)
-
-            # Evaluo el modelo con Cross Validation
-            # print("Evaluo modelo con Cross Validation...")
-            cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-            df_models.loc[len(df_models)] = [modelo, best_params, model_best_params, cv_accuracy]
-            print(f"Precision promedio de validación cruzada: {cv_accuracy:.1f}% \n")
-
-        # Selecciono el mejor modelo
-        idx = df_models[df_models['cv_accuracy'] == max(df_models['cv_accuracy'])].index[0]
-        best_model, best_accuracy = df_models.loc[idx, 'model_trained'], df_models.loc[idx, 'cv_accuracy']
-        # print(df_models)
-        print(f"\nEl mejor modelo es: {best_model} con precision: {best_accuracy:.1f}%")
-
-        if export:
-            df_models.to_excel(f'./modeling/data/{self.pais}/df_modelos.xlsx')
-            pickle.dump(best_model, open(f"./modeling/data/{self.pais}/modelo.pkl", "wb"))
-
-        return best_model, best_accuracy
-
-    def assess_model(self, model, X_test, y_test, export=True):
-        """
-        Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
-
-        :param model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
-        :param df_test: DataFrame de prueba. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, False de lo contrario. (bool)
-        :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
-        """
-        print("\nEvaluando modelo con datos de prueba...")
-        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
-
-        # Quito cuotas de casas de apuestas y variable respuesta de df_test
-        X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-
-        # Predecir las etiquetas para los datos de prueba
-        y_pred = model.predict(X_test_without_odds)  # es un numpy array
-
-        # Calculo precision
-        test_accuracy = accuracy_score(y_test, y_pred) * 100
-
-        # Calculo roi y matriz de confusion
-        # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
-        df_results = X_test.copy().loc[:, ['odds_loc', 'odds_emp', 'odds_vis']]
-        df_results[self.var_resp] = y_test
-        df_results[self.var_pred] = y_pred
-
-        # Convierto variable respuesta y variable predicha en etiqueta
-        df_results_etiquetas = format_data.revert_columns_from_int(df_results, df_etiquetas, columns=[self.var_resp, self.var_pred])
-
-        # Calculo roi e imprimo matriz de confusion
-        roi = calculate_roi(df_results_etiquetas, self.var_resp, self.var_pred) * 100
-        print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
-        # confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
-
-        if export:
-            df_results.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
-
-        return test_accuracy, roi
-
-def main():
-
-    # Definicion de variables
-    var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
-
-    data_unders = False
-    if data_unders:
-
-        print(" Data understanding ".center(120, "#"))
-
-        # Collect initial data
-        print(" Recolectando datos... ")
-        df_part = collect_initial_data.extract_partidos_flashscore(l_paises=[pais])
-        df_jug = collect_initial_data.extract_jugadores_sofifa(l_paises=[pais])
-        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
-
-        # Describe data (quiero describir los datos igual aunque no los extraiga...)
-        print(" Describiendo datos... ")
-        getting_to_know_data(df_part)
-        getting_to_know_data(df_jug)
-
-    data_prep = False
-    if data_prep:
-
-        # Levanto datasets
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed.xlsx')
-
-        # Creo objeto de clase DataPreparation
-        dp = DataPreparation(df_part, df_jug, var_resp, pais)
-        print(" Data preparation ".center(120, "#"))
-        
-        # Hiperparametros
-        N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-        umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
-        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
-        porc_nan_max = 0.2
-
-        # Preparo el dataset para el analisis
-        df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
-        df_part, df_jug = dp.clean_data(df_part, df_jug)
-        df = dp.integrate_data(df_part, df_jug)
-        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
-        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=0.2, treat_nan=treat_nan)
-
-    modeling = False
-    if modeling:
-        # Levanto dataset para prueba
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
-
-        # Creo objeto de clase Modeling
-        mo = Modeling(df, var_resp, var_pred, pais)
-        print(" Modeling ".center(120, "#"))
-
-        # Hiperparametros
-        bal_type = 'over'  # ['over', 'over_and_under' ,'under']
-        test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
-        test_size = 0.5  # Porcentaje de test_val_size destinado a test.
-        k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
-
-        # Analizo los datos
-        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size)
-        best_model = mo.select_best_model(X_train, y_train, X_val, y_val, k)
-        mo.assess_model(best_model, X_test, y_test)
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    main()
-
-'''
-
-
-'''
-
-from itertools import product
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import cross_val_score
-
-def find_best_hiperparameters(df_part, df_jug, var_resp, pais):
-
-    # Definicion de variables
-    df_res = pd.DataFrame()
-    best_accuracy = 0.0
-    dp = DataPreparation(df_part, df_jug, var_resp, pais)
-
-    # Definir la distribución de los hiperparámetros
-    # param_dist = {'bal_type': ['over', 'over_and_under','under'], 'test_val_size': [0.25, 0.3], 'test_size': [0.5], 'k': [5]}
-    param_dist = {'thr_corr': [0.6, 0.7, 0.8], 'umbral_fs': [0.2, 0.3, 0.4], 'treat_nan': ['drop', 'ml'],
-                  'porc_nan_max': [0.1, 0.2, 0.3]}
-
-    for n_ult_part in [5, 7, 10]:
-
-        # Levanto dataset integrado
-        # Hago el procesamiento de format a integrate una sola vez (o bien levanto df ya integrado) --> en reealidad creo que no... al pedo..
-        # df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
-        # df_part, df_jug = dp.clean_data(df_part, df_jug)
-        # df = dp.integrate_data(df_part, df_jug)
-        df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
-
-        # Construyo datos
-        df = dp.construct_data(df, N_ULT_PART=n_ult_part, export=False)
-
-        # Por combinacion de parametros
-        for i, param_values in enumerate(product(*param_dist.values()), start=1):
-
-            print(f" Iteracion Nº {i} ".center(120, "#"))
-            thr_corr = param_values[0]
-            umbral_fs = param_values[1]
-            treat_nan = param_values[2]
-            porc_nan_max = param_values[3]
-            print(f"thr_corr: {thr_corr} ; umbral_fs: {umbral_fs} ; treat_nan: {treat_nan} ; porc_nan_max: {porc_nan_max}")
-
-            # Preparo el dataset para el analisis
-            df_sel = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=porc_nan_max, treat_nan=treat_nan, export=False)
-
-            # Shuffle
-            df_sel = shuffle(df_sel, random_state=42)
-
-            # Separo dataset en train y test
-            X, y = df_sel.drop(['odds_loc', 'odds_emp', 'odds_vis', var_resp], axis=1), df_sel[var_resp]
-            print(X.shape, y.shape)
-
-            cv_scores = cross_val_score(RandomForestClassifier(), X, y, cv=5)
-            mean_cv_score = cv_scores.mean() * 100
-            print(f"Precision: {mean_cv_score}")
-
-            # Guardo datos en dataframe
-            row_data = {'N_ULT_PART': n_ult_part, 'thr_corr': thr_corr, 'umbral_fs': umbral_fs, 'porc_nan_max': porc_nan_max, 'treat_nan': treat_nan, 'X_shape': X.shape, 'y_shape': y.shape, 'precision': mean_cv_score}
-            df_res = df_res.append(row_data, ignore_index=True)
-            print(row_data)
-            print(df_res)
-            df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
-
-            # Verificar si la precisión actual es la mejor hasta ahora
-            if mean_cv_score > best_accuracy:
-                best_accuracy = mean_cv_score
-                best_hyperparameters = row_data
-
-    # Imprimir los hiperparámetros óptimos y la precisión correspondiente
-    print("Mejores hiperparámetros:", best_hyperparameters)
-    print("Precisión obtenida:", best_accuracy)
-    df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
-    return best_hyperparameters
-
-
-var_resp, var_pred = 'equipo_ganador', 'y_pred'
-pais = "argentina"
-df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
-df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
-find_best_hiperparameters(df_part, df_jug, var_resp, pais)
-
-
-'''

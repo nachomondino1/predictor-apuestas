@@ -7,7 +7,15 @@ import time
 
 
 def select_best_hiperparameters(model, X, y, k):
+    """
+    Selecciona los mejores hiperparametros para un modelo.
 
+    :param model: Modelo de Machine Learning. (sklearn.ensemble)
+    :param X: Dataframe de validacion con variables predictoras. (DataFrame)
+    :param y: Dataframe de validacion solo con variable respuesta. (DataFrame)
+    :param k: Numero de folds. (int)
+    :return: Modelo con mejores hiperparametros. (sklearn.ensemble?)
+    """
     start = time.time()
 
     # Definicion de variables
@@ -50,18 +58,28 @@ def select_best_hiperparameters(model, X, y, k):
     # Obtener los mejores hiperparámetros y el modelo con dichos hiperparametros
     best_params = grid_search.best_params_
     model = grid_search.best_estimator_
+    # print(f"Mejores hiperparametros: {best_params}")
+    print(f"Mejores hiperparametros: {model}")
 
     end = time.time()
     print(f"Seleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
-    return model, best_params
+    return model
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
-    # Cross validation para evaluar la precision del modelo
+    """
+    Realiza cross validation para evaluar el rendimiento del modelo entrenado.
 
-    # Realizar validación cruzada manual
+    :param model: Modelo de Machine Learning. (sklearn.ensemble)
+    :param X_train: Dataframe de entrenamiento con variables predictoras. (DataFrame)
+    :param y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
+    :param k: Numero de folds. (int)
+    :return: Precision promedio de la validación cruzada. (float)
+    """
+    # Definicion de variables
     scores, rois = [], []
     fold_size = len(X_train) // k
 
+    # Por k
     for i in range(k):
 
         # Dividir los datos en conjuntos de entrenamiento y test

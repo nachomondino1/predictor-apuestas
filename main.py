@@ -136,7 +136,7 @@ class DataPreparation:  # 17.4 min
         df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
         df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)  # Segun diferencia de gol y puntos
-        df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
+        # df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido --> requiere 1) partidos de copa 2) eliminacion de valores atipicos
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
@@ -166,7 +166,8 @@ class DataPreparation:  # 17.4 min
 
         # Elimino filas y columnas con alto porcentaje de NaN values
         df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-        df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
+        if thr_nan_col is not None:
+            df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -204,14 +205,16 @@ class Modeling:
 
     def generate_test_design(self, bal_type, test_val_size=0.2, test_size=0.5, treat_nan='drop', export=True):
         """
-        Balancea el dataset y separa en conjuntos de entrenamiento y testeo
+        Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
-        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param bal_type: Tipo de balanceo de clases a realizar.(string)
+        :param test_val_size: Porcentaje del total de datos destinado a validacion y test. (float)
+        :param test_size: # Porcentaje de test_val_size destinado a test. (float)
+        :param treat_nan: Tipo de tratamiento de NaN values.(string)
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
-
         X, y = self.df.drop(self.var_resp, axis=1), self.df[self.var_resp]  # Separar en X e y
 
         # Eliminacion de NaN values --> conviene al principio... para separar en las proporciones que digo...
@@ -232,16 +235,9 @@ class Modeling:
         print(f'Val: {X_val.shape} {y_val.shape}')
         print(f'Test: {X_test.shape} {y_test.shape}')
 
-        # Balanceo el dataset de entrenamiento --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
-        if bal_type is not None:
-            X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
-            print(f"Shape X_train luego de balanceo: {X_train.shape}")
-
         # Relleno nan --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
         if treat_nan == "ml" or treat_nan == 'mode':
-            df_train = pd.concat([X_train, y_train], axis=1)  # Junto X_train e y_train
-            df_train = clean_data.fill_nan_values(df_train, type=treat_nan)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
-            X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]  # Vuelvo a separar en X_train e y_train
+            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=treat_nan)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizo el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
             # Elimino NaN de df_val y df_test para evitar "ValueError: Input X contains NaN."
@@ -255,6 +251,11 @@ class Modeling:
             X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]  # Separar en X e y
             print(f"Se elimino NaN values en test. Shape X_test: {X_test.shape}")
 
+        # Balanceo el dataset de entrenamiento --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
+        if bal_type is not None:
+            X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
+            print(f"Shape X_train luego de balanceo: {X_train.shape}")
+
         if export:
             X_train.to_excel(f'./modeling/data/{self.pais}/X_train.xlsx', index=False)
             X_val.to_excel(f'./modeling/data/{self.pais}/X_val.xlsx', index=False)
@@ -262,67 +263,49 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def select_best_model(self, X_train, y_train, X_val, y_val, k=10, export=True):
+    def build_model(self, model, X_val, y_val, X_train, y_train, k=10):
         """
         Selecciona el mejor modelo a partir de la precision.
 
-        :param df_train: Dataframe de entrenamiento. (DataFrame)
-        :param l_modelos: Lista de nombres de modelos a probar. (Lista)
-        :param best_params: Booleano para indicar si se deben buscar los mejores hiperparametros para cada modelo. True
-        para buscar, False de lo contrario. (bool)
+        :param model: Modelo de Machine Learning. (sklearn.ensemble)
+        :param X_val: Dataframe de validacion con variables predictoras. (DataFrame)
+        :param y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
+        :param X_train: Dataframe de entrenamiento con variables predictoras.  (DataFrame)
+        :param y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
         :param k: Numero de folds. (int)
-        :param export: Booleano para indicar si se debe exportar el dataframe. True para exportar, False de lo contrario. (bool)
         :return: Mejor modelo. (sklearn.ensemble?)
         """
         # Definicion de variables
         warnings.filterwarnings("ignore")
-        df_models = pd.DataFrame(columns=['model', 'best_params', 'model_trained', 'cv_accuracy'])  # Datos del modelo y su precision y roi... --> en vez de imprimirlo por pantalla, genero un df...
-        # l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
-        #              SVC(), MLPClassifier(), GradientBoostingClassifier()]
-        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), MLPClassifier()]
-        print("\nSeleccionando el mejor modelo...")
+        model_name = str(model)[:str(model).find('(')]  # Defino el nombre del modelo (e.g. "RandomForest")
 
-        # Por modelo
-        for modelo in l_modelos:
+        # Find best hiperparameters
+        print(f" Modelo: {model_name} ".center(120, '-'))
+        # print("Buscando mejores hiperparametros...")
+        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k)
 
-            # Find best hiperparameters
-            print(f" Modelo: {str(modelo)[:str(modelo).find('(')]} ".center(120, '-'))
-            # print("Buscando mejores hiperparametros...")
-            model_best_params, best_params = build_model.select_best_hiperparameters(modelo, X_val, y_val, k)
-            print(f"Mejores hiperparametros: {best_params}")
+        # Entreno el modelo
+        # print("Entrenando modelo con mejores hiperparametros...")
+        model_best_params.fit(X_train, y_train)
 
-            # Entreno el modelo
-            # print("Entrenando modelo...")
-            model_best_params.fit(X_train, y_train)
-
-            # Evaluo el modelo con Cross Validation
-            # print("Evaluo modelo con Cross Validation...")
-            cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-            df_models.loc[len(df_models)] = [modelo, best_params, model_best_params, cv_accuracy]
-            print(f"Precision promedio de validación cruzada: {cv_accuracy:.1f}% \n")
-
-        # Selecciono el mejor modelo
-        idx = df_models[df_models['cv_accuracy'] == max(df_models['cv_accuracy'])].index[0]
-        best_model, best_accuracy = df_models.loc[idx, 'model_trained'], df_models.loc[idx, 'cv_accuracy']
-        # print(df_models)
-        print(f"\nEl mejor modelo es: {best_model} con precision: {best_accuracy:.1f}%")
-
-        if export:
-            df_models.to_excel(f'./modeling/data/{self.pais}/df_modelos.xlsx')
-            pickle.dump(best_model, open(f"./modeling/data/{self.pais}/modelo.pkl", "wb"))
-
-        return best_model, best_accuracy
+        # Evaluo el modelo con Cross Validation
+        # print("Evaluo rendimiento del modelo con Cross Validation...")
+        cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
+        print(f"\nPrecision promedio de validación cruzada: {cv_accuracy:.1f}%")
+        return model_name, model_best_params, cv_accuracy
 
     def assess_model(self, model, X_test, y_test, export=True):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
         :param model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
-        :param df_test: DataFrame de prueba. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, False de lo contrario. (bool)
+        :param X_test: Dataframe de prueba con variables predictoras. (DataFrame)
+        :param y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, False
+        de lo contrario. (bool)
         :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
-        print("\nEvaluando modelo con datos de prueba...")
+        # print("Evaluando modelo con datos de prueba...")
         df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
         # Quito cuotas de casas de apuestas y variable respuesta de df_test
@@ -345,7 +328,8 @@ class Modeling:
 
         # Calculo roi
         roi = calculate_roi(df_results_etiquetas, self.var_resp, self.var_pred) * 100
-        print(f"Resultados promedios del modelo en los datos de prueba: \n  - Precision prom: {test_accuracy:.1f}% \n  - ROI prom: {roi:.1f}%")
+        print(f"Precision promedio de prueba: {test_accuracy:.1f}%")
+        print(f"ROI promedio de prueba: {roi:.1f}%")
 
         if export:
             confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
@@ -358,6 +342,7 @@ def main():
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    export = True
 
     data_unders = False
     if data_unders:
@@ -402,6 +387,19 @@ def main():
 
     modeling = False
     if modeling:
+
+        # Hiperparametros
+        test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
+        test_size = 0.5  # Porcentaje de test_val_size destinado a test.
+        bal_type = 'over'  # Tipo de balanceo a realizar [None, 'over', 'under']
+        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
+        k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
+
+        # Definicion de variables
+        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_roi'])  # Datos del modelo y su precision y roi
+        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
+                     SVC(), MLPClassifier(), GradientBoostingClassifier()]
+
         # Levanto dataset para prueba
         df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
 
@@ -409,17 +407,31 @@ def main():
         mo = Modeling(df, var_resp, var_pred, pais)
         print(" Modeling ".center(120, "#"))
 
-        # Hiperparametros
-        test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
-        test_size = 0.5  # Porcentaje de test_val_size destinado a test.
-        bal_type = 'over'  # ['over', 'over_and_under' ,'under']
-        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
-        k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
-
-        # Analizo los datos
+        # Generar el diseño de la prueba
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size, treat_nan=treat_nan)
-        best_model, best_accuracy = mo.select_best_model(X_train, y_train, X_val, y_val, k)
-        mo.assess_model(best_model, X_test, y_test)
+
+        # Por modelo
+        for modelo in l_modelos:
+
+            # Entreno modelo y evaluo su rendimiento
+            model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
+            test_accuracy, test_roi = mo.assess_model(model_best_params, X_test, y_test)
+
+            # Guardo modelo
+            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, test_accuracy, test_roi]
+
+        # Selecciono el mejor modelo
+        idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
+        best_model = df_models.loc[idx, 'model_trained']
+        best_model_train_prec = df_models.loc[idx, 'train_cv_accuracy']
+        best_model_test_prec = df_models.loc[idx, 'test_accuracy']
+        best_model_test_roi = df_models.loc[idx, 'test_roi']
+        print(f"\nEl mejor modelo es: {best_model} con: \n\t- Train Precision: {best_model_train_prec:.1f}% "
+              f"\n\t- Test Precision: {best_model_test_prec:.0f}% \n\t- Test ROI: {best_model_test_roi:.1f}%")
+
+        if export:
+            df_models.to_excel(f'./modeling/data/{pais}/df_modelos.xlsx')
+            pickle.dump(best_model, open(f"./modeling/data/{pais}/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
