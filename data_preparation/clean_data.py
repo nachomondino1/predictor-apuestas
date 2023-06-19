@@ -46,38 +46,51 @@ def clean_teams_names(df):
     return df
 
 # TRATAMIENTO DE NAN VALUES
-def fill_nan_values(df, type):
+def fill_nan_values(X, y, type):
 
-    # Definivion de variables
-    l_columnas_con_nan = df.columns[df.isna().any()].tolist()
+    # Definivion de variable
+    # l_columnas_con_nan = X.columns[X.isna().any()].tolist()
+    nan_threshold = 0.05  # cuidado que si hago eliminacion de col antes por un valor inferior, esta lista esta vacia y no hace fillna...
+    l_columnas_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
+    print("Columnas consideradas con mucho NaN:", l_columnas_con_nan)
+
     param_grid = {
-        'n_estimators': [100, 200, 300],
+        'n_estimators': [100, 300], # 200
         'max_depth': [None, 5, 10],
-        'min_samples_split': [2, 5, 10]
+        'min_samples_split': [2, 10] #  5
     }
 
     # Crear una copia del dataframe original
-    df_filled = df.copy()
+    X_filled = X.copy()
 
     for col in l_columnas_con_nan:
+        # print(f"Columna a rellenar: {col}")
 
         # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
         if type == "mode":
-            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+            X_filled[col].fillna(X_filled[col].mode()[0], inplace=True)
 
         # OPCION 2: Llenar los valores faltantes con ML
         elif type == "ml":
 
+            # Elimino registros NaN en las columnas con bajo % de NaN (para poder usarlas en X_train)
+            # print("Shape X_filled antes:", X_filled.shape)  # e.g. (3279, 18)
+            X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
+            # print("Shape X_filled despues:", X_filled_dropna.shape) # e.g. (3106, 18)
+
             # Dividir el dataframe en conjunto de entrenamiento y prueba
-            X_train = df_filled.loc[df[col].notnull()].drop(columns=l_columnas_con_nan)
-            y_train = df_filled.loc[df[col].notnull(), col]
-            X_test = df_filled.loc[df[col].isnull()].drop(columns=l_columnas_con_nan)
+            X_train = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan
+            # print(X_train.shape) # e.g. (2728, 11)
+            y_train = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan
+            # print(y_train.shape) # e.g. (2728,)
+            X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)
+            # print(X_test.shape) # e.g. (378, 11)
 
             # Crear un modelo RandomForestRegressor
             model = RandomForestRegressor()
 
             # Realizar la búsqueda de cuadrícula para encontrar los mejores hiperparámetros
-            grid_search = GridSearchCV(model, param_grid, cv=3)
+            grid_search = GridSearchCV(model, param_grid, cv=2)
             grid_search.fit(X_train, y_train)
 
             # Obtener los mejores hiperparámetros encontrados
@@ -93,10 +106,15 @@ def fill_nan_values(df, type):
             predicted_values = model_best.predict(X_test)
 
             # Rellenar los valores faltantes en el dataframe
-            df_filled.loc[df[col].isnull(), col] = predicted_values
+            predicted_values_index = X_test.index
+            X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
 
-    # Imprimir el dataframe después de la imputación
-    return df_filled
+    # Elimino los registros NaN en las columnas que preferi usar para entrenar en vez de rellenar
+    X_filled = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
+    y = y.loc[X_filled.index]  # Selecciono las y solo de los registros en X_filled
+    X_filled = X_filled.reset_index(drop=True)  # Reseteo index en X
+    y = y.reset_index(drop=True) # Reseteo index en y
+    return X_filled, y
 
 def eliminar_filas_nan(df, umbral):
     """
@@ -139,7 +157,7 @@ def eliminar_columnas_nan(df, umbral):
 
     # Elimina las columnas identificadas del DataFrame
     df_sin_nan = df.drop(columnas_eliminar, axis=1)
-    print(f"Columnas eliminadas por % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
+    print(f"Se eliminaron {len(list(columnas_eliminar))} columnas por tener un % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
     return df_sin_nan
 
 def prueba():
