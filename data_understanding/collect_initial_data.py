@@ -22,7 +22,7 @@ def select_liga_as_filter(crawler, pais):
 
     # Selecciono competicion mas importante del pais
     pais_a_buscar = d_pais[pais] if pais in d_pais.keys() else pais
-    comp_a_buscar = df_comp[df_comp['pais'] == pais]['nombre'][0]
+    comp_a_buscar = df_comp[df_comp['pais'] == pais]['nombre'].values[0]
 
     # Remuevo busqueda de la competicion buscada para el anterior pais (no es necesaria creo)
     # boton_remover_busqueda = crawler.extract_tag(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]//preceding-sibling::div//button', sec_wait=3)
@@ -574,10 +574,10 @@ if __name__ == "__main__":
 
     # Selecciono pais a extraer y obtengo las competencias y su categoria
     # pais = "argentina"  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    l_paises = ['argentina']
+    l_paises = ['inglaterra']
 
     # Extraigo partidos
-    df = extract_partidos_flashscore(l_paises)
+    # df = extract_partidos_flashscore(l_paises)
 
     # Extraigo jugadores
-    # extract_jugadores_sofifa(l_paises)
+    extract_jugadores_sofifa(l_paises)
