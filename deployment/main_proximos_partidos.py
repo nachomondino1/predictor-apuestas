@@ -149,12 +149,11 @@ class DataPreparation:  # 17.4 min
         # Tratamiento de NaN values --> hace falta aqui? loo hago antes de concatenarlo?
         # df = select_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan
         # df = select_data.eliminar_columnas_nan(df, umbral=0.2)  # 2º elimino columnas con mucho NaN
-        # df = select_data.eliminar_filas_nan(df, umbral=0)  # Si es 0, funciona igual a dropna() pero ademas, imprime rdos
         # Ojo que por ahi elimino alguno/s de los proximos partidos
 
-        # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
+        # Codifico variables categoricas a numericas con el mismo sistema que se uso en el dataframe original (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
-        df = format_data.convert_columns_to_int(df, df_etiquetas)  # CUIDADO! NO USAR "df = format_data.convert_columns_to_int(df)" PUESTO QUE PUEDE USAR UN SISTEMA DE CODIFICACION ≠ AL QUE SE USO PARA ENTRENAR AL MODELO...
+        df = format_data.convert_columns_to_int(df, df_etiquetas)
         # df.to_excel('/Users/nachomondino/Desktop/df_codificacion_next_matches.xlsx')  #  Comprobé que codifica bien
 
         # Selecciono las variables que necesita el modelo
@@ -201,29 +200,30 @@ def rellenar_player_data(df_part, df_part_old):
 def main():
 
     # Definicion de variables
-    pais = 'argentina'
-    var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    dp = DataPreparation(var_resp, pais)
-    data_unders, data_prep, modeling = False, False, True
+    pais, var_resp, var_pred = 'argentina', 'equipo_ganador', 'y_pred'
     export = True
 
     ## DATA UNDERSTANDING
+    data_unders = False
     if data_unders:
         # Hiperparametros
         n_dias_a_prox_part = 1  # Numero de dias maximo para partido a recolectar
 
         print(" Data Understanding ".center(120, "#"))
-        # Collect initial data
+        # Collect initial data (solo partidos y no jugadores)
         df_part = collect_initial_data.extract_proximos_partidos_flashcore([pais], n_dias_max=n_dias_a_prox_part)
 
         # Describe data
         getting_to_know_data(df_part)
 
+    data_prep = False
     if data_prep:
 
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         treat_nan = 'ml'  # Relleno de nan values: 'mode' o 'ml'
+
+        dp = DataPreparation(var_resp, pais)
 
         # Levanto dataset con los ultimos 15 partidos de la liga argentina
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx')
@@ -231,23 +231,25 @@ def main():
         ## DATA PREPARATION
         print(" Data preparation ".center(120, "#"))
 
-        # no le hago format porque ya extraigo la fecha en formato datetime, la copa como 1 o 0 y no tengo posesion_loc ni posesion_vis
         df_part = dp.clean_data(export=export)
         df = dp.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
         df = dp.select_data(treat_nan=treat_nan, export=export)
 
+    modeling = False
     if modeling:
-        # Vuelvo a seleccionar solo los partidos a predecir  (despues de select para poder hacer treat_nan con ml basandome en los partidos viejos...)
-
+        # Levanto dataset preparado para pruebas
         df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/deployment/data_next_matches/df_part_selected_next_matches.xlsx', index_col=0)
 
-        ## Modeling  --> solo tengo que predecir... y despues analizar los resultados una vez concluida la fecha...
+        # Modeling
+        # Quito odds del dataframe preparado
         df_test_pred = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
         print(df_test_pred.shape)
 
+        # Levanto modelo ya entrenado
         loaded_model = pickle.load(open(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/modeling/data/{pais}/modelo.pkl", "rb"))
 
+        # Realizo predicciones sobre los nuevos partidos
         y_pred = loaded_model.predict(df_test_pred)
 
         # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
@@ -256,14 +258,10 @@ def main():
 
         # Traduzco predicciones numericas a etiquetas
         df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas.xlsx')
-        df = format_data.revert_columns_from_int(df_res, df_etiquetas, columns=['y_pred'])  # df = format_data.target_to_object(df_res, pais)
+        df = format_data.revert_columns_from_int(df_res, df_etiquetas, columns=['y_pred'])
         df.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/deployment/data_next_matches/predicciones.xlsx')
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     main()
-
-# Tal vez, para no rellenar automaticamente las variables de jugadores (como dif_rat_tit, dif_edad_sup, dif_rat_aus)
-# por no tener las formaciones antes del partido, podria tomar el rating de cada equipo segun su ultimo partido?
-# Y considerar bajas?
