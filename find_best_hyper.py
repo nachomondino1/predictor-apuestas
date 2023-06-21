@@ -12,16 +12,23 @@ from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 
 
-def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
+def find_best_hiperparameters(var_resp, var_pred, pais):
 
     # Definicion de variables
     df_res = pd.DataFrame()
     best_accuracy = 0.0
     l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), MLPClassifier()]
-    dp = DataPreparation(df_part, df_jug, var_resp, pais)
+    dp = DataPreparation(var_resp, pais)
+    mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
 
-    # Hiperparametros de construct_data
-    param_construct = {'n_ult_part': [3, 5, 10, 15]}  # n_ult_part --> mas tirando a 10
+    # Hiperparametros
+    # construct_data
+    param_construct = {'n_ult_part': [5, 10, 15]}
+    # select_data
+    param_select = {'thr_corr': [0.7, 0.6, 0.5], 'thr_fs': [ 0.1, 0.2, 0.3], 'thr_nan_col': [0.2, 0.5, None]}
+    # Modeling
+    param_dist_mod = {'bal_type': [None, 'under', 'over'], 'test_val_size': [0.2], 'test_size': [0.5], 'k': [5],
+                      'treat_nan': ['drop', 'ml']}  # bal_type =  'over', 'under'
 
     # Por combinacion de parametros
     for i, param_values in enumerate(product(*param_construct.values()), start=1):
@@ -29,6 +36,7 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
         # Levanto dataset integrado
         df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
 
+        # Asigno valor a cada hiperpametro
         n_ult_part = param_values[0]
 
         # Construyo datos
@@ -36,24 +44,17 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
         df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_{n_ult_part}.xlsx')
         print(f" Iteracion Nº {i} ".center(120, "#"))
 
-        # Hiperparametros de select_data
-        param_select = {'thr_corr': [0.7, 0.6, 0.5], 'thr_fs': [0.1, 0.2, 0.3], 'thr_nan_col': [0.2, 0.5, None]}  # thr_fs --> mas tirando a 0.2 # thr_corr --> medio indep # thr_nan_col --> 0.2 es casi lo mismo que 0.35 pues solo no borra historial_entre_si que igual no es tenida en cuenta nunca por feature_selection
-
         # Por combinacion de parametros
         for j, param_values in enumerate(product(*param_select.values()), start=1):
 
+            # Asigno valor a cada hiperpametro
             thr_corr, thr_fs, thr_nan_col = param_values[0], param_values[1], param_values[2]
             print(f" Iteracion Nº {i}.{j} ".center(120, "+"))
             print(f"thr_corr: {thr_corr} ; thr_fs: {thr_fs} ; thr_nan_col: {thr_nan_col}")
 
             # Preparo el dataset para el analisis
             df_sel = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, thr_nan_col=thr_nan_col, export=False)
-
-            # Creo objeto de clase Modeling con df_selected
-            mo = Modeling(df_sel, var_resp, var_pred, pais)
-
-            # Hiperparametros de modeling
-            param_dist_mod = {'bal_type': [None, 'under', 'over'], 'test_val_size': [0.2], 'test_size': [0.5], 'k': [5], 'treat_nan': ['drop', 'ml']}  # bal_type =  'over', 'under'
+            df_sel.to_excel(f'/Users/nachomondino/Desktop/df_selected_{pais}_prueba.xlsx')
 
             # Por combinacion de parametros
             for h, param_val in enumerate(product(*param_dist_mod.values()), start=1):
@@ -67,7 +68,7 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
                 df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_roi'])  # Datos del modelo y su precision y roi
 
                 # Generar el diseño de la prueba
-                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size, treat_nan=treat_nan)
+                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type, test_val_size, test_size, treat_nan=treat_nan)
 
                 # Por modelo
                 for modelo in l_modelos:
@@ -113,11 +114,8 @@ def find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais):
 
 
 def main():
-    var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"
-    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
-    df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
-    find_best_hiperparameters(df_part, df_jug, var_resp, var_pred, pais)
+    pais, var_resp, var_pred = "argentina", 'equipo_ganador', 'y_pred'
+    find_best_hiperparameters(var_resp, var_pred, pais)
 
 if __name__ == '__main__':
     main()

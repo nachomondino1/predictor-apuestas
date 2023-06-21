@@ -18,8 +18,7 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
 
     # Calculo matriz de correlacion
-    # df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
-    df_correlacion = df.corr().abs()
+    df_correlacion = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1).corr().abs()
 
     # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
     df_corr = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0)
@@ -100,7 +99,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def random_forest(self, X, y, k=5, graf=False):  # Lo dejo en funcion? Si ya llama a train_model... --> SOLO USARE RANDOM ENCIMA...
+    def random_forest(self, X, y, k=3, graf=False):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
@@ -260,10 +259,14 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     """
     # Definicion de variables
     fs = FeatureSelection()
-    graficar = True
+    graficar = False
+
+    # Elimino odds
+    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
 
     # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
-    df = df.dropna()
+    df = df.dropna()  # Es dificil que queden pocos registros porque borro filas y col con muchos nan antes
+    # print(f"Largo del dataframe antes de fs: {df.shape}")
 
     # Separo en X e y
     X = df.drop(var_resp, axis=1)
@@ -314,31 +317,21 @@ def prueba():
 
     # Elimino filas y columnas con alto porcentaje de NaN values
     df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
-
-    # Quito odds para evitar su borrado y su analisis
-    df_without_odds = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-
-    # Elimino columnas con alto porcentaje de NaN values
     if thr_nan_col is not None:
-        df_without_odds = clean_data.eliminar_columnas_nan(df_without_odds, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
+        df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
 
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-    df_without_odds, df_etiquetas = format_data.convert_columns_to_int(df_without_odds)
-    # df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_etiquetas.xlsx')
+    df, df_etiquetas = format_data.convert_columns_to_int(df)
+    # df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
     # Elimino variables altamente correlacionadas
-    l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df_without_odds, var_resp, thr_corr)
-    df_without_odds = df_without_odds.drop(l_columnas_a_eliminar, axis=1)
+    l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df, var_resp, thr_corr)
+    df = df.drop(l_columnas_a_eliminar, axis=1)
 
     # Selecciono las variables mas importantes (feature selection)
-    l_selected_features = select_best_features(df_without_odds, var_resp, thr_fs=thr_fs, graf=True)
-    df_without_odds = df_without_odds.filter(l_selected_features)
-
-    # Vuelvo a agregar odds y var_resp
-    columns_to_select = list(df_without_odds.columns) + ['odds_loc', 'odds_emp', 'odds_vis', var_resp]
-    print(columns_to_select)
+    l_selected_features = select_best_features(df, var_resp, thr_fs=thr_fs, graf=export)
+    columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis',var_resp]
     df = df.filter(columns_to_select)
-    print(df)
     df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
 
 

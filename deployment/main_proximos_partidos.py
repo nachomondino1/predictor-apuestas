@@ -16,18 +16,14 @@ class DataPreparation:  # 17.4 min
         self.var_resp = var_resp
         self.pais = pais
 
-    def clean_data(self, df_part=None, export=False):  # 0.0 min
+    def clean_data(self, df_part, export=False):  # 0.0 min
         """
         Limpia los datos de un dataframe.
-        :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param df_part: Dataframe de los datos de los partidos. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe limpiado. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{self.pais}/entidad_next_partido.xlsx') if df_part is None else df_part
-
         print("\nLimpiando los datos...")
-
         # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
         df_part = clean_data.prepare_text_columns(df_part, l_col_to_except=['id', 'temporada'])  # df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
@@ -39,7 +35,7 @@ class DataPreparation:  # 17.4 min
 
         return df_part
 
-    def integrate_data(self, df_part=None, df_jug=None, export=False):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part, export=False):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
         :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -47,11 +43,11 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe integrado. (DataFrame)
         """
-        df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_part_cleaned_next_matches.xlsx') if df_part is None else df_part
-        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_jug_cleaned.xlsx') if df_jug is None else df_jug
-
         start = time.time()
         print("\nIntegrando los datos...")
+
+        # Levanto dataframe de jugadores
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx')
 
         # Integro entidad partido y jugador
         df_integrated = integrate_data.player_data_in_match(df_part, df_jug)
@@ -64,7 +60,7 @@ class DataPreparation:  # 17.4 min
 
         return df_integrated
 
-    def construct_data(self, df_new=None, N_ULT_PART=5, export=False):  # 1.6 minutos
+    def construct_data(self, df_new, N_ULT_PART=5, export=False):  # 1.6 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
         :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -72,9 +68,6 @@ class DataPreparation:  # 17.4 min
         :param export: Booleano para indicar si se debe exportar el dataframe construido. True para exportar, False de lo contrario. (bool)
         :return: Dataframe construido. (DataFrame)
         """
-        # Si no han pasado un dataset utilizo un dataframe guardado
-        # df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_integrated.xlsx') if df is None else df
-
         start = time.time()
         print("\nConstruyendo datos...")
 
@@ -117,7 +110,7 @@ class DataPreparation:  # 17.4 min
 
         return df_new
 
-    def select_data(self, df_new=None, treat_nan='drop', export=False):  # 1.3 minutos
+    def select_data(self, df_new, treat_nan='drop', export=False):  # 1.3 minutos
         """
         Selecciona las variables relevantes del dataframe.
         :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
@@ -125,7 +118,6 @@ class DataPreparation:  # 17.4 min
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
         # Si no han pasado un dataset utilizo un dataframe guardado
-        df_new = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_next_matches/df_constructed_next_matches.xlsx') if df_new is None else df_new
         df = df_new.copy()
 
         # Definicion de variables
@@ -216,6 +208,7 @@ def main():
         # Describe data
         getting_to_know_data(df_part)
 
+    ## DATA PREPARATION
     data_prep = False
     if data_prep:
 
@@ -223,25 +216,22 @@ def main():
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
         treat_nan = 'ml'  # Relleno de nan values: 'mode' o 'ml'
 
-        dp = DataPreparation(var_resp, pais)
+        # Levanto dataset recolectado para pruebas
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_next_partido.xlsx')
 
-        # Levanto dataset con los ultimos 15 partidos de la liga argentina
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx')
-
-        ## DATA PREPARATION
         print(" Data preparation ".center(120, "#"))
-
-        df_part = dp.clean_data(export=export)
-        df = dp.integrate_data(df_part, df_jug, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
+        dp = DataPreparation(var_resp, pais)
+        df_part = dp.clean_data(df_part, export=export)
+        df = dp.integrate_data(df_part, export=export)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, export=export)
-        df = dp.select_data(treat_nan=treat_nan, export=export)
+        df = dp.select_data(df, treat_nan=treat_nan, export=export)
 
+    ## MODELING
     modeling = False
     if modeling:
         # Levanto dataset preparado para pruebas
         df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/deployment/data_next_matches/df_part_selected_next_matches.xlsx', index_col=0)
 
-        # Modeling
         # Quito odds del dataframe preparado
         df_test_pred = df.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Esto esta ok
         print(df_test_pred.shape)

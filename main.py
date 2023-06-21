@@ -29,9 +29,7 @@ import pickle
 
 class DataPreparation:  # 17.4 min
 
-    def __init__(self, df_part, df_jug, var_resp, pais):
-        self.df_part = df_part
-        self.df_jug = df_jug
+    def __init__(self, var_resp, pais):
         self.var_resp = var_resp
         self.pais = pais
 
@@ -83,6 +81,9 @@ class DataPreparation:  # 17.4 min
 
         # Remuevo strings adicionales en los nombres de los equipos
         df_part = clean_data.clean_teams_names(df_part)
+
+        # Elimino filas con alto porcentaje de NaN values --> partidos con pocos datos... que no sirve integrar ni para construir
+        # df_part = clean_data.eliminar_filas_nan(df_part, umbral=0.5) # Lo dejo aqui? seria para evitar tener un df enorme en integrate y construct...
 
         end = time.time()
         print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
@@ -149,7 +150,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df, thr_corr=0.6, thr_nan_col=0.2 , thr_fs=0.5, export=True):  # 1.3 minutos
+    def select_data(self, df, thr_corr=0.6, thr_nan_col=0.2 , thr_fs=0.5, export=True):  # 1.3 minutos # Chequear cambios
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -167,7 +168,7 @@ class DataPreparation:  # 17.4 min
         # Elimino filas y columnas con alto porcentaje de NaN values
         df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
         if thr_nan_col is not None:
-            df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
+            df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -178,8 +179,7 @@ class DataPreparation:  # 17.4 min
         df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        fs = select_data.FeatureSelection(df.dropna(), self.var_resp)
-        l_selected_features = fs.select_best_features(umbral=thr_fs, graf=export)
+        l_selected_features = select_data.select_best_features(df, self.var_resp, thr_fs=thr_fs, graf=export)
         columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
         df = df.filter(columns_to_select)
 
@@ -188,22 +188,22 @@ class DataPreparation:  # 17.4 min
 
         if export:
             df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
+
         return df
 
 class Modeling:
 
-    def __init__(self, df, var_resp, var_pred, pais):
+    def __init__(self, var_resp, var_pred, pais):
         if not isinstance(var_resp, str) or not isinstance(var_pred, str):
             raise TypeError("Los parámetros var_resp y var_pred deben ser cadenas de texto.")
         if not isinstance(pais, str):
             raise TypeError("El parámetro pais debe ser una cadena de texto.")
 
-        self.df = df
         self.var_resp = var_resp
         self.var_pred = var_pred
         self.pais = pais
 
-    def generate_test_design(self, bal_type, test_val_size=0.2, test_size=0.5, treat_nan='drop', export=True):
+    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, treat_nan='drop', export=True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -215,13 +215,13 @@ class Modeling:
         :return: Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
-        X, y = self.df.drop(self.var_resp, axis=1), self.df[self.var_resp]  # Separar en X e y
 
         # Eliminacion de NaN values --> conviene al principio... para separar en las proporciones que digo...
         if treat_nan == 'drop':
-            df = pd.concat([X, y], axis=1)
             df = clean_data.eliminar_filas_nan(df, umbral=0)  # Eliminar filas con valores nulos en X e y   # Opcion 1: Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
-            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separar en X e y
+
+        # Separo en X e y
+        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separar en X e y
 
         # Separo conjunto de datos en train, validation y test
         X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size,random_state=42, shuffle=True)  # Divido todos los  datos en train y validacion + prueba
@@ -255,6 +255,11 @@ class Modeling:
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
             print(f"Shape X_train luego de balanceo: {X_train.shape}")
+
+        # Shuffle y borro index --> fundamental para evitar problemas en CV en la division de los folds (si devuelve el df ordenado por clase, fallara el cv)
+        df_train = pd.concat([X_train, y_train], axis=1)
+        df_train = df_train.sample(frac=1).reset_index(drop=True)  # Para evitar que queden misma clase en un fold de CV?
+        X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
 
         if export:
             X_train.to_excel(f'./modeling/data/{self.pais}/X_train.xlsx', index=False)
@@ -341,7 +346,7 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "inglaterra"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
     data_unders = False
@@ -360,33 +365,39 @@ def main():
         getting_to_know_data(df_part)
         getting_to_know_data(df_jug)
 
-    data_prep = False
+    data_prep = True
     if data_prep:
+
+        # Definicion de variables
+        print(" Data preparation ".center(120, "#"))
+        dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
+
+        # Hiperparametros
+        N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
+        thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+        thr_nan_col = 0.2
 
         # Levanto datasets
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed.xlsx')
-
-        # Creo objeto de clase DataPreparation
-        dp = DataPreparation(df_part, df_jug, var_resp, pais)
-        print(" Data preparation ".center(120, "#"))
-        
-        # Hiperparametros
-        N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
-        umbral_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
-        porc_nan_max = 0.2
+        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed.xlsx')
 
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
         df_part, df_jug = dp.clean_data(df_part, df_jug)
         df = dp.integrate_data(df_part, df_jug)
-        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
-        df = dp.select_data(df, thr_corr=thr_corr, umbral_fs=umbral_fs, porc_nan_max=porc_nan_max)
+        # df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
+        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, thr_nan_col=thr_nan_col, export=False)
 
     modeling = False
     if modeling:
+        # Definicion de variables
+        print(" Modeling ".center(120, "#"))
+        mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
+        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_roi'])  # Datos del modelo y su precision y roi
+        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
+                     SVC(), MLPClassifier(), GradientBoostingClassifier()]
 
         # Hiperparametros
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
@@ -395,20 +406,11 @@ def main():
         treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
 
-        # Definicion de variables
-        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_roi'])  # Datos del modelo y su precision y roi
-        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
-                     SVC(), MLPClassifier(), GradientBoostingClassifier()]
-
         # Levanto dataset para prueba
         df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
 
-        # Creo objeto de clase Modeling
-        mo = Modeling(df, var_resp, var_pred, pais)
-        print(" Modeling ".center(120, "#"))
-
-        # Generar el diseño de la prueba
-        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(bal_type, test_val_size, test_size, treat_nan=treat_nan)
+        # General el diseño de la prueba
+        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, treat_nan=treat_nan)
 
         # Por modelo
         for modelo in l_modelos:
