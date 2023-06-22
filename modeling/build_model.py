@@ -32,14 +32,14 @@ def select_best_hiperparameters(model, X, y, k):
                                        'multi_class': ['multinomial']},
                 'SVC': {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
                         'decision_function_shape': ['ovo', 'ovr']},
-                'MLPClassifier': {'activation': ['logistic', 'tanh', 'relu'],  # 'identity', 'sigmoid'
+                'MLPClassifier': {'activation': ['identity', 'sigmoid','logistic', 'tanh', 'relu'],  # 'identity', 'sigmoid'
                                   'solver': ['lbfgs', 'sgd', 'adam'],
-                                  'learning_rate': ['constant', 'invscaling', 'adaptive'],  # 'learning_rate'
-                                  'max_iter': [300],  # 200
+                                  'learning_rate': ['constant', 'learning_rate', 'invscaling', 'adaptive'],  # 'learning_rate'
+                                  'max_iter': [200, 300],  # 200
                                   'hidden_layer_sizes': [(64), (128), (64, 32)]},
                 'GradientBoostingClassifier': {'learning_rate': [0.1, 0.05, 0.01],
                                                'n_estimators': [100, 200, 300],
-                                               'max_depth': [5, 7, 20]},  # None, 30
+                                               'max_depth': [None, 5, 7, 20, 30]},  # None, 30
                 'PCA': {'n_components': [2, 5, 10],
                         'whiten': [True, False],
                         'svd_solver': ['auto', 'full', 'randomized'],
@@ -77,12 +77,12 @@ def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que
     """
     # Definicion de variables
     scores, rois = [], []
-    fold_size = len(X_train) // k
+    fold_size = len(X_train) // k  # e.g 3000 / 5 = 600
 
     # Por k
     for i in range(k):
 
-        # Dividir los datos en conjuntos de entrenamiento y test
+        # Dividir los datos en conjuntos de entrenamiento y test (confirme experimentalmente y por Chat GPT que esta division de folds no importa si el indice no es de 0 a len(df). Sin embargo, si importa que el df no tenga algun orden especifico puesto que si no los folds quedan desbalanceados)
         start, end = i * fold_size, (i + 1) * fold_size
         X_train_fold = np.concatenate((X_train[:start], X_train[end:]), axis=0)
         y_train_fold = np.concatenate((y_train[:start], y_train[end:]), axis=0)
