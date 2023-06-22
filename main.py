@@ -6,6 +6,7 @@ import warnings
 from data_understanding import collect_initial_data
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
+from sklearn.preprocessing import StandardScaler
 from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 # Modeling
 # Generate test design
@@ -23,7 +24,7 @@ from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 # Assess model
 from modeling.asses_model import calculate_roi, confusion_matrix
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
 
 
@@ -78,6 +79,10 @@ class DataPreparation:  # 17.4 min
         # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
         df_part = clean_data.prepare_text_columns(df_part, l_col_to_except=['id', 'temporada'])  # df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
         df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id'])  # df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+
+        # Normalizo valor de mercado para evitar el error en entrenamiento de "ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed."
+        scaler = StandardScaler()  # Crea un objeto StandardScaler
+        df_jug['valor_mercado'] = scaler.fit_transform(df_jug['valor_mercado'].values.reshape(-1, 1))
 
         # Remuevo strings adicionales en los nombres de los equipos
         df_part = clean_data.clean_teams_names(df_part)
@@ -150,7 +155,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df, thr_corr=0.6, thr_nan_col=0.2 , thr_fs=0.5, export=True):  # 1.3 minutos # Chequear cambios
+    def select_data(self, df, thr_nan_col=None, thr_corr=None, thr_fs=None, export=True):  # 1.3 minutos # Chequear cambios
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -166,7 +171,11 @@ class DataPreparation:  # 17.4 min
         df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
         # Elimino filas y columnas con alto porcentaje de NaN values
-        df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
+        columns_to_check = ['dt_loc', 'dif_remates_segun_ult_part', 'dif_edad_tit']  # Si no tiene dts, estadisticas o formaciones, entonces borro el registro
+        largo_inicial = len(df)
+        df = df.dropna(subset=columns_to_check, how='any')
+        print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
+
         if thr_nan_col is not None:
             df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
 
@@ -175,13 +184,15 @@ class DataPreparation:  # 17.4 min
         df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
         # Elimino variables altamente correlacionadas
-        l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
-        df = df.drop(l_columnas_a_eliminar, axis=1)
+        if thr_corr is not None:
+            l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
+            df = df.drop(l_columnas_a_eliminar, axis=1)
 
         # Selecciono las variables mas importantes (feature selection)
-        l_selected_features = select_data.select_best_features(df, self.var_resp, thr_fs=thr_fs, graf=export)
-        columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
-        df = df.filter(columns_to_select)
+        if thr_fs is not None:
+            l_selected_features = select_data.select_best_features(df, self.var_resp, thr_fs=thr_fs, graf=export)
+            columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
+            df = df.filter(columns_to_select)
 
         end = time.time()
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -203,7 +214,7 @@ class Modeling:
         self.var_pred = var_pred
         self.pais = pais
 
-    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, treat_nan='drop', export=True):
+    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, fill_na=None, export=True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -216,9 +227,10 @@ class Modeling:
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
 
-        # Eliminacion de NaN values --> conviene al principio... para separar en las proporciones que digo...
-        if treat_nan == 'drop':
-            df = clean_data.eliminar_filas_nan(df, umbral=0)  # Eliminar filas con valores nulos en X e y   # Opcion 1: Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
+        # Si no hago el relleno de nan (conviene al principio... para separar en las proporciones que digo...)
+        if fill_na is None:
+            # Elimino filas puesto que al modelo no le pueden ingresar NaN values
+            df = clean_data.eliminar_filas_nan(df, umbral=0)  # Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
 
         # Separo en X e y
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separar en X e y
@@ -230,15 +242,14 @@ class Modeling:
         # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
         X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
         X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-
         print(f'Train: {X_train.shape} {y_train.shape}')
         print(f'Val: {X_val.shape} {y_val.shape}')
         print(f'Test: {X_test.shape} {y_test.shape}')
 
         # Relleno nan --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
-        if treat_nan == "ml" or treat_nan == 'mode':
-            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=treat_nan)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
-            print(f"Se realizo el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
+        if fill_na is not None:
+            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
+            print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
             # Elimino NaN de df_val y df_test para evitar "ValueError: Input X contains NaN."
             df_val = pd.concat([X_val, y_val], axis=1)
@@ -256,7 +267,7 @@ class Modeling:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
             print(f"Shape X_train luego de balanceo: {X_train.shape}")
 
-        # Shuffle y borro index --> fundamental para evitar problemas en CV en la division de los folds (si devuelve el df ordenado por clase, fallara el cv)
+        # Shuffle --> fundamental para evitar problemas en CV en la division de los folds (si devuelve el df ordenado por clase, fallara el cv)
         df_train = pd.concat([X_train, y_train], axis=1)
         df_train = df_train.sample(frac=1).reset_index(drop=True)  # Para evitar que queden misma clase en un fold de CV?
         X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
@@ -319,14 +330,16 @@ class Modeling:
         # Predecir las etiquetas para los datos de prueba
         y_pred = model.predict(X_test_without_odds)  # es un numpy array
 
-        # Calculo precision
+        # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
+        recall = recall_score(y_test, y_pred, average='macro') * 100  # recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred, average='macro') * 100  # f1 = f1_score(y_test, y_pred)
 
         # Calculo roi y matriz de confusion
         # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
-        df_results = X_test.copy().loc[:, ['odds_loc', 'odds_emp', 'odds_vis']]
-        df_results[self.var_resp] = y_test
-        df_results[self.var_pred] = y_pred
+        df_results = X_test.copy().loc[:, ['odds_loc', 'odds_emp', 'odds_vis']]  # Agrego odds
+        df_results[self.var_resp] = y_test  # Agrego y_real
+        df_results[self.var_pred] = y_pred  # Agrego y_pred
 
         # Convierto variable respuesta y variable predicha en etiqueta
         df_results_etiquetas = format_data.revert_columns_from_int(df_results, df_etiquetas, columns=[self.var_resp, self.var_pred])
@@ -335,21 +348,27 @@ class Modeling:
         roi = calculate_roi(df_results_etiquetas, self.var_resp, self.var_pred) * 100
         print(f"Precision promedio de prueba: {test_accuracy:.1f}%")
         print(f"ROI promedio de prueba: {roi:.1f}%")
+        print(f"Recall promedio de prueba: {recall:.1f}%")
+        print(f"F1-score promedio de prueba: {f1:.1f}%")
 
         if export:
             confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
             df_results.to_excel(f'./modeling/data/{self.pais}/df_results.xlsx')
 
-        return test_accuracy, roi
+        return test_accuracy, recall, f1, roi
 
 def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "inglaterra"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
+    # Procesamiento
     data_unders = False
+    data_prep = True
+    modeling = False
+
     if data_unders:
 
         print(" Data understanding ".center(120, "#"))
@@ -365,7 +384,6 @@ def main():
         getting_to_know_data(df_part)
         getting_to_know_data(df_jug)
 
-    data_prep = True
     if data_prep:
 
         # Definicion de variables
@@ -374,9 +392,9 @@ def main():
 
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+        thr_nan_col = 0.2
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
-        thr_nan_col = 0.2
 
         # Levanto datasets
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
@@ -388,14 +406,13 @@ def main():
         df_part, df_jug = dp.clean_data(df_part, df_jug)
         df = dp.integrate_data(df_part, df_jug)
         # df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
-        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, thr_nan_col=thr_nan_col, export=False)
+        # df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
-    modeling = False
     if modeling:
         # Definicion de variables
         print(" Modeling ".center(120, "#"))
         mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
-        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_roi'])  # Datos del modelo y su precision y roi
+        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score', 'test_roi'])  # Datos del modelo y su precision y roi
         l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
                      SVC(), MLPClassifier(), GradientBoostingClassifier()]
 
@@ -403,37 +420,45 @@ def main():
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
         bal_type = 'over'  # Tipo de balanceo a realizar [None, 'over', 'under']
-        treat_nan = 'drop'  # Eliminacion de nan values [drop, mode, ml]
+        fill_na = None  # Relleno de nan values [None, mode, ml]
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
 
         # Levanto dataset para prueba
         df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_selected.xlsx')
 
         # General el diseño de la prueba
-        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, treat_nan=treat_nan)
+        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, fill_na=fill_na)
 
         # Por modelo
         for modelo in l_modelos:
 
             # Entreno modelo y evaluo su rendimiento
             model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
-            test_accuracy, test_roi = mo.assess_model(model_best_params, X_test, y_test)
+            accuracy, recall, f1, roi = mo.assess_model(model_best_params, X_test, y_test)
 
             # Guardo modelo
-            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, test_accuracy, test_roi]
+            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1, roi]
 
         # Selecciono el mejor modelo
-        idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
-        best_model = df_models.loc[idx, 'model_trained']
-        best_model_train_prec = df_models.loc[idx, 'train_cv_accuracy']
-        best_model_test_prec = df_models.loc[idx, 'test_accuracy']
-        best_model_test_roi = df_models.loc[idx, 'test_roi']
-        print(f"\nEl mejor modelo es: {best_model} con: \n\t- Train Precision: {best_model_train_prec:.1f}% "
-              f"\n\t- Test Precision: {best_model_test_prec:.0f}% \n\t- Test ROI: {best_model_test_roi:.1f}%")
+        idx = df_models['test_accuracy'].idxmax()  # idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
+        bm_name = df_models.loc[idx, 'model_name']
+        bm_params = df_models.loc[idx, 'model_trained']
+        bm_train_acc = df_models.loc[idx, 'train_cv_accuracy']
+        bm_test_acc = df_models.loc[idx, 'test_accuracy']
+        bm_test_rec = df_models.loc[idx, 'test_recall']
+        bm_test_f1 = df_models.loc[idx, 'test_f1_score']
+        bm_test_roi = df_models.loc[idx, 'test_roi']
+        print(f"\nEl mejor modelo es: {bm_name} con: "
+              f"\n\t- Train Precision: {bm_train_acc:.1f}% "
+              f"\n\t- Test Precision: {bm_test_acc:.1f}% "
+              f"\n\t- Test recall: {bm_test_rec:.1f}%\n"
+              f"\n\t- Test f1-score: {bm_test_f1:.1f}%\n"
+              f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
+              )
 
         if export:
             df_models.to_excel(f'./modeling/data/{pais}/df_modelos.xlsx')
-            pickle.dump(best_model, open(f"./modeling/data/{pais}/modelo.pkl", "wb"))
+            pickle.dump(bm_params, open(f"./modeling/data/{pais}/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

@@ -298,15 +298,17 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     return l_selected_features
 
 def prueba():
-    warnings.filterwarnings('ignore')
-
     from data_preparation import format_data, clean_data
 
+    # Definicion de variables
     var_resp = 'equipo_ganador'
     pais = 'argentina'
+    warnings.filterwarnings('ignore')
+
+    # Definicion de hiperparametros
+    thr_nan_col = 0.2
     thr_corr = 0.6  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
     thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
-    thr_nan_col = 0.2
     export = False
 
     # Levanto dataset de prueba
@@ -316,7 +318,11 @@ def prueba():
     df = df.drop(['id', 'fecha', 'cancha', 'competicion', 'temporada', 'pais'], axis=1)
 
     # Elimino filas y columnas con alto porcentaje de NaN values
-    df = clean_data.eliminar_filas_nan(df, umbral=0.5)  # 1º elimino registros con muchos nan --> puesto que quiero preservar variables antes que registros
+    largo_inicial = len(df)
+    columns_to_check = ['dt_loc', 'dif_remates_segun_ult_part', 'dif_edad_tit']
+    df = df.dropna(subset=columns_to_check, how='any')
+    print(f"Se eliminó el {(largo_inicial-len(df))/largo_inicial*100:.0f}% de filas, quedan {len(df)} filas.")
+    # df.to_excel('/Users/nachomondino/Desktop/df_drop_na_prueba.xlsx', index=False)
     if thr_nan_col is not None:
         df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
 
@@ -329,8 +335,8 @@ def prueba():
     df = df.drop(l_columnas_a_eliminar, axis=1)
 
     # Selecciono las variables mas importantes (feature selection)
-    l_selected_features = select_best_features(df, var_resp, thr_fs=thr_fs, graf=export)
-    columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis',var_resp]
+    l_selected_features = select_best_features(df, var_resp, thr_fs=thr_fs, graf=True)
+    columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', var_resp]
     df = df.filter(columns_to_select)
     df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
 
