@@ -109,7 +109,7 @@ class FeatureSelection():
         :return: Dataframe. Importancia por variable. (Dataframe)
         """
         # Verificar si se deben buscar los mejores hiperparámetros
-        model = select_best_hiperparameters(RandomForestClassifier(), X, y, k=k)
+        model = select_best_hiperparameters(RandomForestClassifier(), X, y, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(X, y)
