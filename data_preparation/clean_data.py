@@ -156,7 +156,7 @@ def eliminar_columnas_nan(df, umbral):
     columnas_eliminar = prop_nan[prop_nan > umbral].index
 
     # Elimina las columnas identificadas del DataFrame
-    df_sin_nan = df.drop(columnas_eliminar, axis=1)
+    df_sin_nan = df.drop(columnas_eliminar, axis=1).reset_index(drop=True)  # es clave el drop=True para eliminar el indice viejo sino agrega la columna "index"
     print(f"Se eliminaron {len(list(columnas_eliminar))} columnas por tener un % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
     return df_sin_nan
 
