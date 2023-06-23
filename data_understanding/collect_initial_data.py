@@ -18,13 +18,10 @@ def select_liga_as_filter(crawler, pais):
     """
     # Definicion de variables
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/df_competencias.xlsx')
-    # d_pais = {'brasil': 'brazil', 'inglaterra': 'england', 'espana': 'spain'}  # Por diferencias entre nombres de paises entre Flashscore y Sofifa. # Por ejemplo, en flashscore aparece 'Brasil' mientras que en Sofifa aparece Brazil
 
     # Selecciono competicion mas importante del pais
-    # pais_a_buscar = d_pais[pais] if pais in d_pais.keys() else pais
-    # comp_a_buscar = df_comp[df_comp['pais'] == pais]['nombre'].values[0]
     pais_a_buscar = df_comp[df_comp['pais'] == pais]['pais_sofifa'].values[0]
-    comp_a_buscar = df_comp[df_comp['pais'] == pais]['nombre_sofiifa'].values[0]
+    comp_a_buscar = df_comp[df_comp['pais'] == pais]['nombre_sofifa'].values[0]
 
     # Busco competicion
     input_league = crawler.extract_tag(xpath='.//form[@class="relative pjax-form"]//input[@aria-label="Leagues"]')
@@ -40,7 +37,7 @@ def select_liga_as_filter(crawler, pais):
         if crawler.click_boton(boton_liga_a_selec) is False:
             print(f'Sofifa no encontró resultados a nuestra busqueda. Es posible que no exista la liga de {pais}.')
 
-def extract_jugadores_sofifa(pais):  # Si bien puede extraer varios paises, creo que lo usare para un solo a la vez. De todas maneras dejo la funcion para multiples paises.
+def extract_jugadores_sofifa(pais):
     """
     Obtengo datos de jugadores mediante scrapear sofifa.com
     """
@@ -559,10 +556,10 @@ if __name__ == "__main__":
 
     # Selecciono pais a extraer y obtengo las competencias y su categoria
     # pais = "argentina"  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    pais = 'espana'
+    pais = 'sudamerica'
 
     # Extraigo partidos
     df = extract_partidos_flashscore(pais)
 
     # Extraigo jugadores
-    extract_jugadores_sofifa(pais)
+    # extract_jugadores_sofifa(pais)
