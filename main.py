@@ -138,14 +138,19 @@ class DataPreparation:  # 17.4 min
         df = construct_data.determinar_equipo_ganador(df)
 
         # Construyo variables historicas
+        df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=True)
+        df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=False)
+        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
+        df = construct_data.rendimiento_equipo_segun_localia(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
         l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-        df = construct_data.historial_entre_si_segun_localia(df, n_ult_part=int(N_ULT_PART/2))
         df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
-        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)  # Segun diferencia de gol y puntos
         # df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido --> requiere 1) partidos de copa 2) eliminacion de valores atipicos
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
+
+        # Elimino columnas usadas para construir datos
+        df = df.drop(columns=['goles_loc', 'goles_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -399,13 +404,13 @@ def main():
         # Levanto datasets
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
-        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed.xlsx')
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated.xlsx')
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
-        df_part, df_jug = dp.clean_data(df_part, df_jug)
-        df = dp.integrate_data(df_part, df_jug)
-        # df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
+        # df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
+        # df_part, df_jug = dp.clean_data(df_part, df_jug)
+        # df = dp.integrate_data(df_part, df_jug)
+        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
         # df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
     if modeling:

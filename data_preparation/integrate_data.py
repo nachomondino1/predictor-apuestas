@@ -125,6 +125,12 @@ def player_data_in_match(df_part, df_jug):
                     df_part.loc[i, f'prom_alt_jug_{titularidad}_{condicion}'] = sum(l_prom_alt) / len(l_prom_alt)
                     df_part.loc[i, f'prom_rat_jug_{titularidad}_{condicion}'] = sum(l_prom_rating) / len(l_prom_rating)
                     df_part.loc[i, f'prom_valor_jug_{titularidad}_{condicion}'] = sum(l_prom_valor) / len(l_prom_valor)
+
+                    # Calculo nro de jugadores lesionados
+                    if titularidad == 'aus':
+                        df_part.loc[i, f'n_jug_{titularidad}_{condicion}'] = len(l_prom_rating)
+
+                        print("Numero de ausentes: ", len(l_prom_rating))
                     # print(f'\nPromedio de edad: {sum(l_prom_edad) / len(l_prom_edad)} \nPromedio de altura: {sum(l_prom_alt) / len(l_prom_alt)} \nPromedio de rating: {sum(l_prom_rating) / len(l_prom_rating)} \nPromedio de valor: {sum(l_prom_valor) / len(l_prom_valor)} ')
 
                 except ZeroDivisionError:
