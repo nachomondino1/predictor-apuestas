@@ -28,8 +28,9 @@ def clean_teams_names(df):
     :return: Dataframe con nombres de equipos modificados y limpios
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
-    df['equipo_loc'] = df['equipo_loc'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
-    df['equipo_vis'] = df['equipo_vis'].replace({'vencedor': '', 'equipo que avanza': ''}).str.strip()
+    d_sub_strings_adic = {'vencedor': '', 'equipo que avanza': ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
+    df['equipo_loc'] = df['equipo_loc'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['equipo_vis'] = df['equipo_vis'].replace(d_sub_strings_adic, regex=True).str.strip()
 
     # Quitar abreviaturas en nombres de equipos (NO FUNCIONA...)
     d_abrev_team_names = {' l p': ' la plata', 'atl ': 'atletico ', ' jrs': ' juniors', ' utd': ' united'}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
@@ -161,9 +162,11 @@ def eliminar_columnas_nan(df, umbral):
     return df_sin_nan
 
 def prueba():
+    pais = 'argentina'
+
     # Levanto dataset
-    df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/inglaterra/df_part_formated.xlsx')
-    df_jug =pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/inglaterra/df_jug_formated.xlsx')
+    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_formated.xlsx')
+    df_jug =pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_formated.xlsx')
 
     # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
     l_col_to_except = ['id', 'temporada']
@@ -173,8 +176,8 @@ def prueba():
     # Remuevo strings adicionales en los nombres de los equipos
     df_part = clean_teams_names(df_part)
 
-    df_part.to_excel('/Users/nachomondino/Desktop/df_part_cleaned.xlsx', index=False)
-    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_cleaned.xlsx', index=False)
+    df_part.to_excel('/Users/nachomondino/Desktop/df_part_cleaned_prueba.xlsx', index=False)
+    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_cleaned_prueba.xlsx', index=False)
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
