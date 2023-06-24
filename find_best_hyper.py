@@ -11,21 +11,6 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 
-def define_n_iterations(l_dicts):
-    """
-    Calcula el numero de iteraciones y el tiempo estimado para terminar
-    :param l_dicts: Lista de diccionarios de hiperparametros. (list)
-    :return: Numero de iteraciones y tiempo estimado (int y float)
-    """
-    # Cuidado con el nro de iteraciones sobretodo en select. nº comb = producto de posibles comb de cada hiper  EJ: {'thr_corr': [0.5, 0.6, 0.7], 'thr_fs': [0.25, 0.2, 0.15, 0.1, 0.05], 'thr_nan_col': [0.2, 0.5, None]} --> nºcomb = 3x5x3=45
-    # n comb totales = 3 x 45 x 6 = 810 --> 90 iteraciones en 17 horas --> 5,35 iter/hora => 810 iteraciones = 151 horas  # n comb totales = 1 x 18 x 6 = 108 --> 90 iteraciones en 17 horas --> 5,35 iter/hora => 216 iteraciones = 151 horas
-    n_iter = 1
-    for dict in l_dicts:
-        for key in dict.keys():
-            n_iter *= len(dict[key])
-    ritmo = 5.35  # iteraciones/hora  --> depende de cada iteracion pero en promedio. Depende mucho de que algoritmos pruebo.
-    n_horas = n_iter / ritmo
-    return n_iter, n_horas
 
 def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de datos reducido antes de separar en train, val y test?
 
@@ -40,8 +25,8 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
     mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
 
     # Definicion de hiperparametros
-    param_construct = {'n_ult_part': [5]}
-    param_select = {'thr_nan_col': [0.2, None], 'thr_corr': [0.7, 0.5, None], 'thr_fs': [0.2, None]}  # 'thr_nan_col': [0.2, 0.5, None]
+    param_construct = {'n_ult_part': [5], 'n_ult_part_loc': [3], 'peso_puntos':[0.6]}
+    param_select = {'thr_nan_col': [None, 0.2], 'thr_corr': [0.7, 0.5, None], 'thr_fs': [0.35, 0.2, None]}  # 'thr_nan_col': [0.2, 0.5, None]
     param_mod = {'test_val_size': [0.2], 'test_size': [0.5], 'fill_na': [None, 'ml'],
                  'bal_type': [None, 'under', 'over'], 'k': [5]}
 
@@ -57,11 +42,15 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
 
         # Asigno valor a cada hiperpametro
         n_ult_part = param_values[0]
+        n_ult_part_loc = param_values[1]
+        peso_puntos = param_values[2]
+
         print(f" Iteracion Nº {i} ".center(120, "#"))
         print(f'Hiper construct --> n_ult_part: {n_ult_part}')
 
         # Construyo datos
-        df = dp.construct_data(df, N_ULT_PART=n_ult_part, export=False)
+        df = dp.construct_data(df, N_ULT_PART=n_ult_part, N_ULT_PART_LOC=n_ult_part_loc, peso_puntos=peso_puntos)
+
         df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated_{n_ult_part}.xlsx')
 
         # Por combinacion de parametros de select_data
@@ -119,7 +108,8 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
                       )
 
                 # Guardo datos en dataframe
-                row_data = {'n_ult_part': n_ult_part, 'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr,
+                row_data = {'n_ult_part': n_ult_part, 'n_ult_part_loc': n_ult_part_loc, 'peso_puntos': peso_puntos,
+                            'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr,
                             'thr_fs': thr_fs, 'fill_na': fill_na, 'bal_type': bal_type,
                             'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
                             'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
@@ -144,6 +134,22 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
     print("Precisión obtenida:", best_accuracy)
     df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_dp.xlsx', index=False)
     return best_hyperparameters
+
+def define_n_iterations(l_dicts):
+    """
+    Calcula el numero de iteraciones y el tiempo estimado para terminar
+    :param l_dicts: Lista de diccionarios de hiperparametros. (list)
+    :return: Numero de iteraciones y tiempo estimado (int y float)
+    """
+    # Cuidado con el nro de iteraciones sobretodo en select. nº comb = producto de posibles comb de cada hiper  EJ: {'thr_corr': [0.5, 0.6, 0.7], 'thr_fs': [0.25, 0.2, 0.15, 0.1, 0.05], 'thr_nan_col': [0.2, 0.5, None]} --> nºcomb = 3x5x3=45
+    # n comb totales = 3 x 45 x 6 = 810 --> 90 iteraciones en 17 horas --> 5,35 iter/hora => 810 iteraciones = 151 horas  # n comb totales = 1 x 18 x 6 = 108 --> 90 iteraciones en 17 horas --> 5,35 iter/hora => 216 iteraciones = 151 horas
+    n_iter = 1
+    for dict in l_dicts:
+        for key in dict.keys():
+            n_iter *= len(dict[key])
+    ritmo = 5.35  # iteraciones/hora  --> depende de cada iteracion pero en promedio. Depende mucho de que algoritmos pruebo.
+    n_horas = n_iter / ritmo
+    return n_iter, n_horas
 
 
 def main():

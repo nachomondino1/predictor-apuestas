@@ -122,7 +122,7 @@ class DataPreparation:  # 17.4 min
 
         return df_integrated
 
-    def construct_data(self, df, N_ULT_PART=5, export=True):  # 2.7 minutos
+    def construct_data(self, df, N_ULT_PART=5, N_ULT_PART_LOC=3, peso_puntos=0.6,export=True):  # 2.7 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -138,13 +138,17 @@ class DataPreparation:  # 17.4 min
         df = construct_data.determinar_equipo_ganador(df)
 
         # Construyo variables historicas
-        df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=True)
+        df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART_LOC, segun_loc=True)
         df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=False)
-        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
-        df = construct_data.rendimiento_equipo_segun_localia(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
-        l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-        df = construct_data.promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
-        # df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido --> requiere 1) partidos de copa 2) eliminacion de valores atipicos
+
+        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART_LOC, peso_puntos=peso_puntos, por_localia=True)
+        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=peso_puntos, por_localia=False)
+
+        l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases',
+                        'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
+        for var in l_estad_part:
+            df = construct_data.promediar_var_en_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
+        # df = n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
@@ -397,6 +401,8 @@ def main():
 
         # Hiperparametros
         N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
+        N_ULT_PART_LOC = 3
+        peso_puntos = 0.6
         thr_nan_col = 0.2
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
@@ -410,7 +416,7 @@ def main():
         # df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
         # df_part, df_jug = dp.clean_data(df_part, df_jug)
         # df = dp.integrate_data(df_part, df_jug)
-        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART)
+        df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, N_ULT_PART_LOC=N_ULT_PART_LOC, peso_puntos=peso_puntos)
         # df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
     if modeling:

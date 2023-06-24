@@ -19,7 +19,7 @@ def determinar_equipo_ganador(df):
         df.loc[i, 'equipo_ganador'] = 'Local' if ng1 > ng2 else 'Empate' if ng1==ng2 else "Visitante"
     return df
 
-def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar la variable en los ultimos partidos, no para sumar..
+def promediar_var_en_ult_partidos(df, n_ult_part, variable, por_localia=False):
     """
     Obtiene el promedio de las estadisticas en los ultimos partidos
 
@@ -28,52 +28,110 @@ def promedio_ult_partidos(df, n_ult_part, l_var):  # Esta hecha para promediar l
     :param variable: String. Nombre de variable a promediar
     :return: Dataframe con estadisticas promediadas
     """
-    # Ordeno por fecha descendiente
+    # Defincion de variables
+    n_ult_part_min = int(0.6 * n_ult_part)  # Definir suficientes partidos mínimos
+    str_adic = "_segun_loc" if por_localia else ""  # Variable adicional según localía
+
+    # Ordeno por fecha ascendente
     df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
-    n_ult_part_min = 0.6 * n_ult_part
 
-    for variable in l_var:
+    # Por equipo
+    for equipo in df['equipo_loc'].unique():
 
-        # Por equipo
-        for equipo in df['equipo_loc'].unique():
+        # Obtengo los partidos que jugó el equipo
+        l_dfs = [df[df['equipo_loc'] == equipo], df[df['equipo_vis'] == equipo]] if por_localia else [
+            df[(df['equipo_loc'] == equipo) | (df['equipo_vis'] == equipo)]]
 
-            # Obtengo los partidos que jugo el equipo
-            df_team = df[(df['equipo_loc'] == equipo) | (df['equipo_vis'] == equipo)]
-            l = []
-            # print(" Equipo: {} ".format(equipo).center(120, "#"))
+        # Inicializar lista de valores de la variable
+        l = []
 
-            # Por partido que jugó el equipo
-            for idx in list(df_team.index):  # for idx in l_idxs: NO HACER ESTO
+        for df_team in l_dfs:
 
-                # Definicion de variables
-                is_equipo_loc = df_team.loc[idx, 'equipo_loc'] == equipo
+            # Recorrer los partidos del equipo
+            for idx, row in df_team.iterrows():
+
+                # Definición de variables
+                is_equipo_loc = row['equipo_loc'] == equipo
                 loc_o_vis = 'loc' if is_equipo_loc else 'vis'
 
                 # Si ya tengo los suficientes partidos para determinar la variable
                 if len(l) == n_ult_part:
 
-                    # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                    l_sin_nan = list(filter(lambda x: not math.isnan(x), l))  # Y si es None?
+                    # Quito NaN de la lista para que no falle el cálculo
+                    l_sin_nan = [x for x in l if not math.isnan(x)]
 
                     # Si no eliminé todos los elementos
-                    if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
+                    if len(l_sin_nan) >= n_ult_part_min:
 
-                        # Guardo el valor promedio de la variable en los ultimos n_part
-                        df.loc[idx, f'prom_{variable}_ult_part_{loc_o_vis}'] = sum(l_sin_nan) / len(l_sin_nan)
-                        # print('Con valores agregados:', list(df.loc[idx]))
+                        agregar_valor_promedio(df, idx, l_sin_nan, variable, loc_o_vis, str_adic)
 
-                    # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
+                    # Elimino el valor más antiguo de la lista (para tener siempre los últimos n_part partidos)
                     l = l[1:]
 
-                # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-                l.append(df.loc[idx, f'{variable}_{loc_o_vis}'] if is_equipo_loc else df.loc[idx, f'{variable}_{loc_o_vis}'])
-                # print(f'{variable} ultimos partidos: {l}')
+                # Agrego el valor de la variable al final de la lista
+                value = obtener_valor_variable(row, variable, is_equipo_loc, loc_o_vis)
+                l.append(value)
 
-        # Calculo diferencia entre variables promedio para el equipo local y para el equipo vis
-        df[f'dif_{variable}_segun_ult_part'] = df[f'prom_{variable}_ult_part_loc'] - df[f'prom_{variable}_ult_part_vis']
+    df = calcular_diferencia(df, variable, str_adic)
+    return df
+
+def agregar_valor_promedio(df, idx, l, variable, loc_o_vis, str_adic):  # cambiar nombre
+    """
+    Agrega el valor promedio de la variable al dataframe en la posición indicada por el índice.
+
+    :param df: Dataframe.
+    :param idx: Integer. Índice del partido.
+    :param l: List. Lista de valores de la variable.
+    :param variable: String. Nombre de variable a promediar.
+    :param loc_o_vis: String. Etiqueta de local o visitante.
+    :param str_adic: String. Sufijo adicional según localía.
+    """
+    if variable == 'goles' or variable == 'puntos':
+        df.loc[idx, f'sum_{variable}_ult_part_{loc_o_vis}{str_adic}'] = sum(l)
+    else:
+        promedio = sum(l) / len(l)
+        df.loc[idx, f'prom_{variable}_ult_part_{loc_o_vis}{str_adic}'] = promedio
+
+def obtener_valor_variable(row, variable, is_equipo_loc, loc_o_vis):
+    """
+    Obtiene el valor de la variable según el partido y la localía.
+
+    :param row: Series. Fila del dataframe correspondiente al partido.
+    :param variable: String. Nombre de variable a obtener.
+    :param is_equipo_loc: Boolean. Indica si el equipo es local en el partido.
+    :param loc_o_vis: String. Etiqueta de local o visitante.
+    :return: Valor de la variable.
+    """
+    if variable == 'goles':
+        value = row['goles_loc'] - row['goles_vis'] if is_equipo_loc else row['goles_vis'] - row['goles_loc']
+    elif variable == 'puntos':
+        resultado = row['equipo_ganador']
+        puntos_loc = lambda res: 3 if res == "Local" else (1 if res == "Empate" else 0)
+        puntos_vis = lambda res: 3 if res == "Visitante" else (1 if res == "Empate" else 0)
+        value = puntos_loc(resultado) if is_equipo_loc else puntos_vis(resultado)
+    else:
+        value = row[f'{variable}_{loc_o_vis}']
+    return value
+
+def calcular_diferencia(df, variable, str_adic):
+    """
+    Calcula la diferencia de la variable entre local y visitante y elimina las columnas temporales.
+
+    :param df: Dataframe.
+    :param variable: String. Nombre de variable a promediar.
+    :param str_adic: String. Sufijo adicional según localía.
+    """
+    if variable == 'goles' or variable == 'puntos':
+        df[f'dif_{variable}_segun_ult_part{str_adic}'] = df[f'sum_{variable}_ult_part_loc{str_adic}'] - df[f'sum_{variable}_ult_part_vis{str_adic}']
 
         # Elimino columnas utilizadas para calcular tanto el promedio como la diferencia
-        df = df.drop(columns=[f'{variable}_loc', f'{variable}_vis', f'prom_{variable}_ult_part_loc', f'prom_{variable}_ult_part_vis'])
+        df = df.drop(columns=[f'sum_{variable}_ult_part_loc{str_adic}', f'sum_{variable}_ult_part_vis{str_adic}'])
+        # df = df.drop(columns=[f'sum_{variable}_ult_part_loc{str_adic}', f'sum_{variable}_ult_part_vis{str_adic}'])
+    else:
+        df[f'dif_{variable}_segun_ult_part{str_adic}'] = df[f'prom_{variable}_ult_part_loc{str_adic}'] - df[f'prom_{variable}_ult_part_vis{str_adic}']
+        df = df.drop(columns=[f'{variable}_loc', f'{variable}_vis', f'prom_{variable}_ult_part_loc{str_adic}', f'prom_{variable}_ult_part_vis{str_adic}'])
+        # df = df.drop(columns=[f'prom_{variable}_ult_part_loc{str_adic}', f'prom_{variable}_ult_part_vis{str_adic}'])
+
     return df
 
 def historial_entre_si(df, n_ult_part, segun_loc=True):  # Garantizo que funciona
@@ -130,6 +188,7 @@ def historial_entre_si(df, n_ult_part, segun_loc=True):  # Garantizo que funcion
 
                         equipo_ganador = df.loc[l_idxs[k], 'equipo_ganador']  # {'Local', 'Empate', 'Visitante}
 
+
                         # Obtengo el equipo ganador y el equipo local del partido k
                         if segun_loc:
                             historial = +1 if equipo_ganador == 'Local' else 0 if equipo_ganador == 'Empate' else -1
@@ -165,7 +224,7 @@ def historial_entre_si(df, n_ult_part, segun_loc=True):  # Garantizo que funcion
                 l_idxs_cargados.append(list(l_idxs))
 
                 # Quito nan de lista para que no falle la cuenta y de nan
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_historiales))
+                l_sin_nan = [x for x in l_historiales if not math.isnan(x)]
 
                 # Guardo historial del partido j
                 if len(l_sin_nan) >= n_ult_part_min:
@@ -179,7 +238,7 @@ def historial_entre_si(df, n_ult_part, segun_loc=True):  # Garantizo que funcion
                     break
     return df
 
-def rendimiento_equipo(df, n_ult_part, peso_puntos):  # funciona perfecto la normalizacion
+def rendimiento_equipo(df, n_ult_part, peso_puntos, por_localia=False):  # funciona perfecto la normalizacion
     """
     Calcula el rendimiento de un equipo utilizando la diferencia de goles y la cantidad de puntos obtenidos en los últimos partidos.
     :param df: DataFrame que contiene los datos del equipo.
@@ -187,331 +246,25 @@ def rendimiento_equipo(df, n_ult_part, peso_puntos):  # funciona perfecto la nor
     :param peso_puntos: Peso que se le da a la cantidad de puntos en el rendimiento final.
     :return: DataFrame con la columna adicional de rendimiento del equipo.
     """
+    # Definicion de variables
+    str_adic = "_segun_loc" if por_localia else ""
+    col_name_1 = f'dif_goles_segun_ult_part{str_adic}'
+    col_name_2 = f'dif_puntos_segun_ult_part{str_adic}'
+
     # Calculo diferencia de gol
-    df = dif_gol_ult_part(df, n_ult_part)
+    df = promediar_var_en_ult_partidos(df, n_ult_part=n_ult_part, variable='goles', por_localia=por_localia)
 
     # Calculo diferencia de forma
-    df = dif_cant_puntos_ult_part(df, n_ult_part)
+    df = promediar_var_en_ult_partidos(df, n_ult_part=n_ult_part, variable='puntos', por_localia=por_localia)
 
     # Normalizar diferencia de goles y cantidad de puntos en el rango [-1, 1]
-    df['dif_goles_norm'] = 2 * ((df['dif_gol_ult_part'] - df['dif_gol_ult_part'].min()) / (df['dif_gol_ult_part'].max() - df['dif_gol_ult_part'].min())) - 1
-    df['dif_puntos_norm'] = 2 * ((df['dif_cant_punt_ult_part'] - df['dif_cant_punt_ult_part'].min()) / (df['dif_cant_punt_ult_part'].max() - df['dif_cant_punt_ult_part'].min())) - 1
+    df['dif_goles_norm'] = 2 * ((df[col_name_1] - df[col_name_1].min()) / (df[col_name_1].max() - df[col_name_1].min())) - 1
+    df['dif_puntos_norm'] = 2 * ((df[col_name_2] - df[col_name_2].min()) / (df[col_name_2].max() - df[col_name_2].min())) - 1
 
     # Calcular variable de rendimiento
-    df['dif_rendimiento_ult_part'] = (1-peso_puntos) * df['dif_goles_norm'] + peso_puntos * df['dif_puntos_norm']
+    df[f'dif_rendimiento_ult_part{str_adic}'] = (1-peso_puntos) * df['dif_goles_norm'] + peso_puntos * df['dif_puntos_norm']
 
-    df = df.drop(['dif_goles_norm', 'dif_puntos_norm', 'dif_gol_ult_part', 'dif_cant_punt_ult_part'], axis=1)
-    return df
-
-def dif_gol_ult_part(df, n_ult_part):  # Con promedio_ult_part() funciona pero solo para goles_anotados... (verificado)
-    """
-    Determina la cantidad de goles anotados y recibidos en los ultimos partidos
-    :param df: Dataframe.
-    :param n_ult_part: Integer. Numero de partidos de los cuales obtener los goles
-    :return: Dataframe con columnas goles_ult_part_loc y goles_ult_part_vis.
-    """
-    # Definicion de variables
-    n_ult_part_min = 0.6 * n_ult_part
-
-    # Ordeno por fecha descendiente
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
-
-    # Por equipo
-    for equipo in df['equipo_loc'].unique():
-
-        # Obtengo los partidos que jugo el equipo
-        df_team = df[(df['equipo_loc'] == equipo) | (df['equipo_vis'] == equipo)]
-        l_dif_goles = []
-        # print(" Equipo: {} ".format(equipo).center(120, "#"))
-
-        # Por partido que jugó el equipo
-        for idx in list(df_team.index):  # for idx in l_idxs: NO HACER ESTO
-
-            # Definicion de variables
-            is_equipo_loc = df_team.loc[idx, 'equipo_loc'] == equipo
-            loc_o_vis = 'loc' if is_equipo_loc else 'vis'
-
-            # Si ya tengo los suficientes partidos para determinar los goles del equipo
-            if len(l_dif_goles) == n_ult_part:
-
-                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_dif_goles))  # Y si es None?
-
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
-
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, f'dif_gol_ult_part_{loc_o_vis}'] = sum(l_sin_nan)
-                    # print('Con valores agregados:', list(df.loc[idx]))
-
-                # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
-                l_dif_goles = l_dif_goles[1:]
-
-            # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-            dif_gol = df.loc[idx, 'goles_loc'] - df.loc[idx, 'goles_vis'] if is_equipo_loc else df.loc[idx, 'goles_vis'] - df.loc[idx, 'goles_loc']
-            l_dif_goles.append(dif_gol)
-            # print(f'Dif gol: {l_dif_goles}')
-
-    # Calculo diferencia entre local y visitante
-    df['dif_gol_ult_part'] = df['dif_gol_ult_part_loc'] - df['dif_gol_ult_part_vis']
-
-    # Elimino variables
-    # df = df.drop(columns=['goles_loc', 'goles_vis', 'dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'], axis=1)
-    df = df.drop(columns=['dif_gol_ult_part_loc', 'dif_gol_ult_part_vis'], axis=1)
-    return df
-
-def dif_cant_puntos_ult_part(df, n_ult_part):  # Es igual a promedio_ult_part no mas que tengo que ver el nombre de la variable...
-    # Requiere de dataframe ordenado por fecha decreciente
-    # Tengo que agregar forma de cada equipo y puntaje antes de cada partido.
-
-    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)  # Mas antiguo a mas reciente
-
-    # Definicion de variables
-    l_equipos = df['equipo_loc'].unique()
-    puntos_loc = lambda res: 3 if res == "Local" else (1 if res == "Empate" else 0)
-    puntos_vis = lambda res: 3 if res == "Visitante" else (1 if res == "Empate" else 0)
-    n_ult_part_min = 0.6 * n_ult_part
-
-    # Por equipo
-    for equipo in l_equipos:
-
-        # Obtengo los partidos que jugo el equipo
-        df_team = df[(df['equipo_loc'] == equipo) | (df['equipo_vis'] == equipo)]
-        l_puntos = []
-        # print(" Equipo: {} ".format(equipo).center(120, "#"))
-
-        # Por partido que jugo el equipo
-        for idx in list(df_team.index):  # for idx in l_idxs: NO HACER ESTO
-
-            # Definicion de variables
-            resultado = df_team.loc[idx, 'equipo_ganador']
-            is_equipo_loc = df_team.loc[idx, 'equipo_loc'] == equipo
-            loc_o_vis = 'loc' if is_equipo_loc else 'vis'
-
-            # Si ya tengo los suficientes partidos para determinar los goles del equipo
-            if len(l_puntos) == n_ult_part:
-
-                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_puntos))  # Y si es None?
-
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
-
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, f'forma_{loc_o_vis}'] = sum(l_sin_nan)
-                    # print('Con valores agregados:', list(df.loc[idx]))
-
-                # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
-                l_puntos = l_puntos[1:]
-
-            # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-            puntos = puntos_loc(resultado) if is_equipo_loc else puntos_vis(resultado)
-            l_puntos.append(puntos)
-            # print(l_puntos)
-
-    # Calculo diferencia
-    df['dif_cant_punt_ult_part'] = df['forma_loc'] - df['forma_vis']
-
-    # Elimino variables
-    df = df.drop(['forma_loc', 'forma_vis'], axis=1)
-    return df
-
-def rendimiento_equipo_segun_localia(df, n_ult_part, peso_puntos):  # funciona perfecto la normalizacion
-    """
-    Calcula el rendimiento de un equipo utilizando la diferencia de goles y la cantidad de puntos obtenidos en los últimos partidos.
-    :param df: DataFrame que contiene los datos del equipo.
-    :param n_ult_part: Número de últimos partidos a considerar para calcular la diferencia de goles y puntos.
-    :param peso_puntos: Peso que se le da a la cantidad de puntos en el rendimiento final.
-    :return: DataFrame con la columna adicional de rendimiento del equipo.
-    """
-    # Calculo diferencia de gol
-    df = dif_gol_ult_part_segun_localia(df, n_ult_part)
-
-    # Calculo diferencia de forma
-    df = dif_cant_puntos_ult_part_segun_localia(df, n_ult_part)
-
-    # Normalizar diferencia de goles y cantidad de puntos en el rango [-1, 1]
-    df['dif_goles_norm'] = 2 * ((df['dif_gol_ult_part_segun_loc'] - df['dif_gol_ult_part_segun_loc'].min()) / (df['dif_gol_ult_part_segun_loc'].max() - df['dif_gol_ult_part_segun_loc'].min())) - 1
-    df['dif_puntos_norm'] = 2 * ((df['dif_cant_punt_ult_part_segun_loc'] - df['dif_cant_punt_ult_part_segun_loc'].min()) / (df['dif_cant_punt_ult_part_segun_loc'].max() - df['dif_cant_punt_ult_part_segun_loc'].min())) - 1
-
-    # Calcular variable de rendimiento
-    df['dif_rendimiento_ult_part_segun_loc'] = (1-peso_puntos) * df['dif_goles_norm'] + peso_puntos * df['dif_puntos_norm']
-
-    df = df.drop(['dif_goles_norm', 'dif_puntos_norm', 'dif_gol_ult_part_segun_loc', 'dif_cant_punt_ult_part_segun_loc'], axis=1)
-    return df
-
-def dif_gol_ult_part_segun_localia(df, n_ult_part):  # Con promedio_ult_part() funciona pero solo para goles_anotados... (verificado)
-    """
-    Determina la cantidad de goles anotados y recibidos en los ultimos partidos
-    :param df: Dataframe.
-    :param n_ult_part: Integer. Numero de partidos de los cuales obtener los goles
-    :return: Dataframe con columnas goles_ult_part_loc y goles_ult_part_vis.
-    """
-    # Definicion de variables
-    n_ult_part_min = 0.6 * n_ult_part
-
-    # Ordeno por fecha descendiente
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
-
-    # Por equipo
-    for equipo in df['equipo_loc'].unique():
-
-        # Obtengo los partidos que jugo el equipo
-        df_team_loc = df[df['equipo_loc'] == equipo]
-        l_dif_goles = []
-        # print(" Equipo: {} ".format(equipo).center(120, "#"))
-
-        # Por partido que jugó el equipo
-        for idx in list(df_team_loc.index):  # for idx in l_idxs: NO HACER ESTO
-
-            # Si ya tengo los suficientes partidos para determinar los goles del equipo
-            if len(l_dif_goles) == n_ult_part:
-
-                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_dif_goles))  # Y si es None?
-
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
-
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, f'dif_gol_ult_part_loc_segun_loc'] = sum(l_sin_nan)
-                    # print('Con valores agregados:', list(df.loc[idx]))
-
-                # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
-                l_dif_goles = l_dif_goles[1:]
-
-            # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-            dif_gol = df.loc[idx, 'goles_loc'] - df.loc[idx, 'goles_vis']
-            l_dif_goles.append(dif_gol)
-            # print(f'Dif gol: {l_dif_goles}')
-
-
-
-        # Obtengo los partidos que jugo el equipo
-        df_team_vis = df[df['equipo_vis'] == equipo]
-        l_dif_goles = []
-        # print(" Equipo: {} ".format(equipo).center(120, "#"))
-
-        # Por partido que jugó el equipo
-        for idx in list(df_team_vis.index):  # for idx in l_idxs: NO HACER ESTO
-
-            # Si ya tengo los suficientes partidos para determinar los goles del equipo
-            if len(l_dif_goles) == n_ult_part:
-
-                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_dif_goles))  # Y si es None?
-
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
-
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, f'dif_gol_ult_part_vis_segun_loc'] = sum(l_sin_nan)
-                    # print('Con valores agregados:', list(df.loc[idx]))
-
-                # Elimino goles del ultimo partido (para tener siempre los ultimos <n_part> partidos)
-                l_dif_goles = l_dif_goles[1:]
-
-            # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-            dif_gol = df.loc[idx, 'goles_vis'] - df.loc[idx, 'goles_loc']
-            l_dif_goles.append(dif_gol)
-            # print(f'Dif gol: {l_dif_goles}')
-
-    # Calculo diferencia entre local y visitante
-    df['dif_gol_ult_part_segun_loc'] = df['dif_gol_ult_part_loc_segun_loc'] - df['dif_gol_ult_part_vis_segun_loc']
-
-    # Elimino variables
-    df = df.drop(columns=['dif_gol_ult_part_loc_segun_loc', 'dif_gol_ult_part_vis_segun_loc'], axis=1)
-    return df
-
-def dif_cant_puntos_ult_part_segun_localia(df, n_ult_part):  # Mejorar la hice asi no mas
-    # Requiere de dataframe ordenado por fecha decreciente
-    # Tengo que agregar forma de cada equipo y puntaje antes de cada partido.
-
-    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)  # Mas antiguo a mas reciente
-
-    # Definicion de variables
-    l_equipos = df['equipo_loc'].unique()
-    puntos_loc = lambda res: 3 if res == "Local" else (1 if res == "Empate" else 0)
-    puntos_vis = lambda res: 3 if res == "Visitante" else (1 if res == "Empate" else 0)
-    n_ult_part_min = 0.6 * n_ult_part
-
-    # Por equipo
-    for equipo in l_equipos:
-
-        # Obtengo los partidos que jugó el equipo
-        df_team_loc = df[df['equipo_loc'] == equipo]
-        l_puntos = []
-        # print(" Equipo: {} ".format(equipo).center(120, "#"))
-
-        # Por partido que jugó el equipo
-        for idx in list(df_team_loc.index):  # for idx in l_idxs: NO HACER ESTO
-
-            # Definicion de variables
-            equipo_ganador = df_team_loc.loc[idx, 'equipo_ganador']  # Local, Empate o Visitante
-
-            # Si ya tengo los suficientes partidos para determinar los puntos del equipo
-            if len(l_puntos) == n_ult_part:
-
-                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_puntos))  # Y si es None?
-
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
-
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, 'forma_loc_segun_loc'] = sum(l_sin_nan)
-                    # print('Con valores agregados:', list(df.loc[idx]))
-
-                # Elimino puntos del ultimo partido (para tener siempre los ultimos <n_part> partidos)
-                l_puntos = l_puntos[1:]
-
-            # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-            puntos = puntos_loc(equipo_ganador)
-            l_puntos.append(puntos)
-            # print(l_puntos)
-
-
-
-        # Obtengo los partidos que jugó el equipo
-        df_team_vis = df[df['equipo_vis'] == equipo]
-
-        l_puntos = []
-        # print(" Equipo: {} ".format(equipo).center(120, "#"))
-
-        # Por partido que jugó el equipo
-        for idx in list(df_team_vis.index):  # for idx in l_idxs: NO HACER ESTO
-
-            # Definicion de variables
-            equipo_ganador = df_team_vis.loc[idx, 'equipo_ganador']  # Local, Empate o Visitante
-
-            # Si ya tengo los suficientes partidos para determinar los puntos del equipo
-            if len(l_puntos) == n_ult_part:
-
-                # Quito nan de lista para que no falle la cuenta y de nan (ESTABA FALLANDO!!)
-                l_sin_nan = list(filter(lambda x: not math.isnan(x), l_puntos))  # Y si es None?
-
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= n_ult_part_min:  # No puede ser n_ult_part porque elimina nan... entonces cada vez que eliminan, no entraria...
-
-                    # Guardo el valor promedio de la variable en los ultimos n_part
-                    df.loc[idx, 'forma_vis_segun_loc'] = sum(l_sin_nan)
-                    # print('Con valores agregados:', list(df.loc[idx]))
-
-                # Elimino puntos del ultimo partido (para tener siempre los ultimos <n_part> partidos)
-                l_puntos = l_puntos[1:]
-
-            # Agrego puntos del partido (para tener siempre los ultimos <n_part> partidos)
-            puntos = puntos_vis(equipo_ganador)
-            l_puntos.append(puntos)
-            # print(l_puntos)
-
-    # Calculo diferencia
-    df['dif_cant_punt_ult_part_segun_loc'] = df['forma_loc_segun_loc'] - df['forma_vis_segun_loc']
-
-    # Elimino variables
-    df = df.drop(['forma_loc_segun_loc', 'forma_vis_segun_loc'], axis=1)
+    df = df.drop(['dif_goles_norm', 'dif_puntos_norm', col_name_1, col_name_2], axis=1)
     return df
 
 def n_dias_ult_partido(df):  # Peopuesta por Chat GPT
@@ -582,6 +335,8 @@ def calculate_dif_col_jugadores(df):
 def prueba():
     # Definicion de variables
     N_ULT_PART = 5
+    N_ULT_PART_LOC = 3
+    peso_puntos = 0.6
 
     # Levanto dataset
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
@@ -593,19 +348,20 @@ def prueba():
     df = determinar_equipo_ganador(df)
 
     # Construyo variables historicas
-    df = historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=True)
+    df = historial_entre_si(df, n_ult_part=N_ULT_PART_LOC, segun_loc=True)
     df = historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=False)
 
-    df = rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
-    df = rendimiento_equipo_segun_localia(df, n_ult_part=N_ULT_PART, peso_puntos=0.6)
+    df = rendimiento_equipo(df, n_ult_part=N_ULT_PART_LOC, peso_puntos=peso_puntos, por_localia=True)
+    df = rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=peso_puntos, por_localia=False)
 
-    # l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp',
-    #                 'offsides', 'ataques', 'ataques_pelig']
-    # df = promedio_ult_partidos(df, n_ult_part=N_ULT_PART, l_var=l_estad_part)  # Estadisticas del partido
+    l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas', 'pases', 'pases_comp',
+                    'offsides', 'ataques', 'ataques_pelig']
+    for var in l_estad_part:
+        df = promediar_var_en_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
     # df = n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
 
     # # Construyo variables de diferencias para las variables promedio de los jugadores
-    # df = calculate_dif_col_jugadores(df)
+    df = calculate_dif_col_jugadores(df)
 
     # Elimino columnas usadas para construir datos
     df = df.drop(columns=['goles_loc', 'goles_vis'], axis=1)
