@@ -306,9 +306,9 @@ def prueba():
     warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
-    thr_nan_col = 0.2
-    thr_corr = 0.6  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
-    thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+    thr_nan_col = None #0.3
+    thr_corr = 0.7  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
+    thr_fs = 0.15  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
     export = False
 
     # Levanto dataset de prueba
@@ -324,6 +324,10 @@ def prueba():
     print(f"Se eliminó el {(largo_inicial-len(df))/largo_inicial*100:.0f}% de filas, quedan {len(df)} filas.")
     # df.to_excel('/Users/nachomondino/Desktop/df_drop_na_prueba.xlsx', index=False)
     if thr_nan_col is not None:
+
+        prop_nan = df.isna().mean()
+        print(prop_nan)
+
         df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN
 
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
