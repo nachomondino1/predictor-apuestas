@@ -196,7 +196,7 @@ def extract_partidos_flashscore(pais):
                 crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
 
                 # Reinicio diccionario en el que guardar datos del nuevo partido
-                d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais,'es_copa': 1 if categoria == "Copa" else 0}
+                d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais,'es_copa': 1 if categoria == "copa" else 0}
 
                 # EXTRACCION DE CAMPOS
                 fecha_str = crawler.extract_tag(xpath='.//div[@class="duelParticipant__startTime"]', text=True, sec_wait=SEC_WAIT_LONG)
@@ -286,7 +286,7 @@ def extract_proximos_partidos_flashcore(pais, n_dias_max):  # Funciona ok
 
             # Definicion de variables
             id = id[id.rfind('_') + 1:]  # Quito lo que no es del id (e.g. paso de "g_1_fshvzbls" a "fshvzbls")
-            d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': 1 if categoria == "Copa" else 0}  # Reinicio diccionario en el que guardar la nueva fila
+            d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': 1 if categoria == "copa" else 0}  # Reinicio diccionario en el que guardar la nueva fila
 
             # Ingreso a pagina de informacion del partido
             crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
