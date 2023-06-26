@@ -3,28 +3,34 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
 
-def convert_posesion_to_int(df): # no tiene sentido que sea una funcion si son dos lineas
+def convert_posesion_to_int(df):
     """
-    Transformo posesion de string a float
-    :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
-    ejemplo '65%'.
-    :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
-    """
+     Transforma la posesión de string a float.
+
+     :param df: Dataframe con columnas 'posesion_loc' y 'posesion_vis', donde la posesión se representa como un string,
+                por ejemplo, '65%'.
+     :return: Dataframe con la columna 'posesion' interpretada como float, por ejemplo, 0.65.
+     """
     df['posesion_loc'] = df['posesion_loc'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     return df
 
 def convert_valor_mercado_to_int(df):
     """
-    Transformo fecha de string a datetime
-    :param df: Dataframe.
-    :return: Dataframe.
-    """
+     Transforma el valor de mercado de string a float.
+
+     :param df: Dataframe con columna 'valor_mercado' cuyos valores son un string, por ejemplo, '€1.2M'.
+     :return: Dataframe con la columna 'valor_mercado' interpretada como float, por ejemplo, 1.200.000.
+     """
     d = {'M': 1000000, 'K': 1000}
 
     def convertir_valor_mercado(valor_mercado_str):
+
+        # Si no se tiene el dato del valor de mercado
         if valor_mercado_str == "€0":
             return None
+
+        # Si se tiene el dato del valor de mercado
         else:
             for elem in d.keys():
                 if elem in valor_mercado_str:
@@ -37,63 +43,48 @@ def convert_valor_mercado_to_int(df):
 
 def convert_columns_to_int(df, df_etiquetas=None):
     """
-    Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores originales y enteros correspondientes.
+    Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores
+    originales y enteros correspondientes.
 
-    :param df: DataFrame que contiene las variables a convertir.
-    :param pais: País para el cual se realiza la conversión.
-    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
+    :param df: DataFrame que contiene las variables a convertir. (DataFrame)
+    :param df_etiquetas: DataFrame adicional con las etiquetas originales y enteros correspondientes.
+                         Si se proporciona, se utilizará para la conversión en lugar de ajustar un nuevo LabelEncoder.
+                         (DataFrame, opcional)
+    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y
+             enteros correspondientes.
     """
-    # Si aun no tengo un sistema de codificacion
     if df_etiquetas is None:
-
-        # Convertir variables categóricas string a categóricas numéricas
-        le = LabelEncoder()
         df_etiquetas = pd.DataFrame(columns=['variable', 'valor_orig', 'valor_int'])
 
-        # Por variable string
-        for col in df.select_dtypes(include=['object']).columns:
-            df[col] = le.fit_transform(df[col])
+    le = LabelEncoder()
 
-            l_valor_orig = le.classes_
-            l_valor_int = le.transform(l_valor_orig)
+    # Por variable string
+    for col in df.select_dtypes(include=['object']).columns:
+        if col not in df_etiquetas['variable'].unique():
+            df_etiquetas_tmp = pd.DataFrame({'variable': [col] * len(df[col]),
+                                             'valor_orig': df[col],
+                                             'valor_int': le.fit_transform(df[col])})
+            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_tmp], ignore_index=True)
 
-            # Guardo en dataframe
-            for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
-                df_etiquetas.loc[len(df_etiquetas)] = [col, valor_orig, valor_int]
-
-        return df, df_etiquetas
-
-    # Si ya tengo un sistema de codificacion
-    else:
-        # Por variable a codificar
-        for col in df_etiquetas['variable'].unique():
-
-            l_valor_orig = df_etiquetas[df_etiquetas['variable'] == col]['valor_orig']
-            l_valor_int = df_etiquetas[df_etiquetas['variable'] == col]['valor_int']
-
-            # Guardo en dataframe
-            for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
-                df[col] = df[col].replace(valor_orig, valor_int)
-
-        return df
+        df[col] = df[col].map(df_etiquetas.loc[df_etiquetas['variable'] == col].set_index('valor_orig')['valor_int'])
+    return df, df_etiquetas
 
 def revert_columns_from_int(df, df_etiquetas, columns=None):
     """
     Convierte las variables numéricas a sus valores originales utilizando el DataFrame df_etiquetas.
 
-    :param df: DataFrame que contiene las variables a revertir.
-    :param df_etiquetas: DataFrame que contiene las etiquetas originales y los valores enteros correspondientes.
+    :param df: DataFrame que contiene las variables a revertir. (DataFrame)
+    :param df_etiquetas: DataFrame que contiene las etiquetas originales y los valores enteros correspondientes. (DataFrame)
+    :param columns: Lista de columnas a revertir. Si no se proporciona, se revertirán todas las columnas en df_etiquetas.
+                    (list, opcional)
     :return: DataFrame con las variables revertidas a sus valores originales.
     """
-    columns = df_etiquetas['variable'].unique() if columns is None else columns
+    if columns is None:
+        columns = df_etiquetas['variable'].unique()
 
     for col in columns:
-
         col_etiquetas = col if col != 'y_pred' else 'equipo_ganador'
-        df_etiquetas_filt = df_etiquetas[df_etiquetas['variable'] == col_etiquetas]
-        l_valor_orig = list(df_etiquetas_filt['valor_orig'])  # list() Para evitar TypeError: 'numpy.int64' object is not iterable
-        l_valor_int = list(df_etiquetas_filt['valor_int'])
-        mapping = dict(zip(l_valor_int, l_valor_orig))
+        mapping = df_etiquetas.loc[df_etiquetas['variable'] == col_etiquetas].set_index('valor_int')['valor_orig']
         df[col] = df[col].map(mapping)
 
     return df
