@@ -17,14 +17,14 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
     # Definicion de variables
     df_res = pd.DataFrame()
     best_accuracy = 0.0
-    l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
-                 SVC(), MLPClassifier(), GradientBoostingClassifier()]
+    # l_modelos = [RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(), SVC(), MLPClassifier(), GradientBoostingClassifier()]
+    l_modelos = [SVC()]
     dp = DataPreparation(var_resp, pais)
     mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
 
     # Definicion de hiperparametros
-    param_construct = {'n_ult_part': [10, 5], 'n_ult_part_loc': [3, 5], 'peso_puntos':[0.6]}
-    param_select = {'thr_nan_col': [0.2, None], 'thr_corr': [0.5, None], 'thr_fs': [0.3, 0.2, 0.1, None]}  # 'thr_nan_col': [0.2, 0.5, None]
+    param_construct = {'n_ult_part': [5], 'n_ult_part_loc': [5], 'peso_puntos': [0.6]}
+    param_select = {'thr_nan_col': [0.2, None], 'thr_corr': [0.5, None], 'thr_fs': [0.2, 0.1, 0.3]}  # 'thr_nan_col': [0.2, 0.5, None]
     param_mod = {'test_val_size': [0.2], 'test_size': [0.5], 'fill_na': [None, 'ml'],
                  'bal_type': [None, 'under', 'over'], 'k': [5]}
 
@@ -42,8 +42,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
 
         # Pruebo a levantar dataset ya construido
         try:
-            df = pd.read_excel(
-                f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed_{n_ult_part}_{n_ult_part_loc}_{peso_puntos}.xlsx')
+            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed_{n_ult_part}_{n_ult_part_loc}_{peso_puntos}.xlsx')
 
         except:
             # Levanto dataset integrado (es el mismo siempre)
@@ -80,8 +79,6 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
                 print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; k: {k}")
 
                 df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score', 'test_roi'])  # Datos del modelo y su precision y roi
-
-                # Reduzco el tamaño del dataset para acelerar la seleccion de hiperparametros?  # Tal vez, con la normalizacion de valor de mercado, es mas rapido pq le cuesta menos al no tener valores grandes
 
                 # Generar el diseño de la prueba
                 X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, fill_na=fill_na)
@@ -125,7 +122,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
                 df_res = df_res.append(row_data, ignore_index=True)
                 print(row_data)
                 print(df_res)
-                df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod.xlsx', index=False)
+                df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod_2.xlsx', index=False)
 
                 # Verificar si la precisión actual es la mejor hasta ahora
                 if bm_test_acc > best_accuracy:
@@ -138,7 +135,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
     # Imprimir los hiperparámetros óptimos y la precisión correspondiente
     print("Mejores hiperparámetros:", best_hyperparameters)
     print("Precisión obtenida:", best_accuracy)
-    df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod.xlsx', index=False)
+    df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod_2.xlsx', index=False)
     return best_hyperparameters
 
 def define_n_iterations(l_dicts):
