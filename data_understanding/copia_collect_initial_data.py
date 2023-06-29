@@ -10,13 +10,6 @@ from tqdm import tqdm
 import itertools
 
 
-def extract_id_from_url(url):
-
-    pos_ini = url.find('/Matches/') + len('/Matches/')
-    pos_fin = url.find('/Live/')
-    id = url[pos_ini: pos_fin]
-    return id
-
 def extract_partidos_whoscored(pais):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
@@ -26,7 +19,10 @@ def extract_partidos_whoscored(pais):
     warnings.filterwarnings("ignore")  # /Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/scraper_flashscore.py:175: FutureWarning: In a future version, object-dtype columns with all-bool values will not be included in reductions with bool_only=True. Explicitly cast to bool dtype instead. df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
     SEC_WAIT, SEC_WAIT_LONG = 0.2, 1.5
     crawler = WhoScoredCrawler(headless=False, path=None)  # Hacer que no falle con headless=True
-    df = pd.DataFrame()  # No hace falta definir columnas por mas que no haya extraido partidos
+    df_part = pd.DataFrame()  # No hace falta definir columnas por mas que no haya extraido partidos
+    df_jug = pd.DataFrame(columns=['id_jug', 'nombre', 'nacionalidad', 'posicion', 'altura', 'fecha_nac'])  # No hace falta definir columnas por mas que no haya extraido partidos
+    df_jug_part = pd.DataFrame()  # No hace falta definir columnas por mas que no haya extraido partidos
+
     df_comp = pd.read_excel('/Users/nachomondino/Desktop/df_competencias_who_scored.xlsx')
     print(f' PAIS: {pais} '.center(120, '#'))
 
@@ -35,6 +31,7 @@ def extract_partidos_whoscored(pais):
 
     # POR COMPETICION
     for cod_pais, cod_comp, competicion, tipo_comp in zip(df_comp['cod_pais'], df_comp['cod_competicion'], df_comp['competicion'], df_comp['tipo_comp']):
+    # for cod_pais, cod_comp, competicion, tipo_comp in zip(['11'], ['504'], ['Cup'], ['1']):
 
         # Ingreso a pagina
         url = f'https://www.whoscored.com/Regions/{cod_pais}/Tournaments/{cod_comp}/{pais}-{competicion.replace(" ", "-")}'
@@ -55,50 +52,51 @@ def extract_partidos_whoscored(pais):
             print(f"Cantidad de partidos: {len(l_urls_items)}")
 
             # POR PARTIDO (c/u identificado con un id)
-            #  url in l_urls_items:  # Si no uso cont_part: for id in l_ids:
-            for i, url in enumerate(l_urls_items, start=0):  # Si no uso cont_part: for id in l_ids:
+            for i, url in enumerate(l_urls_items[:3], start=0): #  url in l_urls_items:  # Si no uso cont_part: for id in l_ids:
 
                 # Intrego a pagina de partido
                 crawler.driver.get(url)
+                print(f"Partido Nº {i}")
+                time.sleep(random.uniform(2, 4))
 
                 # Extraigo campos
-                id = extract_id_from_url(url)
-                print(id, url)
-                d_new_row = {'id': id, 'pais': pais, 'competicion': competicion, 'temporada': temp_year,  'es_copa': tipo_comp}  # Reinicio diccionario en el que guardar datos del nuevo partido
+                id_part = extract_str_from_url(url, str_ini='/Matches/', str_fin='/Live/')
+                d_new_row = {'id_part': id_part, 'pais': pais, 'competicion': competicion, 'temporada': temp_year,  'es_copa': tipo_comp}  # Reinicio diccionario en el que guardar datos del nuevo partido
+                print(id_part, url)
 
                 # Extraigo campos de la tabla principal
                 d_new_row.update(crawler.extract_fields_from_head_table())
 
-                # Extraigo campos de la table dinamica
-                d_new_row.update(crawler.extract_fields_from_dinamic_table())
+                dinamic_table = crawler.extract_tag(xpath='.//div[@class="panel-container"]')
+                if dinamic_table is not None:
+                    # Extraigo campos de la table dinamica
+                    d_new_row.update(crawler.extract_fields_from_dinamic_table())
 
-                # Extraigo estadisticas del partido  # Dribbles, aerials won, tackles? #  'ataques': 'Ataques', 'ataques_pelig': 'Ataques peligrosos'
-                d_new_row.update(crawler.extract_estadisticas_chat_GPT())
+                    # Extraigo estadisticas del partido  # Dribbles, aerials won, tackles? #  'ataques': 'Ataques', 'ataques_pelig': 'Ataques peligrosos'
+                    d_new_row.update(crawler.extract_estadisticas())
 
+                    # Estilo de juego a partir de % de sides ataques y
 
                 # Datos de jugadores --> hoja "Player statistics"
                 # Alineaciones + ratings
-                boton_player_stat = crawler.extract_tag(xpath='.//div[@id="sub-sub-navigation"]//a[text()="Player Statistics"]')
-                crawler.click_boton(boton_player_stat)
+                boton_player_stat = crawler.extract_tag(xpath='.//div[@id="sub-sub-navigation"]//a[text()="Player Statistics" and not(@class="inactive")]')
 
-                nombre = crawler.extract_tag(xpath='')
-                rating = crawler.extract_tag(xpath='')
-                nacionalidad = crawler.extract_tag(xpath='')  # no cambia
-                equipo_act = crawler.extract_tag(xpath='')
-                posicion = crawler.extract_tag(xpath='')  # no cambia
-                edad = crawler.extract_tag(xpath='')
-                condicion = crawler.extract_tag(xpath='')
-                key_events = crawler.extract_tag(xpath='')
+                if boton_player_stat is not None:
+                    crawler.click_boton(boton_player_stat)
 
+                    time.sleep(2)  # A veces no agarra los jugadores del equipo visitante...
+                    df_jug_match = crawler.extract_player_in_match_data()
+                    df_jug_match['id_part'] = id_part  # agrego id de partido...
 
-                '''
-                # odds --> hoja "Betting"
-                '''
+                    # Guardo datos
+                    df_jug_part = pd.concat([df_jug_part, df_jug_match], axis=0)
+                    print(df_jug_part)
+                    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_match_prueba.xlsx')
 
                 # GUARDADO DE DATOS EN DATAFRAME
-                df = pd.concat([df, pd.DataFrame(d_new_row, index=[i])], axis=0)
-                print(df)
-                df.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
+                df_part = pd.concat([df_part, pd.DataFrame(d_new_row, index=[i])], axis=0)
+                df_part.to_excel('/Users/nachomondino/Desktop/df_part_prueba.xlsx')
+                print(df_part)
 
             '''
             # Si hay siguiente temporada
@@ -112,9 +110,20 @@ def extract_partidos_whoscored(pais):
             '''
             break
 
+    # Extraigo jugadores
+    df_jug = crawler.extract_player_data_(df_jug_part)
+    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_prueba.xlsx')
+
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
 
+
+def extract_str_from_url(url, str_ini, str_fin):
+
+    pos_ini = url.find(str_ini) + len(str_ini)
+    pos_fin = url.find(str_fin)
+    id = url[pos_ini: pos_fin]
+    return id
 
 class WhoScoredCrawler(Crawler):
     # Desarrollo extracciones de distintos campos en funciones de manera de poder usar estas funciones para scraper normal, scraper de fields especificos poro falla y scraper de proximos partidos...
@@ -122,7 +131,8 @@ class WhoScoredCrawler(Crawler):
     def __init__(self, headless, path):
         super().__init__(headless, path)
         self.child_driver = self.driver
-        # Definir SEC_WAIT, SEC_WAIT_LONG como atrib..
+        self.SEC_WAIT = 0.2
+        self.SEC_WAIT_LONG = 1.5
 
     def extract_urls_items(self):
         # EXTRAIGO URL DE ITEMS...
@@ -160,19 +170,29 @@ class WhoScoredCrawler(Crawler):
 
     def extract_fields_from_head_table(self):
 
-        SEC_WAIT, SEC_WAIT_LONG = 0.2, 1.5
         d_nueva_fila = {}
         d_fields_xpath = {
-            'fecha': './/div[@id="match-header"]//tr[2]/td[2]/div[3]//dd[2]',  # falla por tiempo de espera bajo
-            'hora': './/div[@id="match-header"]//tr[2]/td[2]/div[3]//dd[1]', # falla  por tiempo de espera bajo
-            'equipo_loc': './/div[@id="match-header"]//td[@class="team"][1]',
-            'equipo_vis': './/div[@id="match-header"]//td[@class="team"][2]',
-            'ft_result': './/div[@id="match-header"]//td[@class="result"]',
-            'ht_result': './/div[@id="match-header"]//tr[2]/td[2]/div[2]//dd[1]',
+            'fecha': './/div[@id="match-header"]//dt[text()="Kick off:"]/following-sibling::dd',  # falla por tiempo de espera bajo  # './/div[@id="match-header"]//tr[2]/td[2]/div[3]//dd[2]'
+            'hora': './/div[@id="match-header"]//dt[text()="Date:"]/following-sibling::dd', # falla  por tiempo de espera bajo  # './/div[@id="match-header"]//tr[2]/td[2]/div[3]//dd[1]'
+            # 'equipo_loc': './/div[@id="match-header"]//a[starts-with(@class, "team-link")][1]',  # './/div[@id="match-header"]//td[@class="team"][1]'
+            # 'equipo_vis': './/div[@id="match-header"]//a[starts-with(@class, "team-link")][3]',  # './/div[@id="match-header"]//td[@class="team"][2]'
+            'ft_result': './/div[@id="match-header"]//dt[text()="Full time:"]/following-sibling::dd',  # './/div[@id="match-header"]//td[@class="result"]'
+            'ht_result': './/div[@id="match-header"]//dt[text()="Half time:"]/following-sibling::dd',
         }
 
+        l_names = []
+        l_tags = super().extract_tags(xpath='.//div[@id="match-header"]//a[starts-with(@class, "team-link")]')
+        print(len(l_tags))
+        for tag in l_tags:
+            l_names.append(tag.text)
+        print(l_names)
+        mi_lista_sin_vacios = [elemento for elemento in l_names if elemento != ""]
+        d_nueva_fila['equipo_loc'] = mi_lista_sin_vacios[0]
+        d_nueva_fila['equipo_vis'] = mi_lista_sin_vacios[1]
+        print(mi_lista_sin_vacios[0], mi_lista_sin_vacios[1])
+
         for field, xpath in d_fields_xpath.items():
-            value = super().extract_tag(xpath=f"{xpath}", text=True)
+            value = super().extract_tag(xpath=xpath, text=True)
             d_nueva_fila[field] = value
 
         return d_nueva_fila
@@ -181,25 +201,31 @@ class WhoScoredCrawler(Crawler):
 
         d_nueva_fila = {}
         d_fields_xpath = {
-            'arbitro': {'xpath': './/span[@class="referee"]', 'title': False, 'attribute': 'title'},  # falla por tiempo de espera bajo
-            'cancha': {'xpath': './/span[@class="venue"]', 'title': False, 'attribute': 'title'},  # falla  por tiempo de espera bajo
-            'dt_loc': {'xpath': './/span[@class="manager-name"][1]', 'title': True, 'attribute': None},
-            'dt_vis': {'xpath': './/span[@class="manager-name"][2]', 'title': True, 'attribute': None},
+            'arbitro': {'xpath': './/span[@class="referee"]', 'attribute': 'title'},  # falla por tiempo de espera bajo
+            'cancha': {'xpath': './/span[@class="venue"]', 'attribute': 'title'},  # falla  por tiempo de espera bajo
+            # 'dt_loc': {'xpath': './/div[@class="manager"]/span[@class="manager-name"][1]', 'attribute': 'innerText'},
+            # 'dt_vis': {'xpath': './/div[@class="manager"]/span[@class="manager-name"][2]', 'attribute': 'innerText'},
         }
+
+        # no hay manera de que funcione la extraccion de dt_loc dt_vis desde d_fields_xpath
+        l_names = []
+        l_tags = super().extract_tags(xpath='.//div[@class="manager"]/span[@class="manager-name"]')
+        for tag in l_tags:
+            l_names.append(tag.text)
+        print(l_names)
+        d_nueva_fila['dt_loc'] = l_names[0]
+        d_nueva_fila['dt_vis'] = l_names[1]
 
         for field, dict in d_fields_xpath.items():
 
-            value = super().extract_tag(xpath=f"{dict['xpath']}", text=dict['title'], attribute=dict['attribute'])
+            value = super().extract_tag(xpath=dict['xpath'], attribute=dict['attribute'])
             d_nueva_fila[field] = value
-
-        # arbitro = super().extract_tag(xpath='.//span[@class="referee"]', attribute='title')
-        # cancha = super().extract_tag(xpath='.//span[@class="venue"]', attribute='title')
-        # dt_loc = super().extract_tag(xpath='.//span[@class="manager-name"][1]', text=True)
-        # dt_vis = super().extract_tag(xpath='.//span[@class="manager-name"][2]', text=True)
+            # print(d_nueva_fila['dt_loc'])
+            # print(d_nueva_fila['dt_vis'])
 
         return d_nueva_fila
 
-    def extract_estadisticas_chat_GPT(self):
+    def extract_estadisticas(self):
 
         SEC_WAIT = 0.2
         d_nueva_fila = {}
@@ -253,6 +279,102 @@ class WhoScoredCrawler(Crawler):
                 boton_less = super().extract_tag(xpath=f'.//div[@class="match-centre-stats" and @data-mode="team"]//li[@data-for="{field_page}"]/div[2]')
                 super().click_boton(boton_less)
         return d_nueva_fila
+
+    def extract_player_in_match_data(self):
+
+        df_jug_match = pd.DataFrame(columns=['id_jug', 'edad', 'rating', 'condicion', 'min_played', 'url'])
+
+        # Extraigo lista de jugadores
+        l_tags_jug = super().extract_tags(xpath='.//div[@id="live-player-stats"]//tbody[@id="player-table-statistics-body"]/tr')
+        print(f"Cantidad de jugadores en el partido: {len(l_tags_jug)}")
+
+        # Por jugador
+        for i, tag in enumerate(l_tags_jug, start=1):  # for tag in l_tags_jug:
+
+            # print(f"Jugador Nº {i}")
+            url_with_id = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]', attribute='href')  # "/Players/406712/Show/Sebastián-Meza"
+            id_jug = extract_str_from_url(url_with_id, str_ini='/Players/', str_fin='/Show/')
+            edad = super().extract_tag(tag_inicial=tag, xpath='.//td[1]/span/span[1]', text=True)  # edad = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[1]', text=True)
+            rating = super().extract_tag(tag_inicial=tag, xpath='.//td[@class="rating "]', text=True)
+            condicion, min_played = self.determine_condicion_and_min_played(tag)
+            # equipo_act = crawler.extract_tag(xpath='')
+
+            # Guardo datos de jugador
+            l_data = [id_jug, edad, rating, condicion, min_played, url_with_id]
+            # print(l_data)
+            df_jug_match.loc[len(df_jug_match)] = l_data
+            # print(df_jug_match)
+
+        return df_jug_match
+
+    def determine_condicion_and_min_played(self, tag):
+
+        # Determino si el jugador es suplente o titular
+        suplente = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[text()=",  Sub  "]', sec_wait=self.SEC_WAIT, print_fail=False)
+        condicion = 'titular' if suplente is None else 'suplente'  # 1 es titular y 0 es
+
+        # Determino si el jugador ingreso o salio
+        cambio = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span', sec_wait=self.SEC_WAIT, print_fail=False)
+
+        # 1) si no dice sub (jugo de tit) y no salio, 90 2) si no dice sub (jugo de tit) y salio, min en que salio 3) si es sub es 90 - min que entro
+        # Si fue titular
+        if condicion == "titular":
+            salio = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span[@data-type="18"]', sec_wait=self.SEC_WAIT, print_fail=False)
+
+            # Si salió
+            if salio is not None:
+                min_cambio = int(cambio.get_attribute('data-minute'))
+                min_played = min_cambio if min_cambio <= 90 else 90
+
+            # y si no salió
+            else:
+                min_played = 90
+
+        # Si fue suplente
+        else:
+            ingreso = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span[@data-type="19"]', sec_wait=self.SEC_WAIT, print_fail=False)
+
+            # Si ingresó
+            if ingreso is not None:
+                min_cambio = int(cambio.get_attribute('data-minute'))
+                min_played = 90 - min_cambio if min_cambio <= 90 else min_cambio-90
+
+            # Si no ingresó
+            else:
+                min_played = 0
+
+        return condicion, min_played
+
+    def extract_player_data_(self, df_jug_match):
+        # Si el id es nuevo, guardo url o la visito directamente? --> visitarla ahora no...
+
+        df_jug = pd.DataFrame()
+
+        # Por jugador unico
+        for url in df_jug_match['url'].unique():
+
+            # Ingreso a pagina de jugador
+            self.child_driver.get(url)
+
+            # Puedo construir df_jug despues, guardar la url del jug...
+            id_jug = extract_str_from_url(url, str_ini='/Players/', str_fin='/Show/')
+            nombre = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Name: "]//parent::div', attribute='textContent')  # no cambia
+            nacionalidad = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Nationality: "]//parent::div', attribute='textContent')  # no cambia
+            posicion = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Positions: "]//following-sibling::span/span[1]', text=True)  # no cambia
+            altura = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Height: "]//parent::div', attribute='textContent')  # no cambia
+            fecha_nac = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Age: "]//following-sibling::i', text=True)  # no hace falta pues tengo la edad por partido..
+
+            # Guardo datos
+            l_data = [id_jug, nombre, nacionalidad, posicion, altura, fecha_nac]
+            print(l_data)
+            df_jug.loc[len(df_jug)] = l_data
+
+            # Salgo de pagina de jugador
+            self.child_driver.back()  # no hace falta creo
+            time.sleep(2)
+
+        return df_jug
+
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
