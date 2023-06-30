@@ -11,15 +11,24 @@ def prepare_text_columns(df, l_col_to_except):
     :param l_col_to_except: Lista. Columnas del tipo object que omitir en el procesamiento.
     :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
     '''
-    # Creo objeto de la clase
-    tp = TextPreparation(df, l_col_to_except)
+    # Obtengo columnas a procesar
+    l_cols_to_process = set_columns_to_process(df, l_col_to_except)
 
-    # Uso metodos de la clase
-    tp.to_lower()
-    tp.delete_accent()
-    tp.delete_special_characters()
-    tp.delete_punctuation()
-    return tp.df
+    # Creo objeto de la clase
+    tp = TextPreparation()
+    df = tp.to_lower(df, columns=l_cols_to_process)
+    df = tp.delete_accent(df, columns=l_cols_to_process)
+    df = tp.delete_special_characters(df, columns=l_cols_to_process)
+    df = tp.delete_punctuation(df, columns=l_cols_to_process)
+
+    return df
+
+def set_columns_to_process(df, l_col_to_except):
+    """Define las columnas a procesar"""
+    l_cols_object = df.select_dtypes(include='object').columns
+    l_cols_to_process = [col for col in l_cols_object if col not in l_col_to_except]
+    print("Columnas tipo object a preparar:", l_cols_to_process)
+    return l_cols_to_process
 
 def clean_teams_names(df):
     """
@@ -121,13 +130,9 @@ def eliminar_filas_nan(df, umbral):
     """
     Elimina las filas de un DataFrame que contienen un porcentaje alto de valores NaN.
 
-    Args:
-        df (pandas.DataFrame): DataFrame de entrada.
-        umbral (float): Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una fila.
-
-    Returns:
-        pandas.DataFrame: DataFrame resultante después de eliminar las filas con valores NaN.
-
+    :param df: DataFrame de entrada. (DataFrame)
+    :param umbral: Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una fila. (float)
+    :return: DataFrame resultante después de eliminar las filas con valores NaN. (DataFrame)
     """
     # Elimino filas segun umbral
     porcentaje_nan = df.isnull().mean(axis=1)  # Calcula el porcentaje de valores NaN en cada fila
@@ -142,13 +147,9 @@ def eliminar_columnas_nan(df, umbral):
     """
     Elimina las columnas de un DataFrame que contienen un porcentaje alto de valores NaN.
 
-    Args:
-        df (pandas.DataFrame): DataFrame de entrada.
-        umbral (float): Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una columna.
-
-    Returns:
-        pandas.DataFrame: DataFrame resultante después de eliminar las columnas con valores NaN.
-
+    :param df: DataFrame de entrada. (DataFrame)
+    :param umbral: Umbral en forma de porcentaje (0-100) para determinar el límite de NaN en una columna. (float)
+    :return: DataFrame resultante después de eliminar las columnas con valores NaN. (DataFrame)
     """
     # Calcula la proporción de NaN en cada columna
     prop_nan = df.isna().mean()
