@@ -6,7 +6,7 @@ import time
 from tqdm import tqdm
 
 
-def player_data_in_match(df_part, df_jug):
+def player_data_in_match(df_part, df_jug, pais):
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de edad, overall rating,  valor de mercado y altura del equipo titular,
@@ -15,7 +15,6 @@ def player_data_in_match(df_part, df_jug):
     :return:
     """
     # Definicion de variables
-    pais = df_part['pais'].unique()[0]
     l_titularidad = ['tit', 'sup', 'aus']  # tengo que agregar 'sup_ing' pero se debe procesar con sup...
     l_condicion = ['loc', 'vis']
     warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...

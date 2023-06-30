@@ -306,7 +306,7 @@ def prueba():
     warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
-    thr_nan_col = None #0.3
+    thr_nan_col = 0.2 #0.3
     thr_corr = 0.7  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
     thr_fs = 0.15  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
     export = False
@@ -342,8 +342,7 @@ def prueba():
     l_selected_features = select_best_features(df, var_resp, thr_fs=thr_fs, graf=True)
     columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', var_resp]
     df = df.filter(columns_to_select)
-    df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
-
+    # df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

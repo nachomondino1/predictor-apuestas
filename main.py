@@ -48,11 +48,11 @@ class DataPreparation:  # 17.4 min
 
         # Entidad partido: fecha, posesion y es_copa
         df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        df_part = df_part[df_part['goles_loc'] != '-']  # Eliminar las filas con valor "-" en la columna "goles_loc"
         df_part = format_data.convert_posesion_to_int(df_part)  # Podria usar la limpieza de punct de tp y luego convertir a int64 pero as al pedo
-        df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)  # ya no va a ser necesario...
 
         # Entidad jugador: fecha y valor de mercado
-        df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')
+        df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')  # ya lo voy a extraer datetime...
         df_jug = format_data.convert_valor_mercado_to_int(df_jug)
 
         end = time.time()
@@ -77,8 +77,8 @@ class DataPreparation:  # 17.4 min
         print("\nLimpiando los datos...")
 
         # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-        df_part = clean_data.prepare_text_columns(df_part, l_col_to_except=['id', 'temporada'])  # df_part = clean_data.prepare_text_columns(df_part)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id'])  # df_jug = clean_data.prepare_text_columns(df_jug)  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_part = clean_data.prepare_text_columns(df_part, l_col_to_except=['id', 'temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+        df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id'])   # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
         # Normalizo valor de mercado para evitar el error en entrenamiento de "ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed."
         scaler = StandardScaler()  # Crea un objeto StandardScaler
@@ -112,7 +112,7 @@ class DataPreparation:  # 17.4 min
         print("\nIntegrando los datos...")
 
         # Integro entidad partido y jugador
-        df_integrated = integrate_data.player_data_in_match(df_part, df_jug)
+        df_integrated = integrate_data.player_data_in_match(df_part, df_jug, self.pais)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -370,7 +370,7 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina_sudamerica"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
     # Procesamiento
@@ -409,15 +409,16 @@ def main():
 
         # Levanto datasets
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated.xlsx')
+        # df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx')
+        df_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/argentina/entidad_jugadores.xlsx')
+        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated.xlsx')
 
         # Preparo el dataset para el analisis
-        # df_part, df_jug = dp.format_data(df_part, df_jug)  # df_part, df_jug,
-        # df_part, df_jug = dp.clean_data(df_part, df_jug)
-        # df = dp.integrate_data(df_part, df_jug)
+        df_part, df_jug = dp.format_data(df_part, df_jug)
+        df_part, df_jug = dp.clean_data(df_part, df_jug)
+        df = dp.integrate_data(df_part, df_jug)
         df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, N_ULT_PART_LOC=N_ULT_PART_LOC, peso_puntos=peso_puntos)
-        # df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+        df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
     if modeling:
         # Definicion de variables
