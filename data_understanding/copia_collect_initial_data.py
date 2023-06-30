@@ -43,15 +43,24 @@ def extract_partidos_whoscored(pais):
         time.sleep(random.uniform(crawler.SEC_WAIT_MIN, crawler.SEC_WAIT_MAX))  # simular comportamiento humano
         crawler.driver.get_screenshot_as_file('screenshot.png')
 
-        # Extraigo temporada inicial
-        temp_year = crawler.extract_tag(xpath='.//div[@id="breadcrumb-nav"]//select[@id="seasons"]/option[@selected="selected"]', text=True)
+        # Extraigo temporadas --> hacer funcion...
+        d_temps = {}
+        l_tag_temps = crawler.extract_tags(xpath='.//div[@id="breadcrumb-nav"]//select[@id="seasons"]/option', sec_wait=10, print_fail=False)  # value = /Regions/11/Tournaments/68/Seasons/9081/Argentina-Liga-Profesional  text = 2023
+        for tag in l_tag_temps:
+            url_temp = f"https://www.whoscored.com{tag.get_attribute('value')}"
+            temp_year = tag.text
+            d_temps[temp_year] = url_temp
+        print(d_temps)
 
         # POR TEMPORADA
-        while True:
+        for temp_year, url_temp in d_temps.items():
+
+            # Ingrerso a pagina de temporada
+            crawler.driver.get(url_temp)
+            print(f' Temporada: {temp_year} '.center(120, '+'))
 
             # Extriago urls de items
             l_urls_items = crawler.extract_urls_partidos()
-            print(f' Temporada: {temp_year} '.center(120, '+'))
             print(f"Cantidad de partidos: {len(l_urls_items)}")
 
             # POR PARTIDO (c/u identificado con un id)
@@ -78,54 +87,25 @@ def extract_partidos_whoscored(pais):
                     df_jug_match = crawler.extract_player_in_match_data()
                     df_jug_match['id_part'] = id_part  # agrego id de partido...
                     df_jug_part = pd.concat([df_jug_part, df_jug_match], axis=0)  # Guardo datos
-                    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_match_prueba.xlsx')
+                    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_match_prueba.xlsx', index=False)
                     print(df_jug_part.shape)
 
                     # Extraigo estadisticas del partido
                     d_new_row.update(crawler.extract_estadisticas())
                     # Estilo de juego a partir de % de sides ataques y
 
-                '''
-                # Datos de jugadores --> hoja "Player statistics"  # Alineaciones + ratings
-                boton_player_stat = crawler.extract_tag(xpath='.//div[@id="sub-sub-navigation"]//a[text()="Player Statistics" and not(@class="inactive")]', sec_wait=crawler.SEC_WAIT_MAX, print_fail=False)
-                no_results = crawler.extract_tag(xpath='.//div[@id="live-player-stats"]//tbody[@id="player-table-statistics-body"]/tr[text()="There are no results to display"]', sec_wait=crawler.SEC_WAIT_MIN, print_fail=False)
-
-                if boton_player_stat is not None and no_results is None:
-                    crawler.click_boton(boton_player_stat)
-
-                    # time.sleep(2)  # A veces no agarra los jugadores del equipo visitante...
-                    df_jug_match = crawler.extract_player_in_match_data()
-                    df_jug_match['id_part'] = id_part  # agrego id de partido...
-
-                    # Guardo datos
-                    df_jug_part = pd.concat([df_jug_part, df_jug_match], axis=0)
-                    print(df_jug_part.shape)
-                    # df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_match_prueba.xlsx')
-                '''
-
                 # GUARDADO DE DATOS EN DATAFRAME
                 df_part = pd.concat([df_part, pd.DataFrame(d_new_row, index=[i])], axis=0)
-                df_part.to_excel('/Users/nachomondino/Desktop/df_part_prueba.xlsx')
+                df_part.to_excel('/Users/nachomondino/Desktop/df_part_prueba.xlsx', index=False)
                 print(df_part.shape)
 
             # Guardo partidos de la temporada por seguridad
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_part_{competicion}_{temp_year}.xlsx')
-            df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_jug_part_{competicion}_{temp_year}.xlsx')
-
-            # Si hay siguiente temporada
-            tag_next_temp = crawler.extract_tag(xpath='.//div[@id="breadcrumb-nav"]//select[@id="seasons"]/option[@selected="selected"]//following-sibling::option', sec_wait=crawler.SEC_WAIT_MAX, print_fail=False)
-            if tag_next_temp is not None:
-                temp_year = tag_next_temp.text
-                crawler.click_boton(tag_next_temp)
-
-            else:
-                print("Ya no hay mas temporadas para esta competicion")
-                break
-            # break  # para pruebas
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_part_{competicion}_{temp_year}.xlsx', index=False)
+            df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_jug_part_{competicion}_{temp_year}.xlsx', index=False)
 
     # Extraigo jugadores
     # df_jug = crawler.extract_player_data_(df_jug_part)  # Falla...   for url in df_jug_match['url'].unique():  raise KeyError(key) from err # KeyError: 'url'
-    # df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_prueba.xlsx')
+    # df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_prueba.xlsx', index=False)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
@@ -183,7 +163,6 @@ class WhoScoredCrawler(Crawler):
 
         d_nueva_fila = {}
         d_fields_xpath = {
-            # 'fecha': {'xpath': './/div[@id="match-header"]//dt[text()="Kick off:"]/following-sibling::dd'},  # falla por tiempo de espera bajo
             'fecha': {'xpath': './/div[@id="match-header"]//dt[text()="Date:"]/following-sibling::dd'}, # falla  por tiempo de espera bajo
             'equipo_loc': {'xpath': './/div[@id="match-header"]//td[@class="team"][1]/a[@class="team-link"]',
                            'xpath_alt': './/span[@class="col12-lg-4 col12-m-4 col12-s-0 col12-xs-0 home team"]'},
@@ -194,7 +173,6 @@ class WhoScoredCrawler(Crawler):
         }
 
         # Extraigo fecha antes para poder hacer el WebDriverWAit alto y evitar Stale Element Exception (es fundamental)
-        # time.sleep(random.uniform(self.SEC_WAIT_MIN + 2, self.SEC_WAIT_MAX + 2))
         d_nueva_fila['hora'] = super().extract_tag(xpath='.//div[@id="match-header"]//dt[text()="Kick off:"]/following-sibling::dd', text=True, sec_wait=10)  # por que no sirve el Driver Wait de dspy?
 
         for field, dict in d_fields_xpath.items():
@@ -213,7 +191,9 @@ class WhoScoredCrawler(Crawler):
             'arbitro': {'xpath': './/span[@class="referee"]', 'attribute': 'title'},  # falla por tiempo de espera bajo
             'cancha': {'xpath': './/span[@class="venue"]', 'attribute': 'title'},  # falla  por tiempo de espera bajo
             'dt_loc': {'xpath': './/div[@class="match-centre-header-team" and @data-field="home"]//span[@class="manager-name"]', 'attribute': 'innerText'},
-            'dt_vis': {'xpath': './/div[@class="match-centre-header-team" and @data-field="away"]//span[@class="manager-name"]', 'attribute': 'innerText'}
+            'dt_vis': {'xpath': './/div[@class="match-centre-header-team" and @data-field="away"]//span[@class="manager-name"]', 'attribute': 'innerText'},
+            'prom_edad_loc': {'xpath': './/div[@class="compared" and @data-field="home"]/div[@class="average-age"]', 'attribute': 'innerText'},
+            'prom_edad_vis': {'xpath': './/div[@class="compared" and @data-field="away"]/div[@class="average-age"]', 'attribute': 'innerText'}
         }
 
         for field, dict in d_fields_xpath.items():
@@ -323,29 +303,6 @@ class WhoScoredCrawler(Crawler):
         df_jug_match = pd.DataFrame(player_data)
         return df_jug_match
 
-    def extract_player_in_match_data_old(self):  # + 50 s por partido por el calculo de min_played
-        player_data = []
-
-        start = time.time()
-
-        l_tags_jug = super().extract_tags(xpath='.//div[@id="live-player-stats"]//tbody[@id="player-table-statistics-body"]/tr')  #  sec_wait=self.SEC_WAIT_MAX + 2
-        print(f"Cantidad de jugadores: {len(l_tags_jug)}")
-
-        for tag in l_tags_jug:
-            url_with_id = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]', attribute='href', sec_wait=self.SEC_WAIT_MIN)
-            id_jug = extract_str_from_url(url_with_id, str_ini='/Players/', str_fin='/Show/')
-            edad = super().extract_tag(tag_inicial=tag, xpath='.//td[1]/span/span[1]', text=True, sec_wait=self.SEC_WAIT_MIN)
-            rating = super().extract_tag(tag_inicial=tag, xpath='.//td[@class="rating "]', text=True, sec_wait=self.SEC_WAIT_MIN)
-            condicion, min_played = self.determine_condicion_and_min_played(tag)
-
-            player_data.append({'id_jug': id_jug, 'edad': edad, 'rating': rating, 'condicion': condicion,
-                                'min_played': min_played, 'url': url_with_id})
-
-        end = time.time()
-        print(f'Tardo {end-start} segundos')
-        df_jug_match = pd.DataFrame(player_data)
-        return df_jug_match
-
     def extract_player_data_(self, df_jug_match):
         # Si el id es nuevo, guardo url o la visito directamente? --> visitarla ahora no...
 
@@ -386,69 +343,3 @@ if __name__ == "__main__":
 
     # Extraigo partidos
     df = extract_partidos_whoscored(pais)
-
-
-'''
-
-    def determine_condicion_and_min_played(self, tag):
-
-        SEC_WAIT =  0.001 #self.SEC_WAIT_MIN / 6
-        # Determino si el jugador es suplente o titular
-        suplente = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[text()=",  Sub  "]', sec_wait=SEC_WAIT, print_fail=False)
-        condicion = 'titular' if suplente is None else 'suplente'
-
-        # Determino si el jugador ingreso o salio
-        cambio = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span', sec_wait=SEC_WAIT, print_fail=False)
-        min_cambio = int(cambio.get_attribute('data-minute')) if cambio else 0
-        min_cambio = min_cambio if min_cambio <= 90 else 90
-
-        # Si fue titular
-        if condicion == "titular":
-            salio = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span[@data-type="18"]', sec_wait=SEC_WAIT, print_fail=False)
-            min_played = min_cambio if salio else 90
-
-        # Si fue suplente
-        else:
-            ingreso = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span[@data-type="19"]', sec_wait=SEC_WAIT, print_fail=False)
-            min_played = 90 - min_cambio if ingreso else 0
-
-        return condicion, min_played
-        
-        
-    def determine_condicion_and_min_played_old(self, tag):
-
-        # Determino si el jugador es suplente o titular
-        suplente = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[text()=",  Sub  "]', sec_wait=self.SEC_WAIT_MIN/2, print_fail=False)
-        condicion = 'titular' if suplente is None else 'suplente'  # 1 es titular y 0 es
-
-        # Determino si el jugador ingreso o salio
-        cambio = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span', sec_wait=self.SEC_WAIT_MIN/2, print_fail=False)
-
-        # Si fue titular
-        if condicion == "titular":
-            salio = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span[@data-type="18"]', sec_wait=self.SEC_WAIT_MIN/2, print_fail=False)
-
-            # Si salió
-            if salio is not None:
-                min_cambio = int(cambio.get_attribute('data-minute'))
-                min_played = min_cambio if min_cambio <= 90 else 90
-
-            # y si no salió
-            else:
-                min_played = 90
-
-        # Si fue suplente
-        else:
-            ingreso = super().extract_tag(tag_inicial=tag, xpath='.//a[@class="player-link"]//following-sibling::span/span[@class="incident-wrapper"]/span[@data-type="19"]', sec_wait=self.SEC_WAIT_MIN/2, print_fail=False)
-
-            # Si ingresó
-            if ingreso is not None:
-                min_cambio = int(cambio.get_attribute('data-minute'))
-                min_played = 90 - min_cambio if min_cambio <= 90 else min_cambio-90
-
-            # Si no ingresó
-            else:
-                min_played = 0
-
-        return condicion, min_played
-'''
