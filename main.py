@@ -3,18 +3,18 @@ import pandas as pd
 import time
 import warnings
 # Data understanding
-from data_understanding import collect_initial_data
+from p2_data_understanding import collect_initial_data_who_scored, collect_initial_data_flashscore_sofifa, describe_data
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
-from data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
+from p3_data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
-from modeling import generate_test_design
+from p4_modeling import generate_test_design
 from sklearn.utils import shuffle
 # Build model
-from modeling import build_model
+from p4_modeling import build_model
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
@@ -23,9 +23,44 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 # Assess model
-from modeling.asses_model import calculate_roi, confusion_matrix
+from p4_modeling.asses_model import calculate_roi, confusion_matrix
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
+
+
+class DataUnderstanding:
+
+    def __init__(self, pais):
+        self.pais = pais
+
+    def collect_initial_data(self):
+
+        print(" Recolectando datos... ")
+
+        # Extraigo partidos
+        df_part, df_jug_part = collect_initial_data_who_scored.extract_partidos_whoscored(self.pais)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
+        df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug_part.xlsx', index=False)
+
+
+        # Extraigo datos de jugadores
+        df_jug = collect_initial_data_who_scored.extract_player_data(df_jug_part)
+        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx',index=False)
+        return df_part, df_jug_part, df_jug
+
+    def describe_data(self, df_part, df_jug_part, df_jug):
+
+        print(" Describiendo datos... ")
+
+        getting_to_know_data(df_part)
+        getting_to_know_data(df_jug_part)
+
+        # Verifico unicidad de registros segun campos id
+        describe_data.verificar_unicidad_registros(df_part, columns_id='id_part')
+        describe_data.verificar_unicidad_registros(df_jug_part, columns_id=['id_jug', 'id_part'])
+
+        # Verifico consistencia en campos que relacionan entidades
+        describe_data.verificar_relacion_entidades(df_part, df_jug_part)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
 
 
 class DataPreparation:  # 17.4 min
@@ -370,7 +405,7 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina_sudamerica"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
     # Procesamiento
@@ -381,17 +416,11 @@ def main():
     if data_unders:
 
         print(" Data understanding ".center(120, "#"))
+        du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
-        # Collect initial data
-        print(" Recolectando datos... ")
-        df_part = collect_initial_data.extract_partidos_flashscore(l_paises=[pais])
-        df_jug = collect_initial_data.extract_jugadores_sofifa(l_paises=[pais])
+        df_part, df_jug_part, df_jug = du.collect_initial_data()
+        du.describe_data(df_part, df_jug_part, df_jug)
         print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
-
-        # Describe data (quiero describir los datos igual aunque no los extraiga...)
-        print(" Describiendo datos... ")
-        getting_to_know_data(df_part)
-        getting_to_know_data(df_jug)
 
     if data_prep:
 
