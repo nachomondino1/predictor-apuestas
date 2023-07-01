@@ -4,7 +4,7 @@ from dspy.data_understanding.web_scraping.selenium import Crawler
 import time
 import random
 from tqdm import tqdm
-
+import re
 
 def extract_partidos_whoscored(pais):
     """
@@ -55,7 +55,6 @@ def extract_partidos_whoscored(pais):
             for id_part, url_part in d_parts.items():
 
                 d_new_row = {'id_part': id_part, 'pais': pais, 'competicion': competicion, 'temporada': temp_year,  'es_copa': tipo_comp}  # Reinicio diccionario en el que guardar datos del nuevo partido
-                progress_bar.update(1)
                 # print(f" Partido ID:{id_part} ".center(120, '-'))  # print(f" Partido Nº {i} ".center(120, '-'))
 
                 # Intrego a pagina de partido
@@ -83,13 +82,14 @@ def extract_partidos_whoscored(pais):
                     # Estilo de juego a partir de % de sides ataques y
 
                 # GUARDADO DE DATOS EN DATAFRAME
-                df_part = pd.concat([df_part, pd.DataFrame(d_new_row, index=[0])], axis=0)  # ver index al no usar mas enumerate...
+                df_part = pd.concat([df_part, pd.DataFrame(d_new_row, index=[0])], axis=0)
+                progress_bar.update(1)
                 # print(df_part.shape)
                 # df_part.to_excel('/Users/nachomondino/Desktop/df_part_prueba.xlsx', index=False)
 
             # Guardo partidos de la temporada por seguridad
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_part_{competicion.replace(" ", "_")}_{temp_year.replace("/", "_")}.xlsx', index=False)
-            df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_jug_part_{competicion.replace(" ", "_")}_{temp_year.replace("/", "_")}.xlsx', index=False)
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/df_part_{competicion.replace(" ", "_")}_{temp_year.replace("/", "_")}.xlsx', index=False)
+            df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding1/data/{pais}/data_seg/df_jug_part_{competicion.replace(" ", "_")}_{temp_year.replace("/", "_")}.xlsx', index=False)
             print(df_part.shape)
             print(df_jug_part.shape)
 
@@ -97,19 +97,80 @@ def extract_partidos_whoscored(pais):
             progress_bar.close()
 
         # Guardo partidos de la competicion por seguridad
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_part_{competicion.replace(" ", "_")}_completo.xlsx', index=False)
-        df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/data_seg/df_jug_part_{competicion.replace(" ", "_")}_completo.xlsx', index=False)
-
-    # Guardo datos
-    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/df_part.xlsx', index=False)
-    df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/df_jug_part.xlsx', index=False)
-
-    # Extraigo datos de jugadores
-    df_jug = crawler.extract_player_data(df_jug_part)
-    df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/df_jug.xlsx', index=False)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/df_part_{competicion.replace(" ", "_")}_completo.xlsx', index=False)
+        df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/df_jug_part_{competicion.replace(" ", "_")}_completo.xlsx', index=False)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
+    return df_part, df_jug_part
+
+def extract_player_data(df_jug_part):
+    """
+    Extraccion de datos de jugadores
+
+    :param df_jug_part: DataFrame con datos de cada jugador en cada partido: id del partido, id del jugador, nombre,
+    rating, condicion, minuto del cambio (si hubo). (DataFrame)
+    :return: DataFrame con datos de cada jugador de la competicion: id, nombre, nacionalidad, posicion
+    princiapal, altura y fecha de nacimiento. (DataFrame)
+    """
+    # Responder en documentacion por que lo hago aparte. Es mucho mas larga la extraccion y da posibilidad a Stale Element Exception
+    # Si el id es nuevo, guardo url o la visito directamente? --> visitarla ahora no..
+    # Defino variables
+    player_data = []
+    crawler = Crawler(headless=False, path=None) # Creo objeto de clase  # crawler = WhoScoredCrawler(headless=False, path=None)
+    sec_wait = 0.01  # Ojo que no sea tan bajo que no llega a cargar y falla la extraccion...
+
+    # Selecciono dataframe con jugadores unicos
+    df_unique = df_jug_part.drop_duplicates(subset='id_jug').reset_index(drop=True)
+
+    # Construyo la url a partir del id del jugador y su nombre
+    df_unique['url'] = 'https://www.whoscored.com/Players/' + df_unique['id_jug'].astype(str) + '/Show/' + df_unique['nombre_jug'].str.replace(' ', '-')   # https://www.whoscored.com/Players/462994/Show/Bruno-Zapelli
+
+    # Inicializo barra de progreso
+    progress_bar = tqdm(total=len(df_unique), ncols=80)
+
+    # Por jugador unico
+    for _, row in df_unique.iterrows():
+
+        # Ingreso a url del jugador
+        crawler.driver.get(row['url'])
+
+        # Extraigo datos y los guardo
+        nacionalidad = crawler.extract_tag(xpath='.//h1//following-sibling::div//span[text()="Nationality: "]//parent::div', attribute='textContent', sec_wait=sec_wait, print_fail=False)
+        posicion = crawler.extract_tag(xpath='.//h1//following-sibling::div//span[text()="Positions: "]//following-sibling::span/span[1]', text=True, sec_wait=sec_wait, print_fail=False)
+        altura = crawler.extract_tag(xpath='.//h1//following-sibling::div//span[text()="Height: "]//parent::div', attribute='textContent', sec_wait=sec_wait, print_fail=False)
+        fecha_nac = crawler.extract_tag(xpath='.//h1//following-sibling::div//span[text()="Age: "]//following-sibling::i', text=True, sec_wait=sec_wait, print_fail=False)  # no hace falta pues tengo la edad por partido..
+
+        if nacionalidad is not None:
+            l = [elem.strip() for elem in nacionalidad.split('\n') if elem.strip() != ""]  # ['', '            Nationality: ', '            Argentina ', '        '] --> "Argentina"
+            if len(l) > 1:
+                nacionalidad = l[1]
+            else:
+                nacionalidad = None
+
+        if altura is not None:  # Height: 177cm--> 177cm
+            altura = re.split(' |cm', altura)[1]
+
+        player_data.append({
+            'id_jug': row['id_jug'],
+            'nombre_jug': row['nombre_jug'],
+            'nacionalidad': nacionalidad,
+            'posicion': posicion,
+            'altura': altura,
+            'fecha_nac': fecha_nac
+        })
+        print(row['id_jug'], row['nombre_jug'], nacionalidad, posicion, altura, fecha_nac)
+
+        progress_bar.update(1)
+
+    # Creo dataframe
+    df_jug = pd.DataFrame(player_data)
+
+    # Cierro la barra de progreso y el driver
+    progress_bar.close()
+    crawler.driver.close()
+
+    return df_jug
 
 class WhoScoredCrawler(Crawler):
     """
@@ -258,7 +319,6 @@ class WhoScoredCrawler(Crawler):
         del cambio (si hubo). (DataFrame)
         """
         # start = time.time()
-
         # Definicion de variables
         player_data = []
         SEC_WAIT = 0.001
@@ -367,51 +427,20 @@ class WhoScoredCrawler(Crawler):
         # print(d_nueva_fila)
         return d_nueva_fila
 
-    def extract_player_data(self, df_jug_part):  # ver si funciona... # ver donde poner...
-        """
-        Extraccion de datos de jugadores
-
-        :param df_jug_part: DataFrame con datos de cada jugador en cada partido: id del partido, id del jugador, nombre,
-        rating, condicion, minuto del cambio (si hubo). (DataFrame)
-        :return: DataFrame con datos de cada jugador de la competicion: id, nombre, nacionalidad, posicion
-        princiapal, altura y fecha de nacimiento. (DataFrame)
-        """
-        # Responder en documentacion por que lo hago aparte. Es mucho mas larga la extraccion y da posibilidad a Stale Element Exception
-        # Si el id es nuevo, guardo url o la visito directamente? --> visitarla ahora no...
-        player_data = []
-
-        # Selecciono dataframe con jugadores unicos
-        df_filt = df_jug_part[df_jug_part['id_jug'].unique()].reset_index(drop=True)
-
-        # Por jugador unico
-        for i in range(len(df_filt)):
-            id_jug = df_filt.loc[i, 'id_jug']
-            nombre_jug = df_filt.loc[i, 'nombre_jug']
-            url = f'https://www.whoscored.com/Players/{id_jug}/Show/{nombre_jug.replace(" ", "-")}'  # https://www.whoscored.com/Players/462994/Show/Bruno-Zapelli
-
-            # Ingreso a pagina de jugador
-            self.child_driver.get(url)
-
-            # Puedo construir df_jug despues, guardar la url del jug...
-            nacionalidad = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Nationality: "]//parent::div', attribute='textContent')
-            posicion = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Positions: "]//following-sibling::span/span[1]', text=True)
-            altura = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Height: "]//parent::div', attribute='textContent')
-            fecha_nac = super().extract_tag(xpath='.//h1//following-sibling::div//span[text()="Age: "]//following-sibling::i', text=True)  # no hace falta pues tengo la edad por partido..
-
-            # Guardo datos
-            player_data.append({'id_jug': id_jug, 'nombre_jug': nombre_jug, 'nacionalidad': nacionalidad, 'posicion': posicion,
-                 'altura': altura, 'fecha_nac': fecha_nac})
-
-        df_jug = pd.DataFrame(player_data)
-        return df_jug
-
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Selecciono pais a extraer y obtengo las competencias y su categoria
-    # pais = "argentina"  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    pais = 'Argentina'
+    pais = 'Argentina' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
 
     # Extraigo partidos
-    df = extract_partidos_whoscored(pais)
+    # df_part, df_jug_part = extract_partidos_whoscored(pais)
+    # df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx', index=False)
+    # df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx', index=False)
+
+    # Levanto df_jug_part para prueba
+    df_jug_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina/data_seg/df_jug_part_Liga_Profesional_2005.xlsx')
+
+    # Extraigo datos de jugadores
+    df_jug = extract_player_data(df_jug_part)
+    df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx', index=False)
