@@ -1,4 +1,6 @@
 import pandas as pd
+import math
+from datetime import datetime, timedelta
 
 
 def map_data(df_jug, df_jug_part):
@@ -10,16 +12,37 @@ def map_data(df_jug, df_jug_part):
 
     return df_merged
 
+def integrate_player_to_part(df_jug_part, df_part):
+    # De df_jug quiero prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}
+    # De df_jug_part quiero prom_rat_{tit, sup}_{loc, vis} y ponderarlo por min played...
+
+    # Calculo edad
+    df_jug_part = determine_edad(df_part, df_jug_part)
+
+    # Calculo min_played
+    df_jug_part = determine_min_played(df_jug_part)
+
+    # Por jugador, construyo sum_min_played y prom_rating en ultimos n partidos --> para no requerir equipo, uso fecha
+    df_jug_part = determine_var_en_ult_partidos(df_jug_part, 'min_played', type='sum')
+    df_jug_part = determine_var_en_ult_partidos(df_jug_part, 'rating', type='mean_pond', var_pond='min_played')
+    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_part_rating_ult_part.xlsx')
+
+    # df_jug_part = pd.read_excel('/Users/nachomondino/Desktop/df_jug_part_rating_ult_part.xlsx', index_col=0)
+
+    # Construyo prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}     # Agregar construccion de rating
+    df_part = construct_variables_jug_in_part(df_part, df_jug_part)
+    df_part.to_excel('/Users/nachomondino/Desktop/df_part_int.xlsx')
+
 def determine_min_played(df):
 
     def calculate_minutes_played(row):
         if row['titularidad'] == 'titular':
-            if pd.isna(row['min_cambio']):
+            if pd.isna(row['min_cambio']) or row['min_cambio'] >=90:
                 return 90
             else:
                 return row['min_cambio']
         elif row['titularidad'] == 'suplente':
-            if pd.isna(row['min_cambio']):
+            if pd.isna(row['min_cambio']) or row['min_cambio'] >=90:
                 return 0
             else:
                 return 90 - row['min_cambio']
@@ -45,60 +68,7 @@ def determine_edad(df_part, df_jug_part):
 
     return df_merged
 
-def construct_prom_edad_altura(df_part, df_jug_part):  # Agregar calculo de rating y min played
-
-    l_condiciones = df_jug_part['condicion'].unique()
-    l_titularidades = df_jug_part['titularidad'].unique()
-
-    # Por partido en df_part
-
-    for index, row in df_part.iterrows():
-        df_jug_part_filt = df_jug_part[df_jug_part['id_part'] == row['id_part']]
-
-        # Por condicion (home, away)
-        for condicion in l_condiciones:
-            df_jug_part_filt = df_jug_part_filt[df_jug_part_filt['condicion'] == condicion]
-
-            # Por titularidad (tit, sup)
-            for titularidad in l_titularidades:
-
-                # Selecciono registros
-                df_jug_part_filt = df_jug_part_filt[df_jug_part_filt['titularidad'] == titularidad]
-
-                # Calculo promedio de edad y altura
-                if len(df_jug_part_filt) > 0:
-                    prom_edad = sum(df_jug_part_filt['altura'])/len(df_jug_part_filt)
-                    prom_alt = sum(df_jug_part_filt['edad'])/len(df_jug_part_filt)
-
-                    # Guardo columna en df_part
-                    df_part.loc[index, f'prom_edad_{condicion}_{titularidad}'] = prom_edad
-                    df_part.loc[index, f'prom_alt_{condicion}_{titularidad}'] = prom_alt
-
-    return df_part
-
-def integrate_player_to_part_2(df_jug_part, df_part):
-    # De df_jug quiero prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}
-    # De df_jug_part quiero prom_rat_{tit, sup}_{loc, vis} y ponderarlo por min played...
-
-    # Calculo edad
-    df_jug_part = determine_edad(df_part, df_jug_part)
-
-    # Calculo min_played
-    df_jug_part = determine_min_played(df_jug_part)
-
-    # Construyo rating individual en ultimos n partidos  #
-    # from p3_data_preparation.construct_data import promediar_var_en_ult_partidos
-    df_jug_part = promediar_var_en_ult_partidos(df_jug_part, 5, 'min_played', type='sum')
-    df_jug_part = promediar_var_en_ult_partidos(df_jug_part, 5, 'rating', type='mean')
-    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_part_rating_ult_part.xlsx')
-
-    # Construyo prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}     # Agregar ocnstruiccion de rating
-    df_part = construct_prom_edad_altura(df_part, df_jug_part)
-    df_part.to_excel('/Users/nachomondino/Desktop/df_part_int.xlsx')
-
-
-import math
-def promediar_var_en_ult_partidos(df, n_ult_part, variable, type='mean'):  # Verificar que calcule bien
+def determine_var_en_ult_partidos(df, variable, type='mean', var_pond=None):  # Calcula bien.
     """
     Obtiene el promedio de las estadisticas en los ultimos partidos
 
@@ -107,51 +77,89 @@ def promediar_var_en_ult_partidos(df, n_ult_part, variable, type='mean'):  # Ver
     :param variable: String. Nombre de variable a promediar
     :return: Dataframe con estadisticas promediadas
     """
-    # Defincion de variables
-    # n_ult_part_min = int(0.2 * n_ult_part)  # Definir suficientes partidos mínimos
-
     # Ordeno por fecha ascendente
-    df = df.sort_values(by='fecha', ascending=True, ignore_index=True)
+    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
 
     # Por jugador
     for id_jug in df['id_jug'].unique():
+        # print(f"ID JUGADOR: {id_jug}")
 
         # Obtengo los partidos que jugó el jugador
         df_filt = df[df['id_jug'] == id_jug]
-
-        # Inicializar lista de valores de la variable
-        l = []
+        # print(df_filt)
 
         # Recorrer los partidos del jugador
         for idx, row in df_filt.iterrows():
 
-            # Si ya tengo los suficientes partidos para determinar la variable
-            if len(l) == n_ult_part:
+            # Filtro para seleccionar los ultimos partidos del jugador en los ultimos n dias
+            fecha_part = row['fecha']
+            fecha_limite = fecha_part - timedelta(days=30)
+            df_seleccionados = df_filt.copy()
+            df_seleccionados = df_seleccionados.dropna(subset=[variable])  # Elimino registros en que no se tiene la variable (evita que el prom o sum de nan)
+            df_seleccionados = df_seleccionados.loc[(df_seleccionados['fecha'] >= fecha_limite) & (df_seleccionados['fecha'] < fecha_part)]
+            largo = len(df_seleccionados)
 
-                # Quito NaN de la lista para que no falle el cálculo
-                l_sin_nan = [x for x in l if x is not None and not math.isnan(x)]
+            if largo > 0:
+                if type == "mean_pond":
+                    df_seleccionados = df_seleccionados.dropna(subset=[var_pond])  # Elimino registros en que no se tiene la variable (evita que el prom o sum de nan)
 
-                # Si no eliminé todos los elementos
-                if len(l_sin_nan) >= 1:
+                    if len(df_seleccionados) > 0:
+                        promedio_ponderado = (df_seleccionados[var_pond] * df_seleccionados[variable]).sum() / df_seleccionados[var_pond].sum()
+                        df.loc[idx, f'prom_pond_{variable}_ult_part'] = promedio_ponderado
 
-                    if type == "mean":
-                        df.loc[idx, f'prom_{variable}_ult_part'] = sum(l) / len(l)
+                elif type == "mean":
+                    promedio = df_seleccionados[variable].sum() / len(df_seleccionados[variable])  # df_seleccionados[variable].dropna().sum() / len(df_seleccionados[variable].dropna())
+                    df.loc[idx, f'prom_{variable}_ult_part'] = promedio
 
-                    elif type == "sum":
-                        df.loc[idx, f'sum_{variable}_ult_part'] = sum(l)
+                elif type == "sum":
+                    suma = df_seleccionados[variable].sum()  # df_seleccionados[variable].dropna().sum()
+                    df.loc[idx, f'sum_{variable}_ult_part'] = suma
 
-                # Elimino el valor más antiguo de la lista (para tener siempre los últimos n_part partidos)
-                l = l[1:]
-
-            # Agrego el valor de la variable al final de la lista
-            value = row[variable]
-            l.append(value)
     return df
 
+def construct_variables_jug_in_part(df_part, df_jug_part):  # Agregar calculo de rating y min played
 
+    l_condiciones = df_jug_part['condicion'].unique()
+    l_titularidades = df_jug_part['titularidad'].unique()
+
+    # Por partido en df_part
+    for index, row in df_part.iterrows():
+
+        df_jug_part_filt = df_jug_part.copy()
+        df_jug_part_filt_1 = df_jug_part_filt[df_jug_part_filt['id_part'] == row['id_part']]
+
+        # Por condicion (home, away)
+        for condicion in l_condiciones:
+            df_jug_part_filt_2 = df_jug_part_filt_1[df_jug_part_filt_1['condicion'] == condicion]
+
+            # Por titularidad (tit, sup)
+            for titularidad in l_titularidades:
+
+                # Selecciono registros
+                df_jug_part_filt_3 = df_jug_part_filt_2[df_jug_part_filt_2['titularidad'] == titularidad]
+                largo = len(df_jug_part_filt_3)
+                # print(df_jug_part_filt_3)
+                # print(sum(df_jug_part_filt_3['edad']))
+                # print(sum(df_jug_part_filt_3['altura']))
+                # print(sum(df_jug_part_filt_3['prom_rating_ult_part']))
+                # print(sum(df_jug_part_filt_3['sum_min_played_ult_part']))
+
+                # Calculo promedio de edad y altura
+                if largo > 0:
+                    prom_edad = df_jug_part_filt_3['edad'].dropna().sum() / len(df_jug_part_filt_3['edad'].dropna())
+                    prom_alt = df_jug_part_filt_3['altura'].dropna().sum() / len(df_jug_part_filt_3['altura'].dropna())
+                    sum_rat = df_jug_part_filt_3['prom_pond_rating_ult_part'].dropna().sum()
+                    sum_min_played = df_jug_part_filt_3['sum_min_played_ult_part'].dropna().sum()
+
+                    # Guardo columna en df_part
+                    df_part.loc[index, f'prom_edad_{condicion}_{titularidad}'] = prom_edad
+                    df_part.loc[index, f'prom_alt_{condicion}_{titularidad}'] = prom_alt
+                    df_part.loc[index, f'sum_rat_{condicion}_{titularidad}'] = sum_rat
+                    df_part.loc[index, f'sum_min_{condicion}_{titularidad}'] = sum_min_played
+
+    return df_part
 
 def prueba():
-
     # Levanto datasets de prueba
     df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina/df_part_formated.xlsx')
     df_jug_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina/df_jug_part.xlsx')
@@ -161,8 +169,8 @@ def prueba():
     df_jug_part_integ = map_data(df_jug, df_jug_part)
     df_jug_part_integ.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
 
-    # Integro df_jug_part a df_part
-    df_part_integ = integrate_player_to_part_2(df_jug_part_integ, df_part)
+    # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
+    df_part_integ = integrate_player_to_part(df_jug_part_integ, df_part)
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
