@@ -3,48 +3,6 @@ from dspy.data_preparation.text_preparation import TextPreparation
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 
-from fuzzywuzzy import fuzz
-def buscar_coincidencias(str1, str2):
-    if fuzz.token_set_ratio(str1, str2) < 50:
-        return False
-    return True
-
-def rellenar_statistics_with_flashscore(df_part_who, df_part_flash):
-
-    # Saco horas de fechas para poder compararlas
-    df_part_who['fecha_sin_hora'] = df_part_who['fecha'].dt.date
-    df_part_flash['fecha_sin_hora'] = df_part_flash['fecha'].dt.date
-
-    # Selecciono partidos sin estadisticas
-    df_filt = df_part_who[df_part_who['posesion_loc'].isnull()]
-
-    print(df_filt)
-
-    # Por partido sin estadisticas en Whoscored
-    for idx, row in df_filt.iterrows():
-
-        fecha_who = row['fecha_sin_hora']
-        equipo_loc_who = row['equipo_loc']
-        equipo_vis_who = row['equipo_vis']
-
-        l_col = ['posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc', 'remates_a_puerta_vis', 'faltas_loc', 'faltas_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc', 'pases_comp_vis', 'offsides_loc', 'offsides_vis']
-
-        # Busco match entre dfs
-        df_filt = df_part_flash[df_part_flash['fecha_sin_hora'] == fecha_who]
-
-        for index, fila in df_filt.iterrows():
-
-            equipo_loc_fs = fila['equipo_loc']
-            equipo_vis_fs = fila['equipo_vis']
-
-            # Si lo encontró
-            if buscar_coincidencias(str1=equipo_loc_fs, str2=equipo_loc_who) and buscar_coincidencias(str1=equipo_vis_fs, str2=equipo_vis_who):
-
-                # Relleno con columnas de df_part_flash en caso que tenga datos
-                for col in l_col:
-                    df_part_who.loc[idx, col] = df_part_flash.loc[index, col]
-
-    return df_part_who
 
 def prepare_text_columns(df, l_col_to_except):
     '''

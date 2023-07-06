@@ -4,7 +4,7 @@ import time
 import warnings
 import datetime
 # Data understanding
-from p2_data_understanding import collect_initial_data_who_scored, collect_initial_data_flashscore_sofifa, describe_data
+from p2_data_understanding import scraper_whoscored, scraper_flashscore, describe_data
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
@@ -39,14 +39,18 @@ class DataUnderstanding:
         print(" Recolectando datos... ")
 
         # Extraigo partidos
-        df_part, df_jug_part = collect_initial_data_who_scored.extract_partidos_whoscored(self.pais)
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
+        df_part_ws, df_jug_part = scraper_whoscored.extract_partidos_whoscored(self.pais)
+        df_part_ws.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
         df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug_part.xlsx', index=False)
 
         # Extraigo datos de jugadores
-        df_jug = collect_initial_data_who_scored.extract_player_data(df_jug_part)
-        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx',index=False)
-        return df_part, df_jug_part, df_jug
+        df_jug = scraper_whoscored.extract_player_data(df_jug_part)
+        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
+
+        # Extraigo partidos de Flashscore
+        df_part_fs = scraper_flashscore.extract_partidos_flashscore(self.pais)
+        df_part_fs.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx', index=False)
+        return df_part_ws, df_part_fs, df_jug_part, df_jug
 
     def describe_data(self, df_part, df_jug_part, df_jug):  # Agregar df_jug a descripcion y df_part de flashscore?
 
@@ -70,7 +74,7 @@ class DataPreparation:  # 17.4 min
         self.var_resp = var_resp
         self.pais = pais
 
-    def format_data(self, df_part, df_jug, export=True):  # 0.0 min
+    def format_data(self, df_part, df_part_flash, df_jug, export=True):  # 0.0 min
         """
         Arreglo el data type de algunas variables.
 
@@ -84,7 +88,7 @@ class DataPreparation:  # 17.4 min
 
         # Entidad partido WhoScored: fecha, resultados de medio tiempo y final
         df_part['fecha'] = pd.to_datetime(df_part['fecha'] + ' ' + df_part['hora'], format='%a, %d-%b-%y %H:%M')
-        df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' por diferencia con extraccion
+        df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
         df_part[['ht_goles_loc', 'ht_goles_vis']] = df_part['ht_result'].str.split(' : ', expand=True)  # Separar ht_result en ht_goles_loc y ht_goles_vis
         df_part[['goles_loc', 'goles_vis']] = df_part['ft_result'].str.split(' : ', expand=True)  # Separar ft_result en goles_loc y goles_vis
         df_part = df_part.drop(['hora', 'ht_result', 'ft_result'], axis=1)
@@ -92,14 +96,19 @@ class DataPreparation:  # 17.4 min
         # Entidad jugador: fecha
         df_jug['fecha_nac'] = pd.to_datetime(df_jug['fecha_nac'], format='%d-%m-%Y')
 
+        # Entidad partido Flashscore: fecha y posesion
+        df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        df_part_flash = format_data.convert_posesion_to_int(df_part_flash)
+
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
+            df_part_flash.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_fs_formated.xlsx', index=False)
             df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
 
-        return df_part, df_jug
+        return df_part, df_part_flash, df_jug
 
     def clean_data(self, df_part_who, df_part_flash, export=True):  # 0.0 min
         """
@@ -113,8 +122,6 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nLimpiando los datos...")
 
-        df_part_flash = format_data.convert_posesion_to_int(df_part_flash)
-
         # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
         df_part_who = clean_data.prepare_text_columns(df_part_who, l_col_to_except=['temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
         df_part_flash = clean_data.prepare_text_columns(df_part_flash, l_col_to_except=['id', 'temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
@@ -122,18 +129,16 @@ class DataPreparation:  # 17.4 min
         # Remuevo strings adicionales en los nombres de los equipos
         df_part_flash = clean_data.clean_teams_names(df_part_flash)
 
-        # Relleno estadisticas del partido en partidos viejos usando datos de Flashscore
-        df_part_who = clean_data.rellenar_statistics_with_flashscore(df_part_who, df_part_flash)
-
         end = time.time()
         print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_part_who.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_cleaned.xlsx', index=False)
+            df_part_flash.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_fs_cleaned.xlsx', index=False)
 
-        return df_part_who
+        return df_part_who, df_part_flash
 
-    def integrate_data(self, df_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part_who, df_part_flash, df_jug_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -145,16 +150,23 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Integro entidad partido y jugador
-        df_integrated = integrate_data.player_data_in_match(df_part, df_jug, self.pais)
+        # Relleno estadisticas del partido en partidos viejos usando datos de Flashscore
+        df_part= integrate_data.rellenar_statistics_with_flashscore(df_part_who, df_part_flash)
+
+        # Integro df_jug a df_jug_part
+        df_jug_part_integ = integrate_data.map_data(df_jug, df_jug_part)
+        df_jug_part_integ.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
+
+        # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
+        df = integrate_data.integrate_player_to_part(df_jug_part_integ, df_part)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_integrated.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
+            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
 
-        return df_integrated
+        return df
 
     def construct_data(self, df, N_ULT_PART=5, N_ULT_PART_LOC=3, peso_puntos=0.6,export=True):  # 2.7 minutos
         """
@@ -418,9 +430,9 @@ def main():
         print(" Data understanding ".center(120, "#"))
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
-        df_part, df_jug_part, df_jug = du.collect_initial_data()
-        du.describe_data(df_part, df_jug_part, df_jug)
-        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
+        df_part_ws, df_part_fs, df_jug_part, df_jug = du.collect_initial_data()
+        du.describe_data(df_part_ws, df_jug_part, df_jug)
+        print(f"Dataframe partido:\n{df_part_ws} \nDataframe jugadores:\n{df_jug}")
 
     if data_prep:
 
@@ -440,13 +452,13 @@ def main():
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
         df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-        df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/entidad_partido.xlsx')
+        df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
         # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated.xlsx')
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = dp.format_data(df_part, df_jug)
-        df_part = dp.clean_data(df_part, df_part_flash)
-        # df = dp.integrate_data(df_part, df_jug)
+        df_part, df_part_flash, df_jug = dp.format_data(df_part, df_part_flash, df_jug)
+        df_part, df_part_flash = dp.clean_data(df_part, df_part_flash)
+        df = dp.integrate_data( df_part, df_part_flash, df_jug_part, df_jug)
         # df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, N_ULT_PART_LOC=N_ULT_PART_LOC, peso_puntos=peso_puntos)
         # df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
