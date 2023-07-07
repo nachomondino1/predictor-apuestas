@@ -1,6 +1,4 @@
 import pandas as pd
-import math
-from datetime import datetime, timedelta
 from fuzzywuzzy import fuzz
 
 # RELLENO DE DATOS DE WHOSCORED A PARTIR DE FLASHCORE
@@ -64,121 +62,23 @@ def buscar_coincidencias(str1, str2, umbral):
 
 
 # Integracion entre datos de WHOSCORED
-def map_data(df_jug, df_jug_part):
+def map_player_entities(df_jug, df_jug_part):
+    """
+    Integro entidad de jugador con la entidad de jugador por partido.
+    :param df_jug: Dataframe jugador
+    :param df_jug_part: Dataframe jugador por partido
+    :return: Dataframe jugador por partido con columnas altura y fecha_nac por jugador.
+    """
     # Filtrar las columnas necesarias de df_jug_part
     df_jug_filtered = df_jug[['id_jug', 'altura', 'fecha_nac']]
 
     # Combinar df_jug_part_filtered con df_jug usando el id_jug como clave
     df_merged = pd.merge(df_jug_part, df_jug_filtered, on='id_jug', how='left')
-
     return df_merged
 
-def integrate_player_to_part(df_jug_part, df_part):
+def map_player_to_part(df_part, df_jug_part):  # Agregar calculo de rating y min played
     # De df_jug quiero prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}
     # De df_jug_part quiero prom_rat_{tit, sup}_{loc, vis} y ponderarlo por min played...
-
-    # Calculo edad
-    df_jug_part = determine_edad(df_part, df_jug_part)
-
-    # Calculo min_played
-    df_jug_part = determine_min_played(df_jug_part)
-
-    # Por jugador, construyo sum_min_played y prom_rating en ultimos n partidos --> para no requerir equipo, uso fecha
-    df_jug_part = determine_var_en_ult_partidos(df_jug_part, 'min_played', type='sum')
-    df_jug_part = determine_var_en_ult_partidos(df_jug_part, 'rating', type='mean_pond', var_pond='min_played')
-    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_part_rating_ult_part.xlsx')
-
-    # df_jug_part = pd.read_excel('/Users/nachomondino/Desktop/df_jug_part_rating_ult_part.xlsx', index_col=0)
-
-    # Construyo prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}     # Agregar construccion de rating
-    df_part = construct_variables_jug_in_part(df_part, df_jug_part)
-    df_part.to_excel('/Users/nachomondino/Desktop/df_part_int.xlsx')
-
-def determine_min_played(df):
-
-    def calculate_minutes_played(row):
-        if row['titularidad'] == 'titular':
-            if pd.isna(row['min_cambio']) or row['min_cambio'] >=90:
-                return 90
-            else:
-                return row['min_cambio']
-        elif row['titularidad'] == 'suplente':
-            if pd.isna(row['min_cambio']) or row['min_cambio'] >=90:
-                return 0
-            else:
-                return 90 - row['min_cambio']
-        else:
-            return None
-
-    # Aplicar la función a cada fila del DataFrame para calcular los minutos jugados.
-    df['min_played'] = df.apply(calculate_minutes_played, axis=1)
-    return df
-
-def determine_edad(df_part, df_jug_part):
-
-    # Filtrar las columnas necesarias de df_jug_part
-    df_part_filtered = df_part[['id_part', 'fecha']]
-
-    # Combinar df_jug_part_filtered con df_jug usando el id_jug como clave
-    df_merged = pd.merge(df_jug_part, df_part_filtered, on='id_part', how='left')
-
-    # Calculo edad (fecha_hora - fecha nac)
-    diferencia_dias = (df_merged['fecha'] - df_merged['fecha_nac']).dt.days  # Calcular la diferencia en días
-    df_merged['edad'] = diferencia_dias // 365  # Calcular la edad en años
-    # df_merged = df_merged.drop(['fecha_nac'], axis=1)  # Borro columnas fecha_hora y fecha_nac
-
-    return df_merged
-
-def determine_var_en_ult_partidos(df, variable, type='mean', var_pond=None):  # Calcula bien.
-    """
-    Obtiene el promedio de las estadisticas en los ultimos partidos
-
-    :param df: Dataframe.
-    :param n_ult_part: Integer. Numero de partidos de los cuales obtener los goles
-    :param variable: String. Nombre de variable a promediar
-    :return: Dataframe con estadisticas promediadas
-    """
-    # Ordeno por fecha ascendente
-    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
-
-    # Por jugador
-    for id_jug in df['id_jug'].unique():
-        # print(f"ID JUGADOR: {id_jug}")
-
-        # Obtengo los partidos que jugó el jugador
-        df_filt = df[df['id_jug'] == id_jug]
-        # print(df_filt)
-
-        # Recorrer los partidos del jugador
-        for idx, row in df_filt.iterrows():
-
-            # Filtro para seleccionar los ultimos partidos del jugador en los ultimos n dias
-            fecha_part = row['fecha']
-            fecha_limite = fecha_part - timedelta(days=30)
-            df_seleccionados = df_filt.copy()
-            df_seleccionados = df_seleccionados.dropna(subset=[variable])  # Elimino registros en que no se tiene la variable (evita que el prom o sum de nan)
-            df_seleccionados = df_seleccionados.loc[(df_seleccionados['fecha'] >= fecha_limite) & (df_seleccionados['fecha'] < fecha_part)]
-            largo = len(df_seleccionados)
-
-            if largo > 0:
-                if type == "mean_pond":
-                    df_seleccionados = df_seleccionados.dropna(subset=[var_pond])  # Elimino registros en que no se tiene la variable (evita que el prom o sum de nan)
-
-                    if len(df_seleccionados) > 0:
-                        promedio_ponderado = (df_seleccionados[var_pond] * df_seleccionados[variable]).sum() / df_seleccionados[var_pond].sum()
-                        df.loc[idx, f'prom_pond_{variable}_ult_part'] = promedio_ponderado
-
-                elif type == "mean":
-                    promedio = df_seleccionados[variable].sum() / len(df_seleccionados[variable])  # df_seleccionados[variable].dropna().sum() / len(df_seleccionados[variable].dropna())
-                    df.loc[idx, f'prom_{variable}_ult_part'] = promedio
-
-                elif type == "sum":
-                    suma = df_seleccionados[variable].sum()  # df_seleccionados[variable].dropna().sum()
-                    df.loc[idx, f'sum_{variable}_ult_part'] = suma
-
-    return df
-
-def construct_variables_jug_in_part(df_part, df_jug_part):  # Agregar calculo de rating y min played
 
     l_condiciones = df_jug_part['condicion'].unique()
     l_titularidades = df_jug_part['titularidad'].unique()
@@ -221,6 +121,8 @@ def construct_variables_jug_in_part(df_part, df_jug_part):  # Agregar calculo de
     return df_part
 
 def prueba():
+    from p3_data_preparation import construct_data
+
     pais = "argentina"
 
     # Levanto datasets de prueba
@@ -229,15 +131,21 @@ def prueba():
     df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx')
     df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_fs_cleaned.xlsx')
 
-    # Relleno estadisticas en partidos de Whoscored usando datos de Flashscore
+    # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
     df_part = fill_whoscored_with_flashscore(df_part, df_part_flash)
 
     # Integro df_jug a df_jug_part
-    # df_jug_part_integ = map_data(df_jug, df_jug_part)
-    # df_jug_part_integ.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
+    df_jug_part = map_player_entities(df_jug, df_jug_part)
+
+    # Calculo edad y minutos jugados
+    df_jug_part = construct_data.determine_edad(df_part, df_jug_part)  # construct_data
+    df_jug_part = construct_data.determine_min_played(df_jug_part)  # construct_data
+    # Por jugador, construyo sum_min_played y prom_rating en ultimos n partidos --> para no requerir equipo, uso fecha
+    df_jug_part = construct_data.determine_var_en_ult_partidos(df_jug_part, 'min_played', type='sum')
+    df_jug_part = construct_data.determine_var_en_ult_partidos(df_jug_part, 'rating', type='mean_pond', var_pond='min_played')
 
     # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
-    # df_part_integ = integrate_player_to_part(df_jug_part_integ, df_part)
+    df_part_integ = map_player_to_part(df_jug_part, df_part)
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
