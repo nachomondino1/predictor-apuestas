@@ -4,8 +4,8 @@ import pandas as pd
 def concat_dfs():
 
     # Levanto datasets a concatenar
-    df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina/df_jug_part.xlsx')
-    df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/south_america/df_jug_part.xlsx')
+    df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina/df_part_fs.xlsx')
+    df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/south_america/df_part_fs.xlsx')
     # df_3 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/inglaterra/premier-league_1989_1990_inglaterra.xlsx')
 
     # Imprimo caracteristicas de cada dataframe a concatenar
@@ -14,6 +14,7 @@ def concat_dfs():
 
     print(df_2.head(1))
     print(df_2.shape)
+    df_2['fecha'] = pd.to_datetime(df_2['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
 
     # print(df_3.head(1))
     # print(df_3.shape)
@@ -29,7 +30,7 @@ def concat_dfs():
     df_sin_duplicados = df_concat.drop_duplicates().reset_index(drop=True)
     print(df_sin_duplicados.shape)
 
-    df_sin_duplicados.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina_south_america/df_jug_part.xlsx', index=False)
+    df_sin_duplicados.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina_south_america/df_part_fs.xlsx', index=False)
 
 
 concat_dfs()
