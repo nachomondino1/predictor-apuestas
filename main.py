@@ -97,7 +97,7 @@ class DataPreparation:  # 17.4 min
         df_jug['fecha_nac'] = pd.to_datetime(df_jug['fecha_nac'], format='%d-%m-%Y')
 
         # Entidad partido Flashscore: fecha y posesion
-        df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        df_part_flash['fecha'] = pd.to_datetime(df_part_flash['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
         df_part_flash = format_data.convert_posesion_to_int(df_part_flash)
 
         end = time.time()
@@ -138,7 +138,7 @@ class DataPreparation:  # 17.4 min
 
         return df_part_who, df_part_flash
 
-    def integrate_data(self, df_part_who, df_part_flash, df_jug_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part, df_part_flash, df_jug_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -150,15 +150,21 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Relleno estadisticas del partido en partidos viejos usando datos de Flashscore
-        df_part= integrate_data.rellenar_statistics_with_flashscore(df_part_who, df_part_flash)
+        # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
+        df_part = integrate_data.fill_whoscored_with_flashscore(df_part, df_part_flash)
 
         # Integro df_jug a df_jug_part
-        df_jug_part_integ = integrate_data.map_data(df_jug, df_jug_part)
-        df_jug_part_integ.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
+        df_jug_part = integrate_data.map_player_entities(df_jug, df_jug_part)
+
+        # Calculo edad y minutos jugados por jugador en cada partido
+        df_jug_part = construct_data.determine_edad(df_part, df_jug_part)  # construct_data
+        df_jug_part = construct_data.determine_min_played(df_jug_part)  # construct_data
+        # Por jugador, construyo sum_min_played y prom_rating en ultimos n partidos --> para no requerir equipo, uso fecha
+        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=30, tipo='sum')
+        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=30, tipo='mean_pond', var_pond='min_played')
 
         # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
-        df = integrate_data.integrate_player_to_part(df_jug_part_integ, df_part)
+        df = integrate_data.map_player_to_part(df_jug_part, df_part)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -168,7 +174,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def construct_data(self, df, N_ULT_PART=5, N_ULT_PART_LOC=3, peso_puntos=0.6,export=True):  # 2.7 minutos
+    def construct_data(self, df, n_dias, n_anios_historial, export=True):  # 2.7 minutos
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -180,28 +186,36 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nConstruyendo nuevos datos...")
 
+        # Definicion de variables
+        n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
+        n_anios_historial_loc = n_anios_historial * 2
+
         # Construyo variable respuesta: "equipo_gandor"
         df = construct_data.determinar_equipo_ganador(df)
 
+        # Determino diferencia de goles y puntos obtenidos
+        df = construct_data.determinar_dif_goles(df)
+        df = construct_data.determinar_puntos(df)
+
         # Construyo variables historicas
-        df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART_LOC, segun_loc=True)
-        df = construct_data.historial_entre_si(df, n_ult_part=N_ULT_PART, segun_loc=False)
+        # l_var = ['dif_goles', 'puntos', 'posesion']
+        l_var = ['dif_goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos', 'remates_fuera',
+                 'remates_block', 'porc_pases_comp', 'pases', 'pases_comp', 'pases_clave', 'amagues', 'duelos_aereos',
+                 'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
 
-        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART_LOC, peso_puntos=peso_puntos, por_localia=True)
-        df = construct_data.rendimiento_equipo(df, n_ult_part=N_ULT_PART, peso_puntos=peso_puntos, por_localia=False)
+        for variable in l_var:
+            df = construct_data.determine_var_en_ult_partidos(df, n_dias=n_dias, variable=variable, tipo='mean')
+            df = construct_data.determine_var_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=variable, tipo='mean')
 
-        l_estad_part = ['posesion', 'remates', 'remates_a_puerta', 'remates_palos', 'remates_fuera', 'remates_block',
-                        'porc_pases_comp', 'total_pases', 'pases_acer', 'pases_clave', 'amagues', 'duelos_aereos',
-                        'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
-        for var in l_estad_part:
-            df = construct_data.promediar_var_en_ult_partidos(df, n_ult_part=N_ULT_PART, variable=var)
-        # df = construct_data.n_dias_ult_partido(df)  # Numero de dias desde ultimo partido
+        # historial entre si
+        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
+        df = construct_data.historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
 
         # Elimino columnas usadas para construir datos
-        df = df.drop(columns=['goles_loc', 'goles_vis'], axis=1)
+        # df = df.drop(columns=['goles_loc', 'goles_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -225,9 +239,10 @@ class DataPreparation:  # 17.4 min
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha'], axis=1)
+        df = df.drop(['prom_edad_loc', 'prom_edad_vis',	'rating_loc', 'rating_vis', 'posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc', 'remates_a_puerta_vis', 'remates_palos_loc', 'remates_palos_vis', 'remates_fuera_loc', 'remates_fuera_vis', 'remates_block_loc', 'remates_block_vis', 'porc_pases_comp_loc', 'porc_pases_comp_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc', 'pases_comp_vis', 'pases_clave_loc', 'pases_clave_vis', 'amagues_loc', 'amagues_vis', 'duelos_aereos_loc', 'duelos_aereos_vis', 'tackles_loc', 'tackles_vis', 'intercepciones_loc', 'intercepciones_vis', 'corners_loc', 'corners_vis', 'faltas_loc', 'faltas_vis', 'offsides_loc', 'offsides_vis', 'ht_goles_loc', 'ht_goles_vis', 'goles_loc',	'goles_vis', 'dif_goles_loc', 'dif_goles_vis', 'puntos_loc', 'puntos_vis'], axis=1)
 
         # Elimino filas y columnas con alto porcentaje de NaN values
-        columns_to_check = ['dt_loc', 'dif_remates_segun_ult_part', 'dif_edad_tit']  # Si no tiene dts, estadisticas o formaciones, entonces borro el registro
+        columns_to_check = ['dif_remates_segun_ult_part']  # Si no tiene dts, estadisticas o formaciones, entonces borro el registro
         largo_inicial = len(df)
         df = df.dropna(subset=columns_to_check, how='any')
         print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
@@ -296,8 +311,8 @@ class Modeling:
         X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True) # Divido validacion + prueba en validacion y prueba
 
         # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
-        X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+        # X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
+        # X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
         print(f'Train: {X_train.shape} {y_train.shape}')
         print(f'Val: {X_val.shape} {y_val.shape}')
         print(f'Test: {X_test.shape} {y_test.shape}')
@@ -380,50 +395,45 @@ class Modeling:
         # print("Evaluando modelo con datos de prueba...")
         df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
-        # Quito cuotas de casas de apuestas y variable respuesta de df_test
-        X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-
         # Predecir las etiquetas para los datos de prueba
-        y_pred = model.predict(X_test_without_odds)  # es un numpy array
+        y_pred = model.predict(X_test)  # es un numpy array
 
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100  # recall = recall_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, average='macro') * 100  # f1 = f1_score(y_test, y_pred)
+        print(f"Precision de test: {test_accuracy:.1f}%")
+        print(f"Recall de prueba: {recall:.1f}%")
+        print(f"F1-score de prueba: {f1:.1f}%")
 
-        # Calculo roi y matriz de confusion
+        # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
         # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
-        df_results = X_test.copy().loc[:, ['odds_loc', 'odds_emp', 'odds_vis']]  # Agrego odds
+        df_results = pd.DataFrame()
         df_results[self.var_resp] = y_test  # Agrego y_real
         df_results[self.var_pred] = y_pred  # Agrego y_pred
 
         # Convierto variable respuesta y variable predicha en etiqueta
         df_results_etiquetas = format_data.revert_columns_from_int(df_results, df_etiquetas, columns=[self.var_resp, self.var_pred])
 
-        # Calculo roi
-        roi = calculate_roi(df_results_etiquetas, self.var_resp, self.var_pred) * 100
-        print(f"Precision promedio de prueba: {test_accuracy:.1f}%")
-        print(f"ROI promedio de prueba: {roi:.1f}%")
-        print(f"Recall promedio de prueba: {recall:.1f}%")
-        print(f"F1-score promedio de prueba: {f1:.1f}%")
-
         if export:
-            confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
+            # confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
             df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
 
-        return test_accuracy, recall, f1, roi
+        # return test_accuracy, recall, f1, roi
+        return test_accuracy, recall, f1
 
 def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "argentina_south_america"
     export = True
 
     # Procesamiento
     data_unders = False
-    data_prep = True
-    modeling = False
+    data_prep = False
+    modeling = True
 
     if data_unders:
 
@@ -441,40 +451,39 @@ def main():
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
-        N_ULT_PART = 5  # Numero de partidos a tener en cuenta para variables historicas como posesion en ult partidos
-        N_ULT_PART_LOC = 3
-        peso_puntos = 0.6
-        thr_nan_col = 0.2
+        n_dias = 30  # 30 es como N_ULT_PART igual a 5...
+        n_anios_historial = 2
+        thr_nan_col = 0.5
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
         # Levanto datasets
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-        df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-        df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
-        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_integrated.xlsx')
+        # df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+        # df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
+        # df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+        # df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx', index_col=0)
 
         # Preparo el dataset para el analisis
-        df_part, df_part_flash, df_jug = dp.format_data(df_part, df_part_flash, df_jug)
-        df_part, df_part_flash = dp.clean_data(df_part, df_part_flash)
-        df = dp.integrate_data( df_part, df_part_flash, df_jug_part, df_jug)
-        # df = dp.construct_data(df, N_ULT_PART=N_ULT_PART, N_ULT_PART_LOC=N_ULT_PART_LOC, peso_puntos=peso_puntos)
-        # df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+        # df_part, df_part_flash, df_jug = dp.format_data(df_part, df_part_flash, df_jug)
+        # df_part, df_part_flash = dp.clean_data(df_part, df_part_flash)
+        # df = dp.integrate_data(df_part, df_part_flash, df_jug_part, df_jug)
+        # df = dp.construct_data(df, n_dias, n_anios_historial)
+        df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
     if modeling:
         # Definicion de variables
         print(" Modeling ".center(120, "#"))
         mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
-        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score', 'test_roi'])  # Datos del modelo y su precision y roi
+        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su precision y roi
         l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
                      SVC(), MLPClassifier(), GradientBoostingClassifier()]
 
         # Hiperparametros
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
-        bal_type = 'over'  # Tipo de balanceo a realizar [None, 'over', 'under']
-        fill_na = None  # Relleno de nan values [None, mode, ml]
+        bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
+        fill_na = 'ml'  # Relleno de nan values [None, mode, ml]
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
 
         # Levanto dataset para prueba
@@ -488,10 +497,12 @@ def main():
 
             # Entreno modelo y evaluo su rendimiento
             model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
-            accuracy, recall, f1, roi = mo.assess_model(model_best_params, X_test, y_test)
+            # accuracy, recall, f1, roi = mo.assess_model(model_best_params, X_test, y_test)
+            accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test)
 
             # Guardo modelo
-            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1, roi]
+            # df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1, roi]
+            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1]
 
         # Selecciono el mejor modelo
         idx = df_models['test_accuracy'].idxmax()  # idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
@@ -501,13 +512,13 @@ def main():
         bm_test_acc = df_models.loc[idx, 'test_accuracy']
         bm_test_rec = df_models.loc[idx, 'test_recall']
         bm_test_f1 = df_models.loc[idx, 'test_f1_score']
-        bm_test_roi = df_models.loc[idx, 'test_roi']
+        # bm_test_roi = df_models.loc[idx, 'test_roi']
         print(f"\nEl mejor modelo es: {bm_name} con: "
               f"\n\t- Train Precision: {bm_train_acc:.1f}% "
               f"\n\t- Test Precision: {bm_test_acc:.1f}% "
               f"\n\t- Test recall: {bm_test_rec:.1f}%\n"
               f"\n\t- Test f1-score: {bm_test_f1:.1f}%\n"
-              f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
+              # f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
               )
 
         if export:
