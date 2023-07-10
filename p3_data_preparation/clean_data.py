@@ -20,7 +20,6 @@ def prepare_text_columns(df, l_col_to_except):
     df = tp.delete_accent(df, columns=l_cols_to_process)
     df = tp.delete_special_characters(df, columns=l_cols_to_process)
     df = tp.delete_punctuation(df, columns=l_cols_to_process)
-
     return df
 
 def set_columns_to_process(df, l_col_to_except):
@@ -29,31 +28,6 @@ def set_columns_to_process(df, l_col_to_except):
     l_cols_to_process = [col for col in l_cols_object if col not in l_col_to_except]
     print("Columnas tipo object a preparar:", l_cols_to_process)
     return l_cols_to_process
-
-def clean_teams_names(df):
-    """
-    Limpia y cambia el nombre de algunos equipos en el dataframe.
-    :param df: Dataframe con columnas "equipo_loc" y "equipo_vis"
-    :return: Dataframe con nombres de equipos modificados y limpios
-    """
-    # Limpio string 'Vencedor' en el nombre de algunos equipos.
-    d_sub_strings_adic = {'vencedor': '', 'equipo que avanza': ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
-    df['equipo_loc'] = df['equipo_loc'].replace(d_sub_strings_adic, regex=True).str.strip()
-    df['equipo_vis'] = df['equipo_vis'].replace(d_sub_strings_adic, regex=True).str.strip()
-
-    # Quitar abreviaturas en nombres de equipos (NO FUNCIONA...)
-    d_abrev_team_names = {' l p': ' la plata', 'atl ': 'atletico ', ' jrs': ' juniors', ' utd': ' united'}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
-    df['equipo_loc'] = df['equipo_loc'].replace(d_abrev_team_names, regex=True).str.strip()
-    df['equipo_vis'] = df['equipo_vis'].replace(d_abrev_team_names, regex=True).str.strip()
-
-    # Reemplazo nombres enteros de equipos para que sea igual a los de la entidad jugador
-    d_team_names = {'estudiantes la plata': 'estudiantes', 'qpr': 'queens park rangers',  'wolves': 'wolverhampton',
-                    'west brom': 'west bromwich albion'}
-    for equipo_part, equipo_jug in d_team_names.items():
-        df['equipo_loc'] = df['equipo_loc'].replace(equipo_part, equipo_jug)
-        df['equipo_vis'] = df['equipo_vis'].replace(equipo_part, equipo_jug)
-
-    return df
 
 # TRATAMIENTO DE NAN VALUES
 def fill_nan_values(X, y, type):
@@ -159,7 +133,7 @@ def eliminar_columnas_nan(df, umbral):
 
     # Elimina las columnas identificadas del DataFrame
     df_sin_nan = df.drop(columnas_eliminar, axis=1).reset_index(drop=True)  # es clave el drop=True para eliminar el indice viejo sino agrega la columna "index"
-    print(f"Se eliminaron {len(list(columnas_eliminar))} columnas por tener un % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
+    print(f"Se eliminaron {len(list(columnas_eliminar))} de {len(df.columns)} columnas por tener un % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
     return df_sin_nan
 
 def prueba():

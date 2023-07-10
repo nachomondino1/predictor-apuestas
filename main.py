@@ -74,7 +74,7 @@ class DataPreparation:  # 17.4 min
         self.var_resp = var_resp
         self.pais = pais
 
-    def format_data(self, df_part, df_part_flash, df_jug, export=True):  # 0.0 min
+    def format_data(self, df_part, df_jug, export=True):  # 0.0 min
         """
         Arreglo el data type de algunas variables.
 
@@ -96,49 +96,16 @@ class DataPreparation:  # 17.4 min
         # Entidad jugador: fecha
         df_jug['fecha_nac'] = pd.to_datetime(df_jug['fecha_nac'], format='%d-%m-%Y')
 
-        # Entidad partido Flashscore: fecha y posesion
-        df_part_flash['fecha'] = pd.to_datetime(df_part_flash['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
-        df_part_flash = format_data.convert_posesion_to_int(df_part_flash)
-
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
-            df_part_flash.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_fs_formated.xlsx', index=False)
             df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
 
-        return df_part, df_part_flash, df_jug
+        return df_part, df_jug
 
-    def clean_data(self, df_part_who, df_part_flash, export=True):  # 0.0 min
-        """
-        Limpia los datos de un dataframe.
-
-        :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe limpiado. (DataFrame)
-        """
-        start = time.time()
-        print("\nLimpiando los datos...")
-
-        # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-        df_part_who = clean_data.prepare_text_columns(df_part_who, l_col_to_except=['temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-        df_part_flash = clean_data.prepare_text_columns(df_part_flash, l_col_to_except=['id', 'temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
-
-        # Remuevo strings adicionales en los nombres de los equipos
-        df_part_flash = clean_data.clean_teams_names(df_part_flash)
-
-        end = time.time()
-        print(f"Limpieza de datos en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df_part_who.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_cleaned.xlsx', index=False)
-            df_part_flash.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_fs_cleaned.xlsx', index=False)
-
-        return df_part_who, df_part_flash
-
-    def integrate_data(self, df_part, df_part_flash, df_jug_part, df_jug, export=True):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part, df_jug_part, df_jug, fill_data_with_flashcore=False, n_dias_player_data=30, export=True):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -151,17 +118,19 @@ class DataPreparation:  # 17.4 min
         print("\nIntegrando los datos...")
 
         # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
-        df_part = integrate_data.fill_whoscored_with_flashscore(df_part, df_part_flash)
+        if fill_data_with_flashcore:
+            df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
+            df_part = integrate_data.fill_whoscored_with_flashscore(df_part, df_part_flash)
 
         # Integro df_jug a df_jug_part
         df_jug_part = integrate_data.map_player_entities(df_jug, df_jug_part)
 
         # Calculo edad y minutos jugados por jugador en cada partido
-        df_jug_part = construct_data.determine_edad(df_part, df_jug_part)  # construct_data
-        df_jug_part = construct_data.determine_min_played(df_jug_part)  # construct_data
-        # Por jugador, construyo sum_min_played y prom_rating en ultimos n partidos --> para no requerir equipo, uso fecha
-        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=30, tipo='sum')
-        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=30, tipo='mean_pond', var_pond='min_played')
+        df_jug_part = construct_data.add_fecha(df_part, df_jug_part)
+        df_jug_part = construct_data.determine_edad(df_jug_part)
+        df_jug_part = construct_data.determine_min_played(df_jug_part)
+        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=n_dias_player_data, tipo='sum')
+        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=n_dias_player_data, tipo='mean_pond', var_pond='min_played')
 
         # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
         df = integrate_data.map_player_to_part(df_jug_part, df_part)
@@ -190,38 +159,63 @@ class DataPreparation:  # 17.4 min
         n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
 
-        # Construyo variable respuesta: "equipo_gandor"
+        # Construyo variables: "equipo_gandor", diferencia de goles y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
-
-        # Determino diferencia de goles y puntos obtenidos
         df = construct_data.determinar_dif_goles(df)
         df = construct_data.determinar_puntos(df)
 
         # Construyo variables historicas
-        # l_var = ['dif_goles', 'puntos', 'posesion']
         l_var = ['dif_goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos', 'remates_fuera',
                  'remates_block', 'porc_pases_comp', 'pases', 'pases_comp', 'pases_clave', 'amagues', 'duelos_aereos',
                  'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
-
+        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
+        df = construct_data.historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
         for variable in l_var:
             df = construct_data.determine_var_en_ult_partidos(df, n_dias=n_dias, variable=variable, tipo='mean')
             df = construct_data.determine_var_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=variable, tipo='mean')
-
-        # historial entre si
-        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
-        df = construct_data.historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
 
         # Elimino columnas usadas para construir datos
-        # df = df.drop(columns=['goles_loc', 'goles_vis'], axis=1)
+        df = df.drop(['prom_edad_loc', 'prom_edad_vis',	'rating_loc', 'rating_vis', 'posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc', 'remates_a_puerta_vis', 'remates_palos_loc', 'remates_palos_vis', 'remates_fuera_loc', 'remates_fuera_vis', 'remates_block_loc', 'remates_block_vis', 'porc_pases_comp_loc', 'porc_pases_comp_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc', 'pases_comp_vis', 'pases_clave_loc', 'pases_clave_vis', 'amagues_loc', 'amagues_vis', 'duelos_aereos_loc', 'duelos_aereos_vis', 'tackles_loc', 'tackles_vis', 'intercepciones_loc', 'intercepciones_vis', 'corners_loc', 'corners_vis', 'faltas_loc', 'faltas_vis', 'offsides_loc', 'offsides_vis', 'ht_goles_loc', 'ht_goles_vis', 'goles_loc',	'goles_vis', 'dif_goles_loc', 'dif_goles_vis', 'puntos_loc', 'puntos_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
+
+        return df
+
+    def clean_data(self, df, thr_nan_col=None, export=True):  # 0.0 min
+        """
+        Limpia los datos de un dataframe.
+
+        :param df: Dataframe de los datos de los partidos. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
+        :return: Dataframe limpiado. (DataFrame)
+        """
+        start = time.time()
+        print("\nLimpiando los datos...")
+
+        # Eliminacion de NaN values
+        # Elimino filas y columnas con alto porcentaje de NaN values
+        largo_inicial = len(df)
+        df = df.dropna(subset=['dif_remates_segun_ult_part'], how='any')
+        print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
+
+        if thr_nan_col is not None:
+            df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
+
+        # Verificar que no haya outliers
+        # ...
+
+        end = time.time()
+        print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
+
+        if export:
+            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_cleaned.xlsx',index=False)
 
         return df
 
@@ -239,16 +233,6 @@ class DataPreparation:  # 17.4 min
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha'], axis=1)
-        df = df.drop(['prom_edad_loc', 'prom_edad_vis',	'rating_loc', 'rating_vis', 'posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc', 'remates_a_puerta_vis', 'remates_palos_loc', 'remates_palos_vis', 'remates_fuera_loc', 'remates_fuera_vis', 'remates_block_loc', 'remates_block_vis', 'porc_pases_comp_loc', 'porc_pases_comp_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc', 'pases_comp_vis', 'pases_clave_loc', 'pases_clave_vis', 'amagues_loc', 'amagues_vis', 'duelos_aereos_loc', 'duelos_aereos_vis', 'tackles_loc', 'tackles_vis', 'intercepciones_loc', 'intercepciones_vis', 'corners_loc', 'corners_vis', 'faltas_loc', 'faltas_vis', 'offsides_loc', 'offsides_vis', 'ht_goles_loc', 'ht_goles_vis', 'goles_loc',	'goles_vis', 'dif_goles_loc', 'dif_goles_vis', 'puntos_loc', 'puntos_vis'], axis=1)
-
-        # Elimino filas y columnas con alto porcentaje de NaN values
-        columns_to_check = ['dif_remates_segun_ult_part']  # Si no tiene dts, estadisticas o formaciones, entonces borro el registro
-        largo_inicial = len(df)
-        df = df.dropna(subset=columns_to_check, how='any')
-        print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
-
-        if thr_nan_col is not None:
-            df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -259,13 +243,13 @@ class DataPreparation:  # 17.4 min
             l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
             df = df.drop(l_columnas_a_eliminar, axis=1)
 
-        # Selecciono las variables mas importantes (feature selection)
+        # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
-            l_selected_features = select_data.select_best_features(df, self.var_resp, thr_fs=thr_fs, graf=export)
-            columns_to_select = l_selected_features + ['odds_loc', 'odds_emp', 'odds_vis', self.var_resp]
-            df = df.filter(columns_to_select)
+            l_not_important_features = select_data.select_best_features(df, self.var_resp, thr_fs=thr_fs, graf=True)
+            df = df.drop(l_not_important_features, axis=1)
 
         end = time.time()
+        print(f"Las siguientes {len(df.columns)} columnas son las seleccionadas: {df.columns}")
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
@@ -309,10 +293,6 @@ class Modeling:
         # Separo conjunto de datos en train, validation y test
         X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size,random_state=42, shuffle=True)  # Divido todos los  datos en train y validacion + prueba
         X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True) # Divido validacion + prueba en validacion y prueba
-
-        # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
-        # X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
-        # X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)
         print(f'Train: {X_train.shape} {y_train.shape}')
         print(f'Val: {X_val.shape} {y_val.shape}')
         print(f'Test: {X_test.shape} {y_test.shape}')
@@ -432,8 +412,8 @@ def main():
 
     # Procesamiento
     data_unders = False
-    data_prep = False
-    modeling = True
+    data_prep = True
+    modeling = False
 
     if data_unders:
 
@@ -451,6 +431,8 @@ def main():
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
+        fill_with_fs = True  # Relleno datos con flashscore {True, False}
+        n_dias_player_data = 365  # Numero de dias para tener en cuenta en construccion de variables historicas para jugadores
         n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 2
         thr_nan_col = 0.5
@@ -458,18 +440,17 @@ def main():
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
         # Levanto datasets
-        # df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-        # df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
-        # df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-        # df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx', index_col=0)
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+        df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx', index_col=0)
 
         # Preparo el dataset para el analisis
-        # df_part, df_part_flash, df_jug = dp.format_data(df_part, df_part_flash, df_jug)
-        # df_part, df_part_flash = dp.clean_data(df_part, df_part_flash)
-        # df = dp.integrate_data(df_part, df_part_flash, df_jug_part, df_jug)
-        # df = dp.construct_data(df, n_dias, n_anios_historial)
-        df = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+        df_part, df_jug = dp.format_data(df_part, df_jug)
+        df = dp.integrate_data(df_part, df_jug_part, df_jug, fill_data_with_flashcore=fill_with_fs, n_dias_player_data=n_dias_player_data)
+        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
+        df = dp.clean_data(df, thr_nan_col=thr_nan_col)
+        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
     if modeling:
         # Definicion de variables
