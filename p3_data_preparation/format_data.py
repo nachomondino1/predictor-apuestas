@@ -3,44 +3,6 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
 
-def convert_posesion_to_int(df):
-    """
-     Transforma la posesión de string a float.
-
-     :param df: Dataframe con columnas 'posesion_loc' y 'posesion_vis', donde la posesión se representa como un string,
-                por ejemplo, '65%'.
-     :return: Dataframe con la columna 'posesion' interpretada como float, por ejemplo, 0.65.
-     """
-    df['posesion_loc'] = df['posesion_loc'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
-    df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
-    return df
-
-def convert_valor_mercado_to_int(df):
-    """
-     Transforma el valor de mercado de string a float.
-
-     :param df: Dataframe con columna 'valor_mercado' cuyos valores son un string, por ejemplo, '€1.2M'.
-     :return: Dataframe con la columna 'valor_mercado' interpretada como float, por ejemplo, 1.200.000.
-     """
-    d = {'M': 1000000, 'K': 1000}
-
-    def convertir_valor_mercado(valor_mercado_str):
-
-        # Si no se tiene el dato del valor de mercado
-        if valor_mercado_str == "€0":
-            return None
-
-        # Si se tiene el dato del valor de mercado
-        else:
-            for elem in d.keys():
-                if elem in valor_mercado_str:
-                    valor_mercado_int = float(valor_mercado_str.replace("€", "").replace(elem, "")) * d[elem]
-                    return valor_mercado_int
-            return None
-
-    df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
-    return df
-
 def convert_columns_to_int(df, df_etiquetas=None):
     """
     Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores
@@ -60,13 +22,20 @@ def convert_columns_to_int(df, df_etiquetas=None):
 
     # Por variable string
     for col in df.select_dtypes(include=['object']).columns:
-        if col not in df_etiquetas['variable'].unique():
-            df_etiquetas_tmp = pd.DataFrame({'variable': [col] * len(df[col]),
-                                             'valor_orig': df[col],
-                                             'valor_int': le.fit_transform(df[col])})
-            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_tmp], ignore_index=True)
+        print("Columna: ", col)
 
-        df[col] = df[col].map(df_etiquetas.loc[df_etiquetas['variable'] == col].set_index('valor_orig')['valor_int'])
+        if col not in df_etiquetas['variable'].unique():
+
+            # Convierto columna a int
+            df[col] = le.fit_transform(df[col])
+
+            # Guardo etiquetas
+            l_valor_orig = le.classes_
+            l_valor_int = le.transform(l_valor_orig)
+
+            # Guardo en dataframe
+            for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
+                df_etiquetas.loc[len(df_etiquetas)] = [col, valor_orig, valor_int]
     return df, df_etiquetas
 
 def revert_columns_from_int(df, df_etiquetas, columns=None):
