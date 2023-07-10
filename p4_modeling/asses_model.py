@@ -3,41 +3,6 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 # from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
-
-def calculate_roi(df_result, var_resp, var_pred):
-    """
-    Calcula ROI comparando las predicciones del modelo y los resultados reales.
-    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
-    :param var_resp: Nombre de la variable respuesta. (str)
-    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
-    :return: ROI del modelo. (float)
-    """
-    # Definicion de variables
-    ingresos = 0
-    inversion = len(df_result)  # Suponiendo 1 euro por cada partido del df_test
-
-    # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    df_correct = df_result[df_result[var_resp] == df_result[var_pred]]
-    # print(df_correct.shape)
-
-    # Por registro
-    for idx in df_correct.index:
-
-        etiqueta = df_correct.loc[idx, var_resp]
-
-        # Obtengo el ingreso obtenido segun la etiqueta
-        ingreso = df_result.loc[idx, 'odds_loc'] if etiqueta == "Local" else df_result.loc[idx, 'odds_emp'] if etiqueta == "Empate" else df_result.loc[idx, 'odds_vis']  # Vefificada
-        ingresos += ingreso
-        # print(f"Ganamos ${ingreso}")
-
-    # Calculo el ROI e imprimo resultados
-    roi = (ingresos - inversion) / inversion
-    # print(f" RESULTADOS ".center(120, "#"))
-    # print(f"Dinero invertido: ${inversion}")
-    # print(f"Dinero luego de apuestas: ${ingresos}")
-    # print(f"ROI: {roi:.2f}%")
-    return roi
-
 def calculate_precision(df_result, var_resp, var_pred):
     """
     Calcula precision del modelo comparando sus predicciones y lo real
@@ -66,7 +31,6 @@ def confusion_matrix(y_real, y_pred):
     # Calculo los numeros para la matriz de confusion
     confusion_matrix = metrics.confusion_matrix(y_real, y_pred)
 
-
     # Imprimo matriz de confusion
     cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix,
                                                 display_labels=y_real.unique())
@@ -80,8 +44,6 @@ def prueba():
     df = pd.read_excel('/Users/nachomondino/Desktop/df_results.xlsx')
 
     calculate_precision(df, var_resp=var_resp, var_pred=var_pred)
-
-    calculate_roi(df, var_resp, var_pred)
 
     # confusion_matrix(df, var_resp, var_pred)
     # df_cm.to_excel('/Users/nachomondino/Desktop/cm.xlsx')
@@ -125,6 +87,7 @@ def graficar_matriz_conf(self, n_cv: int) -> None:
     best_model_idx = self.cv_results['test_precision_macro'].argmax()
     best_model = self.cv_results['estimator'][best_model_idx]
     self.y_pred = cross_val_predict(best_model, self.X_bal, self.y_bal, cv=n_cv)
+    
     # Calculamos la matriz de confusión utilizando los datos de prueba
     conf_mat = confusion_matrix(self.y_bal, self.y_pred)
     print("Precision del mejor modelo: {:.3f}".format(self.cv_results['test_precision_macro'][best_model_idx]))
