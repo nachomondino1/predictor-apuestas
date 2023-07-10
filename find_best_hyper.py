@@ -2,17 +2,15 @@
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
-from modeling import build_model
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-import lightgbm as lgb  # Gradient Boosting
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 
 
-def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de datos reducido antes de separar en train, val y test?
+def find_best_hiperparameters(var_resp, var_pred, pais):
 
     # Definicion de variables
     df_res = pd.DataFrame()
@@ -23,117 +21,125 @@ def find_best_hiperparameters(var_resp, var_pred, pais):  # Usar un conjunto de 
     mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
 
     # Definicion de hiperparametros
-    param_construct = {'n_ult_part': [10, 5], 'n_ult_part_loc': [3, 5], 'peso_puntos':[0.6]}
-    param_select = {'thr_nan_col': [0.2, None], 'thr_corr': [0.5, None], 'thr_fs': [0.3, 0.2, 0.1, None]}  # 'thr_nan_col': [0.2, 0.5, None]
+    param_integrate = {'fill_with_fs': [True, False], 'n_dias_player_data': [365]}
+    param_construct = {'n_dias': [30], 'n_anios_historial': [2]}
+    param_clean = {'thr_nan_col': [0.2, None]}
+    param_select = {'thr_corr': [0.5, None], 'thr_fs': [0.2, 0.1, 0.3]}  # 'thr_nan_col': [0.2, 0.5, None]
     param_mod = {'test_val_size': [0.2], 'test_size': [0.5], 'fill_na': [None, 'ml'],
                  'bal_type': [None, 'under', 'over'], 'k': [5]}
 
     # Imprimo largo de iteraciones
-    n_iter, n_horas = define_n_iterations(l_dicts=[param_construct, param_select, param_mod])
-    print(f"Numero de iteraciones totales: {n_iter} \nTiempo estimado: {n_horas} horas")
+    n_iter = define_n_iterations(l_dicts=[param_construct, param_select, param_mod])
+    print(f"Numero de iteraciones totales: {n_iter}")
 
-    # Por combinacion de parametros de construct_data
-    for i, param_values in enumerate(product(*param_construct.values()), start=1):
+    for x, param_values_1 in enumerate(product(*param_integrate.values()), start=1):
 
         # Asigno valor a cada hiperpametro
-        n_ult_part, n_ult_part_loc, peso_puntos = param_values[0], param_values[1], param_values[2]
-        print(f" Iteracion Nº {i} ".center(120, "#"))
-        print(f'Hiper construct --> n_ult_part: {n_ult_part} ; n_ult_part_loc: {n_ult_part_loc} ; peso_puntos: {peso_puntos}')
+        fill_with_fs, n_dias_player_data = param_values_1[0], param_values_1[1]
+        print(f'Hiper integrate --> fill_with_fs: {fill_with_fs} ; n_dias_player_data: {n_dias_player_data}')
 
-        # Pruebo a levantar dataset ya construido
-        try:
-            df = pd.read_excel(
-                f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed_{n_ult_part}_{n_ult_part_loc}_{peso_puntos}.xlsx')
+        # Integro datos
+        df = dp.integrate_data(df_part, df_jug_part, df_jug, fill_data_with_flashcore=fill_with_fs, n_dias_player_data=n_dias_player_data)
 
-        except:
-            # Levanto dataset integrado (es el mismo siempre)
-            df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
-
-            # Construyo datos
-            df = dp.construct_data(df, N_ULT_PART=n_ult_part, N_ULT_PART_LOC=n_ult_part_loc, peso_puntos=peso_puntos)
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed_{n_ult_part}_{n_ult_part_loc}_{peso_puntos}.xlsx', index=False)
-
-        # Por combinacion de parametros de select_data
-        for j, param_values in enumerate(product(*param_select.values()), start=1):
+        # Por combinacion de parametros de construct_data
+        for i, param_values_2 in enumerate(product(*param_construct.values()), start=1):
 
             # Asigno valor a cada hiperpametro
-            thr_nan_col, thr_corr, thr_fs = param_values[0], param_values[1], param_values[2]
-            print(f" Iteracion Nº {i}.{j} ".center(120, "+"))
-            print(f"Hiper select --> thr_nan_col: {thr_nan_col} ; thr_corr: {thr_corr} ; thr_fs: {thr_fs}")
+            n_dias, n_anios_historial = param_values_2[0], param_values_2[1]
+            print(f" Iteracion Nº {i} ".center(120, "#"))
+            print(f'Hiper construct --> n_dias: {n_dias} ; n_anios_historial: {n_anios_historial}')
 
-            # Selecciono datos
-            df_sel = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
-            # df_sel.to_excel(f'/Users/nachomondino/Desktop/df_selected_{pais}.xlsx')
+            # Pruebo a levantar dataset ya construido
+            try:
+                df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed_{n_dias}_{n_anios_historial}.xlsx')
 
-            # Reduzco el tamaño del dataset para acelerar la seleccion de hiperparametros?  # Tal vez, con la normalizacion de valor de mercado, es mas rapido pq le cuesta menos al no tener valores grandes
-            # Seleccionar n filas al azar
-            # n_reg = int(0.2 * len(df_sel))
-            # df_sel = df_sel.sample(n=n_reg)
-            # print(f"Se seleccionaron solo {n_reg} registros de los {len(df)} para acelerar la busqueda de hiperparametros optimos")
+            except:
+                # Levanto dataset integrado (es el mismo siempre)
+                df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/argentina/df_integrated.xlsx')
 
-            # Por combinacion de parametros de modeling
-            for h, param_val in enumerate(product(*param_mod.values()), start=1):
+                # Construyo datos
+                df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
+                df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_constructed_{n_dias}_{n_anios_historial}.xlsx', index=False)
 
-                # Asigno valor a cada hiperparametro
-                test_val_size, test_size, fill_na, bal_type, k = param_val[0], param_val[1], param_val[2], param_val[3], param_val[4]
-                print(f" Iteracion Nº {i}.{j}.{h} ".center(120, "-"))
-                print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; k: {k}")
+            for m, param_values_3 in enumerate(product(*param_clean.values()), start=1):
 
-                df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score', 'test_roi'])  # Datos del modelo y su precision y roi
+                # Asigno valor a cada hiperpametro
+                thr_nan_col = param_values_3[0]
 
-                # Reduzco el tamaño del dataset para acelerar la seleccion de hiperparametros?  # Tal vez, con la normalizacion de valor de mercado, es mas rapido pq le cuesta menos al no tener valores grandes
+                # Limpio datos
+                df = dp.clean_data(df, thr_nan_col=thr_nan_col, export=False)
+                print(f"Hiper clean --> thr_nan_col: {thr_nan_col}")
 
-                # Generar el diseño de la prueba
-                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, fill_na=fill_na)
+                # Por combinacion de parametros de select_data
+                for j, param_values_4 in enumerate(product(*param_select.values()), start=1):
 
-                # Por modelo
-                for modelo in l_modelos:
+                    # Asigno valor a cada hiperpametro
+                    thr_nan_col, thr_corr, thr_fs = param_values_4[0], param_values_4[1], param_values_4[2]
+                    print(f" Iteracion Nº {i}.{j} ".center(120, "+"))
+                    print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")
 
-                    # Entreno modelo y evaluo su rendimiento
-                    model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
-                    accuracy, recall, f1, roi = mo.assess_model(model_best_params, X_test, y_test, export=False)
+                    # Selecciono datos
+                    df_sel = dp.select_data(df, thr_nan_col=thr_nan_col, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                    # df_sel.to_excel(f'/Users/nachomondino/Desktop/df_selected_{pais}.xlsx')
 
-                    # Guardo modelo
-                    df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1, roi]
+                    # Por combinacion de parametros de modeling
+                    for h, param_values_5 in enumerate(product(*param_mod.values()), start=1):
 
-                # Selecciono el mejor modelo
-                idx = df_models['test_accuracy'].idxmax()  # idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
-                bm_name = df_models.loc[idx, 'model_name']
-                bm_params = df_models.loc[idx, 'model_trained']
-                bm_train_acc = df_models.loc[idx, 'train_cv_accuracy']
-                bm_test_acc = df_models.loc[idx, 'test_accuracy']
-                bm_test_rec = df_models.loc[idx, 'test_recall']
-                bm_test_f1 = df_models.loc[idx, 'test_f1_score']
-                bm_test_roi = df_models.loc[idx, 'test_roi']
-                print(f"\nEl mejor modelo es: {bm_name} con: "
-                      f"\n\t- Train Precision: {bm_train_acc:.1f}% "
-                      f"\n\t- Test Precision: {bm_test_acc:.1f}% "
-                      f"\n\t- Test recall: {bm_test_rec:.1f}%"
-                      f"\n\t- Test f1-score: {bm_test_f1:.1f}%"
-                      f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
-                      )
+                        # Asigno valor a cada hiperparametro
+                        test_val_size, test_size, fill_na, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3], param_values_5[4]
+                        print(f" Iteracion Nº {i}.{j}.{h} ".center(120, "-"))
+                        print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; k: {k}")
 
-                # Guardo datos en dataframe
-                row_data = {'n_ult_part': n_ult_part, 'n_ult_part_loc': n_ult_part_loc, 'peso_puntos': peso_puntos,
-                            'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr,
-                            'thr_fs': thr_fs, 'fill_na': fill_na, 'bal_type': bal_type,
-                            'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
-                            'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
-                            'k': k, 'best_model': bm_name, 'best_model_params': bm_params,
-                            'test_recall': bm_test_rec, 'test_f1': bm_test_f1,
-                            'train_accuracy': bm_train_acc, 'test_accuracy': bm_test_acc, 'test_roi': bm_test_roi}
-                df_res = df_res.append(row_data, ignore_index=True)
-                print(row_data)
-                print(df_res)
-                df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod.xlsx', index=False)
+                        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su precision y roi
 
-                # Verificar si la precisión actual es la mejor hasta ahora
-                if bm_test_acc > best_accuracy:
-                    best_accuracy = bm_test_acc
-                    best_hyperparameters = row_data
-                    print("EL MEJOR MODELO HASTA AHORA!")
-                else:
-                    print(f"Tiene un precision menor a {best_accuracy}")
+                        # Generar el diseño de la prueba
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, fill_na=fill_na)
+
+                        # Por modelo
+                        for modelo in l_modelos:
+
+                            # Entreno modelo y evaluo su rendimiento
+                            model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
+                            accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test, export=False)
+
+                            # Guardo modelo
+                            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1]
+
+                        # Selecciono el mejor modelo
+                        idx = df_models['test_accuracy'].idxmax()
+                        bm_name = df_models.loc[idx, 'model_name']
+                        bm_params = df_models.loc[idx, 'model_trained']
+                        bm_train_acc = df_models.loc[idx, 'train_cv_accuracy']
+                        bm_test_acc = df_models.loc[idx, 'test_accuracy']
+                        bm_test_rec = df_models.loc[idx, 'test_recall']
+                        bm_test_f1 = df_models.loc[idx, 'test_f1_score']
+                        print(f"\nEl mejor modelo es: {bm_name} con: "
+                              f"\n\t- Train Precision: {bm_train_acc:.1f}% "
+                              f"\n\t- Test Precision: {bm_test_acc:.1f}% "
+                              f"\n\t- Test recall: {bm_test_rec:.1f}%"
+                              f"\n\t- Test f1-score: {bm_test_f1:.1f}%"
+                              )
+
+                        # Guardo datos en dataframe
+                        row_data = {'n_dias': n_dias, 'n_anios_hist': n_anios_historial,
+                                    'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                                    'fill_na': fill_na, 'bal_type': bal_type, 'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                    'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                                    'k': k, 'best_model': bm_name, 'best_model_params': bm_params,
+                                    'test_recall': bm_test_rec, 'test_f1': bm_test_f1,
+                                    'train_accuracy': bm_train_acc, 'test_accuracy': bm_test_acc}
+                        df_res = df_res.append(row_data, ignore_index=True)
+                        print(row_data)
+                        print(df_res)
+                        df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod.xlsx', index=False)
+
+                        # Verificar si la precisión actual es la mejor hasta ahora
+                        if bm_test_acc > best_accuracy:
+                            best_accuracy = bm_test_acc
+                            best_hyperparameters = row_data
+                            print("EL MEJOR MODELO HASTA AHORA!")
+                        else:
+                            print(f"Tiene un precision menor a {best_accuracy}")
 
     # Imprimir los hiperparámetros óptimos y la precisión correspondiente
     print("Mejores hiperparámetros:", best_hyperparameters)
@@ -153,13 +159,11 @@ def define_n_iterations(l_dicts):
     for dict in l_dicts:
         for key in dict.keys():
             n_iter *= len(dict[key])
-    ritmo = 5.35  # iteraciones/hora  --> depende de cada iteracion pero en promedio. Depende mucho de que algoritmos pruebo.
-    n_horas = n_iter / ritmo
-    return n_iter, n_horas
+    return n_iter
 
 
 def main():
-    pais, var_resp, var_pred = "argentina", 'equipo_ganador', 'y_pred'
+    pais, var_resp, var_pred = "argentina_south_america", 'equipo_ganador', 'y_pred'
     find_best_hiperparameters(var_resp, var_pred, pais)
 
 if __name__ == '__main__':
