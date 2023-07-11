@@ -61,9 +61,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
         # Integro datos
         # Pruebo a levantar dataset ya integrado
         try:
-            df = pd.read_excel(
-                f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_{fill_with_fs}_{n_dias_player_data}.xlsx')
-
+            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_{fill_with_fs}_{n_dias_player_data}.xlsx')
         except FileNotFoundError:
             # Levanto datasets formateado
             df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx')
@@ -82,13 +80,12 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
             print(f" Iter Nº {x}.{i} ".center(120, "#"))
             print(f'Hiper construct --> n_dias: {n_dias} ; n_anios_historial: {n_anios_historial}')
 
-            # Pruebo a levantar dataset ya construido
+            # Construyo datos  # A lo sumo puedo guardar los datasets construidos segun los hiper de integracion tambien.
             try:
-                df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{n_dias}_{n_anios_historial}.xlsx')
-            except:
-                # Construyo datos
+                df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{fill_with_fs}_{n_dias_player_data}_{n_dias}_{n_anios_historial}.xlsx')
+            except FileNotFoundError:
                 df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
-                df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{n_dias}_{n_anios_historial}.xlsx', index=False)
+                df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{fill_with_fs}_{n_dias_player_data}_{n_dias}_{n_anios_historial}.xlsx', index=False)
 
             # Por combinacion de parametros de clean_data
             for m, param_values_3 in enumerate(product(*d_params['clean'].values()), start=1):
