@@ -32,21 +32,20 @@ def set_columns_to_process(df, l_col_to_except):
 # TRATAMIENTO DE NAN VALUES
 def fill_nan_values(X, y, type):
 
-    # Definivion de variable
-    # l_columnas_con_nan = X.columns[X.isna().any()].tolist()
+    # Definicion de variables
+    X_filled = X.copy()    # Crear una copia del dataframe original dado que realizare cambios en las columnas y valores
     nan_threshold = 0.05  # cuidado que si hago eliminacion de col antes por un valor inferior, esta lista esta vacia y no hace fillna...
-    l_columnas_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
-    print("Columnas consideradas con mucho NaN:", l_columnas_con_nan)
-
     param_grid = {
         'n_estimators': [100, 300], # 200
         'max_depth': [None, 5, 10],
         'min_samples_split': [2, 10] #  5
     }
 
-    # Crear una copia del dataframe original
-    X_filled = X.copy()
+    # Determino las columnas con mucho NaN (mas de nan_threshold%)
+    l_columnas_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
+    print("Columnas consideradas con mucho NaN:", l_columnas_con_nan)
 
+    # Por columna a rellenar
     for col in l_columnas_con_nan:
         # print(f"Columna a rellenar: {col}")
 
@@ -58,17 +57,12 @@ def fill_nan_values(X, y, type):
         elif type == "ml":
 
             # Elimino registros NaN en las columnas con bajo % de NaN (para poder usarlas en X_train)
-            # print("Shape X_filled antes:", X_filled.shape)  # e.g. (3279, 18)
             X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
-            # print("Shape X_filled despues:", X_filled_dropna.shape) # e.g. (3106, 18)
 
             # Dividir el dataframe en conjunto de entrenamiento y prueba
-            X_train = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan
-            # print(X_train.shape) # e.g. (2728, 11)
-            y_train = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan
-            # print(y_train.shape) # e.g. (2728,)
-            X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)
-            # print(X_test.shape) # e.g. (378, 11)
+            X_train = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan # e.g. (2728, 11)
+            y_train = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
+            X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)  # e.g. (378, 11)
 
             # Crear un modelo RandomForestRegressor
             model = RandomForestRegressor()
@@ -138,21 +132,22 @@ def eliminar_columnas_nan(df, umbral):
 
 def prueba():
     pais = 'argentina'
+    thr_nan_col = 0.2
 
     # Levanto dataset
-    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_formated.xlsx')
-    df_jug =pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_formated.xlsx')
+    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx')
 
-    # Hago limpieza de datos antes de integrar para facilitar la integracion de datos
-    l_col_to_except = ['id', 'temporada']
-    df_part = prepare_text_columns(df_part, l_col_to_except)
-    df_jug = prepare_text_columns(df_jug, l_col_to_except)
+    # Eliminacion de NaN values
+    # Elimino filas y columnas con alto porcentaje de NaN values
+    largo_inicial = len(df)
+    df = df.dropna(subset=['dif_remates_segun_ult_part'], how='any')
+    print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
 
-    # Remuevo strings adicionales en los nombres de los equipos
-    df_part = clean_teams_names(df_part)
+    if thr_nan_col is not None:
+        df = eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
 
-    df_part.to_excel('/Users/nachomondino/Desktop/df_part_cleaned_prueba.xlsx', index=False)
-    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_cleaned_prueba.xlsx', index=False)
+    # Verificar que no haya outliers
+    # ...
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
