@@ -1,14 +1,26 @@
 import pandas as pd
 from fuzzywuzzy import fuzz
+from p3_data_preparation.preparation_flashscore import preparate_to_integrate
+from p3_data_preparation import clean_data
 
-# RELLENO DE DATOS DE WHOSCORED A PARTIR DE FLASHCORE
-def fill_whoscored_with_flashscore(df_part_who, df_part_flash):  # Verificar que evita SettingWithCopyWarning de   df_part_flash['fecha_sin_hora'] = df_part_flash['fecha'].dt.date...
 
+def fill_whoscored_with_flashscore(df_part_who, df_part_flash):
+    """
+    Relleno NaN values en algunas columnas del dataset partido de Whoscored mediante los datos de Flashscore.
+
+    :param df_part_who: Dataframe de partidos de Whoscored. (DataFrame)
+    :param df_part_flash: Dataframe de partidos de Flashscore. (DataFrame)
+    :return: Dataframe de partidos de Whoscored rellenado con datos de Flashscore. (DataFrame)
+    """
     # Defino columnas a rellenar
     cont_part_rell = 0
-    l_col = ['posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc',
+    l_col = ['arbitro', 'dt_loc', 'dt_vis', 'posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc',
              'remates_a_puerta_vis', 'faltas_loc', 'faltas_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc',
              'pases_comp_vis', 'offsides_loc', 'offsides_vis']
+
+    # Preparo dfs para facilitar y mejorar integracion
+    df_part_flash = preparate_to_integrate(df_part_flash)
+    df_part_who = clean_data.prepare_text_columns(df_part_who, l_col_to_except=['temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
     # Hago copias para evitar SettingWithCopyWarning al crear columnas "fecha_sin_hora"
     df_part_who_filt = df_part_who.copy()
@@ -39,6 +51,7 @@ def fill_whoscored_with_flashscore(df_part_who, df_part_flash):  # Verificar que
                 for col in l_col:
                     df_part_who.loc[idx_ws, col] = df_part_flash.loc[idx_fs, col]
 
+    df_part_who.to_excel('/Users/nachomondino/Desktop/df_rellenado.xlsx', index=False)
     print(f"Cantidad de partidos rellenados: {cont_part_rell} sobre {len(df_part_who_filt)} posibles.")
     return df_part_who
 
@@ -58,9 +71,10 @@ def buscar_coincidencias(str1, str2, umbral):
 def map_player_entities(df_jug, df_jug_part):
     """
     Integro entidad de jugador con la entidad de jugador por partido.
-    :param df_jug: Dataframe jugador
-    :param df_jug_part: Dataframe jugador por partido
-    :return: Dataframe jugador por partido con columnas altura y fecha_nac por jugador.
+
+    :param df_jug: Dataframe de jugadores. (DataFrame)
+    :param df_jug_part: Dataframe de jugadores por partido. (DataFrame)
+    :return: Dataframe jugadores por partido con columnas altura y fecha_nac por jugador. (DataFrame)
     """
     # Filtrar las columnas necesarias de df_jug_part
     df_jug_filtered = df_jug[['id_jug', 'altura', 'fecha_nac']]
@@ -70,17 +84,20 @@ def map_player_entities(df_jug, df_jug_part):
     return df_merged
 
 def map_player_to_part(df_jug_part, df_part):  # Agregar calculo de rating y min played
-    # De df_jug quiero prom_edad_{tit, sup}_{loc, vis}, prom_alt_{tit, sup}_{loc, vis}
-    # De df_jug_part quiero prom_rat_{tit, sup}_{loc, vis} y ponderarlo por min played...
+    """
+    Integro entidad de jugador por partido con la entidad partido.
 
+    :param df_jug_part: Dataframe de jugadores por partido con columnas altura y fecha_nac por jugador. (DataFrame)
+    :param df_part: Dataframe de partidos. (DataFrame)
+    :return: Dataframe de partidos con nuevas columnas con los datos de los jugadores por cada partido. (DataFrame)
+    """
+    # Definicion de variables
     l_condiciones = df_jug_part['condicion'].unique()
     l_titularidades = df_jug_part['titularidad'].unique()
 
     # Por partido en df_part
     for index, row in df_part.iterrows():
-
-        df_jug_part_filt = df_jug_part.copy()
-        df_jug_part_filt_1 = df_jug_part_filt[df_jug_part_filt['id_part'] == row['id_part']]
+        df_jug_part_filt_1 = df_jug_part[df_jug_part['id_part'] == row['id_part']]
 
         # Por condicion (home, away)
         for condicion in l_condiciones:
@@ -100,8 +117,8 @@ def map_player_to_part(df_jug_part, df_part):  # Agregar calculo de rating y min
 
                 # Calculo promedio de edad y altura
                 if largo > 0:
-                    prom_edad = df_jug_part_filt_3['edad'].dropna().sum() / len(df_jug_part_filt_3['edad'].dropna())  #RuntimeWarning: invalid value encountered in double_scalars prom_edad = df_jug_part_filt_3['edad'].dropna().sum() / len(df_jug_part_filt_3['edad'].dropna())
-                    prom_alt = df_jug_part_filt_3['altura'].dropna().sum() / len(df_jug_part_filt_3['altura'].dropna()) # RuntimeWarning: invalid value encountered in double_scalars prom_alt = df_jug_part_filt_3['altura'].dropna().sum() / len(df_jug_part_filt_3['altura'].dropna())
+                    prom_edad = df_jug_part_filt_3['edad'].mean()
+                    prom_alt = df_jug_part_filt_3['altura'].mean()
                     sum_rat = df_jug_part_filt_3['prom_pond_rating_ult_part'].dropna().sum()
                     sum_min_played = df_jug_part_filt_3['sum_min_played_ult_part'].dropna().sum()
 
@@ -116,31 +133,35 @@ def map_player_to_part(df_jug_part, df_part):  # Agregar calculo de rating y min
 def prueba():
     from p3_data_preparation import construct_data
 
+    # Definicion de variables
     pais = "argentina"
     pais = "argentina_south_america"
+    fill_data_with_flashcore = False
+    n_dias_player_data = 365
 
     # Levanto datasets de prueba
     df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_cleaned.xlsx')
     df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
     df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx')
-    df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_fs_cleaned.xlsx')
 
     # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
-    df_part = fill_whoscored_with_flashscore(df_part, df_part_flash)
+    if fill_data_with_flashcore:
+        df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
+        df_part = fill_whoscored_with_flashscore(df_part, df_part_flash)
 
     # Integro df_jug a df_jug_part
     df_jug_part = map_player_entities(df_jug, df_jug_part)
 
-    # Calculo edad y minutos jugados
-    df_jug_part = construct_data.determine_edad(df_part, df_jug_part)  # construct_data
-    df_jug_part = construct_data.determine_min_played(df_jug_part)  # construct_data
-    # Por jugador, construyo sum_min_played y prom_rating en ultimos n partidos --> para no requerir equipo, uso fecha
-    df_jug_part = construct_data.determine_var_en_ult_partidos(df_jug_part, 'min_played', type='sum')
-    df_jug_part = construct_data.determine_var_en_ult_partidos(df_jug_part, 'rating', type='mean_pond', var_pond='min_played')
+    # Calculo edad y minutos jugados por jugador en cada partido
+    df_jug_part = construct_data.add_fecha(df_part, df_jug_part)
+    df_jug_part = construct_data.determine_edad(df_jug_part)
+    df_jug_part = construct_data.determine_min_played(df_jug_part)
+    df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=n_dias_player_data, tipo='sum')
+    df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=n_dias_player_data, tipo='mean_pond', var_pond='min_played')
+    df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_part_antes_int.xlsx', index=False)
 
     # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
-    df_part_integ = map_player_to_part(df_jug_part, df_part)
-
+    df = map_player_to_part(df_jug_part, df_part)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
