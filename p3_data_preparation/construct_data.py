@@ -4,6 +4,21 @@ import math
 from datetime import timedelta
 
 # Construyo variables en dataframe "jugadores por partido"
+def add_fecha(df_part, df_jug_part):
+    """
+    Agrega la fecha de cada partido al dataframe.
+
+    :param df_part: Dataframe con fecha de cada partido. (DataFrame)
+    :param df_jug_part: Dataframe con datos de jugadores en los partidos. (DataFrame)
+    :return: Dataframe con datos de jugadores en los partidos incluyendo la fecha del partido. (DataFrame)
+    """
+    # Filtrar las columnas necesarias de df_jug_part
+    df_part_filtered = df_part[['id_part', 'fecha']]
+
+    # Combinar df_jug_part_filtered con df_jug usando el id_jug como clave
+    df_jug_part_with_date = pd.merge(df_jug_part, df_part_filtered, on='id_part', how='left')
+    return df_jug_part_with_date
+
 def determine_min_played(df):
     """
     Determino minutos jugados por jugador en cada partido segun titularidad y el minuto de su cambio.
@@ -29,26 +44,19 @@ def determine_min_played(df):
     df['min_played'] = df.apply(calculate_minutes_played, axis=1)
     return df
 
-def determine_edad(df_part, df_jug_part):
+def determine_edad(df_jug_part):
     """
     Determino edad de cada jugador en cada partido a partir de la fecha del partido y la fecha de nacimiento del jugador
 
-    :param df_part: Dataframe con fecha de cada partido. (DataFrame)
     :param df_jug_part: Dataframe con datos de cada jugador en cada partido incluyendoo fecha de nacimiento. (DataFrame)
     :return: Dataframe con datos de cada jugador en cada partido agregando columna edad. (DataFrame)
     """
-    # Filtrar las columnas necesarias de df_jug_part
-    df_part_filtered = df_part[['id_part', 'fecha']]
-
-    # Combinar df_jug_part_filtered con df_jug usando el id_jug como clave
-    df_merged = pd.merge(df_jug_part, df_part_filtered, on='id_part', how='left')
-
     # Calculo edad (fecha_hora - fecha nac)
-    diferencia_dias = (df_merged['fecha'] - df_merged['fecha_nac']).dt.days  # Calcular la diferencia en días
-    df_merged['edad'] = diferencia_dias // 365  # Calcular la edad en años
-    return df_merged
+    diferencia_dias = (df_jug_part['fecha'] - df_jug_part['fecha_nac']).dt.days  # Calcular la diferencia en días
+    df_jug_part['edad'] = diferencia_dias // 365  # Calcular la edad en años
+    return df_jug_part
 
-def determine_player_var_en_ult_partidos(df, variable, n_dias, tipo='mean', var_pond=None):  # Calcula bien.
+def determine_player_var_en_ult_partidos(df, variable, n_dias, tipo='mean', var_pond=None):  # Calcula bien. Tarda 262 segundos aprox para min_played
     """
     Obtiene el promedio de las estadisticas en los ultimos partidos de cada jugador
 
@@ -77,7 +85,7 @@ def determine_player_var_en_ult_partidos(df, variable, n_dias, tipo='mean', var_
             fecha_limite = fecha_part - timedelta(days=n_dias)
 
             # Filtro para seleccionar los ultimos partidos del jugador en los ultimos n dias
-            df_sel = df_jugador.loc[(df_jugador['fecha'] >= fecha_limite) & (df_jugador['fecha'] < fecha_part)]
+            df_sel = df_jugador.loc[(df_jugador['fecha'] >= fecha_limite) & (df_jugador['fecha'] < fecha_part)] # tengo que construirle memoria... el tema es como...
 
             if len(df_sel) > 0:
                 if tipo == "mean_pond":
@@ -90,7 +98,6 @@ def determine_player_var_en_ult_partidos(df, variable, n_dias, tipo='mean', var_
 
                 elif tipo == "sum":
                     df.loc[idx, f'sum_{variable}_ult_part'] = df_sel[variable].sum()
-
     return df
 
 # Construyo variables en dataframe "partido"
@@ -240,11 +247,11 @@ def calcular_diferencia(df, variable, tipo, segun_loc=False):
 
     if tipo == 'mean':
         df[f'dif_{variable}_segun_ult_part{str_adic}'] = df[f'prom_{variable}_ult_part_loc{str_adic}'] - df[f'prom_{variable}_ult_part_vis{str_adic}']
-        # df = df.drop(columns=[f'prom_{variable}_ult_part_loc{str_adic}', f'prom_{variable}_ult_part_vis{str_adic}'])
+        df = df.drop(columns=[f'prom_{variable}_ult_part_loc{str_adic}', f'prom_{variable}_ult_part_vis{str_adic}'])
 
     elif tipo == "sum":
         df[f'dif_{variable}_segun_ult_part{str_adic}'] = df[f'sum_{variable}_ult_part_loc{str_adic}'] - df[f'sum_{variable}_ult_part_vis{str_adic}']
-        # df = df.drop(columns=[f'sum_{variable}_ult_part_loc{str_adic}', f'sum_{variable}_ult_part_vis{str_adic}'])
+        df = df.drop(columns=[f'sum_{variable}_ult_part_loc{str_adic}', f'sum_{variable}_ult_part_vis{str_adic}'])
     return df
 
 def historial_entre_si_segun_fecha(df, n_anios):  # VERIFICAR (hecho)
@@ -393,15 +400,13 @@ def prueba():
 
     start = time.time()
 
-    # Construyo variable respuesta: "equipo_ganador"
+    # Construyo variables: "equipo_gandor", diferencia de goles y puntos obtenidos
     df = determinar_equipo_ganador(df)
-
-    # Determino diferencia de goles y puntos obtenidos
     df = determinar_dif_goles(df)
     df = determinar_puntos(df)
 
     # Construyo variables historicas
-    # l_var = ['dif_goles', 'puntos', 'posesion']
+    l_var = ['dif_goles', 'puntos', 'posesion']
     l_var = ['dif_goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos', 'remates_fuera',
              'remates_block', 'porc_pases_comp', 'pases', 'pases_comp', 'pases_clave', 'amagues', 'duelos_aereos',
              'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
@@ -418,7 +423,15 @@ def prueba():
     df = calculate_dif_col_jugadores(df)
 
     # Eliminar columnas que usé para construir... lo puedeo hacer en select_data tambien..
-    # df = df.drop(columns=['goles_loc', 'goles_vis'], axis=1)
+    df = df.drop(
+        ['prom_edad_loc', 'prom_edad_vis', 'rating_loc', 'rating_vis', 'posesion_loc', 'posesion_vis', 'remates_loc',
+         'remates_vis', 'remates_a_puerta_loc', 'remates_a_puerta_vis', 'remates_palos_loc', 'remates_palos_vis',
+         'remates_fuera_loc', 'remates_fuera_vis', 'remates_block_loc', 'remates_block_vis', 'porc_pases_comp_loc',
+         'porc_pases_comp_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc', 'pases_comp_vis', 'pases_clave_loc',
+         'pases_clave_vis', 'amagues_loc', 'amagues_vis', 'duelos_aereos_loc', 'duelos_aereos_vis', 'tackles_loc',
+         'tackles_vis', 'intercepciones_loc', 'intercepciones_vis', 'corners_loc', 'corners_vis', 'faltas_loc',
+         'faltas_vis', 'offsides_loc', 'offsides_vis', 'ht_goles_loc', 'ht_goles_vis', 'goles_loc', 'goles_vis',
+         'dif_goles_loc', 'dif_goles_vis', 'puntos_loc', 'puntos_vis'], axis=1)
 
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
