@@ -1,3 +1,5 @@
+import pandas as pd
+import numpy as np
 from p3_data_preparation import clean_data
 
 def preparate_to_integrate(df_part_flash):
