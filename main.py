@@ -24,7 +24,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 # Assess model
-from p4_modeling.asses_model import calculate_roi, confusion_matrix
+from p4_modeling.asses_model import confusion_matrix
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
 
@@ -119,7 +119,7 @@ class DataPreparation:  # 17.4 min
 
         # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
         if fill_data_with_flashcore:
-            df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_fs.xlsx')
+            df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx')
             df_part = integrate_data.fill_whoscored_with_flashscore(df_part, df_part_flash)
 
         # Integro df_jug a df_jug_part
@@ -219,7 +219,7 @@ class DataPreparation:  # 17.4 min
 
         return df
 
-    def select_data(self, df, thr_nan_col=None, thr_corr=None, thr_fs=None, export=True):  # 1.3 minutos # Chequear cambios
+    def select_data(self, df, thr_corr=None, thr_fs=None, export=True):  # 1.3 minutos # Chequear cambios
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -245,11 +245,11 @@ class DataPreparation:  # 17.4 min
 
         # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
-            l_not_important_features = select_data.select_best_features(df, self.var_resp, thr_fs=thr_fs, graf=True)
+            l_not_important_features = select_data.select_best_features(df, self.var_resp, thr_fs, graf=export)
             df = df.drop(l_not_important_features, axis=1)
 
         end = time.time()
-        print(f"Las siguientes {len(df.columns)} columnas son las seleccionadas: {df.columns}")
+        print(f"Las siguientes {len(df.drop(self.var_resp, axis=1).columns)} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
@@ -282,45 +282,42 @@ class Modeling:
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
 
-        # Si no hago el relleno de nan (conviene al principio... para separar en las proporciones que digo...)
+        # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
         if fill_na is None:
-            # Elimino filas puesto que al modelo no le pueden ingresar NaN values
-            df = clean_data.eliminar_filas_nan(df, umbral=0)  # Elimino filas con al menos un NaN value teniendo en cuenta solo las columnas seleccionadas
+            df = clean_data.eliminar_filas_nan(df, umbral=0)  # df = df.dropna()
 
         # Separo en X e y
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separar en X e y
+        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
         # Separo conjunto de datos en train, validation y test
-        X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size,random_state=42, shuffle=True)  # Divido todos los  datos en train y validacion + prueba
-        X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True) # Divido validacion + prueba en validacion y prueba
+        X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size,random_state=42, shuffle=True)
+        X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True)
         print(f'Train: {X_train.shape} {y_train.shape}')
         print(f'Val: {X_val.shape} {y_val.shape}')
         print(f'Test: {X_test.shape} {y_test.shape}')
 
-        # Relleno nan --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
+        # Relleno nan en el dataset de entrenamiento
         if fill_na is not None:
             X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
             # Elimino NaN de df_val y df_test para evitar "ValueError: Input X contains NaN."
-            df_val = pd.concat([X_val, y_val], axis=1)
-            df_val = df_val.dropna()
+            df_val = pd.concat([X_val, y_val], axis=1).dropna()
             X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]  # Separar en X e y
             print(f"Se elimino NaN values en validacion. Shape X_val: {X_val.shape}")
 
-            df_test = pd.concat([X_test, y_test], axis=1)
-            df_test = df_test.dropna()
+            df_test = pd.concat([X_test, y_test], axis=1).dropna()
             X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]  # Separar en X e y
             print(f"Se elimino NaN values en test. Shape X_test: {X_test.shape}")
 
-        # Balanceo el dataset de entrenamiento --> solo en train... para no sesgar df_test ni df_val y asi evitar overfitting
+        # Balanceo el dataset de entrenamiento
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
             print(f"Shape X_train luego de balanceo: {X_train.shape}")
 
-        # Shuffle --> fundamental para evitar problemas en CV en la division de los folds (si devuelve el df ordenado por clase, fallara el cv)
+        # Shuffle el dataset de entrenamiento
         df_train = pd.concat([X_train, y_train], axis=1)
-        df_train = df_train.sample(frac=1).reset_index(drop=True)  # Para evitar que queden misma clase en un fold de CV?
+        df_train = df_train.sample(frac=1).reset_index(drop=True)
         X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
 
         if export:
@@ -349,7 +346,7 @@ class Modeling:
         # Find best hiperparameters
         print(f" Modelo: {model_name} ".center(120, '-'))
         # print("Buscando mejores hiperparametros...")
-        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k)
+        model_best_params, best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k)
 
         # Entreno el modelo
         # print("Entrenando modelo con mejores hiperparametros...")
@@ -359,7 +356,8 @@ class Modeling:
         # print("Evaluo rendimiento del modelo con Cross Validation...")
         cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
         print(f"\nPrecision promedio de validación cruzada: {cv_accuracy:.1f}%")
-        return model_name, model_best_params, cv_accuracy
+
+        return model_name, model_best_params, best_params, cv_accuracy
 
     def assess_model(self, model, X_test, y_test, export=True):
         """
