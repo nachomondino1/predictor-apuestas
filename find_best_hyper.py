@@ -16,33 +16,33 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     df_res = pd.DataFrame()
     df_hiper = pd.DataFrame(columns=['modelo', 'hiper', 'value', 'cuenta'])
     best_accuracy = 0.0
-    l_modelos = [RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(), SVC(), MLPClassifier(), GradientBoostingClassifier()]
+    l_modelos = [RandomForestClassifier(), xgb.XGBClassifier(), GradientBoostingClassifier(), LogisticRegression(), SVC(), MLPClassifier()]  # DecisionTreeClassifier()
     dp = DataPreparation(var_resp, pais)
     mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
 
     # Definicion de hiperparametros
     d_params = {
         'integrate': {
-            'fill_with_fs': [True, False],  # Mas adelante, pruebo a ver si mejora rellenando datos...
-            'n_dias_player_data': [365, 180]
+            'fill_with_fs': [True, False],  # Opcion de rellenar algunas columnas usando los datos de Flashscore
+            'n_dias_ult_part_player': [60, 180, 365]  # Nº dias para determinar sum_min_played y prom_rat
         },
         'construct': {
-            'n_dias': [30, 60],
-            'n_anios_historial': [2]
+            'n_dias_ult_part': [30, 45],  # Nº dias para determinar promedio de estadisticas como posesion
+            'n_anios_historial': [2]  # Nº años para determinar historial entre equipos
         },
         'clean': {
-            'thr_nan_col': [0.2, None]
+            'thr_nan_col': [0.4, 0.2, None]  # 0.5 no elimina a nadie # Porcentaje de NaN values maximo para las columnas
         },
         'select': {
-            'thr_corr': [0.7, 0.5, None],
-            'thr_fs': [0.2, 0.35]
+            'thr_corr': [0.8, 0.7, 0.5, None],  # Correlacion minima para considerar correlacion entre variables
+            'thr_fs': [0.2, 0.35, None]  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
         },
         'modeling': {
-            'test_val_size': [0.2],
-            'test_size': [0.5],
-            'fill_na': [None, 'ml'],
-            'bal_type': [None, 'under'],  # 'over' (tiene overfitting)
-            'k': [5]
+            'test_val_size': [0.2],  # Proporcion de datos destinado a test y validation, el resto es train
+            'test_size': [0.5],  # Proporcion de datos destinado test, el resto es validation
+            'fill_na': [None, 'ml'],  # Opcion de rellenar NaN values en dataset de entrenamiento
+            'bal_type': [None, 'under', 'over'],  # Opcion de balancear dataset de entrenamiento
+            'k': [5]  # Numero de folds tanto para seleccionar hiperparametros como para entrenar el modelo
         }
     }
 
@@ -54,14 +54,14 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     for x, param_values_1 in enumerate(product(*d_params['integrate'].values()), start=1):
 
         # Asigno valor a cada hiperpametro
-        fill_with_fs, n_dias_player_data = param_values_1[0], param_values_1[1]
+        fill_with_fs, n_dias_ult_part_player = param_values_1[0], param_values_1[1]
         print(f" Iter Nº {x} ".center(120, "#"))
-        print(f'Hiper integrate --> fill_with_fs: {fill_with_fs} ; n_dias_player_data: {n_dias_player_data}')
+        print(f'Hiper integrate --> fill_with_fs: {fill_with_fs} ; n_dias_ult_part_player: {n_dias_ult_part_player}')
 
         # Integro datos
         # Pruebo a levantar dataset ya integrado
         try:
-            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_{fill_with_fs}_{n_dias_player_data}.xlsx')
+            df_integrated = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_{fill_with_fs}_{n_dias_ult_part_player}.xlsx')
         except FileNotFoundError:
             # Levanto datasets formateado
             df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx')
@@ -69,23 +69,23 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
             df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx')
 
             # Integro datos
-            df = dp.integrate_data(df_part, df_jug_part, df_jug, fill_data_with_flashcore=fill_with_fs, n_dias_player_data=n_dias_player_data)
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_{fill_with_fs}_{n_dias_player_data}.xlsx', index=False)
+            df_integrated = dp.integrate_data(df_part, df_jug_part, df_jug, fill_data_with_flashcore=fill_with_fs, n_dias_player_data=n_dias_ult_part_player)
+            df_integrated.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_{fill_with_fs}_{n_dias_ult_part_player}.xlsx', index=False)
 
         # Por combinacion de parametros de construct_data
         for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
             # Asigno valor a cada hiperpametro
-            n_dias, n_anios_historial = param_values_2[0], param_values_2[1]
+            n_dias_ult_part, n_anios_historial = param_values_2[0], param_values_2[1]
             print(f" Iter Nº {x}.{i} ".center(120, "#"))
-            print(f'Hiper construct --> n_dias: {n_dias} ; n_anios_historial: {n_anios_historial}')
+            print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_anios_historial: {n_anios_historial}')
 
-            # Construyo datos  # A lo sumo puedo guardar los datasets construidos segun los hiper de integracion tambien.
+            # Construyo datos
             try:
-                df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{fill_with_fs}_{n_dias_player_data}_{n_dias}_{n_anios_historial}.xlsx')
+                df_constructed = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{fill_with_fs}_{n_dias_ult_part_player}_{n_dias_ult_part}_{n_anios_historial}.xlsx')
             except FileNotFoundError:
-                df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
-                df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{fill_with_fs}_{n_dias_player_data}_{n_dias}_{n_anios_historial}.xlsx', index=False)
+                df_constructed = dp.construct_data(df_integrated, n_dias=n_dias_ult_part, n_anios_historial=n_anios_historial)
+                df_constructed.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_{fill_with_fs}_{n_dias_ult_part_player}_{n_dias_ult_part}_{n_anios_historial}.xlsx', index=False)
 
             # Por combinacion de parametros de clean_data
             for m, param_values_3 in enumerate(product(*d_params['clean'].values()), start=1):
@@ -96,7 +96,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                 print(f"Hiper clean --> thr_nan_col: {thr_nan_col}")
 
                 # Limpio datos
-                df = dp.clean_data(df, thr_nan_col=thr_nan_col, export=False)
+                df_clean = dp.clean_data(df_constructed, thr_nan_col=thr_nan_col, export=False)
 
                 # Por combinacion de parametros de select_data
                 for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
@@ -107,7 +107,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                     print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")
 
                     # Selecciono datos
-                    df_sel = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                    df_sel = dp.select_data(df_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
                     # Por combinacion de parametros de modeling
                     for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
@@ -115,8 +115,8 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                         # Asigno valor a cada hiperparametro
                         test_val_size, test_size, fill_na, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3], param_values_5[4]
                         print(f" Iter Nº {x}.{i}.{m}.{j}.{h} ".center(120, "#"))
-                        print(f'Hiper integrate --> fill_with_fs: {fill_with_fs} ; n_dias_player_data: {n_dias_player_data}')
-                        print(f'Hiper construct --> n_dias: {n_dias} ; n_anios_historial: {n_anios_historial}')
+                        print(f'Hiper integrate --> fill_with_fs: {fill_with_fs} ; n_dias_player_data: {n_dias_ult_part_player}')
+                        print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_anios_historial: {n_anios_historial}')
                         print(f"Hiper clean --> thr_nan_col: {thr_nan_col}")
                         print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")
                         print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; k: {k}")
@@ -138,15 +138,12 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
 
                             # Guardo mejores de hiperparametros
                             for hiper, value in best_params.items():
-
                                 fila_deseada = df_hiper.loc[(df_hiper['modelo'] == model_name) & (df_hiper['hiper'] == hiper) & (df_hiper['value'] == value)]
 
                                 # Si ya tiene cuenta
                                 if len(fila_deseada) > 0:
                                     df_hiper.loc[fila_deseada.index, 'cuenta'] += 1
-
                                 else:
-                                    # Si no tiene cuenta
                                     hiper_data = [{'modelo': model_name, 'hiper': hiper, 'value': value, 'cuenta': 1}]
                                     df_hiper = pd.concat([df_hiper, pd.DataFrame(hiper_data)], axis=0).reset_index(drop=True)
 
@@ -166,7 +163,8 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                               )
 
                         # Guardo datos en dataframe
-                        row_data = {'n_dias': n_dias, 'n_anios_hist': n_anios_historial,
+                        row_data = {'fill_with_fs': fill_with_fs,  'n_dias_ult_part_player': n_dias_ult_part_player,
+                                    'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_anios_historial,
                                     'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                     'fill_na': fill_na, 'bal_type': bal_type, 'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
                                     'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
