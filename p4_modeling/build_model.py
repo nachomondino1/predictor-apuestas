@@ -27,55 +27,68 @@ def select_best_hiperparameters(model, X, y, k):
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
             'max_features': ['auto', None, 'sqrt', 'log2'],
-            # 'random_state': [42]
         },
         'RandomForestClassifier': {
-            'n_estimators': [50, 150, 200],  # 100
-            'criterion': ['entropy'],  # 'gini'
-            'max_depth': [None, 5, 7, 8, 10, 15],
-            # 'min_samples_split': [2, 5, 10],
-            # 'min_samples_leaf': [1, 2, 4],
-            # 'max_features': ['auto', None],  # 'sqrt', 'log2'
-            'bootstrap': [True],  # False
-            # 'random_state': [42]
+            'n_estimators': [100, 200, 500],  # Número de árboles en el bosque. Puedes probar diferentes valores como 100, 200, 500.
+            'criterion': ['entropy'],  # 'gini'  # Función para medir la calidad de una división. Puedes probar 'gini' para el índice de Gini y 'entropy' para la ganancia de información.
+            'max_depth': [5, 7, 8, 10, 15],  # Profundidad máxima de los árboles. Puedes probar None para que los árboles se expandan hasta que todas las hojas sean puras, o un número como 5 o 10 para limitar la profundidad máxima.
+            'min_samples_split': [5, 10],  # Número mínimo de muestras requeridas para realizar una división en un nodo interno. Puedes probar diferentes valores como 2, 5, 10.
+            'min_samples_leaf': [2, 4], # Evitaria valores bajos como 1 para evitar overfitting # Número mínimo de muestras requeridas para estar en un nodo hoja. Puedes probar diferentes valores como 1, 2, 4.
+            'max_features': ['auto'],  # None no uso porque auto usa todas...# 'sqrt', 'log2'  # Número máximo de características a considerar al buscar la mejor división. Puedes probar 'auto' para considerar todas las características, o 'sqrt' para considerar la raíz cuadrada del número total de características.
+            'bootstrap': [True, False],  # False  # Indica si se deben realizar muestras bootstrap al construir árboles. Puedes probar True o False.
+            # 'class_weight': [None, 'balanced']  # Pesos para las clases. Puedes probar None para igual peso, o 'balanced' para ajustar automáticamente los pesos inversamente proporcionales a las frecuencias de clase en los datos de entrada.
         },
         'XGBClassifier': {
-            'max_depth': [None, 5, 6, 7, 8, 10, 15],
-            'n_estimators': [50, 100, 150, 200]
-        },
-        'LogisticRegression': {
-            'penalty': [None, 'l1', 'l2', 'elasticnet'],
-            'C': [0.1, 1.0, 10.0],
-            'solver': ['lbfgs', 'liblinear', 'newton-cg'],  # , 'sag', 'saga'
-            'max_iter': [100, 500, 1000],
-            'multi_class': ['ovr', 'multinomial', 'auto'],
-            # 'fit_intercept': [True, False],
-            # 'class_weight': [None, 'balanced'],
-            # 'random_state': [42]
-        },
-        'SVC': {
-            'C': [0.1, 0.5, 1.0], # gana siempre 0.1?
-            # 'kernel': ['linear', 'poly'],  # 'rbf', 'sigmoid'  # gana siempre linear, a veces poly
-            'degree': [1, 2, 3],  # 4, 5
-            'gamma': ['scale', 'auto'],
-            'coef0': [0.0, 0.1, 1.0],
-            'shrinking': [True, False],
-            'probability': [True, False],
-            'tol': [1e-3, 1e-4, 1e-5],
-            'decision_function_shape': ['ovo'],  # 'ovr'
-            # 'random_state': [42]
-        },
-        'MLPClassifier': {
-            'activation': ['logistic',  'relu', 'tanh', 'identity'],  # 'sigmoid'
-            'solver': ['sgd', 'lbfgs', 'adam'],
-            'learning_rate': ['constant', 'adaptive', 'invscaling'],  # 'learning_rate',
-            'max_iter': [200, 300],
-            'hidden_layer_sizes': [(64), (128), (64, 32)]
+            'n_estimators': [100, 500, 1000],  # Número de árboles en el ensamblado. Valores típicos: 100, 500, 1000.
+            'learning_rate': [0.01, 0.1, 0.3],  # Tasa de aprendizaje que controla la contribución de cada árbol. Valores típicos: 0.01, 0.1, 0.3.
+            'max_depth': [7, 8, 10, 15, 20],  # Profundidad máxima de cada árbol. Valores típicos: 3, 5, 7.
+            'min_child_weight': [1, 3, 5],  # Peso mínimo requerido en una hoja del árbol. Valores típicos: 1, 3, 5.
+            'subsample': [0.8, 1.0],  # Proporción de muestras utilizadas para entrenar cada árbol. Valores típicos: 0.8, 1.0.
+            'colsample_bytree': [0.8, 1.0],  # Proporción de características utilizadas para entrenar cada árbol. Valores típicos: 0.8, 1.0.
+            'gamma': [0, 0.1, 0.5],  # Reducción mínima de la función de pérdida requerida para realizar una partición adicional en un nodo del árbol. Valores típicos: 0, 0.1, 0.5.
+            'reg_alpha': [0, 0.01, 0.1],  # Término de regularización L1 en los pesos del árbol. Valores típicos: 0, 0.01, 0.1.
+            'reg_lambda': [0, 0.01, 0.1],  # Término de regularización L2 en los pesos del árbol. Valores típicos: 0, 0.01, 0.1.
+            # 'scale_pos_weight': [1, 5, 10]  # WARNING: /Users/runner/work/xgboost/xgboost/python-package/build/temp.macosx-10.9-x86_64-cpython-38/xgboost/src/learner.cc:767: # Parameters: { "scale_pos_weight" } are not used.# Relación de pesos entre la clase positiva y la negativa en el conjunto de datos. Valores típicos: 1, 5, 10.
         },
         'GradientBoostingClassifier': {
-            'learning_rate': [0.1, 0.05, 0.01],
-            'n_estimators': [100, 300],  # 200
-            'max_depth': [5, 7, 10]  # None, 30
+            'n_estimators': [100, 500, 1000],  # Número de árboles en el ensamblado. Valores típicos: 100, 500, 1000.
+            'learning_rate': [0.01, 0.05, 0.1],  # Tasa de aprendizaje que controla la contribución de cada árbol. Valores típicos: 0.01, 0.1, 0.3.
+            'max_depth': [3, 5, 7],  # Profundidad máxima de cada árbol. Valores típicos: 3, 5, 7.
+            'min_samples_split': [5, 10],  # Número mínimo de muestras requeridas para dividir un nodo interno. Valores típicos: 2, 5, 10.
+            'min_samples_leaf': [2, 4],  # Número mínimo de muestras requeridas en cada hoja del árbol. Valores típicos: 1, 2, 4.
+            'subsample': [0.8, 1.0],  # Proporción de muestras utilizadas para entrenar cada árbol. Valores típicos: 0.8, 1.0.
+            'max_features': ['auto'], # None no uso porque auto usa todas... # 'sqrt' no usaria pues no tengo tantas variables # Número máximo de características consideradas al buscar la mejor división. Valores típicos: 'auto', 'sqrt' (puede ser un entero o una fracción).
+            'loss': ['deviance']  # 'exponential' no usaria por no usar AdaBoost?... # Función de pérdida a optimizar. Valores típicos: 'deviance' (para clasificación con probabilidades) o 'exponential' (para clasificación con AdaBoost).
+        },
+        'LogisticRegression': {
+            'penalty': [None, 'l1', 'l2'], # 'elasticnet'  # Tipo de regularización a aplicar. Puedes probar 'l1' para regularización L1 (valor absoluto de los coeficientes), 'l2' para regularización L2 (norma euclidiana al cuadrado de los coeficientes).
+            'C': [0.1, 1.0, 10.0],  # Inverso de la fuerza de regularización. Valores típicos: 0.1, 1, 10. Un valor más bajo indica una regularización más fuerte.
+            'solver': ['lbfgs', 'liblinear', 'newton-cg'],  # , 'sag', 'saga'  # Algoritmo a utilizar en la optimización del problema. Puedes probar 'liblinear' para problemas pequeños, 'saga' para problemas grandes.
+            'fit_intercept': [True, False],  # Especifica si se debe ajustar o no el intercepto. Puedes probar True o False.
+            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para la convergencia del algoritmo. Valores típicos: 100, 500, 1000.
+            # 'class_weight': [None, 'balanced'],  # No uso puesto que balanceo o no en modeling y quiero respetar eso. # Pesos para las clases. Puedes probar None para igual peso, 'balanced' para ajustar automáticamente los pesos inversamente proporcionales a las frecuencias de clase en los datos de entrada.
+            'multi_class': ['ovr', 'multinomial', 'auto'],  # Esquema de clasificación multiclase. Puedes probar 'auto' para seleccionar automáticamente el enfoque más adecuado según los datos, 'ovr' para clasificación uno contra el resto, 'multinomial' para una clasificación multinomial.
+        },
+        'SVC': {
+            'C': [0.1, 0.5, 1.0],  # # Parámetro de regularización. Valores típicos: 0.1, 1, 10. Un valor más bajo suaviza la frontera de decisión, permitiendo clasificaciones más flexibles, mientras que un valor más alto la hace más estricta.
+            # 'kernel': ['linear'],  # 'poly', 'rbf', 'sigmoid'  # Tarda mucho no se por que... inclusive usando solo linear...  # Función kernel utilizada para transformar los datos de entrada. Puedes probar 'linear' para un kernel lineal, 'poly' para un kernel polinomial, 'rbf' para un kernel gaussiano (RBF) o 'sigmoid' para un kernel sigmoide.
+            'gamma': ['scale', 'auto'],  # Coeficiente para el kernel RBF, 'poly' y 'sigmoid'. Puedes probar 'scale' para usar 1 / (n_features * X.var()) como valor de gamma, 'auto' para 1 / n_features o valores numéricos, como 0.1, 1, etc.
+            'degree': [1, 2],  # Grado del kernel polinomial. Puedes probar 2, 3, 4, etc.
+            'coef0': [0.0, 0.1, 1.0],  # Término independiente en funciones kernel polinomiales y sigmoide. Valores típicos: 0.0, 0.5, 1.0.
+            'shrinking': [True, False],  # Activa o desactiva el uso de la heurística de encogimiento. Puedes probar True o False.
+            'probability': [True, False], # Habilita o deshabilita la estimación de probabilidades. Puedes probar True o False.
+            # 'tol': [1e-3, 1e-4, 1e-5],  # Siempre gana 1e-3 y ChatGPT no me lo dio como hiper tipico
+            # 'decision_function_shape': ['ovo', 'ovr'],  # Siempre gana ovo y ChatGPT no me lo dio como hiper tipico
+        },
+        'MLPClassifier': {
+            'hidden_layer_sizes': [(10,), (50,), (100,)],  # [(64), (128), (64, 32)],  # Número de neuronas en las capas ocultas. Puedes probar diferentes combinaciones, como (10,) para una capa oculta de 10 neuronas, (50,) para una capa oculta de 50 neuronas, etc.
+            'activation': ['logistic',  'relu', 'tanh'],  # 'identity', 'sigmoid'  # Función de activación utilizada en las capas ocultas. Puedes probar 'logistic' para la función logística o 'relu' para la unidad lineal rectificada.
+            'solver': ['lbfgs', 'sgd'],  # 'adam'  # Algoritmo utilizado para la optimización de pesos. Puedes probar 'adam' para el algoritmo de descenso de gradiente estocástico o 'sgd' para el descenso de gradiente estocástico clásico.
+            'alpha': [0.0001, 0.001, 0.01],  # Parámetro de regularización para controlar la penalización de los pesos. Valores típicos: 0.0001, 0.001, 0.01.
+            'learning_rate': ['constant', 'adaptive', 'invscaling'],  # 'learning_rate',  # Tasa de aprendizaje utilizada en la actualización de los pesos. Puedes probar 'constant' para una tasa de aprendizaje constante o 'adaptive' para una tasa de aprendizaje adaptativa.
+            'learning_rate_init': [0.001, 0.01, 0.1],  # Tasa de aprendizaje inicial. Valores típicos: 0.001, 0.01, 0.1.
+            'max_iter': [100, 200, 500],  # Número máximo de iteraciones. Valores típicos: 100, 200, 500.
+            'early_stopping': [True, False]  # Opción para detener el entrenamiento tempranamente si no hay mejoras en la métrica de validación. Puedes probar True o False.
         },
         'PCA': {
             'n_components': [2, 5, 10],
