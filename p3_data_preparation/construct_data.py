@@ -196,16 +196,15 @@ def determine_prom_en_ult_partidos_localia(df, n_dias, variable, tipo):
     df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
 
     # Por equipo
-    # for equipo in df['equipo_loc'].unique():
-    for equipo in ['boca juniors']:
+    for equipo in df['equipo_loc'].unique():
 
         # Obtengo los partidos que jugó el equipo
         l_dfs = [df[df['equipo_loc'] == equipo], df[df['equipo_vis'] == equipo]]
 
         # Por localia
         for df_equipo in l_dfs:
-            print('\n Iteracion')
-            print(df_equipo)
+            # print('\n Iteracion')
+            # print(df_equipo)
 
             # Por partido del equipo
             for idx, row in df_equipo.iterrows():
@@ -213,16 +212,16 @@ def determine_prom_en_ult_partidos_localia(df, n_dias, variable, tipo):
                 loc_o_vis = 'loc' if row['equipo_loc'] == equipo else 'vis'
                 fecha_part = row['fecha']
                 fecha_limite = fecha_part - timedelta(days=n_dias)
-                print(fecha_part, fecha_limite)
+                # print(fecha_part, fecha_limite)
 
                 # Selecciono los ultimos partidos del equipo
                 df_sel = df_equipo.loc[(df_equipo['fecha'] >= fecha_limite) & (df_equipo['fecha'] < fecha_part)]
-                print(df_sel)
+                # print(df_sel)
 
                 # Necesito la variable segun si fue local o visitante en cada uno de esos partidos...
                 s_valores = df_sel[f'dif_{variable}'] if row['equipo_loc'] == equipo else df_sel[f'dif_{variable}'] * -1
-                print(s_valores)
-                print(s_valores.mean())
+                # print(s_valores)
+                # print(s_valores.mean())
 
                 if len(s_valores) > 0:
                     if tipo == "mean":
@@ -389,6 +388,9 @@ def prueba():
     n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
     n_anios_historial = 2
     n_anios_historial_loc = n_anios_historial * 2
+    l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos',
+                          'porc_pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos',
+                          'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']  # 'remates_fuera', 'remates_block', 'pases_comp'
 
     # Levanto dataset
     df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina_south_america/df_integrated.xlsx')
@@ -401,14 +403,11 @@ def prueba():
     df = determinar_puntos(df)
 
     # Variables historicas
-    l_var = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos', 'remates_fuera',
-             'remates_block', 'porc_pases_comp', 'pases', 'pases_comp', 'pases_clave', 'amagues', 'duelos_aereos',
-             'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
     df = historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
     df = historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
 
     # Por estadistica del partido
-    for var in l_var:
+    for var in l_estadisticas:
 
         # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
         df[f'dif_{var}'] = df[f'{var}_loc'] - df[f'{var}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
@@ -420,13 +419,15 @@ def prueba():
         df.drop([f'dif_{var}'], axis=1)
 
         # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
-        # df = calcular_diferencia(df, var, tipo='mean')
         df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
         df[f'dif_prom_ult_part_segun_localia_dif_{var}'] = df[f'prom_ult_part_segun_localia_dif_{var}_loc'] - df[f'prom_ult_part_segun_localia_dif_{var}_vis']
-        df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis', f'prom_ult_part_dif_{var}_loc_segun_localia', f'prom_ult_part_dif_{var}_vis_segun_localia'])
+        df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis', f'prom_ult_part_segun_localia_dif_{var}_loc', f'prom_ult_part_segun_localia_dif_{var}_vis'])
 
     # Construyo variables de diferencias para las variables promedio de los jugadores
     df = calculate_dif_col_jugadores(df)
+
+    # Elimino variables que no construire
+    df = df.drop(columns=['remates_fuera_loc', 'remates_fuera_vis', f'remates_block_loc', f'remates_block_vis', 'pases_comp_loc', 'pases_comp_vis'], axis=1)
 
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
