@@ -158,27 +158,39 @@ class DataPreparation:  # 17.4 min
         # Definicion de variables
         n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
+        l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos',
+                          'porc_pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos', 'tackles',
+                          'intercepciones', 'corners', 'offsides', 'faltas']  # 'remates_fuera', 'remates_block', 'pases_comp'
 
-        # Construyo variables: "equipo_gandor", diferencia de goles y puntos obtenidos
+        # Construyo variables: "equipo_gandor" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
-        df = construct_data.determinar_dif_goles(df)
         df = construct_data.determinar_puntos(df)
 
-        # Construyo variables historicas
-        l_var = ['dif_goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos', 'remates_fuera',
-                 'remates_block', 'porc_pases_comp', 'pases', 'pases_comp', 'pases_clave', 'amagues', 'duelos_aereos',
-                 'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
+        # Variables historicas
         df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
         df = construct_data.historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
-        for variable in l_var:
-            df = construct_data.determine_var_en_ult_partidos(df, n_dias=n_dias, variable=variable, tipo='mean')
-            df = construct_data.determine_var_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=variable, tipo='mean')
+
+        # Por estadistica del partido
+        for var in l_estadisticas:
+            # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
+            df[f'dif_{var}'] = df[f'{var}_loc'] - df[f'{var}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
+            df.drop([f'{var}_loc', f'{var}_vis'], axis=1)  # (e.g. borro goles_loc y goles_vis)
+
+            # Determinar para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
+            df = construct_data.determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=var, tipo='mean')
+            df = construct_data.determine_prom_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=var, tipo='mean')
+            df.drop([f'dif_{var}'], axis=1)
+
+            # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
+            df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
+            df[f'dif_prom_ult_part_segun_localia_dif_{var}'] = df[f'prom_ult_part_segun_localia_dif_{var}_loc'] - df[f'prom_ult_part_segun_localia_dif_{var}_vis']
+            df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis', f'prom_ult_part_segun_localia_dif_{var}_loc', f'prom_ult_part_segun_localia_dif_{var}_vis'], axis=1)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
 
-        # Elimino columnas usadas para construir datos
-        df = df.drop(['prom_edad_loc', 'prom_edad_vis',	'rating_loc', 'rating_vis', 'posesion_loc', 'posesion_vis', 'remates_loc', 'remates_vis', 'remates_a_puerta_loc', 'remates_a_puerta_vis', 'remates_palos_loc', 'remates_palos_vis', 'remates_fuera_loc', 'remates_fuera_vis', 'remates_block_loc', 'remates_block_vis', 'porc_pases_comp_loc', 'porc_pases_comp_vis', 'pases_loc', 'pases_vis', 'pases_comp_loc', 'pases_comp_vis', 'pases_clave_loc', 'pases_clave_vis', 'amagues_loc', 'amagues_vis', 'duelos_aereos_loc', 'duelos_aereos_vis', 'tackles_loc', 'tackles_vis', 'intercepciones_loc', 'intercepciones_vis', 'corners_loc', 'corners_vis', 'faltas_loc', 'faltas_vis', 'offsides_loc', 'offsides_vis', 'ht_goles_loc', 'ht_goles_vis', 'goles_loc',	'goles_vis', 'dif_goles_loc', 'dif_goles_vis', 'puntos_loc', 'puntos_vis'], axis=1)
+        # Elimino variables que no construire
+        df = df.drop(columns=['remates_fuera_loc', 'remates_fuera_vis', f'remates_block_loc', f'remates_block_vis', 'pases_comp_loc', 'pases_comp_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -198,6 +210,9 @@ class DataPreparation:  # 17.4 min
         """
         start = time.time()
         print("\nLimpiando los datos...")
+
+        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
 
         # Eliminacion de NaN values
         # Elimino filas y columnas con alto porcentaje de NaN values
@@ -230,9 +245,6 @@ class DataPreparation:  # 17.4 min
         warnings.filterwarnings('ignore')
         start = time.time()
         print("\nSeleccionado datos...")
-
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha'], axis=1)
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -434,7 +446,7 @@ def main():
         n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 2
         thr_nan_col = 0.5
-        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas  # Con 0.6 : {'dif_valor_sup', 'dif_pases_comp_segun_ult_part', 'dif_rat_sup', 'dif_valor_aus', 'dif_pases_segun_ult_part', 'dif_gol', 'dif_valor_tit', 'dif_remates_segun_ult_part', 'dif_ataques_segun_ult_part'}
+        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
         # Levanto datasets
