@@ -4,8 +4,8 @@ from dspy.data_understanding.web_scraping.selenium import Crawler
 import time
 import random
 from tqdm import tqdm
-import re
 import warnings
+import re
 
 
 class FlashscoreCrawler(Crawler):
@@ -115,7 +115,7 @@ class FlashscoreCrawler(Crawler):
         # print(d_nueva_fila)
         return d_nueva_fila
 
-    def extract_cuota(self):  # Puedo volver a la anterior, solo fallaron 41 cuotas por "Cuotas retiradas por la casa de apuestas."
+    def extract_cuota(self):
 
         # Definicion de variables
         d_nueva_fila = {}
@@ -231,10 +231,10 @@ def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rell
             progress_bar.close()
 
             # Guardo partidos de la temporada (por seguridad)
-            # df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
 
         # Guardo partidos de la competicion (por seguridad)
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/{competicion_form}_{pais_form}.xlsx', index=False)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/{competicion_form}_{pais_form}.xlsx', index=False)
 
     # Guardado datos a nivel pais
     df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part_fs.xlsx', index=False)
@@ -247,11 +247,9 @@ def prueba():
     # Selecciono pais a extraer y obtengo las competencias y su categoria
     # pais = 'Argentina' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     pais = 'Sudamerica'
-    pais_form = pais.lower().replace(" ", "_")
 
     # Extraigo partidos
     df_part = extract_partidos_flashscore(pais)
-    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part.xlsx', index=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
