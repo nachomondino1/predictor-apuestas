@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
-
+import datetime
 
 def convert_columns_to_int(df, df_etiquetas=None):
     """
@@ -22,7 +22,6 @@ def convert_columns_to_int(df, df_etiquetas=None):
 
     # Por variable string
     for col in df.select_dtypes(include=['object']).columns:
-        print("Columna: ", col)
 
         if col not in df_etiquetas['variable'].unique():
 
@@ -61,18 +60,20 @@ def revert_columns_from_int(df, df_etiquetas, columns=None):
 def prueba():
     # Levanto datasets
     pais = 'argentina'
-    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_partido.xlsx')
-    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/{pais}/entidad_jugadores.xlsx", index_col=0)
+    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx", index_col=0)
 
-    # Entidad partido: fecha de string a datetime, posesion de str a float
-    df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M')  # df_part = convert_fecha_to_datetime(df_part, string_format='%d.%m.%Y %H:%M')
-    df_part = convert_posesion_to_int(df_part)
-    df_part['es_copa'] = df_part['es_copa'].replace(True, 1).replace(False, 0)
+    # Entidad partido WhoScored: fecha, resultados de medio tiempo y final
+    df_part['fecha'] = pd.to_datetime(df_part['fecha'] + ' ' + df_part['hora'], format='%a, %d-%b-%y %H:%M')
+    df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
+    df_part[['ht_goles_loc', 'ht_goles_vis']] = df_part['ht_result'].str.split(' : ', expand=True)  # Separar ht_result en ht_goles_loc y ht_goles_vis
+    df_part[['goles_loc', 'goles_vis']] = df_part['ft_result'].str.split(' : ', expand=True)  # Separar ft_result en goles_loc y goles_vis
+    df_part = df_part.drop(['hora', 'ht_result', 'ft_result'], axis=1)
 
-    # Entidad jugador: fecha de string a datetime y convierto valor de mercado en entero
-    df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')  # df_jug = convert_fecha_to_datetime(df_jug, string_format='%b %d, %Y')
-    df_jug = convert_valor_mercado_to_int(df_jug)
+    # Entidad jugador: fecha
+    df_jug['fecha_nac'] = pd.to_datetime(df_jug['fecha_nac'], format='%d-%m-%Y')
 
+    # Exporto pruebas
     df_part.to_excel('/Users/nachomondino/Desktop/df_part_formated.xlsx', index=False)
     df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_formated.xlsx', index=False)
 
