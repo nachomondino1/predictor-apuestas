@@ -1,5 +1,7 @@
 import pandas as pd
 from dspy.data_preparation.text_preparation import TextPreparation
+from p4_modeling.build_model import select_best_hiperparameters
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler
@@ -36,11 +38,6 @@ def fill_nan_values(X, y, type):
     # Definicion de variables
     X_filled = X.copy()    # Crear una copia del dataframe original dado que realizare cambios en las columnas y valores
     nan_threshold = 0.05  # cuidado que si hago eliminacion de col antes por un valor inferior, esta lista esta vacia y no hace fillna...
-    param_grid = {
-        'n_estimators': [100, 300], # 200
-        'max_depth': [None, 5, 10],
-        'min_samples_split': [2, 10] #  5
-    }
 
     # Determino las columnas con mucho NaN (mas de nan_threshold%)
     l_columnas_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
@@ -60,29 +57,22 @@ def fill_nan_values(X, y, type):
             # Elimino registros NaN en las columnas con bajo % de NaN (para poder usarlas en X_train)
             X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
 
-            # Dividir el dataframe en conjunto de entrenamiento y prueba
-            X_train = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan # e.g. (2728, 11)
-            y_train = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
+            # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
+            # Separo test de train y val puesto que test tendra los NaN values para la columna
+            X_train_val = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan # e.g. (2728, 11)
+            y_train_val = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
             X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)  # e.g. (378, 11)
+            # Separo en train y val
+            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
-            # Crear un modelo RandomForestRegressor
-            model = RandomForestRegressor()
-
-            # Realizar la búsqueda de cuadrícula para encontrar los mejores hiperparámetros
-            grid_search = GridSearchCV(model, param_grid, cv=2)
-            grid_search.fit(X_train, y_train)
-
-            # Obtener los mejores hiperparámetros encontrados
-            best_params = grid_search.best_params_
-
-            # Crear un nuevo modelo RandomForestRegressor con los mejores hiperparámetros
-            model_best = RandomForestRegressor(**best_params)
+            # Selecciono los mejores hiperparametros usando el set de validacion
+            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=10)
 
             # Entrenar el modelo con los datos de entrenamiento
-            model_best.fit(X_train, y_train)
+            model.fit(X_train, y_train)
 
             # Predecir los valores faltantes
-            predicted_values = model_best.predict(X_test)
+            predicted_values = model.predict(X_test)
 
             # Rellenar los valores faltantes en el dataframe
             predicted_values_index = X_test.index
@@ -136,7 +126,7 @@ def prueba():
     thr_nan_col = 0.2
 
     # Levanto dataset
-    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx')
+    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_False_180_30_3.xlsx')
 
     # Eliminacion de NaN values
     # Elimino filas y columnas con alto porcentaje de NaN values
@@ -145,17 +135,19 @@ def prueba():
     print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
 
     if thr_nan_col is not None:
+        prop_nan = df.isna().mean()
+        print(prop_nan)
         df = eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
 
     # Verificar que no haya outliers
     # ...
 
     # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
-    scaler = StandardScaler()  # Crea un objeto StandardScaler
-    df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
-    df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
-
-    df.to_excel('/Users/nachomondino/Desktop/df_cleaned_prueba.xlsx', index=False)
+    # scaler = StandardScaler()  # Crea un objeto StandardScaler
+    # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
+    # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
+    #
+    # df.to_excel('/Users/nachomondino/Desktop/df_cleaned_prueba.xlsx', index=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
