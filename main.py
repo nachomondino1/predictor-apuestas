@@ -158,9 +158,9 @@ class DataPreparation:  # 17.4 min
         # Definicion de variables
         n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
-        l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'remates_palos',
-                          'porc_pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos', 'tackles',
-                          'intercepciones', 'corners', 'offsides', 'faltas']  # 'remates_fuera', 'remates_block', 'pases_comp'
+        l_estadisticas = ['goles', 'ht_goles', 'puntos', 'rating', 'posesion', 'remates', 'remates_a_puerta',
+                          'remates_palos', 'porc_pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos',
+                          'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']  # 'remates_fuera', 'remates_block', 'pases_comp'
 
         # Construyo variables: "equipo_gandor" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
@@ -174,12 +174,12 @@ class DataPreparation:  # 17.4 min
         for var in l_estadisticas:
             # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
             df[f'dif_{var}'] = df[f'{var}_loc'] - df[f'{var}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
-            df.drop([f'{var}_loc', f'{var}_vis'], axis=1)  # (e.g. borro goles_loc y goles_vis)
+            df = df.drop([f'{var}_loc', f'{var}_vis'], axis=1)  # (e.g. borro goles_loc y goles_vis)
 
             # Determinar para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
             df = construct_data.determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=var, tipo='mean')
             df = construct_data.determine_prom_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=var, tipo='mean')
-            df.drop([f'dif_{var}'], axis=1)
+            df = df.drop([f'dif_{var}'], axis=1)
 
             # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
             df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
@@ -190,7 +190,7 @@ class DataPreparation:  # 17.4 min
         df = construct_data.calculate_dif_col_jugadores(df)
 
         # Elimino variables que no construire
-        df = df.drop(columns=['remates_fuera_loc', 'remates_fuera_vis', f'remates_block_loc', f'remates_block_vis', 'pases_comp_loc', 'pases_comp_vis'], axis=1)
+        df = df.drop(columns=['prom_edad_loc', 'prom_edad_vis', 'remates_fuera_loc', 'remates_fuera_vis', f'remates_block_loc', f'remates_block_vis', 'pases_comp_loc', 'pases_comp_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -212,19 +212,25 @@ class DataPreparation:  # 17.4 min
         print("\nLimpiando los datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
+        df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
 
         # Eliminacion de NaN values
-        # Elimino filas y columnas con alto porcentaje de NaN values
+        # Elimino filas con alto porcentaje de NaN values
         largo_inicial = len(df)
-        df = df.dropna(subset=['dif_remates_segun_ult_part'], how='any')
+        df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')
         print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
 
+        # Elimino columnas con alto porcentaje de NaN values
         if thr_nan_col is not None:
             df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
 
         # Verificar que no haya outliers
         # ...
+
+        # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
+        scaler = StandardScaler()  # Crea un objeto StandardScaler
+        df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
+        df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
 
         end = time.time()
         print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
@@ -294,43 +300,43 @@ class Modeling:
         """
         print("\nGenerando datasets de entrenamiento y testeo...")
 
-        # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
+        # Si no relleno NaN values
         if fill_na is None:
+
+            # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
             df = clean_data.eliminar_filas_nan(df, umbral=0)  # df = df.dropna()
 
-        # Separo en X e y
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
+            # Separo en X e y
+            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
-        # Separo conjunto de datos en train, validation y test
-        X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size,random_state=42, shuffle=True)
-        X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True)
-        print(f'Train: {X_train.shape} {y_train.shape}')
-        print(f'Val: {X_val.shape} {y_val.shape}')
-        print(f'Test: {X_test.shape} {y_test.shape}')
+            # Separo conjunto de datos en train, validation y test
+            X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size, random_state=42, shuffle=True)
+            X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True)
 
-        # Relleno nan en el dataset de entrenamiento
-        if fill_na is not None:
-            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  #  Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
+        # Si relleno NaN values
+        else:
+            # Separo en X e y
+            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
+
+            # Separo conjunto de datos en train, validation y test dejando los NaN values en df_train
+            X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X, y, test_val_size=test_val_size, test_size=test_size)
+
+            # Relleno nan en el dataset de entrenamiento
+            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
-
-            # Elimino NaN de df_val y df_test para evitar "ValueError: Input X contains NaN."
-            df_val = pd.concat([X_val, y_val], axis=1).dropna()
-            X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]  # Separar en X e y
-            print(f"Se elimino NaN values en validacion. Shape X_val: {X_val.shape}")
-
-            df_test = pd.concat([X_test, y_test], axis=1).dropna()
-            X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]  # Separar en X e y
-            print(f"Se elimino NaN values en test. Shape X_test: {X_test.shape}")
 
         # Balanceo el dataset de entrenamiento
         if bal_type is not None:
-            X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, type=bal_type)
+            X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, tipo=bal_type)
             print(f"Shape X_train luego de balanceo: {X_train.shape}")
 
         # Shuffle el dataset de entrenamiento
         df_train = pd.concat([X_train, y_train], axis=1)
         df_train = df_train.sample(frac=1).reset_index(drop=True)
         X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
+        print(f'Train: {X_train.shape} {y_train.shape}')
+        print(f'Val: {X_val.shape} {y_val.shape}')
+        print(f'Test: {X_test.shape} {y_test.shape}')
 
         if export:
             X_train.to_excel(f'./p4_modeling/data/{self.pais}/X_train.xlsx', index=False)
@@ -339,7 +345,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val, y_val, X_train, y_train, k=10):
+    def build_model(self, model, X_val, y_val, X_train, y_train, k):
         """
         Selecciona el mejor modelo a partir de la precision.
 
@@ -357,19 +363,16 @@ class Modeling:
 
         # Find best hiperparameters
         print(f" Modelo: {model_name} ".center(120, '-'))
-        # print("Buscando mejores hiperparametros...")
-        model_best_params, best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k)
+        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=10)
 
         # Entreno el modelo
-        # print("Entrenando modelo con mejores hiperparametros...")
         model_best_params.fit(X_train, y_train)
 
         # Evaluo el modelo con Cross Validation
-        # print("Evaluo rendimiento del modelo con Cross Validation...")
         cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
         print(f"\nPrecision promedio de validación cruzada: {cv_accuracy:.1f}%")
 
-        return model_name, model_best_params, best_params, cv_accuracy
+        return model_name, model_best_params, cv_accuracy
 
     def assess_model(self, model, X_test, y_test, export=True):
         """
