@@ -2,6 +2,7 @@ import pandas as pd
 from dspy.data_preparation.text_preparation import TextPreparation
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import StandardScaler
 
 
 def prepare_text_columns(df, l_col_to_except):
@@ -131,7 +132,7 @@ def eliminar_columnas_nan(df, umbral):
     return df_sin_nan
 
 def prueba():
-    pais = 'argentina'
+    pais = 'argentina_south_america'
     thr_nan_col = 0.2
 
     # Levanto dataset
@@ -140,7 +141,7 @@ def prueba():
     # Eliminacion de NaN values
     # Elimino filas y columnas con alto porcentaje de NaN values
     largo_inicial = len(df)
-    df = df.dropna(subset=['dif_remates_segun_ult_part'], how='any')
+    df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')
     print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
 
     if thr_nan_col is not None:
@@ -149,6 +150,12 @@ def prueba():
     # Verificar que no haya outliers
     # ...
 
+    # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
+    scaler = StandardScaler()  # Crea un objeto StandardScaler
+    df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
+    df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
+
+    df.to_excel('/Users/nachomondino/Desktop/df_cleaned_prueba.xlsx', index=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
