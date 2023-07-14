@@ -110,7 +110,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Verificar si se deben buscar los mejores hiperparámetros
-        model, best_params = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(X_train, y_train)
@@ -161,7 +161,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model, best_params = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=10)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=10)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
         rfe = RFE(estimator=model, n_features_to_select=n_features)
 
         # Entreno modelo
@@ -193,7 +193,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model, best_params = select_best_hiperparameters(Lasso(), X_val, y_val, k=10)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(Lasso(), X_val, y_val, k=10)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo
         model.fit(X_train, y_train)
@@ -257,7 +257,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-def select_best_features(df, var_resp, thr_fs, graf=False):
+def select_best_features(df, var_resp, thr_fs, graf=True):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -334,7 +334,7 @@ def prueba():
 
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
     df, df_etiquetas = format_data.convert_columns_to_int(df)
-    # df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+    df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_etiquetas.xlsx')
 
     # Elimino variables altamente correlacionadas
     if thr_corr is not None:
