@@ -73,11 +73,5 @@ def prueba():
     # Verifico consistencia en campos que relacionan entidades
     verificar_relacion_entidades(df_part, df_jug_part)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
 
-
-    '''
-    print(" c) Analisis de cantidad de opiniones por valor de cada campo especifico ".center(120))
-    n_opi_by_value(df_alt, df_opi)
-    '''
-
 if __name__ == "__main__":
     prueba()
