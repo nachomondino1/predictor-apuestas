@@ -29,47 +29,47 @@ def select_best_hiperparameters(model, X, y, k):
         'RandomForestClassifier': {
             'n_estimators': [100, 200, 500],  # Número de árboles en el bosque.
             'criterion': ['entropy'],  # 'gini'  # Función para medir la calidad de una división.
-            'max_depth': [3, 5, 10, 15],  # Profundidad máxima de los árboles.
-            'min_samples_split': [2, 5, 10],  # Número mínimo de muestras requeridas para realizar una división en un nodo interno.
-            'min_samples_leaf': [1, 2, 4], # Número mínimo de muestras requeridas para estar en un nodo hoja.
+            'max_depth': [3, 5, 7], # Podria reemplazar 10 y 15 por 8 # Profundidad máxima de los árboles.
+            'min_samples_split': [2, 10],  # Número mínimo de muestras requeridas para realizar una división en un nodo interno.
+            'min_samples_leaf': [1, 4], # Número mínimo de muestras requeridas para estar en un nodo hoja.
             'max_features': ['auto'],  # Número máximo de características a considerar al buscar la mejor división.
             'bootstrap': [True],  # Indica si se deben realizar muestras bootstrap al construir árboles.
         },
-        'XGBClassifier': {
+        'XGBClassifier': {  # ValueError: DataFrame.dtypes for data must be int, float, bool or category. When categorical type is supplied, The experimental DMatrix parameter`enable_categorical` must be set to `True`.  Invalid columns:dt_loc: object
             'n_estimators': [100, 500, 1000],  # Número de árboles en el ensamblado.
             'learning_rate': [0.01, 0.1, 0.3],  # Tasa de aprendizaje que controla la contribución de cada árbol.
-            'max_depth': [7, 8, 10, 15, 20],  # Profundidad máxima de cada árbol.
-            'min_child_weight': [1, 3, 5],  # Peso mínimo requerido en una hoja del árbol.
+            'max_depth': [3, 7, 10, 15, 20],  # Profundidad máxima de cada árbol.
+            # 'min_child_weight': [1, 3, 5],  # Peso mínimo requerido en una hoja del árbol.
             'subsample': [0.8, 1.0],  # Proporción de muestras utilizadas para entrenar cada árbol.
             'colsample_bytree': [0.8, 1.0],  # Proporción de características utilizadas para entrenar cada árbol.
-            'gamma': [0, 0.1, 0.5],  # Reducción mínima de la función de pérdida requerida para realizar una partición adicional en un nodo del árbol.
-            'reg_alpha': [0, 0.01, 0.1],  # Término de regularización L1 en los pesos del árbol.
-            'reg_lambda': [0, 0.01, 0.1],  # Término de regularización L2 en los pesos del árbol.
+            # 'gamma': [0, 0.1, 0.5],  # Reducción mínima de la función de pérdida requerida para realizar una partición adicional en un nodo del árbol.
+            # 'reg_alpha': [0, 0.01, 0.1],  # Término de regularización L1 en los pesos del árbol.
+            # 'reg_lambda': [0, 0.01, 0.1],  # Término de regularización L2 en los pesos del árbol.
         },
-        'GradientBoostingClassifier': {
-            'n_estimators': [100, 500, 1000],  # Número de árboles en el ensamblado.
-            'learning_rate': [0.01, 0.05, 0.1],  # Tasa de aprendizaje que controla la contribución de cada árbol.
-            'max_depth': [3, 5, 7],  # Profundidad máxima de cada árbol.
-            'min_samples_split': [5, 10],  # Número mínimo de muestras requeridas para dividir un nodo interno.
-            'min_samples_leaf': [2, 4],  # Número mínimo de muestras requeridas en cada hoja del árbol.
+        'GradientBoostingClassifier': {  # Puede performar mejor que Random pero con estos hiper tarda 39.9 minutos --> saco 1000 de n_estim y pongo 200 y saco max depth de 7
+            'n_estimators': [100, 200, 500], # 1000 # Número de árboles en el ensamblado.
+            'learning_rate': [0.01, 0.1, 1],  # Tasa de aprendizaje que controla la contribución de cada árbol.
+            'max_depth': [3, 5],  # 7  # Profundidad máxima de cada árbol.
+            # 'min_samples_split': [1, 5, 10],  # Número mínimo de muestras requeridas para dividir un nodo interno.
+            # 'min_samples_leaf': [2, 4],  # Número mínimo de muestras requeridas en cada hoja del árbol.
             'subsample': [0.8, 1.0],  # Proporción de muestras utilizadas para entrenar cada árbol.
-            'max_features': ['auto'],  # Número máximo de características consideradas al buscar la mejor división.
-            'loss': ['deviance']  # Función de pérdida a optimizar.
+            # 'max_features': ['auto'],  # Número máximo de características consideradas al buscar la mejor división.
+            # 'loss': ['deviance']  # Función de pérdida a optimizar.
         },
         'LogisticRegression': {
-            'penalty': [None, 'l1', 'l2'], # Tipo de regularización a aplicar.
-            'C': [0.1, 1.0, 5.0],  # Inverso de la fuerza de regularización.
-            'solver': ['lbfgs', 'liblinear', 'saga'],  # Algoritmo a utilizar en la optimización del problema.
-            'fit_intercept': [True, False],  # Especifica si se debe ajustar o no el intercepto.
-            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para la convergencia del algoritmo.
+            'penalty': ['l1', 'l2', None],  # Tipo de regularización a aplicar.
+            'C': [0.1, 1.0, 5.0],  # Podria probar un 3.0 en vez de 5  # Inverso de la fuerza de regularización.
+            'solver': ['saga', 'liblinear'], # Podria prescindir de 'lbfgs' # Algoritmo a utilizar en la optimización del problema.
+            'fit_intercept': [True, False],  # Mas del 75% de las veces es True # Especifica si se debe ajustar o no el intercepto.
+            'max_iter': [100, 500, 1000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
             'multi_class': ['auto'],  # Esquema de clasificación multiclase.
         },
         'SVC': {
             'C': [0.1, 1.0, 5.0],  # Parámetro de regularización.
             'kernel': ['poly', 'rbf'], # 'linear', 'sigmoid' # Función kernel utilizada para transformar los datos de entrada.
             # 'gamma': ['scale', 'auto'],  # Coeficiente para el kernel RBF, 'poly' y 'sigmoid'.
-            'degree': [3, 4, 5],  # Grado del kernel polinomial.
-            # 'coef0': [0.0,  0.5, 1.0],  # Término independiente en funciones kernel polinomiales y sigmoide.
+            'degree': [3, 5],  # Grado del kernel polinomial.
+            'coef0': [0.0,  0.5, 1.0],  # Término independiente en funciones kernel polinomiales y sigmoide.
             # 'shrinking': [True, False],  # Activa o desactiva el uso de la heurística de encogimiento.
             # 'probability': [True, False],  # Habilita o deshabilita la estimación de probabilidades.
             # 'tol': [1e-3, 1e-4, 1e-5],  # Siempre gana 1e-3 (y es el valor default) y ChatGPT no me lo dio como hiper tipico
@@ -86,10 +86,10 @@ def select_best_hiperparameters(model, X, y, k):
             # 'early_stopping': [True, False]  # Opción para detener el entrenamiento tempranamente si no hay mejoras en la métrica de validación.
         },
         'PCA': {
-            'n_components': [2, 5, 10],
-            'whiten': [True, False],
-            'svd_solver': ['auto', 'full', 'randomized'],
-            'iterated_power': [1, 2, 3]
+            'n_components': [None, 2, 5, 10, 20, 30], # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
+            'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
+            'svd_solver': ['auto', 'full', 'arpack', 'randomized'],  # Algoritmo de descomposición SVD a utilizar
+            'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
         },
         'Lasso': {
             'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
