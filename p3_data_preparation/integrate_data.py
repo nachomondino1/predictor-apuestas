@@ -119,15 +119,14 @@ def map_player_to_part(df_jug_part, df_part):  # Agregar calculo de rating y min
                 if largo > 0:
                     prom_edad = df_jug_part_filt_3['edad'].mean()
                     prom_alt = df_jug_part_filt_3['altura'].mean()
-                    sum_rat = df_jug_part_filt_3['prom_pond_rating_ult_part'].dropna().sum()
+                    sum_rat = df_jug_part_filt_3['prom_pond_rating_ult_part'].dropna().sum()  #  prom_rat = df_jug_part_filt_3['prom_pond_rating_ult_part'].mean()
                     sum_min_played = df_jug_part_filt_3['sum_min_played_ult_part'].dropna().sum()
 
                     # Guardo columna en df_part
                     df_part.loc[index, f'prom_edad_{condicion}_{titularidad}'] = prom_edad
                     df_part.loc[index, f'prom_alt_{condicion}_{titularidad}'] = prom_alt
-                    df_part.loc[index, f'sum_rat_{condicion}_{titularidad}'] = sum_rat
+                    df_part.loc[index, f'sum_rat_{condicion}_{titularidad}'] = sum_rat  # df_part.loc[index, f'prom_rat_{condicion}_{titularidad}'] = prom_rat
                     df_part.loc[index, f'sum_min_{condicion}_{titularidad}'] = sum_min_played
-
     return df_part
 
 def prueba():
