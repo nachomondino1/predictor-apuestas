@@ -16,32 +16,34 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     df_res = pd.DataFrame()
     df_hiper = pd.DataFrame(columns=['modelo', 'hiper', 'value', 'cuenta'])
     best_accuracy = 0.0
-    l_modelos = [RandomForestClassifier(), xgb.XGBClassifier(), GradientBoostingClassifier(), LogisticRegression(), SVC(), MLPClassifier()]  # DecisionTreeClassifier()
+    cont_iter = 1
+    l_modelos = [RandomForestClassifier(), LogisticRegression(), SVC(), MLPClassifier()]  # Mejor: RandomForestClassifier() seguido por Logistic # Dejo solo los que tardan poco  # MLPClassifier()  # DecisionTreeClassifier()  xgb.XGBClassifier(), GradientBoostingClassifier()
     dp = DataPreparation(var_resp, pais)
     mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
 
     # Definicion de hiperparametros
     d_params = {
         'integrate': {
-            'fill_with_fs': [True, False],  # Opcion de rellenar algunas columnas usando los datos de Flashscore
-            'n_dias_ult_part_player': [60, 180, 365]  # Nº dias para determinar sum_min_played y prom_rat
+            'fill_with_fs': [True],  # Opcion de rellenar algunas columnas usando los datos de Flashscore
+            'n_dias_ult_part_player': [30, 60, 90]  # Nº dias para determinar sum_min_played y prom_rat
         },
         'construct': {
-            'n_dias_ult_part': [30, 45],  # Nº dias para determinar promedio de estadisticas como posesion
-            'n_anios_historial': [2]  # Nº años para determinar historial entre equipos
+            'n_dias_ult_part': [45, 60, 75], # Nº dias para determinar promedio de estadisticas como posesion
+            'n_anios_historial': [3]  # Probar 3 # Nº años para determinar historial entre equipos
         },
         'clean': {
-            'thr_nan_col': [0.4, 0.2, None]  # 0.5 no elimina a nadie # Porcentaje de NaN values maximo para las columnas
+            'thr_nan_col': [0.4, 0.2, None]  # , # Gano 0.2 # Porcentaje de NaN values maximo para las columnas
         },
         'select': {
-            'thr_corr': [0.8, 0.7, 0.5, None],  # Correlacion minima para considerar correlacion entre variables
-            'thr_fs': [0.2, 0.35, None]  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+            'thr_corr': [0.7, 0.5, 0.3, None], # Correlacion minima para considerar correlacion entre variables
+            'thr_fs': [0.4, 0.2, None]  # Muy parecido, el mejorcito fue 0.2 pero por nada (x2) # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
         },
         'modeling': {
-            'test_val_size': [0.2],  # Proporcion de datos destinado a test y validation, el resto es train
+            'test_val_size': [0.3],  # Proporcion de datos destinado a test y validation, el resto es train
             'test_size': [0.5],  # Proporcion de datos destinado test, el resto es validation
-            'fill_na': [None, 'ml'],  # Opcion de rellenar NaN values en dataset de entrenamiento
+            'fill_na': [None, 'ml'], # Opcion de rellenar NaN values en dataset de entrenamiento
             'bal_type': [None, 'under', 'over'],  # Opcion de balancear dataset de entrenamiento
+            'with_pca': [True, False],
             'k': [5]  # Numero de folds tanto para seleccionar hiperparametros como para entrenar el modelo
         }
     }
@@ -97,6 +99,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
 
                 # Limpio datos
                 df_clean = dp.clean_data(df_constructed, thr_nan_col=thr_nan_col, export=False)
+                # df_clean.to_excel('/Users/nachomondino/Desktop/df_clean.xlsx', index=False)
 
                 # Por combinacion de parametros de select_data
                 for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
@@ -108,36 +111,41 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
 
                     # Selecciono datos
                     df_sel = dp.select_data(df_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                    # df_sel.to_excel('/Users/nachomondino/Desktop/df_sel.xlsx', index=False)
 
                     # Por combinacion de parametros de modeling
                     for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
 
                         # Asigno valor a cada hiperparametro
-                        test_val_size, test_size, fill_na, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3], param_values_5[4]
+                        test_val_size, test_size, fill_na, bal_type, with_pca, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3], param_values_5[4], param_values_5[5]
                         print(f" Iter Nº {x}.{i}.{m}.{j}.{h} ".center(120, "#"))
+                        print(f" Iteracion Nº {cont_iter} ")
                         print(f'Hiper integrate --> fill_with_fs: {fill_with_fs} ; n_dias_player_data: {n_dias_ult_part_player}')
                         print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_anios_historial: {n_anios_historial}')
                         print(f"Hiper clean --> thr_nan_col: {thr_nan_col}")
                         print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")
-                        print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; k: {k}")
+                        print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; with_pca: {with_pca} ; k: {k}")
 
                         df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su precision y roi
 
                         # Generar el diseño de la prueba
-                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, fill_na=fill_na)
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, fill_na=fill_na, with_pca=with_pca)
 
                         # Por modelo
                         for modelo in l_modelos:
 
                             # Entreno modelo y evaluo su rendimiento
-                            model_name, model_best_params, best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
+                            model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
                             accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test, export=False)
 
+                            # Obtengo hiperparametros optimos del modelo
+                            d_best_params = model_best_params.get_params()
+
                             # Guardo modelo
-                            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1]
+                            df_models.loc[len(df_models)] = [model_name, d_best_params, cv_accuracy, accuracy, recall, f1]
 
                             # Guardo mejores de hiperparametros
-                            for hiper, value in best_params.items():
+                            for hiper, value in d_best_params.items():
                                 fila_deseada = df_hiper.loc[(df_hiper['modelo'] == model_name) & (df_hiper['hiper'] == hiper) & (df_hiper['value'] == value)]
 
                                 # Si ya tiene cuenta
@@ -166,17 +174,17 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                         row_data = {'fill_with_fs': fill_with_fs,  'n_dias_ult_part_player': n_dias_ult_part_player,
                                     'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_anios_historial,
                                     'thr_nan_col': thr_nan_col, 'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                    'fill_na': fill_na, 'bal_type': bal_type, 'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                    'fill_na': fill_na, 'bal_type': bal_type, 'with_pca': with_pca ,
+                                    'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
                                     'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
                                     'k': k, 'best_model': bm_name, 'best_model_params': bm_params,
                                     'test_recall': bm_test_rec, 'test_f1': bm_test_f1,
                                     'train_accuracy': bm_train_acc, 'test_accuracy': bm_test_acc}
                         df_res = df_res.append(row_data, ignore_index=True)
-                        print(row_data)
-                        print(df_res)
                         df_res.to_excel('/Users/nachomondino/Desktop/df_best_hyper_df_mod.xlsx', index=False)
                         df_hiper.to_excel('/Users/nachomondino/Desktop/df_hiper.xlsx', index=False)
 
+                        cont_iter += 1
                         # Verificar si la precisión actual es la mejor hasta ahora
                         if bm_test_acc > best_accuracy:
                             best_accuracy = bm_test_acc
