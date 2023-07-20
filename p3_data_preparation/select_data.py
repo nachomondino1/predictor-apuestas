@@ -17,6 +17,7 @@ import numpy as np
 def eliminar_columnas_correlacionadas(df, var_resp, umbral):
 
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
+    n_col_inicial = len(df.columns)
 
     # Calculo matriz de correlacion
     df_correlacion = df.corr().abs()
@@ -44,7 +45,7 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
         else:
             columnas_eliminar.add(col2)
 
-    print(f"Se eliminaron {len(columnas_eliminar)} de {len(df_corr.columns)} columnas por tener una correlacion mayor a thr_corr={umbral*100:.0f}%: {columnas_eliminar}")
+    print(f"Se eliminaron {len(columnas_eliminar)} de {n_col_inicial} columnas por tener una correlacion mayor a thr_corr={umbral*100:.0f}%: {columnas_eliminar}")
     return list(columnas_eliminar)
 
 class FeatureSelection():
@@ -278,7 +279,7 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
     df_importance = pd.DataFrame(index=X.columns)
-    print(f"Largo del dataframe antes de fs: {X.shape}")
+    print(f"Largo del dataframe antes de fs (pues borre NaN values dado que no le pueden entrar a ML): {X.shape}")
 
     # Detemino importancia de cada variable para cada modelo
     df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
