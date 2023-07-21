@@ -19,6 +19,20 @@ def add_fecha(df_part, df_jug_part):
     df_jug_part_with_date = pd.merge(df_jug_part, df_part_filtered, on='id_part', how='left')
     return df_jug_part_with_date
 
+def add_team(df_part, df_jug_part):
+    # Filtrar las columnas necesarias de df_jug_part
+    df_part_filtered = df_part[['id_part', 'equipo_loc', 'equipo_vis']]
+
+    # Realizar merge para agregar información de equipos al DataFrame df_jug_part
+    df_jug_part = df_jug_part.merge(df_part_filtered, on='id_part', how='left')
+
+    # Asignar el equipo_actual basado en la condicion
+    df_jug_part['equipo_actual'] = df_jug_part.apply(lambda row: row['equipo_loc'] if row['condicion'] == 'home' else row['equipo_vis'], axis=1)
+
+    # Eliminar columnas auxiliares
+    df_jug_part.drop(columns=['equipo_loc', 'equipo_vis'], inplace=True)
+    return df_jug_part
+
 def determine_min_played(df):
     """
     Determino minutos jugados por jugador en cada partido segun titularidad y el minuto de su cambio.
