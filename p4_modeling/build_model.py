@@ -86,10 +86,12 @@ def select_best_hiperparameters(model, X, y, k):
             # 'early_stopping': [True, False]  # Opción para detener el entrenamiento tempranamente si no hay mejoras en la métrica de validación.
         },
         'PCA': {
-            'n_components': [None, 2, 5, 10, 20, 30], # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
+            'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
             'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
-            'svd_solver': ['auto', 'full', 'arpack', 'randomized'],  # Algoritmo de descomposición SVD a utilizar
+            'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
+            'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
             'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
+            'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
         },
         'Lasso': {
             'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
