@@ -54,29 +54,32 @@ def fill_nan_values(X, y, type):
         # OPCION 2: Llenar los valores faltantes con ML
         elif type == "ml":
 
-            # Elimino registros NaN en las columnas con bajo % de NaN (para poder usarlas en X_train)
-            X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
+            # Si hay al menos una columna sin NaN (sino no tengoo columnas para X_train y falla con ValueError)
+            if len(l_columnas_con_nan) < len(X.columns):
 
-            # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
-            # Separo test de train y val puesto que test tendra los NaN values para la columna
-            X_train_val = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan # e.g. (2728, 11)
-            y_train_val = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
-            X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)  # e.g. (378, 11)
-            # Separo en train y val
-            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
+                # Elimino registros NaN en las columnas con bajo % de NaN (para poder usarlas en X_train)
+                X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
 
-            # Selecciono los mejores hiperparametros usando el set de validacion
-            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=10)
+                # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
+                # Separo test de train y val puesto que test tendra los NaN values para la columna
+                X_train_val = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan # e.g. (2728, 11)
+                y_train_val = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
+                X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)  # e.g. (378, 11)
+                # Separo en train y val
+                X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
-            # Entrenar el modelo con los datos de entrenamiento
-            model.fit(X_train, y_train)
+                # Selecciono los mejores hiperparametros usando el set de validacion
+                model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=10)  # Falla x2
 
-            # Predecir los valores faltantes
-            predicted_values = model.predict(X_test)
+                # Entrenar el modelo con los datos de entrenamiento
+                model.fit(X_train, y_train)
 
-            # Rellenar los valores faltantes en el dataframe
-            predicted_values_index = X_test.index
-            X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
+                # Predecir los valores faltantes
+                predicted_values = model.predict(X_test)
+
+                # Rellenar los valores faltantes en el dataframe
+                predicted_values_index = X_test.index
+                X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
 
     # Elimino los registros NaN en las columnas que preferi usar para entrenar en vez de rellenar
     X_filled = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
