@@ -25,14 +25,15 @@ def convert_columns_to_int(df, df_etiquetas=None):
 
         if col not in df_etiquetas['variable'].unique():
 
-            # Quito NaN de la columna para evitar codificarlo
+            # Quito NaN de la columna para evitar codificar el valor NaN
             df_sin_na = df.dropna(subset=[col])
 
             # Convierto columna a int
             df_sin_na[col] = le.fit_transform(df_sin_na[col])
 
-            # Reemplazar los valores de la columna 'A' en los índices 1 y 3
+            # Reemplazar los valores de la columna en los índices sin Nan
             df.loc[df_sin_na.index, col] = df_sin_na[col]
+            df[col] = df[col].astype("float64")  # Convertir el dtype a int64
 
             # Guardo etiquetas
             l_valor_orig = le.classes_
