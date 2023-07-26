@@ -9,12 +9,15 @@ from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
 from p3_data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
+from p3_data_preparation.integrate_sofifa_to_whoscored import player_data_in_match
+from p3_data_preparation.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
 from p4_modeling import generate_test_design
 from sklearn.utils import shuffle
 # Build model
+from sklearn.decomposition import PCA
 from p4_modeling import build_model
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
@@ -120,17 +123,22 @@ class DataPreparation:  # 17.4 min
         # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
         if fill_data_with_flashcore:
             df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx')
-            df_part = integrate_data.fill_whoscored_with_flashscore(df_part, df_part_flash)
+            df_part = fill_whoscored_with_flashscore(df_part, df_part_flash)
 
         # Integro df_jug a df_jug_part
         df_jug_part = integrate_data.map_player_entities(df_jug, df_jug_part)
 
         # Calculo edad y minutos jugados por jugador en cada partido
         df_jug_part = construct_data.add_fecha(df_part, df_jug_part)
+        df_jug_part = construct_data.add_team(df_part, df_jug_part)
         df_jug_part = construct_data.determine_edad(df_jug_part)
         df_jug_part = construct_data.determine_min_played(df_jug_part)
         df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=n_dias_player_data, tipo='sum')
         df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=n_dias_player_data, tipo='mean_pond', var_pond='min_played')
+
+        # Integro sofifa
+        df_jug_sofifa = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/entidad_jugadores.xlsx')
+        df_jug_part = player_data_in_match(df_jug_part, df_jug_sofifa)
 
         # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
         df = integrate_data.map_player_to_part(df_jug_part, df_part)
@@ -159,15 +167,16 @@ class DataPreparation:  # 17.4 min
         n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
         l_estadisticas = ['goles', 'ht_goles', 'puntos', 'rating', 'posesion', 'remates', 'remates_a_puerta',
-                          'remates_palos', 'porc_pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos',
-                          'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']  # 'remates_fuera', 'remates_block', 'pases_comp'
+                          'remates_palos', 'pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos',
+                          'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
+        l_estadisticas_no_construir = ['prom_edad', 'remates_fuera', 'remates_block', 'porc_pases_comp']
 
         # Construyo variables: "equipo_gandor" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
         df = construct_data.determinar_puntos(df)
 
         # Variables historicas
-        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
+        # df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
         df = construct_data.historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
 
         # Por estadistica del partido
@@ -178,19 +187,21 @@ class DataPreparation:  # 17.4 min
 
             # Determinar para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
             df = construct_data.determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=var, tipo='mean')
-            df = construct_data.determine_prom_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=var, tipo='mean')
+            # df = construct_data.determine_prom_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=var, tipo='mean')
             df = df.drop([f'dif_{var}'], axis=1)
 
             # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
             df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
-            df[f'dif_prom_ult_part_segun_localia_dif_{var}'] = df[f'prom_ult_part_segun_localia_dif_{var}_loc'] - df[f'prom_ult_part_segun_localia_dif_{var}_vis']
-            df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis', f'prom_ult_part_segun_localia_dif_{var}_loc', f'prom_ult_part_segun_localia_dif_{var}_vis'], axis=1)
+            # df[f'dif_prom_ult_part_segun_localia_dif_{var}'] = df[f'prom_ult_part_segun_localia_dif_{var}_loc'] - df[f'prom_ult_part_segun_localia_dif_{var}_vis']
+            # df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis', f'prom_ult_part_segun_localia_dif_{var}_loc', f'prom_ult_part_segun_localia_dif_{var}_vis'], axis=1)
+            df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis'], axis=1)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
 
         # Elimino variables que no construire
-        df = df.drop(columns=['prom_edad_loc', 'prom_edad_vis', 'remates_fuera_loc', 'remates_fuera_vis', f'remates_block_loc', f'remates_block_vis', 'pases_comp_loc', 'pases_comp_vis'], axis=1)
+        for var in l_estadisticas_no_construir:
+            df = df.drop(columns=[f'{var}_loc', f'{var}_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -212,12 +223,14 @@ class DataPreparation:  # 17.4 min
         print("\nLimpiando los datos...")
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        largo_inicial = len(df.columns)
         df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
+        print(f"Se eliminó {largo_inicial - len(df.columns)} de {largo_inicial} columnas puesto que no sirven para el analisis.")
 
         # Eliminacion de NaN values
         # Elimino filas con alto porcentaje de NaN values
         largo_inicial = len(df)
-        df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')
+        df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')  # no localia: dif_prom_ult_part_dif_remates # solo localia: dif_prom_ult_part_segun_localia_dif_remates
         print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
 
         # Elimino columnas con alto porcentaje de NaN values
@@ -287,7 +300,7 @@ class Modeling:
         self.var_pred = var_pred
         self.pais = pais
 
-    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, fill_na=None, export=True):
+    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, fill_na=None, with_pca=True, export=False):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -325,13 +338,33 @@ class Modeling:
             X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
+        # Implemento PCA?
+        if with_pca:
+            # Selecciono los mejores hiperparametros
+            pca = build_model.select_best_hiperparameters(PCA(), X_val, y_val, k=10)
+
+            # Si conviene implementar PCA
+            n_comp_opt = pca.get_params()['n_components']
+            if n_comp_opt != None:
+                print("Implementando PCA()...")
+
+                # Entreno el modelo
+                pca.fit(X_train)
+
+                # Transformo X
+                X_train = pd.DataFrame(pca.transform(X_train))
+                X_val = pd.DataFrame(pca.transform(X_val))
+                X_test = pd.DataFrame(pca.transform(X_test))
+            else:
+                print("No hago PCA() porque gano n_components=None")
+
         # Balanceo el dataset de entrenamiento
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, tipo=bal_type)
             print(f"Shape X_train luego de balanceo: {X_train.shape}")
 
-        # Shuffle el dataset de entrenamiento
-        df_train = pd.concat([X_train, y_train], axis=1)
+        # Shuffle el dataset de entrenamiento (Funciona mal el shuffle)
+        df_train = pd.concat([X_train.reset_index(drop=True), y_train.reset_index(drop=True)], axis=1)  # concatena mal sin el reset_index()
         df_train = df_train.sample(frac=1).reset_index(drop=True)
         X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
         print(f'Train: {X_train.shape} {y_train.shape}')
@@ -412,7 +445,6 @@ class Modeling:
             # confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
             df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
 
-        # return test_accuracy, recall, f1, roi
         return test_accuracy, recall, f1
 
 def main():
