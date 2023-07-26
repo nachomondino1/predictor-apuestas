@@ -38,13 +38,14 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5):
 
     # Todos los registros con al menos un NaN value los guardo en el conjunto de entrenamiento
     df_train = df.loc[df.isna().any(axis=1)]
-    df_train.to_excel('/Users/nachomondino/Desktop/df_train_prueba.xlsx', index=False)
-    # print(df_train.shape)
 
     # Completo el conjunto de entrenamiento con n registros al azar
-    corte = int((1 - test_val_size) * len(df))
-    n = corte - len(df_train)  # número de registros que deseas seleccionar al azar
-    df_train = pd.concat([df_train, df.dropna().sample(n)], axis=0)
+    n_corte = int((1 - test_val_size) * len(df))
+    n = n_corte - len(df_train)  # número de registros que deseas seleccionar al azar
+
+    if n > 0: # Si hay mas filas con nan que el corte, dejo todas las filas con nan en df_train
+        df_train = pd.concat([df_train, df.dropna().sample(n)], axis=0)
+
     X_train, y_train = df_train.drop(y.name, axis=1), df_train[y.name]
     # print(f"Corte: {corte} ; n: {n}")
     # print(df_train.shape)
