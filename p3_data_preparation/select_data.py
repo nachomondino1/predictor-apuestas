@@ -21,6 +21,7 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
 
     # Calculo matriz de correlacion
     df_correlacion = df.corr().abs()
+    df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
 
     # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
     df_corr = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0)
@@ -282,7 +283,7 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     print(f"Largo del dataframe antes de fs (pues borre NaN values dado que no le pueden entrar a ML): {X.shape}")
 
     # Detemino importancia de cada variable para cada modelo
-    df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
+    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
     df_importance = df_importance.merge(fs.via(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
     df_importance = df_importance.merge(fs.random_forest(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
     df_importance = df_importance.merge(fs.rfe(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
@@ -290,7 +291,7 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)
-    # df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
+    df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
 
     # Determino columnas a eliminar por poco importancia
     l_not_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] < df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()
@@ -311,13 +312,15 @@ def prueba():
     warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
-    thr_nan_col = 0.4
-    thr_corr = 0.8  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
+    thr_nan_col = None
+    thr_corr = 0.7  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
     thr_fs = 0.2  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
     export = False
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_True_60_30_2.xlsx')
+    # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_False_90_45_3.xlsx')
+    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina_south_america/df_constructed_False_180_30_3.xlsx')
+    print(df.head())
 
     # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
     df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)
@@ -335,12 +338,14 @@ def prueba():
 
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
     df, df_etiquetas = format_data.convert_columns_to_int(df)
-    df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_etiquetas.xlsx')
+    # df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_etiquetas.xlsx')
+    # df.to_excel(f'/Users/nachomondino/Desktop/df_etiquetado.xlsx')
 
     # Elimino variables altamente correlacionadas
     if thr_corr is not None:
         l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df, var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
+        # df.to_excel(f'/Users/nachomondino/Desktop/df_eliminado_corr.xlsx')
 
     # Selecciono las variables mas importantes (feature selection)
     if thr_fs is not None:
