@@ -462,21 +462,20 @@ def extract_player_data(df_jug_part):
 
 def prueba():
     # Selecciono pais a extraer y obtengo las competencias y su categoria
-    # pais = 'Argentina' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    pais = 'South America'
+    pais = 'England' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     pais_form = pais.lower().replace(" ", "_")
 
     # Extraigo partidos
-    # df_part, df_jug_part = extract_partidos_whoscored(pais)
-    # df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part.xlsx', index=False)
-    # df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_jug_part.xlsx', index=False)
+    df_part, df_jug_part = extract_partidos_whoscored(pais)
+    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part.xlsx', index=False)
+    df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_jug_part.xlsx', index=False)
 
     # Levanto df_part para extraer player data
-    df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_jug_part.xlsx')
+    # df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_jug_part.xlsx')
 
     # Extraigo datos de jugadores
-    df_jug = extract_player_data(df_jug_part)
-    df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_jug.xlsx', index=False)
+    # df_jug = extract_player_data(df_jug_part)
+    # df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_jug.xlsx', index=False)
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

@@ -24,26 +24,26 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     # Definicion de hiperparametros
     d_params = {
         'integrate': {
-            'fill_with_fs': [True],  # Opcion de rellenar algunas columnas usando los datos de Flashscore
-            'n_dias_ult_part_player': [30, 60, 90]  # Nº dias para determinar sum_min_played y prom_rat
+            'fill_with_fs': [False],  # Opcion de rellenar algunas columnas usando los datos de Flashscore
+            'n_dias_ult_part_player': [180, 90, 30]  # Nº dias para determinar sum_min_played y prom_rat
         },
         'construct': {
-            'n_dias_ult_part': [45, 60, 75], # Nº dias para determinar promedio de estadisticas como posesion
+            'n_dias_ult_part': [30, 45, 60],  # Nº dias para determinar promedio de estadisticas como posesion
             'n_anios_historial': [3]  # Probar 3 # Nº años para determinar historial entre equipos
         },
         'clean': {
-            'thr_nan_col': [0.4, 0.2, None]  # , # Gano 0.2 # Porcentaje de NaN values maximo para las columnas
+            'thr_nan_col': [None]  # , # Gano 0.2 # Porcentaje de NaN values maximo para las columnas
         },
         'select': {
-            'thr_corr': [0.7, 0.5, 0.3, None], # Correlacion minima para considerar correlacion entre variables
+            'thr_corr': [0.7, 0.5, None], # Correlacion minima para considerar correlacion entre variables
             'thr_fs': [0.4, 0.2, None]  # Muy parecido, el mejorcito fue 0.2 pero por nada (x2) # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
         },
         'modeling': {
             'test_val_size': [0.3],  # Proporcion de datos destinado a test y validation, el resto es train
             'test_size': [0.5],  # Proporcion de datos destinado test, el resto es validation
             'fill_na': [None, 'ml'], # Opcion de rellenar NaN values en dataset de entrenamiento
-            'bal_type': [None, 'under', 'over'],  # Opcion de balancear dataset de entrenamiento
-            'with_pca': [True, False],
+            'bal_type': [None],  # Opcion de balancear dataset de entrenamiento
+            'with_pca': [True],
             'k': [5]  # Numero de folds tanto para seleccionar hiperparametros como para entrenar el modelo
         }
     }
@@ -214,7 +214,7 @@ def define_n_iterations(d_params):
     return n_iter
 
 def main():
-    pais, var_resp, var_pred = "argentina_south_america", 'equipo_ganador', 'y_pred'
+    pais, var_resp, var_pred = "arg_ing", 'equipo_ganador', 'y_pred'
     find_best_hiperparameters(var_resp, var_pred, pais)
 
 if __name__ == '__main__':

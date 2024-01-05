@@ -246,7 +246,7 @@ def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rell
 def prueba():
     # Selecciono pais a extraer y obtengo las competencias y su categoria
     # pais = 'Argentina' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    pais = 'Sudamerica'
+    pais = 'England'
 
     # Extraigo partidos
     df_part = extract_partidos_flashscore(pais)

@@ -4,7 +4,8 @@ import time
 import warnings
 import datetime
 # Data understanding
-from p2_data_understanding import scraper_whoscored, scraper_flashscore, describe_data
+from p2_data_understanding import describe_data
+from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_whoscored, scraper_sofifa
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
@@ -15,19 +16,16 @@ from p3_data_preparation.integrate_flashscore_to_whoscored import fill_whoscored
 # Generate test design
 from sklearn.model_selection import train_test_split
 from p4_modeling import generate_test_design
-from sklearn.utils import shuffle
 # Build model
 from sklearn.decomposition import PCA
 from p4_modeling import build_model
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-import lightgbm as lgb  # Gradient Boosting
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 # Assess model
-from p4_modeling.asses_model import confusion_matrix
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
 
@@ -37,23 +35,29 @@ class DataUnderstanding:
     def __init__(self, pais):
         self.pais = pais
 
-    def collect_initial_data(self):
+    def collect_initial_data(self): # Por que no extrae sofifa? y por que extrae df_jug de WS?
 
         print(" Recolectando datos... ")
 
-        # Extraigo partidos
+        # Extraigo partidos de WhoScored.com
         df_part_ws, df_jug_part = scraper_whoscored.extract_partidos_whoscored(self.pais)
         df_part_ws.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
         df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug_part.xlsx', index=False)
 
-        # Extraigo datos de jugadores
+        # Extraigo datos de jugadores # TAL VEZ LE PONGO OTRO NOMBRE AL DF_JUG
         df_jug = scraper_whoscored.extract_player_data(df_jug_part)
         df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
 
-        # Extraigo partidos de Flashscore
-        df_part_fs = scraper_flashscore.extract_partidos_flashscore(self.pais)
-        df_part_fs.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx', index=False)
-        return df_part_ws, df_part_fs, df_jug_part, df_jug
+        # Extraigo datos de jugadores de Sofifa
+        df_jug_real = scraper_sofifa.extract_jugadores_sofifa(self.pais)
+        df_jug_real.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/entidad_jugadores.xlsx', index=False)
+
+        # Extraigo partidos de Flashscore # (esto no me gusta, muy rebuscado...)
+        # df_part_fs = scraper_flashscore.extract_partidos_flashscore(self.pais)
+        # df_part_fs.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx', index=False)
+        # return df_part_ws, df_part_fs, df_jug_part, df_jug
+
+        return df_part_ws, df_jug_part, df_jug, df_jug_real
 
     def describe_data(self, df_part, df_jug_part, df_jug):  # Agregar df_jug a descripcion y df_part de flashscore?
 
@@ -451,13 +455,12 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
-    pais = "argentina_south_america"
+    pais = "England" # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
     # Procesamiento
-    data_unders = False
-    data_prep = True
+    data_unders = True
+    data_prep = False
     modeling = False
 
     if data_unders:
@@ -465,7 +468,8 @@ def main():
         print(" Data understanding ".center(120, "#"))
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
-        df_part_ws, df_part_fs, df_jug_part, df_jug = du.collect_initial_data()
+        # df_part_ws, df_part_fs, df_jug_part, df_jug = du.collect_initial_data()
+        df_part_ws, df_jug_part, df_jug, df_jug_real = du.collect_initial_data()
         du.describe_data(df_part_ws, df_jug_part, df_jug)
         print(f"Dataframe partido:\n{df_part_ws} \nDataframe jugadores:\n{df_jug}")
 
