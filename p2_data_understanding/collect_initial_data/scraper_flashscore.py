@@ -85,6 +85,11 @@ class FlashscoreCrawler(Crawler):
                     for i, nombre in enumerate(l_nombres_vis):
                         d_nueva_fila[f'jug_{titularidad}_vis_{i + 1}'] = nombre
 
+        return d_nueva_fila
+
+    def extract_dts(self):
+        d_nueva_fila = {}
+
         # Extraigo entrenadores
         dt_loc_tag = super().extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][1]//a[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN)
         dt_vis_tag = super().extract_tag(xpath='.//div[text()="Entrenadores"]//following-sibling::div//div[@class="lf__side"][2]//a[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN)
@@ -141,7 +146,7 @@ class FlashscoreCrawler(Crawler):
         # print(d_nueva_fila)
         return d_nueva_fila
 
-def extract_partidos_flashscore(pais):
+def extract_data_flashscore(pais):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -149,13 +154,14 @@ def extract_partidos_flashscore(pais):
     # DEFINCION DE PARAMETROS & VARIABLES
     warnings.filterwarnings("ignore")  # /Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/scraper_flashscore.py:175: FutureWarning: In a future version, object-dtype columns with all-bool values will not be included in reductions with bool_only=True. Explicitly cast to bool dtype instead. df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
     crawler = FlashscoreCrawler(headless=True, path=None)
-    df_part = pd.DataFrame()  # Reinicio df por pais # No hace falta definir columnas por mas que no haya extraido partidos
+    df_part, df_part_jug= pd.DataFrame(), pd.DataFrame()
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
     print(f' PAIS: {pais} '.center(120, '#'))
 
     # Selecciono competencias del pais
     df_comp = df_comp[df_comp['pais'] == pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
     pais_form = df_comp.iloc[0]['pais'].lower().replace(' ', "_")
+    print(f"Competiciones a extraer: {df_comp['competicion']}")
 
     # POR COMPETICION
     for competicion, is_cup in zip(df_comp['competicion'], df_comp['is_cup']):
@@ -169,14 +175,12 @@ def extract_partidos_flashscore(pais):
         # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
         crawler.accept_cookies()
 
-        # Extraigo urls de las distintas temporadas de la competicion (años)
+        # Extraigo urls de las distintas temporadas (años) de la competicion
         l_urls_temporadas = crawler.extract_urls_temporadas()
         print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
-        l_urls_temporadas = l_urls_temporadas[2:5] + l_urls_temporadas[6:10] + l_urls_temporadas[11:15]  # Temporalmente para volver a recolectar las temporadas que fallo "Mostrar mas partidos"
-
         # POR TEMPORADA
-        for url_temp in l_urls_temporadas:  # De mas reciente a menos reciente
+        for url_temp in l_urls_temporadas[0:1]:  # De mas reciente a menos reciente (Luego extraigo de 0 a 15)
 
             # Ingreso a pagina de temporada e imprimo año de la temporada
             crawler.driver.get(url_temp)
@@ -185,14 +189,14 @@ def extract_partidos_flashscore(pais):
 
             # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
             while True:
-                boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=crawler.SEC_WAIT_MAX * 5)
+                boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=crawler.SEC_WAIT_MAX * 3)
                 if crawler.click_boton(boton_mostrar) is False:
                     break
 
             # Extraigo partidos (items) y sus ids
             l_items = crawler.extract_tags(xpath='.//div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]', sec_wait=crawler.SEC_WAIT_MAX*5)
             l_ids = [item.get_attribute('id') for item in l_items]
-            print(f"Partidos recolectados de la temporada {temp_year} (deberian ser 380): {len(l_ids)}")
+            print(f"Partidos recolectados de la temporada {temp_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
             progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
 
             # POR PARTIDO (c/u identificado con un id)
@@ -203,7 +207,8 @@ def extract_partidos_flashscore(pais):
                 crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
 
                 # Reinicio diccionario en el que guardar datos del nuevo partido
-                d_nueva_fila = {'id': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': is_cup}
+                d_nueva_fila = {'id_part': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': is_cup}
+                d_nueva_fila_2 = {'id_part': id}
 
                 # EXTRACCION DE CAMPOS
                 # Extraigo campos de hoja "Resumen"
@@ -215,35 +220,40 @@ def extract_partidos_flashscore(pais):
                     time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3))  # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
                     d_nueva_fila.update(crawler.extract_estadisticas())
 
-                # Si tiene hoja "Formaciones", extraigo campos
-                boton_formaciones = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Formaciones" or text()="Alineaciones"]', sec_wait=crawler.SEC_WAIT_MAX)
-                if crawler.click_boton(boton_formaciones) is not False:
-                    time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3)) # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
-                    d_nueva_fila.update(crawler.extract_formacion())
-
                 # Si existe la seccion "Cuotas pre-partido", extraigo cuotas de Bet365
                 if crawler.extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=crawler.SEC_WAIT_MIN) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
                     d_nueva_fila.update(crawler.extract_cuota())
 
+                # Si tiene hoja "Formaciones", extraigo campos
+                boton_formaciones = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Formaciones" or text()="Alineaciones"]', sec_wait=crawler.SEC_WAIT_MAX)
+                if crawler.click_boton(boton_formaciones) is not False:
+                    time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3)) # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
+                    d_nueva_fila.update(crawler.extract_dts())
+                    d_nueva_fila_2.update(crawler.extract_formacion())
+
                 # GUARDADO DE DATOS EN DATAFRAME
                 df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
+                df_part_jug = pd.concat([df_part_jug, pd.DataFrame(d_nueva_fila_2, index=[0])])
                 progress_bar.update(1)
 
             # Cerrar la barra de progreso al finalizar
             progress_bar.close()
 
             # Guardo partidos de la temporada (por seguridad)
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
+            df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part_jug/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
 
         # Guardo partidos de la competicion (por seguridad)
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/{competicion_form}_{pais_form}.xlsx', index=False)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part/{competicion_form}_{pais_form}.xlsx', index=False)
+        df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part_jug/{competicion_form}_{pais_form}.xlsx', index=False)
 
     # Guardado datos a nivel pais
-    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part_fs.xlsx', index=False)
+    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part.xlsx', index=False)
+    df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part_jug.xlsx', index=False)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    return df_part
+    return df_part, df_part_jug
 
 def prueba():
     # Selecciono pais a extraer y obtengo las competencias y su categoria
@@ -251,7 +261,7 @@ def prueba():
     pais = 'England'
 
     # Extraigo partidos
-    df_part = extract_partidos_flashscore(pais)
+    extract_data_flashscore(pais)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

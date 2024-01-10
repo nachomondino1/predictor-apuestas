@@ -95,10 +95,10 @@ def extract_jugadores_sofifa(pais):
             print(f"Cantidad de jugadores encontrados: {n_jug_encontrados}")
 
         # Exporto datos del fifa (Por seguridad)
-        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/entidad_jugadores_{fifa}.xlsx')
+        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/df_jug/{fifa}.xlsx')
 
     # Exporto dataset final
-    df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/entidad_jugadores.xlsx')
+    df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
 
     # Cierro webdriver
     crawler.driver.close()

@@ -5,7 +5,7 @@ import warnings
 import datetime
 # Data understanding
 from p2_data_understanding import describe_data
-from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_whoscored, scraper_sofifa
+from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
@@ -38,38 +38,31 @@ class DataUnderstanding:
     def collect_initial_data(self):
 
         print(" Recolectando datos... ")
-        # Extraigo partidos de WhoScored.com
-        df_part_ws, df_jug_part = scraper_whoscored.extract_partidos_whoscored(self.pais)
-        df_part_ws.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
-        df_jug_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug_part.xlsx', index=False)
-
-        # Extraigo datos de jugadores # TAL VEZ LE PONGO OTRO NOMBRE AL DF_JUG
-        df_jug = scraper_whoscored.extract_player_data(df_jug_part)
-        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
-
-        # Extraigo datos de jugadores de Sofifa
-        df_jug_real = scraper_sofifa.extract_jugadores_sofifa(self.pais)
-        df_jug_real.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/entidad_jugadores.xlsx', index=False)
 
         # Extraigo partidos de Flashscore
-        df_part_fs = scraper_flashscore.extract_partidos_flashscore(self.pais)
-        df_part_fs.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx', index=False)
-        return df_part_ws, df_jug_part, df_jug ,df_jug_real
+        df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(self.pais)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
+        df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
 
-    def describe_data(self, df_part, df_jug_part, df_jug):  # Agregar df_jug a descripcion y df_part de flashscore?
+        # Extraigo datos de jugadores de Sofifa
+        df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais)
+        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
+        return df_part, df_part_jug, df_jug
+
+    def describe_data(self, df_part, df_part_jug, df_jug):
 
         print(" Describiendo datos... ")
         getting_to_know_data(df_part)
-        getting_to_know_data(df_jug_part)
+        getting_to_know_data(df_part_jug)
         getting_to_know_data(df_jug)
 
         # Verifico unicidad de registros segun campos id
         describe_data.verificar_unicidad_registros(df_part, columns_id='id_part')
-        describe_data.verificar_unicidad_registros(df_jug_part, columns_id=['id_jug', 'id_part'])
-        describe_data.verificar_unicidad_registros(df_jug_part, columns_id=['id_jug'])
+        describe_data.verificar_unicidad_registros(df_part_jug, columns_id=['id_jug', 'id_part'])
+        describe_data.verificar_unicidad_registros(df_part_jug, columns_id=['id_jug'])
 
         # Verifico consistencia en campos que relacionan entidades
-        describe_data.verificar_relacion_entidades(df_part, df_jug_part)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
+        describe_data.verificar_relacion_entidades(df_part, df_part_jug)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
 
 
 class DataPreparation:  # 17.4 min
@@ -452,7 +445,7 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "England" # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "England"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
     # Procesamiento
@@ -465,10 +458,9 @@ def main():
         print(" Data understanding ".center(120, "#"))
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
-        df_part_ws, df_part_fs, df_jug_part, df_jug = du.collect_initial_data()
-        # df_part_ws, df_jug_part, df_jug, df_jug_real = du.collect_initial_data()
-        du.describe_data(df_part_ws, df_jug_part, df_jug)
-        print(f"Dataframe partido:\n{df_part_ws} \nDataframe jugadores:\n{df_jug}")
+        df_part, df_part_jug, df_jug = du.collect_initial_data()
+        du.describe_data(df_part, df_part_jug, df_jug)
+        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
     if data_prep:
 
@@ -477,7 +469,6 @@ def main():
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
-        fill_with_fs = True  # Relleno datos con flashscore {True, False}
         n_dias_player_data = 365  # Numero de dias para tener en cuenta en construccion de variables historicas para jugadores
         n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 2
@@ -487,13 +478,13 @@ def main():
 
         # Levanto datasets
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-        df_jug_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug_part.xlsx')
+        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
         # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx', index_col=0)
 
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)
-        df = dp.integrate_data(df_part, df_jug_part, df_jug, fill_data_with_flashcore=fill_with_fs, n_dias_player_data=n_dias_player_data)
+        df = dp.integrate_data(df_part, df_part_jug, df_jug, n_dias_player_data=n_dias_player_data)
         df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
         df = dp.clean_data(df, thr_nan_col=thr_nan_col)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
