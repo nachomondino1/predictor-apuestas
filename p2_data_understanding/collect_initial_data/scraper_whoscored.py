@@ -297,9 +297,8 @@ def extract_partidos_whoscored(pais):
     driver, then enter the page, then accept cookies and so on.
     """
     # DEFINCION DE PARAMETROS & VARIABLES
-    crawler = WhoScoredCrawler(headless=False, path=None)
-    df_part = pd.DataFrame()
-    df_jug_part = pd.DataFrame()
+    crawler = WhoScoredCrawler(headless=False, path=None)  # No puedo usar headless True, me bloquearon la direccion wifi (incluso cambiando de VPN)
+    df_part, df_jug_part = pd.DataFrame(), pd.DataFrame()
     df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
     pais_form = pais.lower().replace(' ', "_")
 

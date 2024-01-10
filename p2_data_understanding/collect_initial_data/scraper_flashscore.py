@@ -14,8 +14,8 @@ class FlashscoreCrawler(Crawler):
     def __init__(self, headless, path):
         super().__init__(headless, path)
         self.child_driver = self.driver
-        self.SEC_WAIT_MIN = 0.2
-        self.SEC_WAIT_MAX = 1.5
+        self.SEC_WAIT_MIN = 1  # antes 0.2 pero fallaba extraccion de campos que si estaban como goles
+        self.SEC_WAIT_MAX = 2  # antes estaba en 1.5
 
     def accept_cookies(self):
         # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
@@ -36,8 +36,8 @@ class FlashscoreCrawler(Crawler):
             'equipo_vis': './/div[starts-with(@class, "duelParticipant__away")]',
             'goles_loc': './/div[@class="detailScore__wrapper"]/span[1]',
             'goles_vis': './/div[@class="detailScore__wrapper"]/span[3]',
-            'arbitro': './/div[@class="mi__data"]//span[contains(text(), "Árbitro")]/following-sibling::span',
-            'cancha': './/div[@class="mi__data"]//span[contains(text(), "Estadio")]/following-sibling::span'
+            'arbitro': './/span[contains(text(), "Árbitro")]/following-sibling::span',
+            'cancha': './/span[contains(text(), "Estadio")]/following-sibling::span'
         }
 
         # Extraigo el primer campo con espera para evitar extraer sin que haya cargado la pagina
@@ -62,8 +62,8 @@ class FlashscoreCrawler(Crawler):
 
         # Definicion de variables
         d_nueva_fila = {}
-        d_formaciones = {'Formaciones iniciales': 'tit', 'Suplentes': 'sup', 'Jugadores reemplazados': 'sup_ing',
-                         'Jugadores ausentes': 'aus'}
+        d_formaciones = {"Formaciones iniciales": "tit", 'Suplentes': 'sup', 'Jugadores reemplazados': 'sup_ing',
+                         'Jugadores ausentes': 'aus'}  # 'Alineaciones iniciales': 'tit', 'Jugadores sustituidos': 'sup_ing',
 
         # Por formacion ("Formacion inicial", "Suplentes" y  "Ausentes")
         for formacion, titularidad in d_formaciones.items():
@@ -109,8 +109,8 @@ class FlashscoreCrawler(Crawler):
         for field, field_page in d_estadisticas.items():
 
             # Extraigo dicha estadistica tanto para el equipo local como para el visitante
-            d_nueva_fila[f'{field}_loc'] = super().extract_tag(xpath=f'.//div[text()="{field_page}"]//preceding-sibling::div', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
-            d_nueva_fila[f'{field}_vis'] = super().extract_tag(xpath=f'.//div[text()="{field_page}"]//following-sibling::div', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
+            d_nueva_fila[f'{field}_loc'] = super().extract_tag(xpath=f'.//strong[text()="{field_page}"]//parent::div//preceding-sibling::div', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
+            d_nueva_fila[f'{field}_vis'] = super().extract_tag(xpath=f'.//strong[text()="{field_page}"]//parent::div//following-sibling::div', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
 
         # print(d_nueva_fila)
         return d_nueva_fila
@@ -141,7 +141,7 @@ class FlashscoreCrawler(Crawler):
         # print(d_nueva_fila)
         return d_nueva_fila
 
-def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rellenar en Whoscored... # ya no oquiero formacion
+def extract_partidos_flashscore(pais):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -154,18 +154,17 @@ def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rell
     print(f' PAIS: {pais} '.center(120, '#'))
 
     # Selecciono competencias del pais
-    df_comp = df_comp[df_comp['pais_fs'] == pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
+    df_comp = df_comp[df_comp['pais'] == pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
     pais_form = df_comp.iloc[0]['pais'].lower().replace(' ', "_")
 
     # POR COMPETICION
-    for competicion, is_cup in zip(df_comp['competicion_fs'], df_comp['is_cup']):
+    for competicion, is_cup in zip(df_comp['competicion'], df_comp['is_cup']):
 
         # Ingreso a pagina
         competicion_form = competicion.lower().replace(" ", "-")  # formateo competicion para las rutas de archivo y urls
         url = f'https://www.flashscore.es/futbol/{pais.lower()}/{competicion_form}/archivo/'
         crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
-        print(f' Competicion: {competicion} '.center(120, '+'))
-        print(url)
+        print(f' Competicion: {competicion}. URL: {url} '.center(120, '+'))
 
         # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
         crawler.accept_cookies()
@@ -173,6 +172,8 @@ def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rell
         # Extraigo urls de las distintas temporadas de la competicion (años)
         l_urls_temporadas = crawler.extract_urls_temporadas()
         print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
+
+        l_urls_temporadas = l_urls_temporadas[2:5] + l_urls_temporadas[6:10] + l_urls_temporadas[11:15]  # Temporalmente para volver a recolectar las temporadas que fallo "Mostrar mas partidos"
 
         # POR TEMPORADA
         for url_temp in l_urls_temporadas:  # De mas reciente a menos reciente
@@ -184,13 +185,14 @@ def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rell
 
             # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
             while True:
-                boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=crawler.SEC_WAIT_MAX * 3)
+                boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=crawler.SEC_WAIT_MAX * 5)
                 if crawler.click_boton(boton_mostrar) is False:
                     break
 
             # Extraigo partidos (items) y sus ids
-            l_items = crawler.extract_tags(xpath='.//div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]')
+            l_items = crawler.extract_tags(xpath='.//div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]', sec_wait=crawler.SEC_WAIT_MAX*5)
             l_ids = [item.get_attribute('id') for item in l_items]
+            print(f"Partidos recolectados de la temporada {temp_year} (deberian ser 380): {len(l_ids)}")
             progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
 
             # POR PARTIDO (c/u identificado con un id)
@@ -208,19 +210,19 @@ def extract_partidos_flashscore(pais): # solo extraigo los campos que puedo rell
                 d_nueva_fila.update(crawler.extract_basic_data_from_resumen())
 
                 # Si tiene hoja "Estadisticas", extraigo campos
-                boton_estadisticas = crawler.extract_tag(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Estadísticas"]', sec_wait=crawler.SEC_WAIT_MAX, print_fail=False)
+                boton_estadisticas = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Estadísticas"]', sec_wait=crawler.SEC_WAIT_MAX, print_fail=False)
                 if crawler.click_boton(boton_estadisticas) is not False:
                     time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3))  # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
                     d_nueva_fila.update(crawler.extract_estadisticas())
 
                 # Si tiene hoja "Formaciones", extraigo campos
-                # boton_formaciones = crawler.extract_tag(xpath='.//div[@class="tabs tabs__detail--nav"]//a[text()="Formaciones"]', sec_wait=crawler.SEC_WAIT_MAX)
-                # if crawler.click_boton(boton_formaciones) is not False:
-                #     time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3)) # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
-                #     d_nueva_fila.update(crawler.extract_formacion())
+                boton_formaciones = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Formaciones" or text()="Alineaciones"]', sec_wait=crawler.SEC_WAIT_MAX)
+                if crawler.click_boton(boton_formaciones) is not False:
+                    time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3)) # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
+                    d_nueva_fila.update(crawler.extract_formacion())
 
                 # Si existe la seccion "Cuotas pre-partido", extraigo cuotas de Bet365
-                if crawler.extract_tag(xpath='.//div[@class="odds oddsNotClickable"]', sec_wait=crawler.SEC_WAIT_MIN) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
+                if crawler.extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=crawler.SEC_WAIT_MIN) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
                     d_nueva_fila.update(crawler.extract_cuota())
 
                 # GUARDADO DE DATOS EN DATAFRAME

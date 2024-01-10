@@ -10,8 +10,8 @@ from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
 from p3_data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-from p3_data_preparation.integrate_sofifa_to_whoscored import player_data_in_match
-from p3_data_preparation.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
+from p3_data_preparation.integrate_data.integrate_sofifa_to_whoscored import player_data_in_match
+from p3_data_preparation.integrate_data.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
@@ -35,10 +35,9 @@ class DataUnderstanding:
     def __init__(self, pais):
         self.pais = pais
 
-    def collect_initial_data(self): # Por que no extrae sofifa? y por que extrae df_jug de WS?
+    def collect_initial_data(self):
 
         print(" Recolectando datos... ")
-
         # Extraigo partidos de WhoScored.com
         df_part_ws, df_jug_part = scraper_whoscored.extract_partidos_whoscored(self.pais)
         df_part_ws.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
@@ -52,12 +51,10 @@ class DataUnderstanding:
         df_jug_real = scraper_sofifa.extract_jugadores_sofifa(self.pais)
         df_jug_real.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/entidad_jugadores.xlsx', index=False)
 
-        # Extraigo partidos de Flashscore # (esto no me gusta, muy rebuscado...)
-        # df_part_fs = scraper_flashscore.extract_partidos_flashscore(self.pais)
-        # df_part_fs.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx', index=False)
-        # return df_part_ws, df_part_fs, df_jug_part, df_jug
-
-        return df_part_ws, df_jug_part, df_jug, df_jug_real
+        # Extraigo partidos de Flashscore
+        df_part_fs = scraper_flashscore.extract_partidos_flashscore(self.pais)
+        df_part_fs.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx', index=False)
+        return df_part_ws, df_jug_part, df_jug ,df_jug_real
 
     def describe_data(self, df_part, df_jug_part, df_jug):  # Agregar df_jug a descripcion y df_part de flashscore?
 
@@ -468,8 +465,8 @@ def main():
         print(" Data understanding ".center(120, "#"))
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
-        # df_part_ws, df_part_fs, df_jug_part, df_jug = du.collect_initial_data()
-        df_part_ws, df_jug_part, df_jug, df_jug_real = du.collect_initial_data()
+        df_part_ws, df_part_fs, df_jug_part, df_jug = du.collect_initial_data()
+        # df_part_ws, df_jug_part, df_jug, df_jug_real = du.collect_initial_data()
         du.describe_data(df_part_ws, df_jug_part, df_jug)
         print(f"Dataframe partido:\n{df_part_ws} \nDataframe jugadores:\n{df_jug}")
 
