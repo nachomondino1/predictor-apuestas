@@ -3,6 +3,43 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 import datetime
 
+def convert_posesion_to_int(df):
+    """
+    Transformo posesion de string a float
+    :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
+    ejemplo '65%'.
+    :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
+    """
+    df['posesion_loc'] = df['posesion_loc'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
+    df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
+    return df
+
+def convert_valor_mercado_to_int(df):
+   """
+    Transforma el valor de mercado de string a float.
+
+    :param df: Dataframe con columna 'valor_mercado' cuyos valores son un string, por ejemplo, '€1.2M'.
+    :return: Dataframe con la columna 'valor_mercado' interpretada como float, por ejemplo, 1.200.000.
+    """
+   d = {'M': 1000000, 'K': 1000}
+
+   def convertir_valor_mercado(valor_mercado_str):
+
+       # Si no se tiene el dato del valor de mercado
+       if valor_mercado_str == "€0":
+           return None
+
+       # Si se tiene el dato del valor de mercado
+       else:
+           for elem in d.keys():
+               if elem in valor_mercado_str:
+                   valor_mercado_int = float(valor_mercado_str.replace("€", "").replace(elem, "")) * d[elem]
+                   return valor_mercado_int
+           return None
+
+   df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
+   return df
+
 def convert_columns_to_int(df, df_etiquetas=None):
     """
     Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores

@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from p3_data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
 from p3_data_preparation.integrate_data.integrate_sofifa_to_whoscored import player_data_in_match
 from p3_data_preparation.integrate_data.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
+from p3_data_preparation.integrate_data.integrate_data_within_whoscored import map_player_to_part
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
@@ -58,20 +59,20 @@ class DataUnderstanding:
 
         # Verifico unicidad de registros segun campos id
         describe_data.verificar_unicidad_registros(df_part, columns_id='id_part')
-        describe_data.verificar_unicidad_registros(df_part_jug, columns_id=['id_jug', 'id_part'])
-        describe_data.verificar_unicidad_registros(df_part_jug, columns_id=['id_jug'])
+        # describe_data.verificar_unicidad_registros(df_part_jug, columns_id=['id_jug', 'id_part'])  # Todavia no tiene id_jug puesto que aun no integre df_jug a df_part_jug
+        # describe_data.verificar_unicidad_registros(df_part_jug, columns_id=['id_jug'])
 
         # Verifico consistencia en campos que relacionan entidades
         describe_data.verificar_relacion_entidades(df_part, df_part_jug)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
 
 
-class DataPreparation:  # 17.4 min
+class DataPreparation:
 
     def __init__(self, var_resp, pais):
         self.var_resp = var_resp
         self.pais = pais
 
-    def format_data(self, df_part, df_jug, export=True):  # 0.0 min
+    def format_data(self, df_part, df_jug, export=True):
         """
         Arreglo el data type de algunas variables.
 
@@ -83,15 +84,14 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nFormateando los datos...")
 
-        # Entidad partido WhoScored: fecha, resultados de medio tiempo y final
-        df_part['fecha'] = pd.to_datetime(df_part['fecha'] + ' ' + df_part['hora'], format='%a, %d-%b-%y %H:%M')
-        df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
-        df_part[['ht_goles_loc', 'ht_goles_vis']] = df_part['ht_result'].str.split(' : ', expand=True)  # Separar ht_result en ht_goles_loc y ht_goles_vis
-        df_part[['goles_loc', 'goles_vis']] = df_part['ft_result'].str.split(' : ', expand=True)  # Separar ft_result en goles_loc y goles_vis
-        df_part = df_part.drop(['hora', 'ht_result', 'ft_result'], axis=1)
+        # Dataframe partido
+        df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+        df_part = format_data.convert_posesion_to_int(df_part)
+        # df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
 
-        # Entidad jugador: fecha
-        df_jug['fecha_nac'] = pd.to_datetime(df_jug['fecha_nac'], format='%d-%m-%Y')
+        # Dataframe jugador: fecha (se podria formatear sueldo y valor de mercado pero por ahora no me interesa)
+        df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')
+        df_jug = format_data.convert_valor_mercado_to_int(df_jug)
 
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
@@ -102,7 +102,7 @@ class DataPreparation:  # 17.4 min
 
         return df_part, df_jug
 
-    def integrate_data(self, df_part, df_jug_part, df_jug, fill_data_with_flashcore=False, n_dias_player_data=30, export=True):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part, df_jug_part, df_jug, n_dias_player_data=30, export=True):  # 13.3 min (sin copa arg y otras comp)
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -114,13 +114,9 @@ class DataPreparation:  # 17.4 min
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Integro Flashscore a Whoscored para rellenar estadisticas en partidos de Whoscored
-        if fill_data_with_flashcore:
-            df_part_flash = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_fs.xlsx')
-            df_part = fill_whoscored_with_flashscore(df_part, df_part_flash)
-
         # Integro df_jug a df_jug_part
-        df_jug_part = integrate_data.map_player_entities(df_jug, df_jug_part)
+        # df_jug_part = integrate_data_within_whoscored.map_player_entities(df_jug, df_jug_part)
+        df_jug_part = ... # Integrar df_jug sofifa a df_part_jug de Flashscore. Entiendo que df_part_jug debe quedar con ids en vez de nombres.
 
         # Calculo edad y minutos jugados por jugador en cada partido
         df_jug_part = construct_data.add_fecha(df_part, df_jug_part)
@@ -160,9 +156,8 @@ class DataPreparation:  # 17.4 min
         # Definicion de variables
         n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
-        l_estadisticas = ['goles', 'ht_goles', 'puntos', 'rating', 'posesion', 'remates', 'remates_a_puerta',
-                          'remates_palos', 'pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos',
-                          'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
+        l_estadisticas = ['goles', 'puntos', 'rating', 'posesion', 'remates', 'remates_a_puerta', 'pases_comp', 'pases',
+                          'offsides', 'faltas']
         l_estadisticas_no_construir = ['prom_edad', 'remates_fuera', 'remates_block', 'porc_pases_comp']
 
         # Construyo variables: "equipo_gandor" y puntos obtenidos
@@ -449,8 +444,8 @@ def main():
     export = True
 
     # Procesamiento
-    data_unders = True
-    data_prep = False
+    data_unders = False
+    data_prep = True
     modeling = False
 
     if data_unders:
@@ -480,14 +475,13 @@ def main():
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
         df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx', index_col=0)
 
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)
-        df = dp.integrate_data(df_part, df_part_jug, df_jug, n_dias_player_data=n_dias_player_data)
-        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
-        df = dp.clean_data(df, thr_nan_col=thr_nan_col)
-        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+        # df = dp.integrate_data(df_part, df_part_jug, df_jug, n_dias_player_data=n_dias_player_data)
+        # df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
+        # df = dp.clean_data(df, thr_nan_col=thr_nan_col)
+        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
     if modeling:
         # Definicion de variables

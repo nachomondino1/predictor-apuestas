@@ -180,7 +180,7 @@ def extract_data_flashscore(pais):
         print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
         # POR TEMPORADA
-        for url_temp in l_urls_temporadas[0:1]:  # De mas reciente a menos reciente (Luego extraigo de 0 a 15)
+        for url_temp in l_urls_temporadas[0:15]:  # De mas reciente a menos reciente (Luego extraigo de 0 a 15)
 
             # Ingreso a pagina de temporada e imprimo año de la temporada
             crawler.driver.get(url_temp)

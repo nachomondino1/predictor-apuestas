@@ -59,16 +59,22 @@ def verificar_relacion_entidades(df_part, df_jug_part): # notas
 
 def prueba():
 
+    pais = "England"
+
     # Levanto datasets
-    df_part = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/England/df_part.xlsx')
-    df_part_jug = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/England/df_part_jug.xlsx')
+    # df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+    df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
+    # df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx', index_col=0)
+
+    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx')
+    df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx', index_col=0)
 
     getting_to_know_data(df_part)
     getting_to_know_data(df_part_jug)
+    getting_to_know_data(df_jug)
 
     # Verifico unicidad de registros segun campos id
     verificar_unicidad_registros(df_part, columns_id='id_part')
-    verificar_unicidad_registros(df_part_jug, columns_id=['id_jug', 'id_part'])
 
     # Verifico consistencia en campos que relacionan entidades
     verificar_relacion_entidades(df_part, df_part_jug)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
