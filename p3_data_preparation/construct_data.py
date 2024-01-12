@@ -3,117 +3,6 @@ import time
 import math
 from datetime import timedelta
 
-# Construyo variables en dataframe "jugadores por partido"
-def add_fecha(df_part, df_jug_part):
-    """
-    Agrega la fecha de cada partido al dataframe.
-
-    :param df_part: Dataframe con fecha de cada partido. (DataFrame)
-    :param df_jug_part: Dataframe con datos de jugadores en los partidos. (DataFrame)
-    :return: Dataframe con datos de jugadores en los partidos incluyendo la fecha del partido. (DataFrame)
-    """
-    # Filtrar las columnas necesarias de df_jug_part
-    df_part_filtered = df_part[['id_part', 'fecha']]
-
-    # Combinar df_jug_part_filtered con df_jug usando el id_jug como clave
-    df_jug_part_with_date = pd.merge(df_jug_part, df_part_filtered, on='id_part', how='left')
-    return df_jug_part_with_date
-
-def add_team(df_part, df_jug_part):
-    # Filtrar las columnas necesarias de df_jug_part
-    df_part_filtered = df_part[['id_part', 'equipo_loc', 'equipo_vis']]
-
-    # Realizar merge para agregar información de equipos al DataFrame df_jug_part
-    df_jug_part = df_jug_part.merge(df_part_filtered, on='id_part', how='left')
-
-    # Asignar el equipo_actual basado en la condicion
-    df_jug_part['equipo_actual'] = df_jug_part.apply(lambda row: row['equipo_loc'] if row['condicion'] == 'home' else row['equipo_vis'], axis=1)
-
-    # Eliminar columnas auxiliares
-    df_jug_part.drop(columns=['equipo_loc', 'equipo_vis'], inplace=True)
-    return df_jug_part
-
-def determine_min_played(df):
-    """
-    Determino minutos jugados por jugador en cada partido segun titularidad y el minuto de su cambio.
-
-    :param df: Dataframe con datos de jugador por partido incluyendo titularidad y minuto de cambio. (DataFrame)
-    :return: Dataframe con datos de jugador por partido agregando columna de minutos jugados. (DataFrame)
-    """
-    def calculate_minutes_played(row):
-        if row['titularidad'] == 'titular':
-            if pd.isna(row['min_cambio']) or row['min_cambio'] >= 90:
-                return 90
-            else:
-                return row['min_cambio']
-        elif row['titularidad'] == 'suplente':
-            if pd.isna(row['min_cambio']) or row['min_cambio'] >= 90:
-                return 0
-            else:
-                return 90 - row['min_cambio']
-        else:
-            return None
-
-    # Aplicar la función a cada fila del DataFrame para calcular los minutos jugados.
-    df['min_played'] = df.apply(calculate_minutes_played, axis=1)
-    return df
-
-def determine_edad(df_jug_part):
-    """
-    Determino edad de cada jugador en cada partido a partir de la fecha del partido y la fecha de nacimiento del jugador
-
-    :param df_jug_part: Dataframe con datos de cada jugador en cada partido incluyendoo fecha de nacimiento. (DataFrame)
-    :return: Dataframe con datos de cada jugador en cada partido agregando columna edad. (DataFrame)
-    """
-    # Calculo edad (fecha_hora - fecha nac)
-    diferencia_dias = (df_jug_part['fecha'] - df_jug_part['fecha_nac']).dt.days  # Calcular la diferencia en días
-    df_jug_part['edad'] = diferencia_dias // 365  # Calcular la edad en años
-    return df_jug_part
-
-def determine_player_var_en_ult_partidos(df, variable, n_dias, tipo='mean', var_pond=None):
-    """
-    Obtiene el promedio de las estadisticas en los ultimos partidos de cada jugador
-
-    :param df: DataFrame.
-    :param variable: String. Nombre de variable a promediar.
-    :param n_dias: Integer. Numero de dias de los cuales obtener los datos.
-    :param tipo: String. Tipo de cálculo a realizar ('mean_pond' para promedio ponderado, 'mean' para promedio, 'sum' para suma).
-    :param var_pond: String. Nombre de la variable de ponderación en caso de promedio ponderado.
-    :return: DataFrame con estadisticas promediadas.
-    """
-    # Ordeno por fecha ascendente
-    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
-
-    # Por jugador
-    for id_jug in df['id_jug'].unique():
-        # print(f"ID JUGADOR: {id_jug}")
-
-        # Obtengo los partidos que jugó el jugador
-        df_jugador = df[df['id_jug'] == id_jug]
-        # print(df_filt)
-
-        # Recorrer los partidos del jugador
-        for idx, row in df_jugador.iterrows():
-
-            fecha_part = row['fecha']
-            fecha_limite = fecha_part - timedelta(days=n_dias)
-
-            # Filtro para seleccionar los ultimos partidos del jugador en los ultimos n dias
-            df_sel = df_jugador.loc[(df_jugador['fecha'] >= fecha_limite) & (df_jugador['fecha'] < fecha_part)]
-
-            if len(df_sel) > 0:
-                if tipo == "mean_pond":
-                    df_sel = df_sel.dropna(subset=[var_pond, variable])
-                    suma = df_sel[var_pond].sum()
-                    if suma > 0:
-                        df.loc[idx, f'prom_pond_{variable}_ult_part'] = (df_sel[var_pond] * df_sel[variable]).sum() / suma
-                elif tipo == "mean":
-                    df.loc[idx, f'prom_{variable}_ult_part'] = df_sel[variable].mean()
-
-                elif tipo == "sum":
-                    df.loc[idx, f'sum_{variable}_ult_part'] = df_sel[variable].sum()
-    return df
-
 # Construyo variables en dataframe "partido"
 def determinar_equipo_ganador(df):
     """
@@ -138,6 +27,7 @@ def determinar_puntos(df):
     :param df:
     :return:
     """
+    # Inicializo las columnas "puntos_loc" y "puntos_vis"
     df['puntos_loc'] = 0
     df['puntos_vis'] = 0
 
@@ -170,100 +60,37 @@ def determine_prom_en_ult_partidos(df, n_dias, variable, tipo):
         # Obtengo los partidos que jugó el equipo
         df_equipo = df[(df['equipo_loc'] == equipo) | (df['equipo_vis'] == equipo)]
         # print(f"Equipo: {equipo}")
-        # print(df_filt)
+        # print(f"Las filas son la cantidad total de partidos del equipo: {df_equipo.shape}")
 
         # Por partido del equipo
         for idx, row in df_equipo.iterrows():
 
             loc_o_vis = 'loc' if row['equipo_loc'] == equipo else 'vis'
-            fecha_part = row['fecha']
-            fecha_limite = fecha_part - timedelta(days=n_dias)
+            fecha_limite = row['fecha'] - timedelta(days=n_dias)
+            # print(f"Partido Nº: {idx}")
 
             # Selecciono los ultimos partidos del equipo
-            df_sel = df_equipo.loc[(df_equipo['fecha'] >= fecha_limite) & (df_equipo['fecha'] < fecha_part)]
+            df_equipo_last_matches = df_equipo.loc[(df_equipo['fecha'] >= fecha_limite) & (df_equipo['fecha'] < row['fecha'])]
+            # print(f"Las filas son las cantidad de partido en ultimos {n_dias} dias: {df_equipo_last_matches.shape}")
+            # df_equipo_last_matches.to_excel('/Users/nachomondino/Desktop/df_equipo_last_matches.xlsx')
 
             # Necesito la posesion segun si fue local o visitante en cada uno de esos partidos...
-            s_valores_loc = df_sel.loc[df_sel['equipo_loc'] == equipo, f'dif_{variable}']
-            s_valores_vis = df_sel.loc[df_sel['equipo_vis'] == equipo, f'dif_{variable}'] * -1  # -1 puesto que valores positivos en dif_variable es para el local y valores negativos es favor del visitante
+            s_valores_loc = df_equipo_last_matches.loc[df_equipo_last_matches['equipo_loc'] == equipo, f'dif_{variable}']
+            s_valores_vis = df_equipo_last_matches.loc[df_equipo_last_matches['equipo_vis'] == equipo, f'dif_{variable}'] * -1  # -1 puesto que valores positivos en dif_variable es para el local y valores negativos es favor del visitante
             s_valores = pd.concat([s_valores_loc, s_valores_vis], ignore_index=True)
+            # print(f"Valores del equipo en estadistica dif_{variable}: {s_valores}")
 
             if len(s_valores) > 0:
                 if tipo == "mean":
-                    # promedio =  sum(l_valores) / len(l_valores)
                     df.loc[idx, f'prom_ult_part_dif_{variable}_{loc_o_vis}'] = s_valores.mean()
+                    # print(f"Promedio: {s_valores.mean()} \n")
 
                 elif tipo == "sum":
-                    # suma = sum(l_valores)
                     df.loc[idx, f'sum_ult_part_dif_{variable}_{loc_o_vis}'] = s_valores.sum()
+
     return df
 
-def determine_prom_en_ult_partidos_localia(df, n_dias, variable, tipo):
-    """
-        Obtiene el promedio de las estadisticas en los ultimos partidos
-
-        :param df: Dataframe.
-        :param n_ult_part: Integer. Numero de partidos de los cuales obtener los goles
-        :param variable: String. Nombre de variable a promediar
-        :return: Dataframe con estadisticas promediadas
-        """
-    # Ordeno por fecha ascendente
-    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)
-
-    # Por equipo
-    for equipo in df['equipo_loc'].unique():
-
-        # Obtengo los partidos que jugó el equipo
-        l_dfs = [df[df['equipo_loc'] == equipo], df[df['equipo_vis'] == equipo]]
-
-        # Por localia
-        for df_equipo in l_dfs:
-            # print('\n Iteracion')
-            # print(df_equipo)
-
-            # Por partido del equipo
-            for idx, row in df_equipo.iterrows():
-
-                loc_o_vis = 'loc' if row['equipo_loc'] == equipo else 'vis'
-                fecha_part = row['fecha']
-                fecha_limite = fecha_part - timedelta(days=n_dias)
-                # print(fecha_part, fecha_limite)
-
-                # Selecciono los ultimos partidos del equipo
-                df_sel = df_equipo.loc[(df_equipo['fecha'] >= fecha_limite) & (df_equipo['fecha'] < fecha_part)]
-                # print(df_sel)
-
-                # Necesito la variable segun si fue local o visitante en cada uno de esos partidos...
-                s_valores = df_sel[f'dif_{variable}'] if row['equipo_loc'] == equipo else df_sel[f'dif_{variable}'] * -1
-                # print(s_valores)
-                # print(s_valores.mean())
-
-                if len(s_valores) > 0:
-                    if tipo == "mean":
-                        df.loc[idx, f'prom_ult_part_segun_localia_dif_{variable}_{loc_o_vis}'] = s_valores.mean()
-                    elif tipo == "sum":
-                        df.loc[idx, f'sum_ult_part_segun_localia_dif_{variable}_{loc_o_vis}'] = s_valores.sum()
-    return df
-
-def calcular_diferencia(df, variable, tipo, segun_loc=False):
-    """
-    Calcula la diferencia de la variable entre local y visitante y elimina las columnas temporales.
-
-    :param df: Dataframe.
-    :param variable: String. Nombre de variable a promediar.
-    :param str_adic: String. Sufijo adicional según localía.
-    """
-    str_adic = "_segun_loc" if segun_loc else ""
-
-    if tipo == 'mean':
-        df[f'dif_prom_dif_{variable}_segun_ult_part{str_adic}'] = df[f'prom_dif_{variable}_ult_part_loc{str_adic}'] - df[f'prom_dif_{variable}_ult_part_vis{str_adic}']
-        # df = df.drop(columns=[f'prom_dif_{variable}_ult_part_loc{str_adic}', f'prom_dif_{variable}_ult_part_vis{str_adic}'])
-
-    elif tipo == "sum":
-        df[f'dif_sum_dif_{variable}_segun_ult_part{str_adic}'] = df[f'sum_dif_{variable}_ult_part_loc{str_adic}'] - df[f'sum_dif_{variable}_ult_part_vis{str_adic}']
-        # df = df.drop(columns=[f'sum_dif_{variable}_ult_part_loc{str_adic}', f'sum_dif_{variable}_ult_part_vis{str_adic}'])
-    return df
-
-def historial_entre_si_segun_fecha(df, n_anios):  # VERIFICAR (hecho)
+def historial_entre_si_segun_fecha(df, n_anios):
     """
     Determina el historial entre los equipos que disputan el partido según los resultados en los últimos partidos entre ellos.
 
@@ -325,136 +152,78 @@ def historial_entre_si_segun_fecha(df, n_anios):  # VERIFICAR (hecho)
                     df.loc[idx, 'historial_entre_si_fecha'] = historial
     return df
 
-def historial_entre_si_localia_segun_fecha(df, n_anios):  # VERIFICAR
+def calculate_dif_col_jugadores(df):
     """
-    Determina el historial entre los equipos que disputan el partido segun los resultados en los ultimos partidos entre
-    ellos.
-
-    :param df: Dataframe. Unidad de analisis: partido. Columnas: al menos fecha, equipo_loc, equipo_vis y equipo_ganador
-    :param n_anios: Integer. Numero de años a tener en cuenta para determinar el historial entre dos equipos.
-    :return: Dataframe pasado por parametro con nueva columna, 'historial_entre_si', que permite a cual de los dos
-    equipos de un partido lo favorece mas el historial entre ellos.
+    Calcula la diferencia entre local y visitante
+    :param df:
+    :return:
     """
-    # Definicion de variables
-    n_dias = 365 * n_anios
-    l_equipos = df['equipo_loc'].unique()
-
-    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
-    df = df.sort_values(by='fecha', ascending=False, ignore_index=True)  # Mas reciente a mas antiguo
-
-    for i in range(len(l_equipos)):
-        eq1 = l_equipos[i]
-
-        for j in range(i+1, len(l_equipos)):
-            eq2 = l_equipos[j]
-
-            l_dfs = [df[(df['equipo_loc'] == eq1) & (df['equipo_vis'] == eq2)],
-                     df[(df['equipo_loc'] == eq2) & (df['equipo_vis'] == eq1)]]
-
-            for df_historial in l_dfs:
-
-                # Por partido del historial
-                for idx, row in df_historial.iterrows():
-
-                    equipo_local = row['equipo_loc']
-                    historial = 0
-                    fecha_part = row['fecha']
-                    fecha_limite = fecha_part - timedelta(days=n_dias)
-
-                    # Selecciono los ultimos partidos
-                    df_sel = df_historial.loc[(df_historial['fecha'] >= fecha_limite) & (df_historial['fecha'] < fecha_part)]
-
-                    # Por ultimos partidos
-                    for index, fila in df_sel.iterrows():
-
-                        if fila['equipo_ganador'] == "Local":
-                            historial += +1 if fila['equipo_loc'] == equipo_local else -1
-
-                        elif fila['equipo_ganador'] == "Visitante":
-                            historial += -1 if fila['equipo_loc'] == equipo_local else +1
-
-                        else:
-                            historial += 0
-
-                    # Guardo historial
-                    if len(df_sel) > 0:
-                        df.loc[idx, 'historial_entre_si_segun_loc_fecha'] = historial
-    return df
-
-def calculate_dif_col_jugadores(df): # Funciona bien
-
-    l_var_jug = ['prom_edad', 'prom_alt', 'sum_rat', 'sum_min', 'prom_ov_rat', 'prom_val_mer']  # l_var_jug = ['prom_edad', 'prom_alt', 'prom_rat', 'sum_min']
-    l_titularidad = ['titular', 'suplente']
+    # Defincion de variables
+    l_var_jug = ['prom_edad', 'prom_alt', 'prom_rat', 'prom_valor']
+    l_titularidad = ['tit', 'sup', 'aus']
 
     for titularidad in l_titularidad:
 
         for var in l_var_jug:
             # Calculo diferencia entre local y visitante
-            df[f'dif_{var}_{titularidad}'] = df[f'{var}_home_{titularidad}'] - df[f'{var}_away_{titularidad}']
+            df[f'dif_{var}_jug_{titularidad}'] = df[f'{var}_jug_{titularidad}_loc'] - df[f'{var}_jug_{titularidad}_vis']
 
             # Elimino variables utilizadas para calcular la diferencia
-            df = df.drop([f'{var}_home_{titularidad}', f'{var}_away_{titularidad}'], axis=1)
+            df = df.drop([f'{var}_jug_{titularidad}_loc', f'{var}_jug_{titularidad}_vis'], axis=1)
+    return df
+
+def prom_pond_jug_aus(df):  # Ojo falla en calculo cuando uno de los dos equipos no tiene jugadores ausentes (o sea, las variables aus son nan) --> en ese caso tiene que hacer la diferencia igual...
+
+    df['prom_rat_jug_aus_loc'] = df['prom_rat_jug_aus_loc'] * df['n_jug_aus_loc']  # Lo guardo en la misma porque sino la cago con calculate_dif_col_jugadores()
+    df['prom_rat_jug_aus_vis'] = df['prom_rat_jug_aus_vis'] * df['n_jug_aus_vis']
+
+    df = df.drop(["n_jug_aus_loc", "n_jug_aus_vis"], axis=1)
     return df
 
 def prueba():
     # Definicion de variables
+    pais = 'England'
     n_dias = 30  # 30 es como N_ULT_PART igual a 5...
-    n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
     n_anios_historial = 2
-    n_anios_historial_loc = n_anios_historial * 2
-    l_estadisticas = ['goles', 'ht_goles', 'puntos', 'rating', 'posesion', 'remates', 'remates_a_puerta',
-                      'remates_palos', 'pases_comp', 'pases', 'pases_clave', 'amagues', 'duelos_aereos',
-                      'tackles', 'intercepciones', 'corners', 'offsides', 'faltas']
-    l_estadisticas_no_construir = ['prom_edad', 'remates_fuera', 'remates_block', 'porc_pases_comp']
-    # l_var = ['goles', 'ht_goles', 'puntos', 'rating', 'remates_a_puerta']
+    l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas',
+                      'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
 
     # Levanto dataset
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina_south_america/df_integrated_False_180.xlsx')
+    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated.xlsx')
     print(df.head())
 
     start = time.time()
-
-    # Elimino variables que no construire
-    for var in l_estadisticas_no_construir:
-        df = df.drop(columns=[f'{var}_loc', f'{var}_vis'], axis=1)
 
     # Construyo variables: "equipo_gandor", diferencia de goles y puntos obtenidos
     df = determinar_equipo_ganador(df)
     df = determinar_puntos(df)
 
     # Variables historicas
-    # df = historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
-    df = historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
+    df = historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
 
     # Por estadistica del partido
-    for var in l_estadisticas:
+    for est in l_estadisticas:
 
         # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
-        df[f'dif_{var}'] = df[f'{var}_loc'] - df[f'{var}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
-        df = df.drop([f'{var}_loc', f'{var}_vis'], axis=1)  # (e.g. borro goles_loc y goles_vis)
+        df[f'dif_{est}'] = df[f'{est}_loc'] - df[f'{est}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
+        df = df.drop([f'{est}_loc', f'{est}_vis'], axis=1)  # (e.g. borro goles_loc y goles_vis)
 
         # Determinar para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-        # if var in l_var:
-        df = determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=var, tipo='mean')
-        # df = determine_prom_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=var, tipo='mean')
-        df = df.drop([f'dif_{var}'], axis=1)
+        df = determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=est, tipo='mean')
+        df = df.drop([f'dif_{est}'], axis=1)
 
         # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
-        # if var in l_var:
-        df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
-        # df[f'dif_prom_ult_part_segun_localia_dif_{var}'] = df[f'prom_ult_part_segun_localia_dif_{var}_loc'] - df[f'prom_ult_part_segun_localia_dif_{var}_vis']
-
-        # if var in l_var:
-        df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis'], axis=1)
-        # df = df.drop(columns=[f'prom_ult_part_segun_localia_dif_{var}_loc', f'prom_ult_part_segun_localia_dif_{var}_vis'], axis=1)
+        df[f'dif_prom_ult_part_dif_{est}'] = df[f'prom_ult_part_dif_{est}_loc'] - df[f'prom_ult_part_dif_{est}_vis']
+        df = df.drop(columns=[f'prom_ult_part_dif_{est}_loc', f'prom_ult_part_dif_{est}_vis'], axis=1)
 
     # Construyo variables de diferencias para las variables promedio de los jugadores
+    df = prom_pond_jug_aus(df)
     df = calculate_dif_col_jugadores(df)
 
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
-    df.to_excel('/Users/nachomondino/Desktop/df_constructed_prueba_2.xlsx')
+    df.to_excel('/Users/nachomondino/Desktop/df_constructed_prueba.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

@@ -1,15 +1,12 @@
 # Importo librerias
-import pandas as pd
-import time
-import warnings
 # Data understanding
 from p2_data_understanding import describe_data
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
-from sklearn.preprocessing import StandardScaler
-from p3_data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-from p3_data_preparation.integrate_data.integrate_sofifa_to_flashscore import *
+from p3_data_preparation import format_data, select_data
+from p3_data_preparation import construct_data
+from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
@@ -37,12 +34,12 @@ class DataUnderstanding:
 
         print(" Recolectando datos... ")
 
-        # Extraigo partidos de Flashscore
+        # Extraigo partidos de Flashscore (df_part y df_part_jug)
         df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(self.pais)
         df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
         df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
 
-        # Extraigo datos de jugadores de Sofifa
+        # Extraigo datos de jugadores de Sofifa (df_jug)
         df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais)
         df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
         return df_part, df_part_jug, df_jug
@@ -137,7 +134,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df, n_dias, n_anios_historial, export=True):  # 2.7 minutos
+    def construct_data(self, df, n_dias, n_anios_historial, export=True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -152,17 +149,15 @@ class DataPreparation:
         # Definicion de variables
         n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
-        l_estadisticas = ['goles', 'puntos', 'rating', 'posesion', 'remates', 'remates_a_puerta', 'pases_comp', 'pases',
-                          'offsides', 'faltas']
-        l_estadisticas_no_construir = ['prom_edad', 'remates_fuera', 'remates_block', 'porc_pases_comp']
+        l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas',
+                          'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
 
-        # Construyo variables: "equipo_gandor" y puntos obtenidos
+        # Construyo variables: "equipo_ganador" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
         df = construct_data.determinar_puntos(df)
 
         # Variables historicas
-        # df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
-        df = construct_data.historial_entre_si_localia_segun_fecha(df, n_anios=n_anios_historial_loc)
+        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial_loc)
 
         # Por estadistica del partido
         for var in l_estadisticas:
@@ -172,21 +167,14 @@ class DataPreparation:
 
             # Determinar para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
             df = construct_data.determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=var, tipo='mean')
-            # df = construct_data.determine_prom_en_ult_partidos_localia(df, n_dias=n_dias_loc, variable=var, tipo='mean')
             df = df.drop([f'dif_{var}'], axis=1)
 
             # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
             df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
-            # df[f'dif_prom_ult_part_segun_localia_dif_{var}'] = df[f'prom_ult_part_segun_localia_dif_{var}_loc'] - df[f'prom_ult_part_segun_localia_dif_{var}_vis']
-            # df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis', f'prom_ult_part_segun_localia_dif_{var}_loc', f'prom_ult_part_segun_localia_dif_{var}_vis'], axis=1)
             df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis'], axis=1)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
         df = construct_data.calculate_dif_col_jugadores(df)
-
-        # Elimino variables que no construire
-        for var in l_estadisticas_no_construir:
-            df = df.drop(columns=[f'{var}_loc', f'{var}_vis'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -226,9 +214,9 @@ class DataPreparation:
         # ...
 
         # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
-        scaler = StandardScaler()  # Crea un objeto StandardScaler
-        df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
-        df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
+        # scaler = StandardScaler()  # Crea un objeto StandardScaler
+        # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
+        # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
 
         end = time.time()
         print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
@@ -285,7 +273,7 @@ class Modeling:
         self.var_pred = var_pred
         self.pais = pais
 
-    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, fill_na=None, with_pca=True, export=False):
+    def generate_test_design(self, df, bal_type, test_val_size=0.2, test_size=0.5, fill_na=None, with_pca=False, export=False):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -413,9 +401,7 @@ class Modeling:
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100  # recall = recall_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, average='macro') * 100  # f1 = f1_score(y_test, y_pred)
-        print(f"Precision de test: {test_accuracy:.1f}%")
-        print(f"Recall de prueba: {recall:.1f}%")
-        print(f"F1-score de prueba: {f1:.1f}%")
+        print(f"Precision de test: {test_accuracy:.1f}% \nRecall de prueba: {recall:.1f}% \nF1-score de prueba: {f1:.1f}% ")
 
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
         # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
@@ -440,9 +426,7 @@ def main():
     export = True
 
     # Procesamiento
-    data_unders = False
-    data_prep = True
-    modeling = False
+    data_unders, data_prep, modeling = False, False, True
 
     if data_unders:
 
@@ -475,9 +459,9 @@ def main():
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)
         df = dp.integrate_data(df_part, df_part_jug, df_jug)
-        # df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
-        # df = dp.clean_data(df, thr_nan_col=thr_nan_col)
-        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
+        df = dp.clean_data(df, thr_nan_col=thr_nan_col)
+        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
     if modeling:
         # Definicion de variables
@@ -491,7 +475,7 @@ def main():
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
         bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
-        fill_na = 'ml'  # Relleno de nan values [None, mode, ml]
+        fill_na = None  # Relleno de nan values [None, mode, ml]
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
 
         # Levanto dataset para prueba
@@ -505,12 +489,10 @@ def main():
 
             # Entreno modelo y evaluo su rendimiento
             model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
-            # accuracy, recall, f1, roi = mo.assess_model(model_best_params, X_test, y_test)
-            accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test)
+            accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test)  # accuracy, recall, f1, roi
 
             # Guardo modelo
-            # df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1, roi]
-            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1]
+            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1] # roi
 
         # Selecciono el mejor modelo
         idx = df_models['test_accuracy'].idxmax()  # idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
@@ -521,13 +503,8 @@ def main():
         bm_test_rec = df_models.loc[idx, 'test_recall']
         bm_test_f1 = df_models.loc[idx, 'test_f1_score']
         # bm_test_roi = df_models.loc[idx, 'test_roi']
-        print(f"\nEl mejor modelo es: {bm_name} con: "
-              f"\n\t- Train Precision: {bm_train_acc:.1f}% "
-              f"\n\t- Test Precision: {bm_test_acc:.1f}% "
-              f"\n\t- Test recall: {bm_test_rec:.1f}%\n"
-              f"\n\t- Test f1-score: {bm_test_f1:.1f}%\n"
-              # f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
-              )
+        print(f"\nEl mejor modelo es: {bm_name} con: \n\t- Train Precision: {bm_train_acc:.1f}% \n\t- Test Precision: "
+              f"{bm_test_acc:.1f}% \n\t- Test recall: {bm_test_rec:.1f}% \n\t- Test f1-score: {bm_test_f1:.1f}%") # f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
 
         if export:
             df_models.to_excel(f'./p4_modeling/data/{pais}/df_modelos.xlsx')

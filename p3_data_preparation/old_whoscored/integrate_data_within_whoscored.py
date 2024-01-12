@@ -64,9 +64,9 @@ def map_player_to_part(df_jug_part, df_part):  # Agregar calculo de rating y min
     return df_part
 
 def prueba():
-    from p3_data_preparation import construct_data
-    from p3_data_preparation.integrate_data.old.integrate_sofifa_to_whoscored import player_data_in_match
-    from p3_data_preparation.integrate_data.old.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
+    from p3_data_preparation.old import construct_data_whoscored
+    from p3_data_preparation.old.integrate_sofifa_to_whoscored import player_data_in_match
+    from p3_data_preparation.old.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
 
     # Definicion de variables
     pais = "argentina"
@@ -88,12 +88,12 @@ def prueba():
     df_jug_part = map_player_entities(df_jug, df_jug_part)
 
     # Calculo edad y minutos jugados por jugador en cada partido
-    df_jug_part = construct_data.add_fecha(df_part, df_jug_part)
-    df_jug_part = construct_data.add_team(df_part, df_jug_part)
-    df_jug_part = construct_data.determine_edad(df_jug_part)
-    df_jug_part = construct_data.determine_min_played(df_jug_part)
-    df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=n_dias_player_data, tipo='sum')
-    df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=n_dias_player_data, tipo='mean_pond', var_pond='min_played')
+    df_jug_part = construct_data_whoscored.add_fecha(df_part, df_jug_part)
+    df_jug_part = construct_data_whoscored.add_team(df_part, df_jug_part)
+    df_jug_part = construct_data_whoscored.determine_edad(df_jug_part)
+    df_jug_part = construct_data_whoscored.determine_min_played(df_jug_part)
+    df_jug_part = construct_data_whoscored.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=n_dias_player_data, tipo='sum')
+    df_jug_part = construct_data_whoscored.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=n_dias_player_data, tipo='mean_pond', var_pond='min_played')
     # df_jug_part.to_excel('/Users/nachomondino/Desktop/df_jug_part_antes_de_int_sofifa.xlsx', index=False)
 
     # Integro sofifa a df_jug_part
