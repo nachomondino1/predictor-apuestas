@@ -107,8 +107,6 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
     l_condicion = ['loc', 'vis']
     warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...
 
-    l0, l1, l2, l3, l4, l5, l6 = [], [], [], [], [], [], []
-
     # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     df_jug['fifa_year'] = df_jug['fifa'].str.split(' ').str[-1]
 
@@ -135,7 +133,6 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
 
                 progress_bar.update(1)
                 # print(f' Partido Nº: {i} '.center(120, '#'))
-                # print(f"Fecha partido: {row['fecha']}")
 
                 # Busco el fifa correspondiente segun la fecha del partido
                 year_fifa = search_fecha_fifa(row['fecha'])
@@ -168,13 +165,6 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
 
                 # Guardo promedios de edad, altura, overall_rating y valor de mercado
                 try:
-                    l0.append(row['id_part'])
-                    l5.append(titularidad)
-                    l6.append(condicion)
-                    l1.append(len(l_prom_edad))
-                    l2.append(len(l_prom_alt))
-                    l3.append(len(l_prom_rating))
-                    l4.append(len(l_prom_valor))
                     df_part.loc[i, f'prom_edad_jug_{titularidad}_{condicion}'] = sum(l_prom_edad) / len(l_prom_edad)
                     df_part.loc[i, f'prom_alt_jug_{titularidad}_{condicion}'] = sum(l_prom_alt) / len(l_prom_alt)
                     df_part.loc[i, f'prom_rat_jug_{titularidad}_{condicion}'] = sum(l_prom_rating) / len(l_prom_rating)
@@ -192,8 +182,6 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
             # Cerrar la barra de progreso al finalizar
             progress_bar.close()
 
-    df_robustez_promedios = pd.DataFrame({"id_part": l0, "titularidad": l5, "condicion": l6, 'len_prom_edad': l1, 'len_prom_alt': l2, 'len_prom_rat': l3, 'len_prom_val': l4})
-    df_robustez_promedios.to_excel('/Users/nachomondino/Desktop/df_robustez_promedios.xlsx', index=False)
     return df_part
 
 def search_fecha_fifa(fecha_part):
@@ -220,13 +208,12 @@ def prueba():
 
     # Levanto datasets
     df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx")
-    # df_part_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx")
+    df_part_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx")
     df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     # print(df_part.head(1))
     # print(df_part_jug.head(1))
     # print(df_jug.head(1))
 
-    """
     # Obtengo listado unicos de jugadores en df_jug (Sofifa) y df_part_jug (Flashscore) para agilizar vinculacion
     df_part_jug_unique_players = unique_players_df_part_jug(df_part_jug)
     df_jug_unique_players = unique_players_df_jug(df_jug)
@@ -238,10 +225,6 @@ def prueba():
     # Reemplazo los nombres de los jugadores por su id en df_part_jug (Flashscore)
     df_part_jug = reemplazar_name_por_id(df_part_jug, df_part_jug_vinc_df_jug)
     df_part_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_with_id.xlsx', index=False)
-    """
-
-    df_part_jug = pd.read_excel('/Users/nachomondino/Desktop/df_part_jug_with_id.xlsx')  # Pruebas de funcion de abajo
-    # print(df_part_jug.head(1))
 
     # Sintetizar la data de df_jug (Sofifa) en df_part (Flashscore) gracias al vinculo con df_part_jug (Flashscore) -->   Aca dentro hago esto:  # Traer fecha, equipo y no se que mas de df_part (Flashscore) y agregar a df_part_jug (Flashscore) para poder saber en que momento traer la info del jugador (Sofifa tiene varias veces un mismo jugador porque es el jugador en ≠ fifas)
     df = player_data_in_match(df_part, df_part_jug, df_jug)
