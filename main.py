@@ -2,7 +2,6 @@
 import pandas as pd
 import time
 import warnings
-import datetime
 # Data understanding
 from p2_data_understanding import describe_data
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
@@ -10,9 +9,7 @@ from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
 from sklearn.preprocessing import StandardScaler
 from p3_data_preparation import format_data, integrate_data, construct_data, select_data, clean_data
-from p3_data_preparation.integrate_data.integrate_sofifa_to_whoscored import player_data_in_match
-from p3_data_preparation.integrate_data.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
-from p3_data_preparation.integrate_data.integrate_data_within_whoscored import map_player_to_part
+from p3_data_preparation.integrate_data.integrate_sofifa_to_flashscore import *
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
@@ -102,36 +99,35 @@ class DataPreparation:
 
         return df_part, df_jug
 
-    def integrate_data(self, df_part, df_jug_part, df_jug, n_dias_player_data=30, export=True):  # 13.3 min (sin copa arg y otras comp)
+    def integrate_data(self, df_part, df_part_jug, df_jug, export=True):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
-        :param df_part: Dataframe de los datos de los partidos. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de lo contrario. (bool)
+        :param df_part: Dataframe de los datos de los partidos.
+        :param df_part_jug: Dataframe de los datos de los jugadores en cada partido.
+        :param df_jug: Dataframe de los datos de los jugadores.
+        :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de
+        lo contrario. (bool)
         :return: Dataframe integrado. (DataFrame)
         """
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Integro df_jug a df_jug_part
-        # df_jug_part = integrate_data_within_whoscored.map_player_entities(df_jug, df_jug_part)
-        df_jug_part = ... # Integrar df_jug sofifa a df_part_jug de Flashscore. Entiendo que df_part_jug debe quedar con ids en vez de nombres.
+        # Obtengo listado unicos de jugadores en df_jug (Sofifa) y df_part_jug (Flashscore) para agilizar vinculacion
+        df_part_jug_unique_players = unique_players_df_part_jug(df_part_jug)
+        df_jug_unique_players = unique_players_df_jug(df_jug)
 
-        # Calculo edad y minutos jugados por jugador en cada partido
-        df_jug_part = construct_data.add_fecha(df_part, df_jug_part)
-        df_jug_part = construct_data.add_team(df_part, df_jug_part)
-        df_jug_part = construct_data.determine_edad(df_jug_part)
-        df_jug_part = construct_data.determine_min_played(df_jug_part)
-        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'min_played', n_dias=n_dias_player_data, tipo='sum')
-        df_jug_part = construct_data.determine_player_var_en_ult_partidos(df_jug_part, 'rating', n_dias=n_dias_player_data, tipo='mean_pond', var_pond='min_played')
+        # Vinculo con "id_jugador" a df_jug (Sofifa) y df_part_jug (Flashscore) utilizando los nombres de los jugadores
+        df_part_jug_vinc_df_jug = integrate_players_by_name(df_part_jug_unique_players, df_jug_unique_players)
+        df_part_jug_vinc_df_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_vinc_df_jug.xlsx', index=False)
 
-        # Integro sofifa
-        df_jug_sofifa = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/entidad_jugadores.xlsx')
-        df_jug_part = player_data_in_match(df_jug_part, df_jug_sofifa)
+        # Reemplazo los nombres de los jugadores por su id en df_part_jug (Flashscore)
+        df_part_jug = reemplazar_name_por_id(df_part_jug, df_part_jug_vinc_df_jug)
+        df_part_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_with_id.xlsx', index=False)
 
-        # Integro df_jug_part_integ (df_jug_part + df_jug) a df_part
-        df = integrate_data.map_player_to_part(df_jug_part, df_part)
+        # Sintetizar la data de df_jug (Sofifa) en df_part (Flashscore) gracias al vinculo con df_part_jug (Flashscore) -->   Aca dentro hago esto:  # Traer fecha, equipo y no se que mas de df_part (Flashscore) y agregar a df_part_jug (Flashscore) para poder saber en que momento traer la info del jugador (Sofifa tiene varias veces un mismo jugador porque es el jugador en ≠ fifas)
+        df = player_data_in_match(df_part, df_part_jug, df_jug)
+        df.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -478,7 +474,7 @@ def main():
 
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)
-        # df = dp.integrate_data(df_part, df_part_jug, df_jug, n_dias_player_data=n_dias_player_data)
+        df = dp.integrate_data(df_part, df_part_jug, df_jug)
         # df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
         # df = dp.clean_data(df, thr_nan_col=thr_nan_col)
         # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)

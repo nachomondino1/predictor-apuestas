@@ -65,8 +65,8 @@ def map_player_to_part(df_jug_part, df_part):  # Agregar calculo de rating y min
 
 def prueba():
     from p3_data_preparation import construct_data
-    from p3_data_preparation.integrate_data.integrate_sofifa_to_whoscored import player_data_in_match
-    from p3_data_preparation.integrate_data.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
+    from p3_data_preparation.integrate_data.old.integrate_sofifa_to_whoscored import player_data_in_match
+    from p3_data_preparation.integrate_data.old.integrate_flashscore_to_whoscored import fill_whoscored_with_flashscore
 
     # Definicion de variables
     pais = "argentina"
