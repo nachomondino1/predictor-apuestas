@@ -6,6 +6,7 @@ import time
 from tqdm import tqdm
 from p3_data_preparation import clean_data
 from sklearn.preprocessing import StandardScaler
+import math
 
 
 def unique_players_df_part_jug(df_part_jug):
@@ -106,12 +107,13 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
     l_condicion = ['loc', 'vis']
     warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...
 
+    contador_falla = 0
+    contador_aciertos = 0
+    df_jug['fifa_year'] = df_jug['fifa'].str.split(' ').str[-1]
+
     # Normalizo valor de mercado para evitar el error en entrenamiento de "ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed."
     scaler = StandardScaler()  # Crea un objeto StandardScaler
     df_jug['valor_mercado'] = scaler.fit_transform(df_jug['valor_mercado'].values.reshape(-1, 1))
-
-    # Inicializo barra de progreso
-    progress_bar = tqdm(total=len(df_part_jug), ncols=80)
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -124,15 +126,20 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
             l_col_to_preprocess = df_part_jug.filter(regex=pattern, axis=1).columns.tolist()  # LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
             print(f'Columnas a procesar: {l_col_to_preprocess}')
 
+            # Inicializo barra de progreso
+            progress_bar = tqdm(total=len(df_part_jug), ncols=80)
+
             # Por partido
-            for i, row in df_part.iterrows():  # el i es igual si es df_part o df_part_jug
+            for i, row in df_part.iterrows():
 
                 progress_bar.update(1)
+                # print(f' Partido Nº: {i} '.center(120, '#'))
+                # print(f"Fecha partido: {row['fecha']}")
 
                 # Busco el fifa correspondiente segun la fecha del partido
-                fecha_part_fifa = search_fecha_actualizacion(df_jug, row['fecha'])  # Pasarle lista de posibles fechas en vez de df_jug...
-                print(f' Partido Nº: {i} '.center(120, '#'))
-                print(f"Fecha partido: {row['fecha']} --> Fecha Actualizacion Fifa: {fecha_part_fifa}")
+                # fecha_part_fifa = search_fecha_actualizacion(df_jug, row['fecha'])  # Pasarle lista de posibles fechas en vez de df_jug...
+                year_fifa = search_fecha_fifa(df_jug, row['fecha'])
+                # print(f"Fecha partido: {row['fecha']} --> Fecha Actualizacion Fifa: {fecha_part_fifa}")
 
                 # Reinicio variables
                 l_prom_edad, l_prom_alt, l_prom_rating, l_prom_valor = [], [], [], []
@@ -142,26 +149,31 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
 
                     # Busco id del jugador en df_part_jug
                     id_jug_ent_part = df_part_jug.loc[i, col_jug]
-                    print(f"\t Id jugador a buscar en Sofifa: {id_jug_ent_part}")
+                    # print(f"\t Id jugador a buscar en Sofifa: {id_jug_ent_part}")
 
-                    # Si el jugador no es nan
-                    # if isinstance(id_jug_ent_part, float) or isinstance(id_jug_ent_part, int) : # no se si es int o float
+                    # Si el id_jugador no es nan
+                    if not math.isnan(id_jug_ent_part):  # hay mucho nan sobretodo columnas de jugadores ausentes (e.g. jug_aus_vis_12)
 
-                    # Busco el id y la fecha en df_jug (Sofifa)
-                    print(df_jug.shape)
-                    df_jug_filt = df_jug[df_jug['id_jugador'] == id_jug_ent_part]
-                    print(df_jug_filt.shape)
-                    df_jug_filt = df_jug_filt[df_jug_filt['fecha'] == fecha_part_fifa]  # FALLA
-                    print(df_jug_filt.shape)
-                    # df_jug_filt = df_jug[(df_jug['id_jugador'] == id_jug_ent_part) & (df_jug['fecha'] == fecha_part_fifa)]
-                    print(df_jug_filt)
+                        # Busco el id y la fecha en df_jug (Sofifa)
+                        # print(df_jug.shape)
+                        df_jug_filt = df_jug[df_jug['id_jugador'] == id_jug_ent_part]
+                        # print(df_jug_filt.shape)
+                        # df_jug_filt = df_jug_filt[df_jug_filt['fecha'] == fecha_part_fifa]  # FALLA
+                        df_jug_filt = df_jug_filt[df_jug_filt['fifa_year'] == year_fifa]  # FALLA
+                        # print(df_jug_filt.shape)
+                        # df_jug_filt = df_jug[(df_jug['id_jugador'] == id_jug_ent_part) & (df_jug['fecha'] == fecha_part_fifa)]
+                        # print(df_jug_filt)
 
-                    # Guardo datos del jugador
-                    l_prom_edad.append(df_jug_filt.edad.values[0])
-                    l_prom_alt.append(df_jug_filt.altura.values[0])
-                    l_prom_rating.append(df_jug_filt.overall_rating.values[0])
-                    l_prom_valor.append( df_jug_filt.valor_mercado.values[0])
-                    print("Ejemplo de lista promedio de edad: ", l_prom_edad)
+                        # Guardo datos del jugador
+                        if len(df_jug_filt) > 0:
+                            l_prom_edad.append(df_jug_filt.edad.values[0])
+                            l_prom_alt.append(df_jug_filt.altura.values[0])
+                            l_prom_rating.append(df_jug_filt.overall_rating.values[0])
+                            l_prom_valor.append( df_jug_filt.valor_mercado.values[0])
+                            # print("Ejemplo de lista promedio de edad: ", l_prom_edad)
+                        else:
+                            print(f"Falla en: Id_jugador: {id_jug_ent_part}. Año fifa: {year_fifa}")
+                            contador_falla += 1
 
                 # Guardo promedios de edad, altura, overall_rating y valor de mercado
                 try:
@@ -173,7 +185,7 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
                     # Calculo nro de jugadores lesionados
                     if titularidad == 'aus':
                         df_part.loc[i, f'n_jug_{titularidad}_{condicion}'] = len(l_prom_rating)
-                        print("Numero de ausentes: ", len(l_prom_rating))
+                        # print("Numero de ausentes: ", len(l_prom_rating))
                     # print(f'\nPromedio de edad: {sum(l_prom_edad) / len(l_prom_edad)} \nPromedio de altura: {sum(l_prom_alt) / len(l_prom_alt)} \nPromedio de rating: {sum(l_prom_rating) / len(l_prom_rating)} \nPromedio de valor: {sum(l_prom_valor) / len(l_prom_valor)} ')
 
                 except ZeroDivisionError:
@@ -183,9 +195,28 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
             # Cerrar la barra de progreso al finalizar
             progress_bar.close()
 
+    print("Cantidad de aciertos en busquedas de jugadores: ", contador_aciertos)
+    print("Cantidad de fallas por jugadores que no estan en una fecha de actualizcaion pero si en la otra de ese mismo fifa (rarisimo): ", contador_falla)
     return df_part
 
-def search_fecha_actualizacion(df, fecha_part): # FALLA PORQUE EL FIFA 24 CAMBIÓ DE NOMBRE Y AHORA ES FC 24... ACTUALIZAR
+def search_fecha_fifa(fecha_part):
+    # Definicion de variables
+    year_part = fecha_part.year  # e.g. "2021"
+
+    # Si el partido se jugo de Julio a Diciembre (post mercado de pases de invierno)
+    if fecha_part.month >= 7:
+
+        year_part_str = str(year_part + 1)[-2:]  # Ultimos dos "22"
+        # print(f"Entró en mes > 7. year_part = {year_part}. year_str = {year_part_str}")
+        return year_part_str
+
+    # Si el partido se jugo de Enero a Julio (post mercado de pases de verano)
+    else:
+
+        year_part_str = str(year_part)[-2:]  # Ultimos dos "21"
+        return year_part_str
+
+def search_fecha_actualizacion(df, fecha_part):
     """
     Segun la fecha del partido, busca la fecha de actualizacion del fifa correspondiente.
     :param df: df_jug
@@ -198,35 +229,37 @@ def search_fecha_actualizacion(df, fecha_part): # FALLA PORQUE EL FIFA 24 CAMBI�
     # Definicion de variables
     year_part = fecha_part.year  # e.g. "2021"
 
+    # Creo la columna "fifa_year" tomando solamente el año del fifa (solo "22" de "FIFA 22")
+    df_jug_2 = df.copy()
+    df_jug_2['fifa_year'] = df['fifa'].str.split(' ').str[-1]
+
     # Si el partido se jugo de Julio a Diciembre (post mercado de pases de invierno)
-    if fecha_part.month >= 7:  #if (mes_part > 7) or (mes_part == 7 and fecha_part.day > 20):
+    if fecha_part.month >= 7:
 
-        year_str = str(year_part + 1)[-2:]  # Ultimos dos "22"
-
-        fifa_str = f"fifa {year_str}"  # FIFA 22
+        year_part_str = str(year_part + 1)[-2:]  # Ultimos dos "22"
+        # print(f"Entró en mes > 7. year_part = {year_part}. year_str = {year_part_str}")
 
         # Si existe un fifa para dicha fecha
-        if fifa_str in df['fifa'].unique():
+        if year_part_str in df_jug_2['fifa_year'].unique():
 
             # Selecciono posibles fechas de actualizion segun el fifa
-            l_posibles_fechas = df[df['fifa'] == fifa_str]['fecha'].unique() # [18 ago 2022, 16 Ago 2021]
+            l_posibles_fechas = df_jug_2[df_jug_2['fifa_year'] == year_part_str]['fecha'].unique() # [18 ago 2022, 16 Ago 2021]
 
             # Elijo la primera fecha de actualizacion (pues es si o si es anterior a enero)
             fecha = min(l_posibles_fechas)
             return fecha
 
     # Si el partido se jugo de Enero a Julio (post mercado de pases de verano)
-    else:  # Jun 2021 entraria aqui
+    else:
 
-        year_str = str(year_part)[-2:]  # Ultimos dos "21"
-
-        fifa_str = f"fifa {year_str}"  # FIFA 21
+        year_part_str = str(year_part)[-2:]  # Ultimos dos "21"
+        # print(f"Entró en mes menor a 7. year_part = {year_part}. year_str = {year_part_str}")
 
         # Si existe un fifa para dicha fecha
-        if fifa_str in df['fifa'].unique():
+        if year_part_str in df_jug_2['fifa_year'].unique():
 
             # Selecciono posibles fechas de actualizion segun el fifa
-            l_posibles_fechas = df[df['fifa'] == fifa_str]['fecha'].unique()  # Cada elemento es del tipo numpy.datetime64... sin embargo, parece funcionar igual
+            l_posibles_fechas = df_jug_2[df_jug_2['fifa_year'] == year_part_str]['fecha'].unique()  # Cada elemento es del tipo numpy.datetime64... sin embargo, parece funcionar igual
 
             # Elijo la ultima fecha de actualizacion (pues si o si es posterior a enero)
             fecha = max(l_posibles_fechas)
@@ -238,7 +271,6 @@ def prueba():
     start = time.time()
     print("\nIntegrando los datos...")
     pais = 'England'
-
 
     # Levanto datasets
     df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx")
