@@ -222,7 +222,7 @@ class DataPreparation:
         print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
 
         if export:
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_cleaned.xlsx',index=False)
+            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_cleaned.xlsx',index=False)
 
         return df
 
@@ -433,9 +433,14 @@ def main():
         print(" Data understanding ".center(120, "#"))
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
-        df_part, df_part_jug, df_jug = du.collect_initial_data()
+        # Extriago datos o los levanto
+        # df_part, df_part_jug, df_jug = du.collect_initial_data()
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+
+        # Describo datos
         du.describe_data(df_part, df_part_jug, df_jug)
-        print(f"Dataframe partido:\n{df_part} \nDataframe jugadores:\n{df_jug}")
 
     if data_prep:
 
@@ -451,10 +456,11 @@ def main():
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
-        # Levanto datasets
+        # Levanto datasets para pruebas
         df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
         df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
         df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_cleaned.xlsx')
 
         # Preparo el dataset para el analisis
         df_part, df_jug = dp.format_data(df_part, df_jug)
@@ -464,6 +470,10 @@ def main():
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
     if modeling:
+        # Levanto dataset para prueba
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
+        df = df.drop(['odds_loc', 'odds_emp','odds_vis'], axis=1)  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
+
         # Definicion de variables
         print(" Modeling ".center(120, "#"))
         mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
@@ -477,9 +487,6 @@ def main():
         bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
         fill_na = None  # Relleno de nan values [None, mode, ml]
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
-
-        # Levanto dataset para prueba
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
 
         # General el diseño de la prueba
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, fill_na=fill_na)

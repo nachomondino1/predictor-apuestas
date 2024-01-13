@@ -15,11 +15,19 @@ import numpy as np
 
 
 def eliminar_columnas_correlacionadas(df, var_resp, umbral):
-
+    """
+    Identificacion de las columnas con un correlacion alta (mayor al umbral)
+    :param df:
+    :param var_resp:
+    :param umbral:
+    :return: List. Columnas a eliminar por correlacion alta.
+    """
+    # Definicion de variables
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
     n_col_inicial = len(df.columns)
 
     # Calculo matriz de correlacion
+    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Elimino odds para evitar eliminarlas y que eliminen otras variables
     df_correlacion = df.corr().abs()
     df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
 
@@ -275,6 +283,7 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     graficar_cada_metodo = False
 
     # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
+    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Elimino odds para evitar eliminarlas y que eliminen otras variables
     df = df.dropna()  # Es dificil que queden pocos registros porque borro filas y col con muchos nan antes
 
     # Separo en X e y
@@ -308,7 +317,7 @@ def prueba():
 
     # Definicion de variables
     var_resp = 'equipo_ganador'
-    pais = 'argentina_south_america'
+    pais = 'England'
     warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
@@ -318,8 +327,7 @@ def prueba():
     export = False
 
     # Levanto dataset de prueba
-    # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_False_90_45_3.xlsx')
-    df = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina_south_america/df_constructed_False_180_30_3.xlsx')
+    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx')
     print(df.head())
 
     # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)

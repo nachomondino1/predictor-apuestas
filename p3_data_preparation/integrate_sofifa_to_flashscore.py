@@ -10,18 +10,27 @@ import math
 
 
 def unique_players_df_part_jug(df_part_jug):
-
+    """
+    Obtencion de listado de jugadores unicos de df_part_jug. Un mismo jugador se repite varias veces porque esta en mas
+    de un partido.
+    :param df_part_jug:
+    :return: Dataframe. Una sola columna con los nombres de los jugadores en df_part_jug (sin repetidos)
+    """
+    # Definicion de variables
     set_unique_players = set()
 
     # Seleccionar todas las columnas excepto "id_part"
     columnas_sin_id_part = df_part_jug.columns[df_part_jug.columns != 'id_part']
-    print(df_part_jug.shape)
+    # print(df_part_jug.shape)
 
+    # Por columna (e.g. jug_tit_loc_7)
     for col in columnas_sin_id_part:
 
+        # Obtengo jugadores unicos y agrego al set
         l_unique_players = df_part_jug[col].unique()
         set_unique_players.update(l_unique_players)
 
+    # Creo dataframe con listado de jugadores unicos
     df = pd.DataFrame(list(set_unique_players), columns=['nombre_jug'])
     df = df.dropna() # No se porque le queda un na
     # print(df.shape)
@@ -29,17 +38,27 @@ def unique_players_df_part_jug(df_part_jug):
     return df
 
 def unique_players_df_jug(df_jug):
-
+    """
+    Obtencion de listado de jugadores unicos de df_jug. Un mismo jugador se repite varias veces porque esta en mas
+    de un fifa.
+    :param df_jug:
+    :return: Dataframe. Columnas id_jugador y nombre. La columna "nombre" tiene los nombres de los jugadores en df_jug
+    (sin repetidos)
+    """
     # Obtengo listado de nombres de los jugadores (sin repetidos)
     df_unique_players = df_jug.drop_duplicates(subset=['id_jugador'])
 
     # Selecciono solo las columnas id y nombre
     df_unique_players = df_unique_players.loc[:, ['id_jugador', 'nombre']]
-
     return df_unique_players
 
 def integrate_players_by_name(df_part_jug, df_jug):
-
+    """
+    Vinculo datasets de los jugadores de Sofifa y los jugadores de Flashscore segun nombre de jugador.
+    :param df_part_jug:
+    :param df_jug:
+    :return:
+    """
     print("Vinculando df_jug de Sofifa y df_part_jug de Flashscore...")
 
     # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
@@ -80,10 +99,15 @@ def integrate_players_by_name(df_part_jug, df_jug):
     # Prueba para definir l_umbrales
     # df = pd.DataFrame({"Cantidad de posibles match": l1, "Umbral": l2})
     # df.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
-
     return df_part_jug_with_id
 
 def reemplazar_name_por_id(df_part_jug, df_part_jug_with_id):
+    """
+    Reemplazo nombre de jugadoores en df_part_jug por su id de manera de facilitar la integracion posterior
+    :param df_part_jug: Dataframe.
+    :param df_part_jug_with_id: Dataframe.
+    :return: Dataframe.
+    """
 
     # Por jugador
     for i, row in df_part_jug_with_id.iterrows():
@@ -96,11 +120,13 @@ def reemplazar_name_por_id(df_part_jug, df_part_jug_with_id):
 def player_data_in_match(df_part, df_part_jug, df_jug):
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
-    particular. Se determinan los promedios de edad, overall rating,  valor de mercado y altura del equipo titular,
+    particular. Se determinan los promedios de edad, overall rating, valor de mercado y altura del equipo titular,
     suplente y los ausentes para cada equipo.
-
-    :param df:
-    :return:
+    :param df_part:
+    :param df_part_jug:
+    :param df_jug:
+    :return: Dataframe. Dataframe con los datos de todos los dataframes pasados como parametro. Tod@ en un solo dataframe
+    para poder entrenar un modelo con ellos.
     """
     # Definicion de variables
     l_titularidad = ['tit', 'sup', 'aus']  # tengo que agregar 'sup_ing' pero se debe procesar con sup...
@@ -185,6 +211,11 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
     return df_part
 
 def search_fecha_fifa(fecha_part):
+    """
+    Dado la fecha de un partido, busco el fifa que le corresponde.
+    :param fecha_part: Datetime. Fecha del partido.
+    :return: String. Año del fifa que corresponde segun la fecha pasada como parametro.
+    """
     # Definicion de variables
     year_part = fecha_part.year  # e.g. "2021"
 
