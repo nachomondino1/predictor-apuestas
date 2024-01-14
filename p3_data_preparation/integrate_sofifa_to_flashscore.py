@@ -13,37 +13,35 @@ def unique_players_df_part_jug(df_part_jug):
     """
     Obtencion de listado de jugadores unicos de df_part_jug. Un mismo jugador se repite varias veces porque esta en mas
     de un partido.
-    :param df_part_jug:
-    :return: Dataframe. Una sola columna con los nombres de los jugadores en df_part_jug (sin repetidos)
+    :param df_part_jug: Dataframe. Unidad de analisis: partido. Columnas: una por jugador segun formaciones.
+    :return: Dataframe. Unidad de analisis: jugador. Una sola columna con nombres de los jugadores en df_part_jug
+    (sin repetidos).
     """
     # Definicion de variables
     set_unique_players = set()
 
     # Seleccionar todas las columnas excepto "id_part"
-    columnas_sin_id_part = df_part_jug.columns[df_part_jug.columns != 'id_part']
-    # print(df_part_jug.shape)
+    l_columnas_sin_id_part = df_part_jug.columns[df_part_jug.columns != 'id_part']
 
     # Por columna (e.g. jug_tit_loc_7)
-    for col in columnas_sin_id_part:
+    for col in l_columnas_sin_id_part:
 
         # Obtengo jugadores unicos y agrego al set
         l_unique_players = df_part_jug[col].unique()
-        set_unique_players.update(l_unique_players)
+        set_unique_players.update(l_unique_players)  #  Uso set puesto que un jugador puede estar en mas de una columna
 
     # Creo dataframe con listado de jugadores unicos
     df = pd.DataFrame(list(set_unique_players), columns=['nombre_jug'])
     df = df.dropna() # No se porque le queda un na
-    # print(df.shape)
-    # print(len(df['nombre'].unique()))
     return df
 
 def unique_players_df_jug(df_jug):
     """
     Obtencion de listado de jugadores unicos de df_jug. Un mismo jugador se repite varias veces porque esta en mas
     de un fifa.
-    :param df_jug:
-    :return: Dataframe. Columnas id_jugador y nombre. La columna "nombre" tiene los nombres de los jugadores en df_jug
-    (sin repetidos)
+    :param df_jug: Dataframe. Unidad de analisis: jugador.
+    :return: Dataframe. Unidad de analisis: jugador. Columnas id_jugador y nombre. La columna "nombre" tiene los nombres
+    de los jugadores en df_jug (sin repetidos).
     """
     # Obtengo listado de nombres de los jugadores (sin repetidos)
     df_unique_players = df_jug.drop_duplicates(subset=['id_jugador'])
@@ -55,14 +53,17 @@ def unique_players_df_jug(df_jug):
 def integrate_players_by_name(df_part_jug, df_jug):
     """
     Vinculo datasets de los jugadores de Sofifa y los jugadores de Flashscore segun nombre de jugador.
-    :param df_part_jug:
-    :param df_jug:
-    :return:
+    :param df_part_jug: Dataframe. Unidad de analisis: jugador. Una sola columna con nombre de los jugadores en
+    df_part_jug (sin repetidos).
+    :param df_jug: Dataframe. Unidad de analisis: jugador. Columnas id_jugador y nombre. La columna "nombre" tiene los
+    nombres de los jugadores en df_jug (sin repetidos).
+    :return: Dataframe. Unidad de analisis: jugador. df_part_jug pasado como parametro con columna "id_jugador" de
+    df_jug gracias a voncular nombres de jugadores de sendos dataframes.
     """
     print("Vinculando df_jug de Sofifa y df_part_jug de Flashscore...")
 
-    # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
-    df_part_jug_with_id = df_part_jug.copy()
+    # Definicion de variables
+    df_part_jug_with_id = df_part_jug.copy()  # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
     l_umbrales = [95, 90, 80, 75]
 
     # Preparo nombre de jugadores para facilitar integracion
@@ -72,16 +73,16 @@ def integrate_players_by_name(df_part_jug, df_jug):
     def buscar_coincidencias(row, palabra, columna, umbral):
         return fuzz.token_set_ratio(palabra, row[columna]) >= umbral
 
-    # Por fila en df_part_jug
+    # Por jugador en df_part_jug
     for i, row in df_part_jug.iterrows():
 
-        # Filtro y me quedo con los jugadores con nombre mas parecidos
+        # Filtro inicial. Me quedo con los jugadores con nombre mas parecido
         df_jug_filt_ini = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', min(l_umbrales)), axis=1)]
 
         # Por umbral
         for umbral in l_umbrales:
 
-            # Selecciono los datos de jugadores segun los nombres de jugadores mas parecidos al buscado
+            # Selecciono los jugadores con nombre mas parecido al buscado
             df_jug_filt = df_jug_filt_ini[df_jug_filt_ini.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', umbral), axis=1)]
 
             # Si hay al menos un posible match
@@ -100,11 +101,10 @@ def integrate_players_by_name(df_part_jug, df_jug):
 def reemplazar_name_por_id(df_part_jug, df_part_jug_with_id):
     """
     Reemplazo nombre de jugadoores en df_part_jug por su id de manera de facilitar la integracion posterior
-    :param df_part_jug: Dataframe.
-    :param df_part_jug_with_id: Dataframe.
-    :return: Dataframe.
+    :param df_part_jug: Dataframe. Unidad de analisis: partido. Columnas: una por jugador segun formaciones.
+    :param df_part_jug_with_id: Dataframe. Unidad de analisis: jugador. Columnas: id_jugador y nombre.
+    :return: Dataframe. df_part_jug pasado como parametro reemplazando los nombres de los jugadores por su id.
     """
-
     # Por jugador
     for i, row in df_part_jug_with_id.iterrows():
 
@@ -118,11 +118,13 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de edad, overall rating, valor de mercado y altura del equipo titular,
     suplente y los ausentes para cada equipo.
-    :param df_part:
-    :param df_part_jug:
-    :param df_jug:
-    :return: Dataframe. Dataframe con los datos de todos los dataframes pasados como parametro. Tod@ en un solo dataframe
-    para poder entrenar un modelo con ellos.
+    :param df_part: Dataframe. Unidad de analisis: partido. Columnas: equipos, arbitros, estadisticas del partido, etc.
+    :param df_part_jug: Dataframe. Unidad de analisis: partido. Columnas: id_part y una por jugador segun formaciones.
+    Celdas: id de jugador (en vez de nombre).
+    :param df_jug: Dataframe. Unidad de analisis: jugador. Columnas: id_jugador y datos del jugador como edad y overall
+    rating.
+    :return: Dataframe. Dataframe con los datos de todos los dataframes pasados como parametro. Tod@ en un solo
+    dataframe para poder entrenar un modelo con ellos.
     """
     # Definicion de variables
     l_titularidad = ['tit', 'sup', 'aus']  # tengo que agregar 'sup_ing' pero se debe procesar con sup...
@@ -210,7 +212,8 @@ def search_fecha_fifa(fecha_part):
     """
     Dado la fecha de un partido, busco el fifa que le corresponde.
     :param fecha_part: Datetime. Fecha del partido.
-    :return: String. Año del fifa que corresponde segun la fecha pasada como parametro.
+    :return: String. Año del fifa que corresponde segun la fecha pasada como parametro (e.g. partido del 23/12/2023 le
+    corresponde FIFA 24)
     """
     # Definicion de variables
     year_part = fecha_part.year  # e.g. "2021"
@@ -219,12 +222,10 @@ def search_fecha_fifa(fecha_part):
     if fecha_part.month >= 7:
 
         year_part_str = str(year_part + 1)[-2:]  # Ultimos dos "22"
-        # print(f"Entró en mes > 7. year_part = {year_part}. year_str = {year_part_str}")
         return year_part_str
 
     # Si el partido se jugo de Enero a Julio (post mercado de pases de verano)
     else:
-
         year_part_str = str(year_part)[-2:]  # Ultimos dos "21"
         return year_part_str
 
@@ -239,7 +240,7 @@ def prueba():
     df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(f"df_part: \n{df_part.head(1)} \n\ndf_part_jug: \n{df_part_jug.head(1)} \n\n df_jug: \n{df_jug.head(1)}")
 
-    # Obtengo listado unicos de jugadores en df_jug (Sofifa) y df_part_jug (Flashscore) para agilizar vinculacion
+    # Obtengo listado de jugadores unicos tanto en df_jug (Sofifa) como en df_part_jug (Flashscore) para agilizar vinculacion
     df_part_jug_unique_players = unique_players_df_part_jug(df_part_jug)
     df_jug_unique_players = unique_players_df_jug(df_jug)
 
