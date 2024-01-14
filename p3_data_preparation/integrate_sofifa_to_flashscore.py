@@ -63,8 +63,7 @@ def integrate_players_by_name(df_part_jug, df_jug):
 
     # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
     df_part_jug_with_id = df_part_jug.copy()
-    l_umbrales = [90, 80, 75]
-    # l1, l2 = [], []   # Prueba para definir l_umbrales
+    l_umbrales = [95, 90, 80, 75]
 
     # Preparo nombre de jugadores para facilitar integracion
     df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id_jugador'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
@@ -77,14 +76,15 @@ def integrate_players_by_name(df_part_jug, df_jug):
     for i, row in df_part_jug.iterrows():
 
         # Filtro y me quedo con los jugadores con nombre mas parecidos
-        # df_jug_filt_ini = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', 75), axis=1)]
+        df_jug_filt_ini = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', min(l_umbrales)), axis=1)]
 
         # Por umbral
         for umbral in l_umbrales:
 
             # Selecciono los datos de jugadores segun los nombres de jugadores mas parecidos al buscado
-            df_jug_filt = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', umbral), axis=1)]
+            df_jug_filt = df_jug_filt_ini[df_jug_filt_ini.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', umbral), axis=1)]
 
+            # Si hay al menos un posible match
             if len(df_jug_filt) >= 1:
 
                 # Agrego id_jugador de Sofifa como columna en df_part_jug
@@ -237,7 +237,7 @@ def prueba():
     df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx")
     df_part_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx")
     df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
-    print(f"{df_part.head(1)} \n\n{df_part_jug.head(1)} \n\n{df_jug.head(1)}")
+    print(f"df_part: \n{df_part.head(1)} \n\ndf_part_jug: \n{df_part_jug.head(1)} \n\n df_jug: \n{df_jug.head(1)}")
 
     # Obtengo listado unicos de jugadores en df_jug (Sofifa) y df_part_jug (Flashscore) para agilizar vinculacion
     df_part_jug_unique_players = unique_players_df_part_jug(df_part_jug)
