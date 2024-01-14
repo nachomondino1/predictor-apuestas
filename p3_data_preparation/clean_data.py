@@ -124,6 +124,18 @@ def eliminar_columnas_nan(df, umbral):
     print(f"Se eliminaron {len(list(columnas_eliminar))} de {len(df.columns)} columnas por tener un % NaN mayor a thr_nan_col={umbral*100:.0f}%: {list(columnas_eliminar)}")
     return df_sin_nan
 
+def clean_teams_names(df):
+    """
+    Limpia y cambia el nombre de algunos equipos en el dataframe.
+    :param df: Dataframe. Unidad de analisis: partido. Columnas: al menos "equipo_loc" y "equipo_vis"
+    :return: Dataframe. El pasado por parametro con nombres de equipos modificados y limpios
+    """
+    # Limpio string 'Vencedor' en el nombre de algunos equipos.
+    d_sub_strings_adic = {'vencedor': '', 'equipo que avanza': ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
+    df['equipo_loc'] = df['equipo_loc'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['equipo_vis'] = df['equipo_vis'].replace(d_sub_strings_adic, regex=True).str.strip()
+    return df
+
 def prueba():
     pais = 'argentina_south_america'
     thr_nan_col = 0.2
