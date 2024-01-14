@@ -76,6 +76,9 @@ def integrate_players_by_name(df_part_jug, df_jug):
     # Por fila en df_part_jug
     for i, row in df_part_jug.iterrows():
 
+        # Filtro y me quedo con los jugadores con nombre mas parecidos
+        # df_jug_filt_ini = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', 75), axis=1)]
+
         # Por umbral
         for umbral in l_umbrales:
 
@@ -83,10 +86,6 @@ def integrate_players_by_name(df_part_jug, df_jug):
             df_jug_filt = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', umbral), axis=1)]
 
             if len(df_jug_filt) >= 1:
-
-                # Prueba para definir l_umbrales
-                # l1.append(len(df_jug_filt))
-                # l2.append(umbral)
 
                 # Agrego id_jugador de Sofifa como columna en df_part_jug
                 df_part_jug_with_id.loc[i, 'id_jugador'] = df_jug_filt.id_jugador.values[0]
@@ -96,9 +95,6 @@ def integrate_players_by_name(df_part_jug, df_jug):
                 df_jug = df_jug.drop(df_jug_filt.index[0])
                 break
 
-    # Prueba para definir l_umbrales
-    # df = pd.DataFrame({"Cantidad de posibles match": l1, "Umbral": l2})
-    # df.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
     return df_part_jug_with_id
 
 def reemplazar_name_por_id(df_part_jug, df_part_jug_with_id):
@@ -241,9 +237,7 @@ def prueba():
     df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx")
     df_part_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx")
     df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
-    # print(df_part.head(1))
-    # print(df_part_jug.head(1))
-    # print(df_jug.head(1))
+    print(f"{df_part.head(1)} \n\n{df_part_jug.head(1)} \n\n{df_jug.head(1)}")
 
     # Obtengo listado unicos de jugadores en df_jug (Sofifa) y df_part_jug (Flashscore) para agilizar vinculacion
     df_part_jug_unique_players = unique_players_df_part_jug(df_part_jug)
@@ -251,11 +245,11 @@ def prueba():
 
     # Vinculo con "id_jugador" a df_jug (Sofifa) y df_part_jug (Flashscore) utilizando los nombres de los jugadores
     df_part_jug_vinc_df_jug = integrate_players_by_name(df_part_jug_unique_players, df_jug_unique_players)
-    df_part_jug_vinc_df_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_vinc_df_jug.xlsx', index=False)
+    # df_part_jug_vinc_df_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_vinc_df_jug.xlsx', index=False)
 
     # Reemplazo los nombres de los jugadores por su id en df_part_jug (Flashscore)
     df_part_jug = reemplazar_name_por_id(df_part_jug, df_part_jug_vinc_df_jug)
-    df_part_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_with_id.xlsx', index=False)
+    # df_part_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_with_id.xlsx', index=False)
 
     # Sintetizar la data de df_jug (Sofifa) en df_part (Flashscore) gracias al vinculo con df_part_jug (Flashscore) -->   Aca dentro hago esto:  # Traer fecha, equipo y no se que mas de df_part (Flashscore) y agregar a df_part_jug (Flashscore) para poder saber en que momento traer la info del jugador (Sofifa tiene varias veces un mismo jugador porque es el jugador en ≠ fifas)
     df = player_data_in_match(df_part, df_part_jug, df_jug)
