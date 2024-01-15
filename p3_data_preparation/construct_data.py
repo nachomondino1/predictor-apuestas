@@ -1,9 +1,36 @@
 import pandas as pd
+import numpy as np
 import time
 import math
 from datetime import timedelta
 
 # Construyo variables en dataframe "partido"
+def determinar_equipo_ganador_segun_casa_apuesta(df):
+    """
+    Se determina el 'equipo_ganador' segun la casa de apuestas
+    :param df: Dataframe. Unidad de analisis: partido. Columnas: entre ellas odds_loc, odds_emp, odds_vis
+    :return: Dataframe pasado por parametro con nueva columna, 'equipo_ganador_ca', que detalla el resultado del partido
+    segun la casa de apuesta.
+    """
+    # Por fila
+    for i, row in df.iterrows():
+
+        # Determino la cuota minima de las 3 posibles
+        odds_min = min(row['odds_loc'], row['odds_emp'], row['odds_vis'])
+
+        # Si la cuota minima es la del equipo local
+        if row['odds_loc'] == odds_min:
+            df.loc[i, 'equipo_ganador_ca'] = "Local"
+
+        # Si la cuota minima es la del equipo visitante
+        elif row['odds_vis'] == odds_min:
+            df.loc[i, 'equipo_ganador_ca'] = "Visitante"
+
+        # Si la cuota minima es la del empat
+        else:
+            df.loc[i, 'equipo_ganador_ca'] = "Empate"
+    return df
+
 def determinar_equipo_ganador(df):
     """
     Se determina el 'equipo_ganador' a partir de los goles que hizo cada equipo
@@ -155,7 +182,7 @@ def historial_entre_si_segun_fecha(df, n_anios):
 def calculate_dif_col_jugadores(df):
     """
     Calcula la diferencia entre local y visitante
-    :param df:
+    :param df: Dataframe. Unidad de analisis: partido
     :return:
     """
     # Defincion de variables
@@ -165,6 +192,7 @@ def calculate_dif_col_jugadores(df):
     for titularidad in l_titularidad:
 
         for var in l_var_jug:
+
             # Calculo diferencia entre local y visitante
             df[f'dif_{var}_jug_{titularidad}'] = df[f'{var}_jug_{titularidad}_loc'] - df[f'{var}_jug_{titularidad}_vis']
 
@@ -172,11 +200,16 @@ def calculate_dif_col_jugadores(df):
             df = df.drop([f'{var}_jug_{titularidad}_loc', f'{var}_jug_{titularidad}_vis'], axis=1)
     return df
 
-def prom_pond_jug_aus(df):  # Ojo falla en calculo cuando uno de los dos equipos no tiene jugadores ausentes (o sea, las variables aus son nan) --> en ese caso tiene que hacer la diferencia igual...
-
+def suma_rat_jug_aus(df):  # Ojo falla en calculo cuando uno de los dos equipos no tiene jugadores ausentes (o sea, las variables aus son nan) --> en ese caso tiene que hacer la diferencia igual...
+    """
+    Calculo la suma del rating de los jugadores ausentes dado que cada equipo tiene distinto numero de ausentes.
+    :param df: Dataframe. Unidad de analisis: partido.
+    :return:
+    """
     df['prom_rat_jug_aus_loc'] = df['prom_rat_jug_aus_loc'] * df['n_jug_aus_loc']  # Lo guardo en la misma porque sino la cago con calculate_dif_col_jugadores()
     df['prom_rat_jug_aus_vis'] = df['prom_rat_jug_aus_vis'] * df['n_jug_aus_vis']
 
+    # Elimino columnas que contaban jugadores ausentes en cada equipo
     df = df.drop(["n_jug_aus_loc", "n_jug_aus_vis"], axis=1)
     return df
 
@@ -217,7 +250,7 @@ def prueba():
         df = df.drop(columns=[f'prom_ult_part_dif_{est}_loc', f'prom_ult_part_dif_{est}_vis'], axis=1)
 
     # Construyo variables de diferencias para las variables promedio de los jugadores
-    df = prom_pond_jug_aus(df)
+    df = suma_rat_jug_aus(df)
     df = calculate_dif_col_jugadores(df)
 
     end = time.time()

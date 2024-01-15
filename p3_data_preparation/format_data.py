@@ -81,26 +81,6 @@ def convert_columns_to_int(df, df_etiquetas=None):
                 df_etiquetas.loc[len(df_etiquetas)] = [col, valor_orig, valor_int]
     return df, df_etiquetas
 
-def revert_columns_from_int(df, df_etiquetas, columns=None):
-    """
-    Convierte las variables numéricas a sus valores originales utilizando el DataFrame df_etiquetas.
-
-    :param df: DataFrame que contiene las variables a revertir. (DataFrame)
-    :param df_etiquetas: DataFrame que contiene las etiquetas originales y los valores enteros correspondientes. (DataFrame)
-    :param columns: Lista de columnas a revertir. Si no se proporciona, se revertirán todas las columnas en df_etiquetas.
-                    (list, opcional)
-    :return: DataFrame con las variables revertidas a sus valores originales.
-    """
-    if columns is None:
-        columns = df_etiquetas['variable'].unique()
-
-    for col in columns:
-        col_etiquetas = col if col != 'y_pred' else 'equipo_ganador'
-        mapping = df_etiquetas.loc[df_etiquetas['variable'] == col_etiquetas].set_index('valor_int')['valor_orig']
-        df[col] = df[col].map(mapping)
-
-    return df
-
 def prueba():
     # Levanto datasets
     pais = 'argentina'

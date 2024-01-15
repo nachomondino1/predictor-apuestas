@@ -21,7 +21,7 @@ def calculate_precision(df_result, var_resp, var_pred):
             n_aciertos += 1
     return n_aciertos / len(df_result) * 100
 
-def confusion_matrix(y_real, y_pred):
+def confusion_matrix(y_real, y_pred, df_etiquetas):
     """
     Muestra matriz de confusion del modelo
     :param df_result: Dataframe test. Con variable respuesta y con la prediccion del modelo
@@ -29,13 +29,28 @@ def confusion_matrix(y_real, y_pred):
     :param var_pred: String. Nombre de la variable con la prediccion del modelo
     """
     # Calculo los numeros para la matriz de confusion
-    confusion_matrix = metrics.confusion_matrix(y_real, y_pred)
+    confusion_matrix = metrics.confusion_matrix(y_real, y_pred)  # numpy.ndarray
 
-    # Imprimo matriz de confusion
-    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix,
-                                                display_labels=y_real.unique())
-    cm_display.plot(cmap='Blues')
-    plt.show()
+    # Imprimo matriz de confusion (evito este codigo porque tenes que cerrar el plot para que el programa continue)
+    # cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=y_real.unique())
+    # cm_display.plot(cmap='Blues')
+    # plt.show()
+
+    # Convertir el array a un DataFrame de pandas
+    df_cm = pd.DataFrame(confusion_matrix)
+    df_cm.index.name = "Resultado real"
+
+    # Cambio numeros de conf matrix por etiquetas
+    for i, row in df_etiquetas.iterrows():
+
+        # Renombro columna
+        df_cm.rename(columns={row['valor_int']: row['valor_orig']}, inplace=True)
+
+        # Renombro filas
+        df_cm = df_cm.rename(index={row['valor_int']: row['valor_orig']})
+
+    print(f"\n\nMatriz de confusion:\n {df_cm}")
+    return df_cm
 
 def prueba():
     var_resp = 'equipo_ganador'

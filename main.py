@@ -10,10 +10,9 @@ from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
 # Generate test design
 from sklearn.model_selection import train_test_split
-from p4_modeling import generate_test_design
+from p4_modeling import generate_test_design, build_model, asses_model
 # Build model
 from sklearn.decomposition import PCA
-from p4_modeling import build_model
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
@@ -155,6 +154,7 @@ class DataPreparation:
         # Construyo variables: "equipo_ganador" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
         df = construct_data.determinar_puntos(df)
+        df = construct_data.determinar_equipo_ganador_segun_casa_apuesta(df)
 
         # Variables historicas
         df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial_loc)
@@ -174,6 +174,7 @@ class DataPreparation:
             df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis'], axis=1)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
+        df = construct_data.suma_rat_jug_aus(df)
         df = construct_data.calculate_dif_col_jugadores(df)
 
         end = time.time()
@@ -212,6 +213,9 @@ class DataPreparation:
 
         # Verificar que no haya outliers
         # ...
+
+        # Elimino strings adicionales en nombres de equipos (esta bien hacerlo aca?)
+        df = clean_data.clean_teams_names(df)
 
         # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
         # scaler = StandardScaler()  # Crea un objeto StandardScaler
@@ -391,8 +395,7 @@ class Modeling:
         de lo contrario. (bool)
         :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
-        # print("Evaluando modelo con datos de prueba...")
-        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+        print("\nEvaluando modelo con datos de prueba...")
 
         # Predecir las etiquetas para los datos de prueba
         y_pred = model.predict(X_test)  # es un numpy array
@@ -401,20 +404,18 @@ class Modeling:
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100  # recall = recall_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, average='macro') * 100  # f1 = f1_score(y_test, y_pred)
-        print(f"Precision de test: {test_accuracy:.1f}% \nRecall de prueba: {recall:.1f}% \nF1-score de prueba: {f1:.1f}% ")
+        print(f"\t- Precision de test: {test_accuracy:.1f}% \n\t- Recall de prueba: {recall:.1f}% \n\t- F1-score de prueba: {f1:.1f}% ")
 
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        # Asignar las predicciones a una nueva columna en df_test (para poder calcular ROI)
-        df_results = pd.DataFrame()
-        df_results[self.var_resp] = y_test  # Agrego y_real
-        df_results[self.var_pred] = y_pred  # Agrego y_pred
-
-        # Convierto variable respuesta y variable predicha en etiqueta
-        df_results_etiquetas = format_data.revert_columns_from_int(df_results, df_etiquetas, columns=[self.var_resp, self.var_pred])
+        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+        df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
+        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
+        # df_conf_mat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{self.pais}/df_conf_matrix.xlsx')
 
         if export:
-            # confusion_matrix(df_results_etiquetas[self.var_resp], df_results_etiquetas[self.var_pred])  # podria exportar el archivo? para evitar tener que cerrarla para que continue el programa
+            df_results = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred})
             df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
+            df_conf_mat.to_excel(f'./p4_modeling/data/{self.pais}/df_conf_matrix.xlsx')
 
         return test_accuracy, recall, f1
 
@@ -423,10 +424,10 @@ def main():
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "England"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
-    export = True
+    export = False
 
     # Procesamiento
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, True
 
     if data_unders:
 
@@ -449,40 +450,45 @@ def main():
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
-        n_dias_player_data = 365  # Numero de dias para tener en cuenta en construccion de variables historicas para jugadores
         n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 2
-        thr_nan_col = 0.5
+        thr_nan_col = None # 0.5
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
-        thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+        thr_fs = None  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
         # Levanto datasets para pruebas
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-        # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_cleaned.xlsx')
+        if not data_unders:
+            df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+            df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
+            df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+            # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_cleaned.xlsx')
+            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{pais}/premier_league_2015_2024/df_constructed_60_3.xlsx')
 
         # Preparo el dataset para el analisis
-        df_part, df_jug = dp.format_data(df_part, df_jug)
-        df = dp.integrate_data(df_part, df_part_jug, df_jug)
-        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
+        # df_part, df_jug = dp.format_data(df_part, df_jug)
+        # df = dp.integrate_data(df_part, df_part_jug, df_jug)
+        # df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
         df = dp.clean_data(df, thr_nan_col=thr_nan_col)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
     if modeling:
+
         # Levanto dataset para prueba
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
-        df = df.drop(['odds_loc', 'odds_emp','odds_vis'], axis=1)  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
+        if not data_prep:
+            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
+
+        df = df.drop(['odds_loc', 'odds_emp','odds_vis', 'equipo_ganador_ca'], axis=1)  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
 
         # Definicion de variables
         print(" Modeling ".center(120, "#"))
         mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
         df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su precision y roi
-        l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
-                     SVC(), MLPClassifier(), GradientBoostingClassifier()]
+        l_modelos = [LogisticRegression()]
+        # l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
+        #              SVC(), MLPClassifier(), GradientBoostingClassifier()]
 
         # Hiperparametros
-        test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
+        test_val_size = 0.3  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
         bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
         fill_na = None  # Relleno de nan values [None, mode, ml]
@@ -499,7 +505,7 @@ def main():
             accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test)  # accuracy, recall, f1, roi
 
             # Guardo modelo
-            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1] # roi
+            df_models.loc[len(df_models)] = [model_name, model_best_params, cv_accuracy, accuracy, recall, f1]  # roi
 
         # Selecciono el mejor modelo
         idx = df_models['test_accuracy'].idxmax()  # idx = df_models[df_models['test_accuracy'] == max(df_models['test_accuracy'])].index[0]
