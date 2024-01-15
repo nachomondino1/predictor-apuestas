@@ -174,7 +174,7 @@ class DataPreparation:
             df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis'], axis=1)
 
         # Construyo variables de diferencias para las variables promedio de los jugadores
-        df = construct_data.suma_rat_jug_aus(df)
+        # df = construct_data.suma_rat_jug_aus(df)
         df = construct_data.calculate_dif_col_jugadores(df)
 
         end = time.time()
@@ -218,6 +218,8 @@ class DataPreparation:
         df = clean_data.clean_teams_names(df)
 
         # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
+        # scaler = StandardScaler()  # Crea un objeto StandardScaler
+        # df['dif_prom_rat_jug_aus'] = scaler.fit_transform(df['dif_prom_rat_jug_aus'].values.reshape(-1, 1))
         # scaler = StandardScaler()  # Crea un objeto StandardScaler
         # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
         # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
@@ -315,6 +317,10 @@ class Modeling:
             X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
+        # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
+        X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+        X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+
         # Implemento PCA?
         if with_pca:
             # Selecciono los mejores hiperparametros
@@ -397,23 +403,39 @@ class Modeling:
         """
         print("\nEvaluando modelo con datos de prueba...")
 
+        # Levanto df_etiquetas
+        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+
+        # Quito cuotas de casas de apuestas de X_test
+        X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+
         # Predecir las etiquetas para los datos de prueba
-        y_pred = model.predict(X_test)  # es un numpy array
+        y_pred = model.predict(X_test_without_odds)  # es un numpy array
 
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
-        recall = recall_score(y_test, y_pred, average='macro') * 100  # recall = recall_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred, average='macro') * 100  # f1 = f1_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred, average='macro') * 100
+        f1 = f1_score(y_test, y_pred, average='macro') * 100
         print(f"\t- Precision de test: {test_accuracy:.1f}% \n\t- Recall de prueba: {recall:.1f}% \n\t- F1-score de prueba: {f1:.1f}% ")
 
+        # Colculo precision y cuota promedio de casa de apuesta
+        df_results = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred, 'y_pred_ca': X_test['y_pred_ca'],
+                                   'odds_loc': X_test['odds_loc'], 'odds_emp': X_test['odds_emp'],
+                                   'odds_vis': X_test['odds_vis']})
+        df_results = format_data.revert_columns_from_int(df_results, df_etiquetas)
+        df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results_prueba.xlsx')
+        test_accuracy_ca = accuracy_score(df_results[self.var_resp], df_results['y_pred_ca']) * 100
+        print(f"\t- Precision de casa de apuesta: {test_accuracy_ca:.1f}%")
+        # Calcular la cuota promedio acertada por la casa de apuesta vs la cuota promedio acertada por mi algoritmo.
+        # print(f"\t- Cuota promedio de casa de apuesta: {test_accuracy_ca:.1f}%")
+        # print(f"\t- Cuota promedio de mi algoritmo: {test_accuracy_ca:.1f}%")
+
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
         df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
         df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
         # df_conf_mat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{self.pais}/df_conf_matrix.xlsx')
 
         if export:
-            df_results = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred})
             df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
             df_conf_mat.to_excel(f'./p4_modeling/data/{self.pais}/df_conf_matrix.xlsx')
 
@@ -427,7 +449,7 @@ def main():
     export = False
 
     # Procesamiento
-    data_unders, data_prep, modeling = False, True, True
+    data_unders, data_prep, modeling = False, False, True
 
     if data_unders:
 
@@ -450,9 +472,9 @@ def main():
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
-        n_dias = 30  # 30 es como N_ULT_PART igual a 5...
-        n_anios_historial = 2
-        thr_nan_col = None # 0.5
+        n_dias = 60  # 30 es como N_ULT_PART igual a 5...
+        n_anios_historial = 3
+        thr_nan_col = None  # 0.5
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = None  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
@@ -461,13 +483,13 @@ def main():
             df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
             df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
             df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-            # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_cleaned.xlsx')
-            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{pais}/premier_league_2015_2024/df_constructed_60_3.xlsx')
+            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated.xlsx')
+            # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{pais}/premier_league_2015_2024/df_constructed_60_3.xlsx')
 
         # Preparo el dataset para el analisis
         # df_part, df_jug = dp.format_data(df_part, df_jug)
         # df = dp.integrate_data(df_part, df_part_jug, df_jug)
-        # df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
+        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
         df = dp.clean_data(df, thr_nan_col=thr_nan_col)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
 
@@ -477,7 +499,7 @@ def main():
         if not data_prep:
             df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
 
-        df = df.drop(['odds_loc', 'odds_emp','odds_vis', 'equipo_ganador_ca'], axis=1)  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
+        # df = df.drop(['odds_loc', 'odds_emp','odds_vis', 'y_pred_ca'], axis=1)  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
 
         # Definicion de variables
         print(" Modeling ".center(120, "#"))
