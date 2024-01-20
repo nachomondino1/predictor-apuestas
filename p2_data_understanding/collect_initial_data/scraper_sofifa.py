@@ -3,13 +3,12 @@ import pandas as pd
 from dspy.data_understanding.web_scraping.selenium import Crawler
 
 
-def extract_jugadores_sofifa(pais):
+def extract_jugadores_sofifa(pais, liga):
     """
     Obtengo datos de jugadores mediante scrapear sofifa.com
     """
     # DEFINCION DE PARAMETROS & VARIABLES
     # Definicion de variables
-    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
     crawler = Crawler(headless=False, path=None)  # Usar False (con True no funciona)
     df_jug = pd.DataFrame(columns=['id_jugador', 'fifa', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
     print(f" PAÍS: {pais} ".center(120, "#"))
@@ -19,7 +18,7 @@ def extract_jugadores_sofifa(pais):
     # crawler.driver.save_screenshot("1_pagina_inicial_sofifa.png")  # Tomar un screenshot y guardarlo en un archivo (sale cortada pero maximizé y no funcionó)
 
     # Filtro listado de jugadores segun la liga del pais que busco
-    select_liga_as_filter(df_comp, crawler,pais)  # crawler.driver.save_screenshot("2_pagina_antes_de_seleccionar_liga.png")
+    select_liga_as_filter(crawler, pais, liga)  # crawler.driver.save_screenshot("2_pagina_antes_de_seleccionar_liga.png")
     boton_sumbit = crawler.extract_tag(xpath='.//button[text()="Submit"]')  # Clickeo en "buscar"
     crawler.click_boton(boton_sumbit)
 
@@ -95,7 +94,7 @@ def extract_jugadores_sofifa(pais):
             print(f"Cantidad de jugadores encontrados: {n_jug_encontrados}")
 
         # Exporto datos del fifa (Por seguridad)
-        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/df_jug/{fifa}.xlsx')
+        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/por_temporada/df_jug/{fifa}.xlsx')
 
     # Exporto dataset final
     df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
@@ -104,7 +103,7 @@ def extract_jugadores_sofifa(pais):
     crawler.driver.close()
     return df_jug
 
-def select_liga_as_filter(df_comp, crawler, pais):
+def select_liga_as_filter(crawler, pais, liga=None):
     """
     Poner el pais como filtro para obtener los jugadores solo de la liga de dicho pais
     :param df_comp:
@@ -114,12 +113,14 @@ def select_liga_as_filter(df_comp, crawler, pais):
     """
     print("Seleccionando liga del pais como filtro...")
 
-    # Selecciono competicion mas importante del pais
-    comp_a_buscar = df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
+    if liga is None:
+        # Selecciono competicion mas importante del pais
+        df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
+        liga = df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
 
     # Cargo competicion en el buscador de ligas
     input_league = crawler.extract_tag(xpath='.//form[@class="pjax-form"]//input[@aria-label="Leagues"]')
-    input_league.send_keys(comp_a_buscar)
+    input_league.send_keys(liga)
 
     # Posibles ligas segun nuestra busqueda
     l_posibles_ligas = crawler.extract_tags(xpath='.//form[@class="pjax-form"]//input[@aria-label="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]/img')  # Puedo hacer click en img pero no en el div
@@ -144,7 +145,8 @@ def select_liga_as_filter(df_comp, crawler, pais):
 def prueba():
     # Agregar: Definir que competicion y que pais queres extraer aquí segun df_comp...
     pais = "England"
-    extract_jugadores_sofifa(pais)
+    liga = "Championship"
+    extract_jugadores_sofifa(pais, liga)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
