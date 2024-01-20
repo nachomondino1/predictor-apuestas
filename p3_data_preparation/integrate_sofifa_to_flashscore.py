@@ -4,8 +4,6 @@ from fuzzywuzzy import fuzz
 import warnings
 import time
 from tqdm import tqdm
-from p3_data_preparation import clean_data
-from sklearn.preprocessing import StandardScaler
 import math
 
 
@@ -65,9 +63,6 @@ def integrate_players_by_name(df_part_jug, df_jug):
     # Definicion de variables
     df_part_jug_with_id = df_part_jug.copy()  # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
     l_umbrales = [95, 90, 80, 75]
-
-    # Preparo nombre de jugadores para facilitar integracion
-    df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id_jugador'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
     # Funcion que hace una busqueda aproximada de un string en una columna
     def buscar_coincidencias(row, palabra, columna, umbral):
@@ -133,10 +128,6 @@ def player_data_in_match(df_part, df_part_jug, df_jug):
 
     # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     df_jug['fifa_year'] = df_jug['fifa'].str.split(' ').str[-1]
-
-    # Normalizo valor de mercado para evitar el error en entrenamiento de "ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed."
-    scaler = StandardScaler()  # Crea un objeto StandardScaler
-    df_jug['valor_mercado'] = scaler.fit_transform(df_jug['valor_mercado'].values.reshape(-1, 1))
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -236,7 +227,7 @@ def prueba():
 
     # Levanto datasets
     df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx")
-    df_part_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx")
+    df_part_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug_formated.xlsx")
     df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
     print(f"df_part: \n{df_part.head(1)} \n\ndf_part_jug: \n{df_part_jug.head(1)} \n\n df_jug: \n{df_jug.head(1)}")
 
