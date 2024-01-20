@@ -40,6 +40,36 @@ def convert_valor_mercado_to_int(df):
    df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
    return df
 
+def keep_goles_int(df):
+    """
+    Elimina las filas que hacen que goles_loc y goles_vis no sea integer como debe. Puede ser por NaN o por string "-".
+    :param df:
+    :return:
+    """
+    l_filas_a_borrar = []
+
+    # Por partido
+    for i, row in df.iterrows():
+        try:
+            int(row['goles_loc'])
+            int(row['goles_vis'])
+        # Si los goles no pueden ser transofrmados a integer
+        except:
+            # Guardo indice para eliminar la fila
+            l_filas_a_borrar.append(i)
+
+    # Elimino filas del dataframe
+    print(f"Cantidad de partidos eliminados por no tener goles integer: {len(l_filas_a_borrar)/len(df)*100:.1f}%")
+    print(df.shape)
+    df = df.drop(l_filas_a_borrar)
+    print(df.shape)
+
+    # Convierto columnas goles a integer
+    df['goles_loc'] = df['goles_loc'].astype(int)
+    df['goles_vis'] = df['goles_vis'].astype(int)
+
+    return df
+
 def convert_columns_to_int(df, df_etiquetas=None):
     """
     Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores
