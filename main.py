@@ -4,11 +4,13 @@ from p2_data_understanding import describe_data
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from dspy.data_understanding.describe_data import getting_to_know_data
 # Data preparation
-from p3_data_preparation import format_data, select_data
+from p3_data_preparation import format_data, select_data, clean_data
+from sklearn.preprocessing import StandardScaler
 from p3_data_preparation import construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
 # Generate test design
+from random import randint
 from sklearn.model_selection import train_test_split
 from p4_modeling import generate_test_design, build_model, asses_model
 # Build model
@@ -39,7 +41,7 @@ class DataUnderstanding:
         df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
 
         # Extraigo datos de jugadores de Sofifa (df_jug)
-        df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais)
+        df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais, "Premier league")
         df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
         return df_part, df_part_jug, df_jug
 
@@ -65,7 +67,7 @@ class DataPreparation:
         self.var_resp = var_resp
         self.pais = pais
 
-    def format_data(self, df_part, df_jug, export=True):
+    def format_data(self, df_part, df_part_jug, df_jug, export=True):
         """
         Arreglo el data type de algunas variables.
 
@@ -78,12 +80,21 @@ class DataPreparation:
         print("\nFormateando los datos...")
 
         # Dataframe partido
+        ## Fecha
         df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-        df_part = format_data.convert_posesion_to_int(df_part)
         # df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
+        ## Posesion
+        df_part = format_data.convert_posesion_to_int(df_part)
+        ## Goles_loc y goles_vis  # Eliminar las filas cuyos goles no son float
+        df_part = format_data.keep_goles_int(df_part)
+        df_part_jug = df_part_jug[df_part_jug['id_part'].isin(df_part['id_part'])]
+        df_part_jug = df_part_jug.reset_index(drop=True)
+        df_part = df_part.reset_index(drop=True)
 
-        # Dataframe jugador: fecha (se podria formatear sueldo y valor de mercado pero por ahora no me interesa)
+        # Dataframe jugador
+        ## Fecha
         df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')
+        ## Valor de mercado
         df_jug = format_data.convert_valor_mercado_to_int(df_jug)
 
         end = time.time()
@@ -91,9 +102,70 @@ class DataPreparation:
 
         if export:
             df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
+            df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_jug_formated.xlsx', index=False)
             df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
 
-        return df_part, df_jug
+        return df_part, df_part_jug, df_jug
+
+    def clean_data(self, df_part, df_part_jug, df_jug, thr_nan_col, export=True):
+        """
+        Limpieza inicial de los dataframes
+        :param df_part:
+        :param df_part_jug:
+        :param df_jug:
+        :param export:
+        :return:
+        """
+        start = time.time()
+        print("\nFormateando los datos...")
+        warnings.filterwarnings('ignore')
+
+        # ELIMINACION DE FILAS NAN SEGUN % NAN, O BIEN, SELECCION DE DATOS SEGUN TEMPORADA....
+        ## Opcion 3: Si tiene formaciones
+        ## Elimino filas con alto porcentaje de NaN values
+        n_filas = len(df_part)
+        df_part_jug = df_part_jug.dropna(subset=['jug_tit_loc_11', 'jug_tit_vis_11'], how='any').reset_index(drop=True)
+        df_part = df_part[df_part['id_part'].isin(df_part_jug['id_part'])].reset_index(drop=True)
+        print(f"De las {n_filas} filas, se eliminan {(n_filas - len(df_part))} por no tener ni una estadistica del "
+              f"partido, quedan {len(df_part)} filas.")
+
+        ## Elimino columnas con alto porcentaje de NaN values
+        if thr_nan_col is not None:
+            df_part = clean_data.eliminar_columnas_nan(df_part, porc_nan_max=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
+            df_part_jug = clean_data.eliminar_columnas_nan(df_part_jug, porc_nan_max=thr_nan_col)  # TEMPORAL? elimino columnas nan que quedan por el concat y luego la eliminacion de temporadas viejas
+
+        # Dataframe partido:
+        ## Equipo_loc y equipo_vis
+        df_part = clean_data.prepare_text_columns(df_part, l_cols_to_process=['equipo_loc', 'equipo_vis'])  # Preparacion texto para facilitar construccion de datos bassado en equipos
+        df_part = clean_data.clean_teams_names(df_part)  # Eliminar strings adicionales en nombres de equipos
+
+        # Dataframe partido jugador:
+        ## jug_tit_loc_1, jug_tit_loc2, ..., jug_aus_sup_18
+        df_part_jug = clean_data.prepare_text_columns(df_part_jug, l_col_to_except=['id_part'])
+
+        # Dataframe jugador:
+        ## Nombre de jugador
+        df_jug = clean_data.prepare_text_columns(df_jug, l_cols_to_process=['nombre'])  # Preaparo texto para integrar
+        ## Valor de mercado
+        scaler = StandardScaler()  # Crea un objeto StandardScaler
+        df_jug['valor_mercado'] = scaler.fit_transform(df_jug['valor_mercado'].values.reshape(-1, 1))
+
+        # Verificar que no haya outliers
+        # algo (sacar de mi tesis)
+
+        # Describo datos post limpieza
+        du = DataUnderstanding(self.pais)
+        du.describe_data(df_part, df_part_jug, df_jug)
+
+        end = time.time()
+        print(f"Limpieza inicial de datos en {(end - start) / 60:.1f} minutos")
+
+        if export:
+            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_form_clean.xlsx', index=False)
+            df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_jug_form_clean.xlsx', index=False)
+            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_jug_form_clean.xlsx', index=False)
+
+        return df_part, df_part_jug, df_jug
 
     def integrate_data(self, df_part, df_part_jug, df_jug, export=True):
         """
@@ -115,15 +187,12 @@ class DataPreparation:
 
         # Vinculo con "id_jugador" a df_jug (Sofifa) y df_part_jug (Flashscore) utilizando los nombres de los jugadores
         df_part_jug_vinc_df_jug = integrate_players_by_name(df_part_jug_unique_players, df_jug_unique_players)
-        df_part_jug_vinc_df_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_vinc_df_jug.xlsx', index=False)
 
         # Reemplazo los nombres de los jugadores por su id en df_part_jug (Flashscore)
         df_part_jug = reemplazar_name_por_id(df_part_jug, df_part_jug_vinc_df_jug)
-        df_part_jug.to_excel('/Users/nachomondino/Desktop/df_part_jug_with_id.xlsx', index=False)
 
         # Sintetizar la data de df_jug (Sofifa) en df_part (Flashscore) gracias al vinculo con df_part_jug (Flashscore) -->   Aca dentro hago esto:  # Traer fecha, equipo y no se que mas de df_part (Flashscore) y agregar a df_part_jug (Flashscore) para poder saber en que momento traer la info del jugador (Sofifa tiene varias veces un mismo jugador porque es el jugador en ≠ fifas)
         df = player_data_in_match(df_part, df_part_jug, df_jug)
-        df.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -146,15 +215,14 @@ class DataPreparation:
         print("\nConstruyendo nuevos datos...")
 
         # Definicion de variables
-        n_dias_loc = n_dias * 2  # 30 es como N_ULT_PART igual a 2
         n_anios_historial_loc = n_anios_historial * 2
-        l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas',
+        l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas',  # Automatizar definicion de estadisticas
                           'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
 
         # Construyo variables: "equipo_ganador" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
         df = construct_data.determinar_puntos(df)
-        df = construct_data.determinar_equipo_ganador_segun_casa_apuesta(df)
+        # df = construct_data.determinar_equipo_ganador_segun_casa_apuesta(df)
 
         # Variables historicas
         df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial_loc)
@@ -185,53 +253,6 @@ class DataPreparation:
 
         return df
 
-    def clean_data(self, df, thr_nan_col=None, export=True):  # 0.0 min
-        """
-        Limpia los datos de un dataframe.
-
-        :param df: Dataframe de los datos de los partidos. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe limpiado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe limpiado. (DataFrame)
-        """
-        start = time.time()
-        print("\nLimpiando los datos...")
-
-        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-        largo_inicial = len(df.columns)
-        df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
-        print(f"Se eliminó {largo_inicial - len(df.columns)} de {largo_inicial} columnas puesto que no sirven para el analisis.")
-
-        # Eliminacion de NaN values
-        # Elimino filas con alto porcentaje de NaN values
-        largo_inicial = len(df)
-        df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')  # no localia: dif_prom_ult_part_dif_remates # solo localia: dif_prom_ult_part_segun_localia_dif_remates
-        print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
-
-        # Elimino columnas con alto porcentaje de NaN values
-        if thr_nan_col is not None:
-            df = clean_data.eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
-
-        # Verificar que no haya outliers
-        # ...
-
-        # Elimino strings adicionales en nombres de equipos (esta bien hacerlo aca?)
-        df = clean_data.clean_teams_names(df)
-
-        # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
-        # scaler = StandardScaler()  # Crea un objeto StandardScaler
-        # df['dif_prom_rat_jug_aus'] = scaler.fit_transform(df['dif_prom_rat_jug_aus'].values.reshape(-1, 1))
-        # scaler = StandardScaler()  # Crea un objeto StandardScaler
-        # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
-        # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
-
-        end = time.time()
-        print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
-
-        if export:
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_cleaned.xlsx',index=False)
-
-        return df
-
     def select_data(self, df, thr_corr=None, thr_fs=None, export=True):  # 1.3 minutos # Chequear cambios
         """
         Selecciona las variables relevantes del dataframe.
@@ -243,6 +264,12 @@ class DataPreparation:
         warnings.filterwarnings('ignore')
         start = time.time()
         print("\nSeleccionado datos...")
+
+        # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
+        n_col = len(df.columns)
+        df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
+        print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. temporada).")
+
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -296,14 +323,18 @@ class Modeling:
         if fill_na is None:
 
             # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
-            df = clean_data.eliminar_filas_nan(df, umbral=0)  # df = df.dropna()
+            df = clean_data.eliminar_filas_nan(df, porc_nan_max=0)  # df = df.dropna()
 
             # Separo en X e y
             X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
-            # Separo conjunto de datos en train, validation y test
-            X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size, random_state=42, shuffle=True)
-            X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True)
+            # Separo conjunto de datos en train, validation y test --> Creo que no hace shuffle......
+            X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size, random_state=randint(1, 1000), shuffle=True)
+            X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
+
+            # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
+            # X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+            # X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
 
         # Si relleno NaN values
         else:
@@ -313,13 +344,13 @@ class Modeling:
             # Separo conjunto de datos en train, validation y test dejando los NaN values en df_train
             X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X, y, test_val_size=test_val_size, test_size=test_size)
 
+            # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
+            # X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+            # X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+
             # Relleno nan en el dataset de entrenamiento
             X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
-
-        # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
-        X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
-        X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
 
         # Implemento PCA?
         if with_pca:
@@ -329,10 +360,10 @@ class Modeling:
             # Si conviene implementar PCA
             n_comp_opt = pca.get_params()['n_components']
             if n_comp_opt != None:
-                print("Implementando PCA()...")
 
                 # Entreno el modelo
                 pca.fit(X_train)
+                print("Implementando PCA()...")
 
                 # Transformo X
                 X_train = pd.DataFrame(pca.transform(X_train))
@@ -406,11 +437,10 @@ class Modeling:
         # Levanto df_etiquetas
         df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
-        # Quito cuotas de casas de apuestas de X_test
-        X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
-
         # Predecir las etiquetas para los datos de prueba
-        y_pred = model.predict(X_test_without_odds)  # es un numpy array
+        # X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)  # Quito cuotas de casas de apuestas de X_test
+        # y_pred = model.predict(X_test_without_odds)  # es un numpy array
+        y_pred = model.predict(X_test)  # es un numpy array
 
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
@@ -418,26 +448,29 @@ class Modeling:
         f1 = f1_score(y_test, y_pred, average='macro') * 100
         print(f"\t- Precision de test: {test_accuracy:.1f}% \n\t- Recall de prueba: {recall:.1f}% \n\t- F1-score de prueba: {f1:.1f}% ")
 
+        """
         # Colculo precision y cuota promedio de casa de apuesta
         df_results = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred, 'y_pred_ca': X_test['y_pred_ca'],
                                    'odds_loc': X_test['odds_loc'], 'odds_emp': X_test['odds_emp'],
                                    'odds_vis': X_test['odds_vis']})
         df_results = format_data.revert_columns_from_int(df_results, df_etiquetas)
-        df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results_prueba.xlsx')
+        # df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results_prueba.xlsx')
         test_accuracy_ca = accuracy_score(df_results[self.var_resp], df_results['y_pred_ca']) * 100
         print(f"\t- Precision de casa de apuesta: {test_accuracy_ca:.1f}%")
         # Calcular la cuota promedio acertada por la casa de apuesta vs la cuota promedio acertada por mi algoritmo.
         # print(f"\t- Cuota promedio de casa de apuesta: {test_accuracy_ca:.1f}%")
         # print(f"\t- Cuota promedio de mi algoritmo: {test_accuracy_ca:.1f}%")
+        """
 
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
-        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
+        # df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
+        # df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
         # df_conf_mat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{self.pais}/df_conf_matrix.xlsx')
 
         if export:
-            df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
-            df_conf_mat.to_excel(f'./p4_modeling/data/{self.pais}/df_conf_matrix.xlsx')
+            # df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
+            # df_conf_mat.to_excel(f'./p4_modeling/data/{self.pais}/df_conf_matrix.xlsx')
+            pass
 
         return test_accuracy, recall, f1
 
@@ -446,71 +479,65 @@ def main():
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
     pais = "England"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
-    export = False
+    export = True
 
     # Procesamiento
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, False
 
     if data_unders:
-
         print(" Data understanding ".center(120, "#"))
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
 
         # Extriago datos o los levanto
-        # df_part, df_part_jug, df_jug = du.collect_initial_data()
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+        df_part, df_part_jug, df_jug = du.collect_initial_data()
 
         # Describo datos
         du.describe_data(df_part, df_part_jug, df_jug)
+    # Si no extraigo datos
+    else:
+        # Levanto datos ya extraidos
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/premier_league_2007_2024/df_part.xlsx')
+        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/premier_league_2007_2024/df_part_jug.xlsx')
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/premier_fa_efl_cs_2014_2024/df_jug.xlsx', index_col=0)
+
+        du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
+        du.describe_data(df_part, df_part_jug, df_jug)
 
     if data_prep:
-
         # Definicion de variables
         print(" Data preparation ".center(120, "#"))
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
-        n_dias = 60  # 30 es como N_ULT_PART igual a 5...
+        n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 3
-        thr_nan_col = None  # 0.5
+        thr_nan_col = 0.9  # 0.5
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = None  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
-        # Levanto datasets para pruebas
-        if not data_unders:
-            df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-            df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
-            df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
-            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated.xlsx')
-            # df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{pais}/premier_league_2015_2024/df_constructed_60_3.xlsx')
-
         # Preparo el dataset para el analisis
-        # df_part, df_jug = dp.format_data(df_part, df_jug)
-        # df = dp.integrate_data(df_part, df_part_jug, df_jug)
-        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial)
-        df = dp.clean_data(df, thr_nan_col=thr_nan_col)
-        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+        df_part, df_part_jug, df_jug = dp.format_data(df_part, df_part_jug, df_jug, export=False)
+        df_part, df_part_jug, df_jug = dp.clean_data(df_part, df_part_jug, df_jug, thr_nan_col=thr_nan_col, export=export)
+        df = dp.integrate_data(df_part, df_part_jug, df_jug, export=export)
+        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial, export=export)
+        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
+    else:
+        # Levanto dataset para prueba
+        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
+        print(df.head(1), df.shape)
 
     if modeling:
 
-        # Levanto dataset para prueba
-        if not data_prep:
-            df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
-
-        # df = df.drop(['odds_loc', 'odds_emp','odds_vis', 'y_pred_ca'], axis=1)  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
+        df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1) # 'y_pred_ca' # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
 
         # Definicion de variables
         print(" Modeling ".center(120, "#"))
         mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
         df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su precision y roi
-        l_modelos = [LogisticRegression()]
-        # l_modelos = [DecisionTreeClassifier(), RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(),
-        #              SVC(), MLPClassifier(), GradientBoostingClassifier()]
+        l_modelos = [RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(), SVC(), MLPClassifier(), GradientBoostingClassifier()]  # [DecisionTreeClassifier()]
 
         # Hiperparametros
-        test_val_size = 0.3  # Porcentaje del total de datos destinado a validacion y test.
+        test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
         bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
         fill_na = None  # Relleno de nan values [None, mode, ml]
@@ -519,7 +546,7 @@ def main():
         # General el diseño de la prueba
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, fill_na=fill_na)
 
-        # Por modelo
+        # Por modelo --> podria ponerlo como metodo en Modeling()
         for modelo in l_modelos:
 
             # Entreno modelo y evaluo su rendimiento
