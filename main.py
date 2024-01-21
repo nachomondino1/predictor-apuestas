@@ -1,19 +1,20 @@
 # Importo librerias
-# Data understanding
-from p2_data_understanding import describe_data
+## Data understanding
+import pandas as pd
+import os
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
+from p2_data_understanding import describe_data
 from dspy.data_understanding.describe_data import getting_to_know_data
-# Data preparation
-from p3_data_preparation import format_data, select_data, clean_data
-from sklearn.preprocessing import StandardScaler
-from p3_data_preparation import construct_data
+## Data preparation
+from p3_data_preparation import format_data, select_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
-# Modeling
-# Generate test design
+from sklearn.preprocessing import StandardScaler
+## Modeling
+from p4_modeling import generate_test_design, build_model, asses_model
+### Generate test design
 from random import randint
 from sklearn.model_selection import train_test_split
-from p4_modeling import generate_test_design, build_model, asses_model
-# Build model
+### Build model
 from sklearn.decomposition import PCA
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb  # XGBoost
@@ -21,7 +22,7 @@ from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
-# Assess model
+### Assess model
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
 
@@ -31,19 +32,57 @@ class DataUnderstanding:
     def __init__(self, pais):
         self.pais = pais
 
+    def make_directories(self):
+        ruta_base = '/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/'
+        l_directorios = [f'{ruta_base}{self.pais.lower()}/data_seg/por_temporada/df_part/',
+                         f'{ruta_base}{self.pais.lower()}/data_seg/por_temporada/df_part_jug/',
+                         f'{ruta_base}{self.pais.lower()}/data_seg/por_temporada/df_jug/',
+                         f'{ruta_base}{self.pais.lower()}/data_seg/por_competicion/df_part/',
+                         f'{ruta_base}{self.pais.lower()}/data_seg/por_competicion/df_part_jug/',
+                         f'{ruta_base}{self.pais.lower()}/data_seg/por_competicion/df_jug/'
+                         ]
+
+        for directorio in l_directorios:
+            if not os.path.exists(directorio):
+                # Si no existe, crear el directorio
+                os.makedirs(directorio)
+
     def collect_initial_data(self):
 
         print(" Recolectando datos... ")
 
-        # Extraigo partidos de Flashscore (df_part y df_part_jug)
-        df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(self.pais)
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
-        df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
+        # Definicion de variables
+        df_part_concat, df_part_jug_concat, df_jug_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-        # Extraigo datos de jugadores de Sofifa (df_jug)
-        df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais, "Premier league")
-        df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
-        return df_part, df_part_jug, df_jug
+        # Selecciono competencias del pais
+        df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
+        df_comp = df_comp[df_comp['pais'] == self.pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
+        print(f' PAIS: {self.pais} '.center(120, '#'))
+        print(f"Competiciones a extraer: \n{df_comp['competicion']}")
+
+        # Creo directorios en donde guardar datos en caso que no existan
+        self.make_directories()
+
+        # POR COMPETICION
+        for competicion, is_cup in zip(df_comp['competicion'], df_comp['is_cup']):
+
+            # Extraigo partidos de Flashscore (df_part y df_part_jug)
+            df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(self.pais, competicion, is_cup, n_temps=16)
+            df_part_concat = pd.concat([df_part_concat, df_part], axis=0)
+            df_part_jug_concat = pd.concat([df_part_jug_concat, df_part_jug], axis=0)
+
+            # Si la competicion es una liga
+            if is_cup == 1:
+
+                # Extraigo datos de jugadores de Sofifa (df_jug)
+                df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais, competicion)
+                df_jug_concat = pd.concat([df_jug_concat, df_jug], axis=0)
+
+        # Exporto datasets con competiciones del pais
+        df_part_concat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
+        df_part_jug_concat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
+        df_jug_concat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
+        return df_part_concat, df_part_jug_concat, df_jug_concat
 
     def describe_data(self, df_part, df_part_jug, df_jug):
 
@@ -121,12 +160,11 @@ class DataPreparation:
         warnings.filterwarnings('ignore')
 
         # ELIMINACION DE FILAS NAN SEGUN % NAN, O BIEN, SELECCION DE DATOS SEGUN TEMPORADA....
-        ## Opcion 3: Si tiene formaciones
         ## Elimino filas con alto porcentaje de NaN values
         n_filas = len(df_part)
         df_part_jug = df_part_jug.dropna(subset=['jug_tit_loc_11', 'jug_tit_vis_11'], how='any').reset_index(drop=True)
         df_part = df_part[df_part['id_part'].isin(df_part_jug['id_part'])].reset_index(drop=True)
-        print(f"De las {n_filas} filas, se eliminan {(n_filas - len(df_part))} por no tener ni una estadistica del "
+        print(f"De las {n_filas} filas, se eliminan {(n_filas - len(df_part))} por no tener formaciones del "
               f"partido, quedan {len(df_part)} filas.")
 
         ## Elimino columnas con alto porcentaje de NaN values
@@ -322,7 +360,7 @@ class Modeling:
         # Si no relleno NaN values
         if fill_na is None:
 
-            # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
+            # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values (solo en variables selected)
             df = clean_data.eliminar_filas_nan(df, porc_nan_max=0)  # df = df.dropna()
 
             # Separo en X e y
@@ -478,11 +516,11 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "England"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "Argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
     export = True
 
     # Procesamiento
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = True, False, False
 
     if data_unders:
         print(" Data understanding ".center(120, "#"))
@@ -492,13 +530,14 @@ def main():
         df_part, df_part_jug, df_jug = du.collect_initial_data()
 
         # Describo datos
-        du.describe_data(df_part, df_part_jug, df_jug)
+        # du.describe_data(df_part, df_part_jug, df_jug)
+
     # Si no extraigo datos
     else:
         # Levanto datos ya extraidos
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/premier_league_2007_2024/df_part.xlsx')
-        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/premier_league_2007_2024/df_part_jug.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/premier_fa_efl_cs_2014_2024/df_jug.xlsx', index_col=0)
+        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
+        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx', index_col=0)
 
         du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
         du.describe_data(df_part, df_part_jug, df_jug)
@@ -521,7 +560,7 @@ def main():
         df = dp.integrate_data(df_part, df_part_jug, df_jug, export=export)
         df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-    else:
+    elif not data_unders:
         # Levanto dataset para prueba
         df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
         print(df.head(1), df.shape)

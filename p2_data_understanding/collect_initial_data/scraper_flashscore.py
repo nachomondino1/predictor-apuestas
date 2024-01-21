@@ -5,12 +5,13 @@ import time
 import random
 from tqdm import tqdm
 import warnings
-import re
 
 
 class FlashscoreCrawler(Crawler):
-    # Desarrollo extracciones de distintos campos en funciones de manera de poder usar estas funciones para scraper normal, scraper de fields especificos poro falla y scraper de proximos partidos...
-
+    """
+    Desarrollo extracciones de distintos campos en funciones de manera de poder usar estas funciones para scraper
+    normal, scraper de fields especificos poro falla y scraper de proximos partidos...
+    """
     def __init__(self, headless, path):
         super().__init__(headless, path)
         self.child_driver = self.driver
@@ -146,7 +147,7 @@ class FlashscoreCrawler(Crawler):
         # print(d_nueva_fila)
         return d_nueva_fila
 
-def extract_data_flashscore(pais):
+def extract_data_flashscore(pais, competicion, is_cup, n_temps=None):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -154,102 +155,91 @@ def extract_data_flashscore(pais):
     # DEFINCION DE PARAMETROS & VARIABLES
     warnings.filterwarnings("ignore")  # /Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/scraper_flashscore.py:175: FutureWarning: In a future version, object-dtype columns with all-bool values will not be included in reductions with bool_only=True. Explicitly cast to bool dtype instead. df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
     crawler = FlashscoreCrawler(headless=True, path=None)
-    df_part, df_part_jug= pd.DataFrame(), pd.DataFrame()
-    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
-    print(f' PAIS: {pais} '.center(120, '#'))
+    df_part, df_part_jug = pd.DataFrame(), pd.DataFrame()
+    pais_form = pais.lower().replace(' ', "_")
+    competicion_form = competicion.lower().replace(" ", "-")  # formateo competicion para las rutas de archivo y urls
 
-    # Selecciono competencias del pais
-    df_comp = df_comp[df_comp['pais'] == pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
-    pais_form = df_comp.iloc[0]['pais'].lower().replace(' ', "_")
-    print(f"Competiciones a extraer: {df_comp['competicion']}")
+    # Ingreso a pagina
+    url = f'https://www.flashscore.es/futbol/{pais.lower()}/{competicion_form}/archivo/'
+    crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
+    print(f' Competicion: {competicion}. URL: {url} '.center(120, '+'))
 
-    # POR COMPETICION
-    for competicion, is_cup in zip(df_comp['competicion'], df_comp['is_cup']):
+    # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
+    crawler.accept_cookies()
 
-        # Ingreso a pagina
-        competicion_form = competicion.lower().replace(" ", "-")  # formateo competicion para las rutas de archivo y urls
-        url = f'https://www.flashscore.es/futbol/{pais.lower()}/{competicion_form}/archivo/'
-        crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
-        print(f' Competicion: {competicion}. URL: {url} '.center(120, '+'))
+    # Extraigo urls de las distintas temporadas (años) de la competicion
+    l_urls_temporadas = crawler.extract_urls_temporadas()
+    if n_temps is not None:
+        l_urls_temporadas = l_urls_temporadas[:n_temps]
+    print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
 
-        # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
-        crawler.accept_cookies()
+    # POR TEMPORADA
+    for url_temp in l_urls_temporadas:  # De mas reciente a menos reciente
 
-        # Extraigo urls de las distintas temporadas (años) de la competicion
-        l_urls_temporadas = crawler.extract_urls_temporadas()
-        print(f'Cantidad de temporadas: {len(l_urls_temporadas)}')
+        # Ingreso a pagina de temporada e imprimo año de la temporada
+        crawler.driver.get(url_temp)
+        temp_year = crawler.extract_tag(xpath='.//div[@class="heading__info"]', text=True)
+        print(f" {temp_year} ".center(120, "-"))
 
-        # POR TEMPORADA
-        for url_temp in l_urls_temporadas[:10]:  # De mas reciente a menos reciente
+        # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
+        while True:
+            boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=crawler.SEC_WAIT_MAX * 3) # boton_mostrar = crawler.extract_tag(xpath='.//div[@id="live-table"]//div[@class="tabs" and text()="Últimos Resultados"]/following_sibling()::div//a[@class="event__more event__more--static"]', sec_wait=crawler.SEC_WAIT_MAX * 15)
+            if crawler.click_boton(boton_mostrar) is False:
+                break
 
-            # Ingreso a pagina de temporada e imprimo año de la temporada
-            crawler.driver.get(url_temp)
-            temp_year = crawler.extract_tag(xpath='.//div[@class="heading__info"]', text=True)
-            print(f" {temp_year} ".center(120, "-"))
+        # Extraigo partidos (items) y sus ids
+        l_items = crawler.extract_tags(xpath='.//div[@id="live-table"]//div[@class="event__match event__match--static event__match--twoLine"]', sec_wait=crawler.SEC_WAIT_MAX*5)
+        l_ids = [item.get_attribute('id') for item in l_items]
+        print(f"Partidos recolectados de la temporada {temp_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
+        progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
 
-            # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
-            while True:
-                boton_mostrar = crawler.extract_tag(xpath='.//a[text()="Mostrar más partidos"]', sec_wait=crawler.SEC_WAIT_MAX * 3)
-                if crawler.click_boton(boton_mostrar) is False:
-                    break
+        # POR PARTIDO (c/u identificado con un id)
+        for id in l_ids:
 
-            # Extraigo partidos (items) y sus ids
-            l_items = crawler.extract_tags(xpath='.//div[@class="sportName soccer"]//div[@title="¡Haga click para detalles del partido!"]', sec_wait=crawler.SEC_WAIT_MAX*5)
-            l_ids = [item.get_attribute('id') for item in l_items]
-            print(f"Partidos recolectados de la temporada {temp_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
-            progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
+            # Ingreso a pagina de informacion del partido
+            id = id[id.rfind('_') + 1:]  # Quito lo que no es del id (e.g. paso de "g_1_fshvzbls" a "fshvzbls")
+            crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
 
-            # POR PARTIDO (c/u identificado con un id)
-            for id in l_ids:
+            # Reinicio diccionario en el que guardar datos del nuevo partido
+            d_nueva_fila = {'id_part': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': is_cup}
+            d_nueva_fila_2 = {'id_part': id}
 
-                # Ingreso a pagina de informacion del partido
-                id = id[id.rfind('_') + 1:]  # Quito lo que no es del id (e.g. paso de "g_1_fshvzbls" a "fshvzbls")
-                crawler.driver.get(f'https://www.flashscore.es/partido/{id}/#/resumen-del-partido')
+            # EXTRACCION DE CAMPOS
+            # Extraigo campos de hoja "Resumen"
+            d_nueva_fila.update(crawler.extract_basic_data_from_resumen())
 
-                # Reinicio diccionario en el que guardar datos del nuevo partido
-                d_nueva_fila = {'id_part': id, 'competicion': competicion, 'temporada': temp_year, 'pais': pais, 'es_copa': is_cup}
-                d_nueva_fila_2 = {'id_part': id}
+            # Si tiene hoja "Estadisticas", extraigo campos
+            boton_estadisticas = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Estadísticas"]', sec_wait=crawler.SEC_WAIT_MAX, print_fail=False)
+            if crawler.click_boton(boton_estadisticas) is not False:
+                time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3))  # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
+                d_nueva_fila.update(crawler.extract_estadisticas())
 
-                # EXTRACCION DE CAMPOS
-                # Extraigo campos de hoja "Resumen"
-                d_nueva_fila.update(crawler.extract_basic_data_from_resumen())
+            # Si existe la seccion "Cuotas pre-partido", extraigo cuotas de Bet365
+            if crawler.extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=crawler.SEC_WAIT_MIN) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
+                d_nueva_fila.update(crawler.extract_cuota())
 
-                # Si tiene hoja "Estadisticas", extraigo campos
-                boton_estadisticas = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Estadísticas"]', sec_wait=crawler.SEC_WAIT_MAX, print_fail=False)
-                if crawler.click_boton(boton_estadisticas) is not False:
-                    time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3))  # Falla el campo posesion_loc puesto que es el primero en ser extraido y aun no cargo...
-                    d_nueva_fila.update(crawler.extract_estadisticas())
+            # Si tiene hoja "Formaciones", extraigo campos
+            boton_formaciones = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Formaciones" or text()="Alineaciones"]', sec_wait=crawler.SEC_WAIT_MAX)
+            if crawler.click_boton(boton_formaciones) is not False:
+                time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3)) # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
+                d_nueva_fila.update(crawler.extract_dts())
+                d_nueva_fila_2.update(crawler.extract_formacion())
 
-                # Si existe la seccion "Cuotas pre-partido", extraigo cuotas de Bet365
-                if crawler.extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=crawler.SEC_WAIT_MIN) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
-                    d_nueva_fila.update(crawler.extract_cuota())
+            # GUARDADO DE DATOS EN DATAFRAME
+            df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
+            df_part_jug = pd.concat([df_part_jug, pd.DataFrame(d_nueva_fila_2, index=[0])])
+            progress_bar.update(1)
 
-                # Si tiene hoja "Formaciones", extraigo campos
-                boton_formaciones = crawler.extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Formaciones" or text()="Alineaciones"]', sec_wait=crawler.SEC_WAIT_MAX)
-                if crawler.click_boton(boton_formaciones) is not False:
-                    time.sleep(random.uniform(crawler.SEC_WAIT_MIN + 3, crawler.SEC_WAIT_MAX + 3)) # Por posible falla en el primer campo a extraer  # WebDriverWait(crawler.driver, SEC_WAIT_LONG + 3).until(EC.presence_of_element_located((By.XPATH, './/div[@class="preMatchTabCnt preMatchTabCnt1"]')))
-                    d_nueva_fila.update(crawler.extract_dts())
-                    d_nueva_fila_2.update(crawler.extract_formacion())
+        # Cerrar la barra de progreso al finalizar
+        progress_bar.close()
 
-                # GUARDADO DE DATOS EN DATAFRAME
-                df_part = pd.concat([df_part, pd.DataFrame(d_nueva_fila, index=[0])])
-                df_part_jug = pd.concat([df_part_jug, pd.DataFrame(d_nueva_fila_2, index=[0])])
-                progress_bar.update(1)
+        # Guardo partidos de la temporada (por seguridad)
+        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/por_temporada/df_part/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
+        df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/por_temporada/df_part_jug/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
 
-            # Cerrar la barra de progreso al finalizar
-            progress_bar.close()
-
-            # Guardo partidos de la temporada (por seguridad)
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
-            df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part_jug/{competicion_form}_{temp_year.replace("/", "_")}_{pais_form}.xlsx', index=False)
-
-        # Guardo partidos de la competicion (por seguridad)
-        df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part/{competicion_form}_{pais_form}.xlsx', index=False)
-        df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/df_part_jug/{competicion_form}_{pais_form}.xlsx', index=False)
-
-    # Guardado datos a nivel pais
-    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part.xlsx', index=False)
-    df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/df_part_jug.xlsx', index=False)
+    # Guardo partidos de la competicion
+    df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/por_competicion/df_part/{competicion_form}_{pais_form}.xlsx', index=False)
+    df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais_form}/data_seg/por_competicion/df_part_jug/{competicion_form}_{pais_form}.xlsx', index=False)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
@@ -257,11 +247,11 @@ def extract_data_flashscore(pais):
 
 def prueba():
     # Selecciono pais a extraer y obtengo las competencias y su categoria
-    # pais = 'Argentina' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    pais = 'England'
+    pais = 'England'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
+    competicion = 'Premier League'
 
     # Extraigo partidos
-    extract_data_flashscore(pais)
+    extract_data_flashscore(pais, competicion)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
