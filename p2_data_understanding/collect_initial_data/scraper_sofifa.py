@@ -1,4 +1,6 @@
 # Importo librerias
+import time
+
 import pandas as pd
 from dspy.data_understanding.web_scraping.selenium import Crawler
 
@@ -106,39 +108,41 @@ def extract_jugadores_sofifa(pais, liga):
 def select_liga_as_filter(crawler, pais, liga=None):
     """
     Poner el pais como filtro para obtener los jugadores solo de la liga de dicho pais
-    :param df_comp:
     :param crawler:
-    :param pais:
+    :param pais: String. Nombre de pais al que pertenece la liga.
+    :param liga: String. Nombre de la liga de la cual extraer los jugadores.
     :return:
     """
     print("Seleccionando liga del pais como filtro...")
 
+    # Si el usuario no pasa una liga
     if liga is None:
         # Selecciono competicion mas importante del pais
         df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
-        liga = df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
+        liga = df_comp[(df_comp['pais'] == pais) and (df_comp['is_cup'] == 0)]['competicion'].values[0]  # La primera liga (evito si esta la B de esa liga) # df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
 
     # Cargo competicion en el buscador de ligas
-    input_league = crawler.extract_tag(xpath='.//form[@class="pjax-form"]//input[@aria-label="Leagues"]')
+    input_league = crawler.extract_tag(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]')
     input_league.send_keys(liga)
 
     # Posibles ligas segun nuestra busqueda
-    l_posibles_ligas = crawler.extract_tags(xpath='.//form[@class="pjax-form"]//input[@aria-label="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]/img')  # Puedo hacer click en img pero no en el div
+    l_posibles_ligas = crawler.extract_tags(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]') # a veces crashea el click pero funciona
     print("\tNº de posibles ligas:", len(l_posibles_ligas))
 
     # Por posible liga
     for liga in l_posibles_ligas:
 
         # Extraigo el pais
-        pais_posible_liga = liga.get_attribute("title")
+        pais_posible_liga = crawler.extract_tag(tag_inicial=liga, xpath='./img', attribute='title')  # Selecciono el div antes que la img.
         print("\tPais de posible liga: ", pais_posible_liga)
 
         # Si es el pais que estoy buscando
-        if pais_posible_liga.lower() == pais.lower():
+        if pais_posible_liga.lower() == pais.lower():  # Podria agregarle coincidencia del 90% por si cambia algun caracter. O bien el tema idioma.
             print("\tEncontró la liga y el pais deseado")
 
             # Hago click en la liga
-            if crawler.click_boton(liga) is False:
+            time.sleep(5) # Espero a que se cargen las opciones antes de hacer click (puede que el div no sea clickable o algo)
+            if crawler.click_boton(boton=liga) is False:
                 print(f'Sofifa no encontró resultados a nuestra busqueda. Es posible que no exista la liga de {pais}.')
             break
 
