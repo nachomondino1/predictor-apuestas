@@ -48,12 +48,12 @@ def unique_players_df_jug(df_jug):
     df_unique_players = df_unique_players.loc[:, ['id_jugador', 'nombre']]
     return df_unique_players
 
-def integrate_players_by_name(df_part_jug, df_jug):
+def integrate_players_by_name(df_part_jug_up, df_jug_up):
     """
     Vinculo datasets de los jugadores de Sofifa y los jugadores de Flashscore segun nombre de jugador.
-    :param df_part_jug: Dataframe. Unidad de analisis: jugador. Una sola columna con nombre de los jugadores en
+    :param df_part_jug_up: Dataframe. Unidad de analisis: jugador. Una sola columna con nombre de los jugadores en
     df_part_jug (sin repetidos).
-    :param df_jug: Dataframe. Unidad de analisis: jugador. Columnas id_jugador y nombre. La columna "nombre" tiene los
+    :param df_jug_up: Dataframe. Unidad de analisis: jugador. Columnas id_jugador y nombre. La columna "nombre" tiene los
     nombres de los jugadores en df_jug (sin repetidos).
     :return: Dataframe. Unidad de analisis: jugador. df_part_jug pasado como parametro con columna "id_jugador" de
     df_jug gracias a voncular nombres de jugadores de sendos dataframes.
@@ -61,18 +61,19 @@ def integrate_players_by_name(df_part_jug, df_jug):
     print("Vinculando df_jug de Sofifa y df_part_jug de Flashscore...")
 
     # Definicion de variables
-    df_part_jug_with_id = df_part_jug.copy()  # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
-    l_umbrales = [95, 90, 80, 75]
+    df_part_jug_with_id = df_part_jug_up.copy()  # Creo copia del dataframe df_part_jug en el que agregar la columna "id_jugador"
+    l_umbrales = [95, 90, 85, 80, 75]
+    n_pos_matchs, n_matchs = len(df_part_jug_up), 0
 
     # Funcion que hace una busqueda aproximada de un string en una columna
     def buscar_coincidencias(row, palabra, columna, umbral):
         return fuzz.token_set_ratio(palabra, row[columna]) >= umbral
 
     # Por jugador en df_part_jug
-    for i, row in df_part_jug.iterrows():
+    for i, row in df_part_jug_up.iterrows():
 
-        # Filtro inicial. Me quedo con los jugadores con nombre mas parecido
-        df_jug_filt_ini = df_jug[df_jug.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', min(l_umbrales)), axis=1)]
+        # Filtro inicial. Me quedo con los jugadores con nombre mas parecido (agiliza enormemente la funcion)
+        df_jug_filt_ini = df_jug_up[df_jug_up.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', min(l_umbrales)), axis=1)]
 
         # Por umbral
         for umbral in l_umbrales:
@@ -88,9 +89,11 @@ def integrate_players_by_name(df_part_jug, df_jug):
                 # df_part_jug_with_id.loc[i, 'nombre_sofifa'] = df_jug_filt.nombre.values[0]  # temporalmente para analizar calidad de match
 
                 # Elimino jugador de df_jug que hizo match para agilizar la busqueda
-                df_jug = df_jug.drop(df_jug_filt.index[0])
+                df_jug_up = df_jug_up.drop(df_jug_filt.index[0])
+                n_matchs += 1
                 break
 
+    print(f"De los {n_pos_matchs} jugadores en df_part_jug, hizo match para {n_matchs/n_pos_matchs*100:.2f}% de ellos, es decir, para {n_matchs}.")
     return df_part_jug_with_id
 
 def reemplazar_name_por_id(df_part_jug, df_part_jug_with_id):
