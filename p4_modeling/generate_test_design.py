@@ -2,7 +2,7 @@ import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
-
+from random import randint
 
 def balance_dataset(X, y, tipo):
 
@@ -56,7 +56,7 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5):
     # print(df_val_test.shape)
 
     # Separo en test y val
-    X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=42, shuffle=True)
+    X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 def prueba():
