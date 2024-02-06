@@ -299,7 +299,7 @@ def extract_partidos_whoscored(pais):
     # DEFINCION DE PARAMETROS & VARIABLES
     crawler = WhoScoredCrawler(headless=False, path=None)  # No puedo usar headless True, me bloquearon la direccion wifi (incluso cambiando de VPN)
     df_part, df_jug_part = pd.DataFrame(), pd.DataFrame()
-    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
+    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias_whoscored.xlsx')
     pais_form = pais.lower().replace(' ', "_")
 
     # Selecciono competencias del pais
@@ -310,7 +310,8 @@ def extract_partidos_whoscored(pais):
     for cod_pais, cod_comp, competicion, is_cup in zip(df_comp['cod_pais'], df_comp['cod_competicion'], df_comp['competicion'], df_comp['is_cup']): # for cod_pais, cod_comp, competicion, is_cup in zip(['11'], ['504'], ['Cup'], ['1']):
 
         # Ingreso a pagina
-        url_comp = f'https://www.whoscored.com/Regions/{cod_pais}/Tournaments/{cod_comp}/{pais}-{competicion.replace(" ", "-")}'
+        url_comp = f'https://es.whoscored.com/Regions/{cod_pais}/Tournaments/{int(cod_comp)}/{pais}-{competicion.replace(" ", "-")}'
+        print(f"URL: {url_comp}")
         crawler.driver.get(url_comp)  # hasta que no se carga toda la pagina, no sigue...
         time.sleep(random.uniform(crawler.SEC_WAIT_MIN, crawler.SEC_WAIT_MAX))  # simular comportamiento humano
         competicion_form = competicion.lower().replace(" ", "_")
@@ -461,7 +462,7 @@ def extract_player_data(df_jug_part):
 
 def prueba():
     # Selecciono pais a extraer y obtengo las competencias y su categoria
-    pais = 'England' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
+    pais = 'Inglaterra' # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     pais_form = pais.lower().replace(" ", "_")
 
     # Extraigo partidos
