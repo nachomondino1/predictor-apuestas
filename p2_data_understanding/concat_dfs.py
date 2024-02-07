@@ -1,36 +1,91 @@
 import pandas as pd
 
 
-def concat_dfs():
+def concat_dfs_competicion(pais, l_dataframes, export=True):
+    """
+    Concatena dfs de distintas competiciones.
+    :return: Dataframe. Contiene todas las competiciones de un pais (DataFrame)
+    """
+    # Levanto competiciones del pais
+    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias_new.xlsx')
+    df_comp_pais = df_comp[df_comp['pais_flashscore'] == pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
+    print("Competiciones del pais:\n", df_comp_pais)
 
-    # Levanto datasets a concatenar
-    df_1 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/England/entidad_jugadores (premier).xlsx', index_col=0)
-    df_2 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/England/entidad_jugadores_FIFA 08.xlsx', index_col=0)
-    # df_3 = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/data/inglaterra/premier-league_1989_1990_inglaterra.xlsx')
+    # Por dataframe (e.f. df_part, df_part_jug)
+    for dataframe in l_dataframes:
 
-    # Imprimo caracteristicas de cada dataframe a concatenar
-    print(df_1.head(1))
-    print(df_1.shape)
+        ruta_base_comp = f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/por_competicion/{dataframe}'
+        df_concat = pd.DataFrame()
+        print(f"\n\nDataframe: {dataframe}")
 
-    print(df_2.head(1))
-    print(df_2.shape)
-    # df_2['fecha'] = pd.to_datetime(df_2['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+        # Por competicion del pais
+        for i, row in df_comp_pais.iterrows():
 
-    # print(df_3.head(1))
-    # print(df_3.shape)
+            competicion_form = row['competicion_flashscore'].lower().replace(" ", "-")
+            print(f" Competicion: {row['competicion_flashscore']} ".center(120, "$"))
 
-    # Concateno dataframes
-    # df_concat = pd.concat([df_1, df_2, df_3], axis=0)
-    df_concat = pd.concat([df_1, df_2], axis=0)
-    print(df_concat.head(1))
-    print(df_concat.shape)
-    # df_concat.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/argentina_south_america/df_jug.xlsx', index=False)
+            # Levanto su dataframe
+            try:
+                df = pd.read_excel(f'{ruta_base_comp}/{competicion_form}_{pais.lower()}.xlsx')
+                print(f"Shape df: {df.shape}")
 
-    # Eliminar los duplicados
+                # Concateno dataframes
+                df_concat = pd.concat([df_concat, df], axis=0)
+                print(f"Shape df_concat: {df_concat.shape}")
+
+            except:
+                print(f"No existe el dataframe para la competicion {competicion_form}")
+
+        # Me fijo si hay duplicados (no deberia)
+        df_sin_duplicados = df_concat.drop_duplicates().reset_index(drop=True)
+        print(f"Nº de filas repetidas: {len(df_concat)-len(df_sin_duplicados)}")
+
+        if export:
+            df_sin_duplicados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/{dataframe}.xlsx', index=False)
+
+def concat_dfs_temporada(pais, dataframe, export=True):
+    """
+    Concatena dfs de distintas temporadas
+    :return: Dataframe. Contiene todas las temporadas especificadas.
+    """
+    df_concat = pd.DataFrame()
+    ruta_base = f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/data_seg/por_temporada/{dataframe}'
+
+    # Por dataframe a concatenar
+    for filename in l_filenames:
+        print(f"\n\nFilename: {filename}")
+
+        try:
+            # Levanto el dataframe
+            df = pd.read_excel(f'{ruta_base}/{filename}', index_col=0)
+            print(df.head(1))
+            print(f"Shape df: {df.shape}")
+
+            # Concateno
+            df_concat = pd.concat([df_concat, df], axis=0)
+            print(f"Shape df_concat: {df_concat.shape}")
+
+        except:
+            print("Falló")
+
+    # Me fijo si hay duplicados (no deberia)
     df_sin_duplicados = df_concat.drop_duplicates().reset_index(drop=True)
-    print(df_sin_duplicados.shape)
+    print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
 
-    df_sin_duplicados.to_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/england/entidad_jugadores.xlsx', index=False)
+    if export:
+        df_sin_duplicados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/{dataframe}.xlsx', index=False)
 
+if __name__ == "__main__":
 
-concat_dfs()
+    # Definicion de variables
+    pais = "Argentina"
+    export = True
+
+    # Concateno competiciones del pais
+    l_dataframes = ["df_part", "df_part_jug"]
+    concat_dfs_competicion(pais, l_dataframes, export)
+
+    # Concateno temporadas de una misma competicion del pais
+    dataframe = "df_jug"
+    l_filenames = ["FIFA 07.xlsx", "FIFA 18_24.xlsx"]
+    concat_dfs_temporada(pais, dataframe, export)
