@@ -120,40 +120,13 @@ def select_liga_as_filter(crawler, pais, liga=None):
     if liga is None:
         # Selecciono competicion mas importante del pais
         df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
-        liga = df_comp[(df_comp['pais'] == pais) and (df_comp['is_cup'] == 0)]['competicion'].values[0]  # La primera liga (evito si esta la B de esa liga) # df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
+        liga = df_comp[(df_comp['pais_sofifa'] == pais) and (df_comp['is_cup'] == 0)]['competicion_sofifa'].values[0]  # La primera liga (evito si esta la B de esa liga) # df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
 
     # Cargo competicion en el buscador de ligas
     input_league = crawler.extract_tag(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]')
     input_league.send_keys(liga)
 
-    # Opcion 1: Selecciona la primera opcion
-    input_league.send_keys(Keys.RETURN)
-
-    # Opcion 2: Selecciona la opcion segun nombre del pais con click()
-    """
-    # Posibles ligas segun nuestra busqueda
-    l_posibles_ligas = crawler.extract_tags(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]')  # a veces crashea el click pero funciona
-    print("\tNº de posibles ligas:", len(l_posibles_ligas))
-    
-    # Por posible liga
-    for tag_liga in l_posibles_ligas:
-    
-        # Extraigo el pais
-        pais_posible_liga = crawler.extract_tag(tag_inicial=tag_liga, xpath='./img', attribute='title')  # Selecciono el div antes que la img.
-        print("\tPais de posible liga: ", pais_posible_liga)
-        
-        # Si es el pais que estoy buscando
-        if pais_posible_liga.lower() == pais.lower():  # Podria agregarle coincidencia del 90% por si cambia algun caracter. O bien el tema idioma.
-            print("\tEncontró la liga y el pais deseado")
-        
-          # Hago click en la liga
-          if crawler.click_boton(tag_liga) is False:
-            print(f'Sofifa no encontró resultados a nuestra busqueda. Es posible que no exista la liga de {pais}.')
-          break
-      """
-
-    # Opcion 3: Selecciona la opcion segun nombre del pais con send_keys
-    """
+    # Selecciona la opcion segun nombre del pais con send_keys
     # Posibles ligas segun nuestra busqueda
     l_posibles_ligas = crawler.extract_tags(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]')  # a veces crashea el click pero funciona
     print("\tNº de posibles ligas:", len(l_posibles_ligas))
@@ -167,15 +140,15 @@ def select_liga_as_filter(crawler, pais, liga=None):
         # Si es el pais que estoy buscando
         if pais_posible_liga.lower() == pais.lower():  # Podria agregarle coincidencia del 90% por si cambia algun caracter. O bien el tema idioma.
             input_league.send_keys(Keys.RETURN)
-
+            break
         else:
             input_league.send_keys(Keys.ARROW_DOWN) # con tab no funciona
-    """
 
 def prueba():
     # Agregar: Definir que competicion y que pais queres extraer aquí segun df_comp...
-    pais = "England"
-    liga = "Premier League"
+    pais = "Argentina"
+    liga = "Liga Profesional de Futbol"
+
     extract_jugadores_sofifa(pais, liga, export=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
