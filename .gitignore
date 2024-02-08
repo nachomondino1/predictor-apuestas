@@ -1,8 +1,8 @@
 # Ignorar directorio de dependencias
-env-model/
+apuestasEnv/
 
 # Ignorar un archivo específico en un directorio específico
-/Users/nachomondino/Documents/GitHub/predictor-apuestas/prueba.py
+/Users/nachomondino/Documents/GitHub/predictor-apuestas/apuestasEnv
 
 # Ignorar todos los archivos de una extensión específica
 *.xls;xlsx;csv
