@@ -31,15 +31,16 @@ class DataUnderstanding:
 
     def __init__(self, pais):
         self.pais = pais
+        self.make_directories()
 
     def make_directories(self):
-        ruta_base = '/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/'
-        l_directorios = [f'{ruta_base}{self.pais.lower()}/data_seg/por_temporada/df_part/',
-                         f'{ruta_base}{self.pais.lower()}/data_seg/por_temporada/df_part_jug/',
-                         f'{ruta_base}{self.pais.lower()}/data_seg/por_temporada/df_jug/',
-                         f'{ruta_base}{self.pais.lower()}/data_seg/por_competicion/df_part/',
-                         f'{ruta_base}{self.pais.lower()}/data_seg/por_competicion/df_part_jug/',
-                         f'{ruta_base}{self.pais.lower()}/data_seg/por_competicion/df_jug/'
+        ruta_base = f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais.lower()}/data_seg'
+        l_directorios = [f'{ruta_base}/por_temporada/df_part/',
+                         f'{ruta_base}/por_temporada/df_part_jug/',
+                         f'{ruta_base}/por_temporada/df_jug/',
+                         f'{ruta_base}/por_competicion/df_part/',
+                         f'{ruta_base}/por_competicion/df_part_jug/',
+                         f'{ruta_base}/por_competicion/df_jug/'
                          ]
 
         for directorio in l_directorios:
@@ -55,29 +56,25 @@ class DataUnderstanding:
 
         # Selecciono competencias del pais
         df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
-        df_comp = df_comp[df_comp['pais'] == self.pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
-        print(f' PAIS: {self.pais} '.center(120, '#'))
-        print(f"Competiciones a extraer: \n{df_comp['competicion']}")
-
-        # Creo directorios en donde guardar datos en caso que no existan
-        self.make_directories()
+        df_comp_pais = df_comp[df_comp['pais_flashscore'] == self.pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
+        print(f' PAIS: {self.pais} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_pais['competicion_flashscore']}")
 
         # POR COMPETICION
-        for competicion, is_cup in zip(df_comp['competicion'], df_comp['is_cup']):  # .values[] para evitar alguna competicion ya extraida
+        for i, row in df_comp_pais.iterrows():
 
-            # if competicion not in ["Liga Profesional", "Primera Nacional", "Copa de la Liga Profesional"]:
+            if row['competicion_flashscore'] == "Copa Italia":
 
-            # Extraigo partidos de Flashscore (df_part y df_part_jug)
-            df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(self.pais, competicion, is_cup, n_temps_max=16, export=export)
-            df_part_concat = pd.concat([df_part_concat, df_part], axis=0)
-            df_part_jug_concat = pd.concat([df_part_jug_concat, df_part_jug], axis=0)
+                # Extraigo partidos de Flashscore (df_part y df_part_jug)
+                df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(row['pais_flashscore'], row['competicion_flashscore'], row['is_cup'], n_temps_max=16, export=export)
+                df_part_concat = pd.concat([df_part_concat, df_part], axis=0)
+                df_part_jug_concat = pd.concat([df_part_jug_concat, df_part_jug], axis=0)
 
-            # Si la competicion es una liga
-            if is_cup == 0:
+                # Si la competicion es una liga
+                if row['is_cup'] == 0:
 
-                # Extraigo datos de jugadores de Sofifa (df_jug)
-                df_jug = scraper_sofifa.extract_jugadores_sofifa(self.pais, competicion, export=export)
-                df_jug_concat = pd.concat([df_jug_concat, df_jug], axis=0)
+                    # Extraigo datos de jugadores de Sofifa (df_jug)
+                    df_jug = scraper_sofifa.extract_jugadores_sofifa(row['pais_sofifa'], row['competicion_sofifa'], export=export)
+                    df_jug_concat = pd.concat([df_jug_concat, df_jug], axis=0)
 
         # Exporto datasets con competiciones del pais
         if export:
@@ -108,6 +105,14 @@ class DataPreparation:
     def __init__(self, var_resp, pais):
         self.var_resp = var_resp
         self.pais = pais
+        self.make_directories()
+
+    def make_directories(self):
+        directorio = f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais.lower()}'
+
+        if not os.path.exists(directorio):
+            # Si no existe, crear el directorio
+            os.makedirs(directorio)
 
     def format_data(self, df_part, df_part_jug, df_jug, export=True):
         """
@@ -255,20 +260,18 @@ class DataPreparation:
         start = time.time()
         print("\nConstruyendo nuevos datos...")
 
-        # Definicion de variables
-        n_anios_historial_loc = n_anios_historial * 2
-        l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas',  # Automatizar definicion de estadisticas
-                          'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
-
         # Construyo variables: "equipo_ganador" y puntos obtenidos
         df = construct_data.determinar_equipo_ganador(df)
         df = construct_data.determinar_puntos(df)
         # df = construct_data.determinar_equipo_ganador_segun_casa_apuesta(df)
 
         # Variables historicas
-        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial_loc)
+        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
 
         # Por estadistica del partido
+        l_estadisticas = construct_data.determine_l_estadisticas(df)
+        print(f"Estadisticas a promediar en ultimos partidos: {l_estadisticas}")
+
         for var in l_estadisticas:
             # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
             df[f'dif_{var}'] = df[f'{var}_loc'] - df[f'{var}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
@@ -291,7 +294,6 @@ class DataPreparation:
 
         if export:
             df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
-
         return df
 
     def select_data(self, df, thr_corr=None, thr_fs=None, export=True):  # 1.3 minutos # Chequear cambios
@@ -310,7 +312,6 @@ class DataPreparation:
         n_col = len(df.columns)
         df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
         print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. temporada).")
-
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -332,7 +333,6 @@ class DataPreparation:
         if export:
             df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
             df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
-
         return df
 
 class Modeling:
@@ -422,9 +422,7 @@ class Modeling:
         df_train = pd.concat([X_train.reset_index(drop=True), y_train.reset_index(drop=True)], axis=1)  # concatena mal sin el reset_index()
         df_train = df_train.sample(frac=1).reset_index(drop=True)
         X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
-        print(f'Train: {X_train.shape} {y_train.shape}')
-        print(f'Val: {X_val.shape} {y_val.shape}')
-        print(f'Test: {X_test.shape} {y_test.shape}')
+        print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
 
         if export:
             X_train.to_excel(f'./p4_modeling/data/{self.pais}/X_train.xlsx', index=False)
@@ -436,7 +434,6 @@ class Modeling:
     def build_model(self, model, X_val, y_val, X_train, y_train, k):
         """
         Selecciona el mejor modelo a partir de la precision.
-
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
         :param X_val: Dataframe de validacion con variables predictoras. (DataFrame)
         :param y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
@@ -451,7 +448,7 @@ class Modeling:
 
         # Find best hiperparameters
         print(f" Modelo: {model_name} ".center(120, '-'))
-        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=10)
+        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k)
 
         # Entreno el modelo
         model_best_params.fit(X_train, y_train)
@@ -519,11 +516,11 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "Argentina"  # tiene sentido solo si hago un modelo por pais? y si no? # Ver si puedo evitar el pais como argumento en train model por tener que meterlo en el calculo del roi en df_etiquetas...
+    pais = "Italia"
     export = True
 
     # Procesamiento
-    data_unders, data_prep, modeling = True, False, False
+    data_unders, data_prep, modeling = False, True, False
 
     if data_unders:
         print(" Data understanding ".center(120, "#"))
@@ -551,9 +548,9 @@ def main():
         dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
 
         # Hiperparametros
+        thr_nan_col = 0.9  # Porcentaje maximo de nan values en una columna
         n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 3
-        thr_nan_col = 0.9  # 0.5
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = None  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 

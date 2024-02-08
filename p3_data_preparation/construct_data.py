@@ -9,7 +9,7 @@ def determinar_equipo_ganador_segun_casa_apuesta(df):
     """
     Se determina el 'equipo_ganador' segun la casa de apuestas
     :param df: Dataframe. Unidad de analisis: partido. Columnas: entre ellas odds_loc, odds_emp, odds_vis
-    :return: Dataframe pasado por parametro con nueva columna, 'equipo_ganador_ca', que detalla el resultado del partido
+    :return: Dataframe pasado por parametro con nueva columna, 'y_pred_ca', que detalla el resultado del partido
     segun la casa de apuesta.
     """
     # Por fila
@@ -20,15 +20,15 @@ def determinar_equipo_ganador_segun_casa_apuesta(df):
 
         # Si la cuota minima es la del equipo local
         if row['odds_loc'] == odds_min:
-            df.loc[i, 'equipo_ganador_ca'] = "Local"
+            df.loc[i, 'y_pred_ca'] = "Local"
 
         # Si la cuota minima es la del equipo visitante
         elif row['odds_vis'] == odds_min:
-            df.loc[i, 'equipo_ganador_ca'] = "Visitante"
+            df.loc[i, 'y_pred_ca'] = "Visitante"
 
         # Si la cuota minima es la del empat
         else:
-            df.loc[i, 'equipo_ganador_ca'] = "Empate"
+            df.loc[i, 'y_pred_ca'] = "Empate"
     return df
 
 def determinar_equipo_ganador(df):
@@ -213,13 +213,39 @@ def suma_rat_jug_aus(df):  # Ojo falla en calculo cuando uno de los dos equipos 
     df = df.drop(["n_jug_aus_loc", "n_jug_aus_vis"], axis=1)
     return df
 
+def determine_l_estadisticas(df):
+    """
+    Determina automaticamente las variables que deben ser promediadas en los ultimos partidos
+    :param df: DataFrame. (DataFrame)
+    :return: List. Variables a ser promediadas. (List)
+    """
+    # Definicion de variables
+    keywords_prohibidas = ['prom_', 'equipo_', 'odds_', 'dt_', 'n_jug_']
+    pattern = f'[a-z_]+\_(loc|vis)'  # posesion_loc
+
+    # Filtro inicial (me quedo con algo_loc y algo_vis)
+    l_estadisticas_raw = df.filter(regex=pattern, axis=1).columns.tolist()
+    # print(l_estadisticas_raw)
+
+    def validar_palabras_prohibidas(cadena):
+        for keyword in keywords_prohibidas:
+            if keyword in cadena:
+                return False
+        return True
+
+    l_estadisticas = [cadena for cadena in l_estadisticas_raw if validar_palabras_prohibidas(cadena)]
+
+    set_est = set()
+    for est in l_estadisticas:
+        est_filt = est.replace('_loc', "").replace('_vis', "")
+        set_est.add(est_filt)
+    return set_est
+
 def prueba():
     # Definicion de variables
     pais = 'England'
     n_dias = 30  # 30 es como N_ULT_PART igual a 5...
     n_anios_historial = 2
-    l_estadisticas = ['goles', 'puntos', 'posesion', 'remates', 'remates_a_puerta', 'tarjetas_amarillas', 'faltas',
-                      'pases', 'pases_comp', 'offsides', 'ataques', 'ataques_pelig']
 
     # Levanto dataset
     df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated.xlsx')
@@ -235,6 +261,9 @@ def prueba():
     df = historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
 
     # Por estadistica del partido
+    l_estadisticas = determine_l_estadisticas(df)
+    print(f"Estadisticas a promediar en ultimos partidos: {l_estadisticas}")
+
     for est in l_estadisticas:
 
         # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
@@ -257,6 +286,7 @@ def prueba():
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
     df.to_excel('/Users/nachomondino/Desktop/df_constructed_prueba.xlsx')
+
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

@@ -27,9 +27,9 @@ def getting_to_know_data(df):
     print("\nDataframe basic statistics:")
     print(df.describe(include='all'))  # basic descriptive statistics for all numeric columns
 
-
 def verificar_unicidad_registros(df, columns_id):
 
+    print(f"\nAnalisis de unicidad de registros segun {columns_id}...")
     df_duplicados = df.duplicated(subset=columns_id)
     hay_duplicados = df_duplicados.any()
 
@@ -38,7 +38,6 @@ def verificar_unicidad_registros(df, columns_id):
     else:
         print(f"Se verifica que todo registro es unico segun {columns_id}")
 
-
 def verificar_relacion_entidades(df_part, df_jug_part): # notas
     """
     Verifica unicidad de ids y consistencia entre dataframes
@@ -46,6 +45,7 @@ def verificar_relacion_entidades(df_part, df_jug_part): # notas
     :param df_opi:
     :return:
     """
+    print(f"\nAnalisis de calidad de la relacion entre dataframes segun el campo que los vincula...")
     # Obtengo cantidad de ids unicos en cada dataframe
     ids = list(df_part['id_part'])  # ids en dataframe altenativas
     ids_con_opi = df_jug_part['id_part'].unique()  # ids en dataframe opiniones
@@ -62,12 +62,9 @@ def prueba():
     pais = "England"
 
     # Levanto datasets
-    # df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
+    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')  #     df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx')
     df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
-    # df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx', index_col=0)
-
-    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_part_formated.xlsx')
-    df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx', index_col=0)
+    df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx', index_col=0)  #     df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_jug_formated.xlsx', index_col=0)
 
     getting_to_know_data(df_part)
     getting_to_know_data(df_part_jug)

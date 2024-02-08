@@ -60,7 +60,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
         try:
             df_constructed = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_constructed_{n_dias_ult_part}_{n_anios_historial}.xlsx')
         except FileNotFoundError:
-            df_constructed = dp.construct_data(df_integrated, n_dias=n_dias_ult_part, n_anios_historial=n_anios_historial)
+            df_constructed = dp.construct_data(df_integrated, n_dias=n_dias_ult_part, n_anios_historial=n_anios_historial, export=False)
             df_constructed.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_constructed_{n_dias_ult_part}_{n_anios_historial}.xlsx', index=False)
 
         # Por combinacion de parametros de select_data
@@ -75,7 +75,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
             df_sel = dp.select_data(df_constructed, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
             # df_sel.to_excel('/Users/nachomondino/Desktop/df_sel.xlsx', index=False)
 
-            df_sel = df_sel.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1) # 'y_pred_ca'  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
+            df_sel = df_sel.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # 'y_pred_ca'  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
 
             # Por combinacion de parametros de modeling
             for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
@@ -176,7 +176,7 @@ def define_n_iterations(d_params):
     return n_iter
 
 def main():
-    pais, var_resp, var_pred = "England", 'equipo_ganador', 'y_pred'
+    pais, var_resp, var_pred = "Italia", 'equipo_ganador', 'y_pred'
     find_best_hiperparameters(var_resp, var_pred, pais)
 
 if __name__ == '__main__':

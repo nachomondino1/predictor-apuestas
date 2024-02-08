@@ -29,7 +29,7 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
     # Calculo matriz de correlacion
     df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Elimino odds para evitar eliminarlas y que eliminen otras variables
     df_correlacion = df.corr().abs()
-    df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
+    # df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
 
     # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
     df_corr = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0)
@@ -289,7 +289,7 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
     df_importance = pd.DataFrame(index=X.columns)
-    print(f"Largo del dataframe antes de fs (pues borre NaN values dado que no le pueden entrar a ML): {X.shape}")
+    # print(f"Largo del dataframe antes de fs (pues borre NaN values dado que no le pueden entrar a ML): {X.shape}")  # es el largo solo para Feature Selection...
 
     # Detemino importancia de cada variable para cada modelo
     # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
@@ -300,7 +300,7 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)
-    df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
+    # df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
 
     # Determino columnas a eliminar por poco importancia
     l_not_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] < df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()

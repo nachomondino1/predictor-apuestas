@@ -10,8 +10,12 @@ def convert_posesion_to_int(df):
     ejemplo '65%'.
     :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
     """
-    df['posesion_loc'] = df['posesion_loc'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
-    df['posesion_vis'] = df['posesion_vis'].apply(lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
+    posesion = "posesion_de_balon"
+    l_tit = ['loc', 'vis']
+
+    for tit in l_tit:
+        df[f'{posesion}_{tit}'] = df[f'{posesion}_{tit}'].apply(
+            lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
     return df
 
 def convert_valor_mercado_to_int(df):

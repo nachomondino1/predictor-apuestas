@@ -52,7 +52,7 @@ def fill_nan_values(X, y, type):
     """
     # Definicion de variables
     X_filled = X.copy()    # Crear una copia del dataframe original dado que realizare cambios en las columnas y valores
-    nan_threshold = 0.1  # cuidado que si hago eliminacion de col antes por un valor inferior, esta lista esta vacia y no hace fillna...
+    nan_threshold = 0.2  # cuidado que si hago eliminacion de col antes por un valor inferior, esta lista esta vacia y no hace fillna...
 
     # Determino las columnas con mucho NaN (mas de nan_threshold%)
     l_columnas_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
