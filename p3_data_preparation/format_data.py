@@ -16,6 +16,9 @@ def convert_posesion_to_int(df):
     for tit in l_tit:
         df[f'{posesion}_{tit}'] = df[f'{posesion}_{tit}'].apply(
             lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
+    
+        # df[f"{posesion}_{tit}"] = df[f"{posesion}_{tit}"].astype(float)  # a diferencia de Pycharm, creo que es necesario convertir la columna a float
+        print(f"Verificacion de dtype de {posesion} (deberia ser float):", df[f"{posesion}_{tit}"].dtype)
     return df
 
 def convert_valor_mercado_to_int(df):
@@ -42,6 +45,7 @@ def convert_valor_mercado_to_int(df):
            return None
 
    df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
+   print("Verificacion de dtype de 'valor_de_mercado' (deberia ser float):", df["valor_mercado"].dtype)
    return df
 
 def keep_goles_int(df):
@@ -71,48 +75,56 @@ def keep_goles_int(df):
     # Convierto columnas goles a integer
     df['goles_loc'] = df['goles_loc'].astype(int)
     df['goles_vis'] = df['goles_vis'].astype(int)
-
+    print(f"Verificacion de dtype de goles (deberia ser int):", df[f"goles_loc"].dtype, df[f"goles_vis"].dtype)
     return df
 
 def convert_columns_to_int(df, df_etiquetas=None):
     """
-    Convierte las variables categóricas de tipo string a numéricas utilizando LabelEncoder y guarda los valores
-    originales y enteros correspondientes.
+    Convierte las variables string a numéricas.
 
     :param df: DataFrame que contiene las variables a convertir. (DataFrame)
-    :param df_etiquetas: DataFrame adicional con las etiquetas originales y enteros correspondientes.
-                         Si se proporciona, se utilizará para la conversión en lugar de ajustar un nuevo LabelEncoder.
-                         (DataFrame, opcional)
-    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y
-             enteros correspondientes.
+    :param df_etiquetas: DataFrame adicional con las etiquetas originales y enteros correspondientes. Si se proporciona, se utilizará 
+    para la conversión en lugar de ajustar un nuevo LabelEncoder.(DataFrame, opcional)
+    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
     """
+    # Definicion de variables
+    le = LabelEncoder()
+
+    # Obtener columnas de tipo objeto
+    l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
+    print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
+
+    # Codifico variables string en numericas
     if df_etiquetas is None:
         df_etiquetas = pd.DataFrame(columns=['variable', 'valor_orig', 'valor_int'])
 
-    le = LabelEncoder()
-
-    # Por variable string
-    for col in df.select_dtypes(include=['object']).columns:
-
-        if col not in df_etiquetas['variable'].unique():
+        # Por variable string
+        for col in l_columnas_a_codificar:
 
             # Quito NaN de la columna para evitar codificar el valor NaN
             df_sin_na = df.dropna(subset=[col])
 
             # Convierto columna a int
-            df_sin_na[col] = le.fit_transform(df_sin_na[col])
+            df_sin_na[col] = le.fit_transform(df_sin_na[col].astype(str)) # agregue el "as_type(str)" porque tiraba error sino desde que uso vsc en vez Pycharm
 
             # Reemplazar los valores de la columna en los índices sin Nan
             df.loc[df_sin_na.index, col] = df_sin_na[col]
             df[col] = df[col].astype("float64")  # Convertir el dtype a int64
 
             # Guardo etiquetas
-            l_valor_orig = le.classes_
-            l_valor_int = le.transform(l_valor_orig)
+            l_valor_str = le.classes_
+            l_valor_int = le.transform(l_valor_str)
 
-            # Guardo en dataframe
-            for valor_orig, valor_int in zip(l_valor_orig, l_valor_int):
-                df_etiquetas.loc[len(df_etiquetas)] = [col, valor_orig, valor_int]
+            # Guardo string y su equivalente numerico
+            df_etiquetas = df_etiquetas.append(pd.DataFrame({'variable': col, 'valor_orig': l_valor_str, 'valor_int': l_valor_int}))  # Funciona bien
+            # print(df_etiquetas)
+            
+    # Por fila
+    for i, row in df_etiquetas.iterrows():
+
+        # Reemplazo valores string por numero
+        df = df.replace(row['valor_orig'], row['valor_int'])
+
     return df, df_etiquetas
 
 def revert_columns_from_int(df, df_etiquetas, columns=None):
