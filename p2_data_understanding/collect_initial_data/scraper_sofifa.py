@@ -10,6 +10,7 @@ def extract_jugadores_sofifa(pais, liga, export=True):
     """
     # DEFINCION DE PARAMETROS & VARIABLES
     path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
+    # path_driver_exe = "/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/collect_initial_data/chromedriver"
     crawler = Crawler(headless=False, path=path_driver_exe)  # Usar False (con True no funciona)
     df_jug = pd.DataFrame(columns=['id_jugador', 'fifa', 'fecha', 'nombre', 'edad', 'altura', 'pie_habil', 'overall_rating', 'potencial', 'equipo_actual', 'valor_mercado', 'sueldo', 'pais'])  # usar d.keys() de headers... asi es automatico.. Ah no, pues extraigo algunos campos mas..
     print(f" PAÍS: {pais} ".center(120, "#"))
@@ -106,7 +107,7 @@ def extract_jugadores_sofifa(pais, liga, export=True):
     crawler.driver.close()
     return df_jug
 
-def select_liga_as_filter(crawler, pais, liga=None):
+def select_liga_as_filter(crawler, pais, liga):
     """
     Poner el pais como filtro para obtener los jugadores solo de la liga de dicho pais
     :param crawler:
@@ -115,22 +116,21 @@ def select_liga_as_filter(crawler, pais, liga=None):
     :return:
     """
     print("Seleccionando liga del pais como filtro...")
-
-    # Si el usuario no pasa una liga
-    if liga is None:
-        # Selecciono competicion mas importante del pais
-        df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
-        liga = df_comp[(df_comp['pais_sofifa'] == pais) and (df_comp['is_cup'] == 0)]['competicion_sofifa'].values[0]  # La primera liga (evito si esta la B de esa liga) # df_comp[df_comp['pais'] == pais]['competicion'].values[0]  # La primera competicion de todas las competiciones del pais
+    # Obtengo el nombre del pais y de la liga segun sofifa
+    df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
+    df_comp_filt = df_comp[(df_comp['pais_flashscore'] == pais) & (df_comp['is_cup'] == 0) & (df_comp['competicion_flashscore'] == liga)]
+    pais, liga = df_comp_filt['pais_sofifa'].values[0] , df_comp_filt['competicion_sofifa'].values[0] 
 
     # Cargo competicion en el buscador de ligas
     input_league = crawler.extract_tag(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]')
     input_league.send_keys(liga)
 
     # Selecciona la opcion segun nombre del pais con send_keys
-    # Posibles ligas segun nuestra busqueda
+    ## Posibles ligas segun nuestra busqueda
     l_posibles_ligas = crawler.extract_tags(xpath='.//form[@class="pjax-form" and @action="/players"]//input[@placeholder="Leagues"]//parent::div//following-sibling::div//div[starts-with(@class, "choices-item")]')  # a veces crashea el click pero funciona
     print("\tNº de posibles ligas:", len(l_posibles_ligas))
 
+    ## Por posible liga
     for tag_liga in l_posibles_ligas:
         
         # Extraigo el pais
@@ -140,14 +140,15 @@ def select_liga_as_filter(crawler, pais, liga=None):
         # Si es el pais que estoy buscando
         if pais_posible_liga.lower() == pais.lower():  # Podria agregarle coincidencia del 90% por si cambia algun caracter. O bien el tema idioma.
             input_league.send_keys(Keys.RETURN)
+            print("Se seleccionó una liga.")
             break
         else:
             input_league.send_keys(Keys.ARROW_DOWN) # con tab no funciona
 
 def prueba():
     # Agregar: Definir que competicion y que pais queres extraer aquí segun df_comp...
-    pais = "Argentina"
-    liga = "Liga Profesional de Futbol"
+    pais = "espana"
+    liga = "LaLiga EA Sports"
 
     extract_jugadores_sofifa(pais, liga, export=False)
 
