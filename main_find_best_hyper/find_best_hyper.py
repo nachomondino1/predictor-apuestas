@@ -1,4 +1,6 @@
 # Importo librerias
+import sys
+sys.path.append('/Users/nachomondino/Documents/GitHub/predictor-apuestas')  # Fallaba el import de main
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
@@ -34,7 +36,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
         'modeling': {
             'test_val_size': [0.25],  # Proporcion de datos destinado a test y validation, el resto es train
             'test_size': [0.5],  # Proporcion de datos destinado test, el resto es validation
-            'fill_na': [None, 'ml'], # Opcion de rellenar NaN values en dataset de entrenamiento
+            'fill_na': [None], # Opcion de rellenar NaN values en dataset de entrenamiento
             'bal_type': [None],  # Opcion de balancear dataset de entrenamiento
             'with_pca': [False],
             'k': [5]  # Numero de folds tanto para seleccionar hiperparametros como para entrenar el modelo
@@ -96,8 +98,11 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                 # Por modelo
                 for modelo in l_modelos:
 
+                    model_name = str(modelo)[:str(modelo).find('(')]  # Defino el nombre del modelo (e.g. "RandomForest")
+                    print(f" Modelo: {model_name} ".center(120, '-'))
+
                     # Entreno modelo y evaluo su rendimiento
-                    model_name, model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
+                    model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
 
                     accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test, export=False)
 
@@ -176,7 +181,7 @@ def define_n_iterations(d_params):
     return n_iter
 
 def main():
-    pais, var_resp, var_pred = "Italia", 'equipo_ganador', 'y_pred'
+    pais, var_resp, var_pred = "england", 'equipo_ganador', 'y_pred'
     find_best_hiperparameters(var_resp, var_pred, pais)
 
 if __name__ == '__main__':
