@@ -7,7 +7,8 @@ apuestasEnv/
 /Users/nachomondino/Documents/GitHub/predictor-apuestas/__init__.py
 
 # Ignorar todos los archivos de una extensión específica  # *.xls;xlsx;csv
-*.xlsx 
+*.xlsx
+*.pyc
 
 # Ignorar carpetas pycache (pycache se utiliza para almacenar archivos de caché compilados (bytecode) que aceleran la carga de módulos en ejecuciones posteriores. )
 __pycache__/
