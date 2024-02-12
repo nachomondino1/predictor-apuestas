@@ -37,14 +37,17 @@ def determinar_equipo_ganador(df):
     :param df: Dataframe. Unidad de analisis: partido. Columnas: entre ellas goles_loc y goles_vis
     :return: Dataframe pasado por parametro con nueva columna, 'equipo_ganador', que detalla el resultado del partido.
     """
-    # Por fila (partido)
-    for i in range(len(df)):
+    # Condiciones para determinar el ganador
+    condiciones = [
+        df['goles_loc'] > df['goles_vis'],
+        df['goles_loc'] < df['goles_vis'],
+    ]
 
-        # Obtengo goles de cada equipo
-        ng1, ng2 = df.loc[i, 'goles_loc'], df.loc[i, 'goles_vis']
+    # Valores correspondientes a las condiciones
+    valores = ['Local', 'Visitante']
 
-        # Guardo equipo ganador
-        df.loc[i, 'equipo_ganador'] = 'Local' if ng1 > ng2 else 'Empate' if ng1==ng2 else "Visitante"
+    # Usar numpy.select para aplicar las condiciones
+    df['equipo_ganador'] = pd.Series(np.select(condiciones, valores, default='Empate'), index=df.index)
     return df
 
 def determinar_puntos(df):
@@ -243,7 +246,7 @@ def determine_l_estadisticas(df):
 
 def prueba():
     # Definicion de variables
-    pais = 'England'
+    pais = 'Italia'
     n_dias = 30  # 30 es como N_ULT_PART igual a 5...
     n_anios_historial = 2
 
@@ -264,6 +267,8 @@ def prueba():
     l_estadisticas = determine_l_estadisticas(df)
     print(f"Estadisticas a promediar en ultimos partidos: {l_estadisticas}")
 
+    df.info()
+
     for est in l_estadisticas:
 
         # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
@@ -279,14 +284,13 @@ def prueba():
         df = df.drop(columns=[f'prom_ult_part_dif_{est}_loc', f'prom_ult_part_dif_{est}_vis'], axis=1)
 
     # Construyo variables de diferencias para las variables promedio de los jugadores
-    df = suma_rat_jug_aus(df)
+    # df = suma_rat_jug_aus(df)
     df = calculate_dif_col_jugadores(df)
 
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
     df.to_excel('/Users/nachomondino/Desktop/df_constructed_prueba.xlsx')
-
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
