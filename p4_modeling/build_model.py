@@ -15,6 +15,7 @@ def select_best_hiperparameters(model, X, y, k):
     :return: Modelo actualizado con los hiperparametros optimos pero aun sin ajustar. (sklearn.ensemble)  # sklearn.ensemble._forest.RandomForestClassifier
     """
     start = time.time()
+    print(f"\nSeleccionando mejores hiperparametros para {model} con k={k}")
 
     # Definicion de hiperparametros a considerar para cada modelo
     d_params = {
@@ -27,9 +28,9 @@ def select_best_hiperparameters(model, X, y, k):
             'max_features': ['auto'],
         },
         'RandomForestClassifier': {
-            'n_estimators': [100, 200, 500],  # Número de árboles en el bosque.
+            'n_estimators': [100, 200],  # Número de árboles en el bosque.
             'criterion': ['entropy'],  # 'gini'  # Función para medir la calidad de una división.
-            'max_depth': [3, 5, 7], # Podria reemplazar 10 y 15 por 8 # Profundidad máxima de los árboles.
+            'max_depth': [3, 7], # Podria reemplazar 10 y 15 por 8 # Profundidad máxima de los árboles.
             'min_samples_split': [2, 10],  # Número mínimo de muestras requeridas para realizar una división en un nodo interno.
             'min_samples_leaf': [1, 4], # Número mínimo de muestras requeridas para estar en un nodo hoja.
             'max_features': ['auto'],  # Número máximo de características a considerar al buscar la mejor división.
@@ -57,11 +58,11 @@ def select_best_hiperparameters(model, X, y, k):
             # 'loss': ['deviance']  # Función de pérdida a optimizar.
         },
         'LogisticRegression': {
-            'penalty': ['l1', 'l2', None],  # Tipo de regularización a aplicar.
+            'penalty': ['l1', 'l2'],  # Tipo de regularización a aplicar.
             'C': [0.1, 1.0, 5.0],  # Podria probar un 3.0 en vez de 5  # Inverso de la fuerza de regularización.
             'solver': ['saga', 'liblinear'], # Podria prescindir de 'lbfgs' # Algoritmo a utilizar en la optimización del problema.
             'fit_intercept': [True, False],  # Mas del 75% de las veces es True # Especifica si se debe ajustar o no el intercepto.
-            'max_iter': [100, 500, 1000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
+            'max_iter': [4000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
             'multi_class': ['auto'],  # Esquema de clasificación multiclase.
         },
         'SVC': {
@@ -126,10 +127,10 @@ def select_best_hiperparameters(model, X, y, k):
 
     # Actualizar los hiperparámetros de model con los mejores hiperparámetros encontrados
     model.set_params(**best_params)
-    print("Mejores hiperparametros:", model)
+    print("\tMejores hiperparametros:", model)
 
     end = time.time()
-    print(f"Seleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
+    print(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
     return model
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
