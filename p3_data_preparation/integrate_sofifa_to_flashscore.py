@@ -92,8 +92,12 @@ def integrate_players_by_name(df_part_jug_up, df_jug_up):
                 df_jug_up = df_jug_up.drop(df_jug_filt.index[0])
                 n_matchs += 1
                 break
+    
+    try:
+        print(f"De los {n_pos_matchs} jugadores en df_part_jug, hizo match para {n_matchs/n_pos_matchs*100:.2f}% de ellos, es decir, para {n_matchs}.")
+    except ZeroDivisionError:
+        print("No se cuenta con las formaciones de ningun partido de df_part, por ende, df_part_jug no tiene que integrar a df_part.")
 
-    print(f"De los {n_pos_matchs} jugadores en df_part_jug, hizo match para {n_matchs/n_pos_matchs*100:.2f}% de ellos, es decir, para {n_matchs}.")
     return df_part_jug_with_id
 
 def reemplazar_name_por_id(df_part_jug, df_part_jug_with_id):
