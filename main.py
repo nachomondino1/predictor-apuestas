@@ -1,8 +1,7 @@
 # Importo librerias
-## Data understanding
 import pandas as pd
-from pandas import DataFrame
 import os
+## Data understanding
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
 ## Data preparation
@@ -34,7 +33,7 @@ class DataUnderstanding:
         self.make_directories()
 
     def make_directories(self):
-        ruta_base = f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais.lower()}/data_seg'
+        ruta_base = f'./p2_data_understanding/data/{self.pais.lower()}/data_seg'
         l_directorios = [f'{ruta_base}/por_temporada/df_part/',
                          f'{ruta_base}/por_temporada/df_part_jug/',
                          f'{ruta_base}/por_temporada/df_jug/',
@@ -55,7 +54,7 @@ class DataUnderstanding:
         df_part_concat, df_part_jug_concat, df_jug_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
         # Selecciono competencias del pais
-        df_comp = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx')
+        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencias.xlsx')
         df_comp_pais = df_comp[df_comp['pais_flashscore'] == self.pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
         print(f' PAIS: {self.pais} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_pais['competicion_flashscore']}")
 
@@ -76,13 +75,13 @@ class DataUnderstanding:
 
         # Exporto datasets con competiciones del pais
         if export:
-            df_part_concat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
-            df_part_jug_concat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
-            df_jug_concat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
+            df_part_concat.to_excel(f'./p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
+            df_part_jug_concat.to_excel(f'./p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
+            df_jug_concat.to_excel(f'./p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
 
         return df_part_concat, df_part_jug_concat, df_jug_concat
 
-    def describe_data(self, df_part: DataFrame, df_part_jug: DataFrame, df_jug: DataFrame):
+    def describe_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame):
 
         print(" Describiendo datos... ")
         describe_data.getting_to_know_data(df_part)
@@ -104,13 +103,13 @@ class DataPreparation:
         self.make_directories()
 
     def make_directories(self):
-        directorio = f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais.lower()}'
+        directorio = f'./p3_data_preparation/data/{self.pais.lower()}'
 
         if not os.path.exists(directorio):
             # Si no existe, crear el directorio
             os.makedirs(directorio)
 
-    def format_data(self, df_part: DataFrame, df_part_jug: DataFrame, df_jug: DataFrame, export: bool = True):
+    def format_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame, export: bool = True):
         """
         Arreglo el data type de algunas variables.
 
@@ -144,13 +143,13 @@ class DataPreparation:
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
-            df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_jug_formated.xlsx', index=False)
-            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
+            df_part.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
+            df_part_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_jug_formated.xlsx', index=False)
+            df_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
 
         return df_part, df_part_jug, df_jug
 
-    def clean_data(self, df_part: DataFrame, df_part_jug: DataFrame, df_jug: DataFrame, thr_nan_col: float, export: bool = True):
+    def clean_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame, thr_nan_col: float, export: bool = True):
         """
         Limpieza inicial de los dataframes
         :param df_part:
@@ -207,13 +206,13 @@ class DataPreparation:
         print(f"Limpieza inicial de datos en {(end - start) / 60:.1f} minutos")
 
         if export:
-            df_part.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_form_clean.xlsx', index=False)
-            df_part_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_jug_form_clean.xlsx', index=False)
-            df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_jug_form_clean.xlsx', index=False)
+            df_part.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_form_clean.xlsx', index=False)
+            df_part_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_jug_form_clean.xlsx', index=False)
+            df_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_jug_form_clean.xlsx', index=False)
 
         return df_part, df_part_jug, df_jug
 
-    def integrate_data(self, df_part: DataFrame, df_part_jug: DataFrame, df_jug: DataFrame, export: bool = True):
+    def integrate_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame, export: bool = True):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -244,12 +243,12 @@ class DataPreparation:
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part_jug_vinc_df_jug.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_part_jug_vinc_df_jug.xlsx', index=False)
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
+            df_part_jug_vinc_df_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_jug_vinc_df_jug.xlsx', index=False)
+            df.to_excel(f'./p3_data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
 
         return df
 
-    def construct_data(self, df: DataFrame, n_dias: int, n_anios_historial:int , export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_dias: int, n_anios_historial:int , export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -296,10 +295,10 @@ class DataPreparation:
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
+            df.to_excel(f'./p3_data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
         return df
 
-    def select_data(self, df: DataFrame, thr_corr=None, thr_fs= None, export: bool = True):  # 1.3 minutos # Chequear cambios
+    def select_data(self, df: pd.DataFrame, thr_corr=None, thr_fs= None, export: bool = True):  # 1.3 minutos # Chequear cambios
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -334,8 +333,8 @@ class DataPreparation:
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx', index=False)
-            df.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
+            df_etiquetas.to_excel(f'./p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx', index=False)
+            df.to_excel(f'./p3_data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
         return df
 
 class Modeling:
@@ -350,7 +349,7 @@ class Modeling:
         self.var_pred = var_pred
         self.pais = pais
 
-    def generate_test_design(self, df: DataFrame, bal_type, test_val_size: float = 0.2, test_size: float = 0.5, fill_na=None, with_pca: bool = False, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type, test_val_size: float = 0.2, test_size: float = 0.5, fill_na=None, with_pca: bool = False, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -434,7 +433,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: DataFrame, y_val: DataFrame, X_train: DataFrame, y_train, k: int):
+    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int):
         """
         Selecciona el mejor modelo a partir de la precision.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -459,7 +458,7 @@ class Modeling:
 
         return model_best_params, cv_accuracy
 
-    def assess_model(self, model, X_test: DataFrame, y_test: DataFrame, export: bool = True):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = True):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -473,7 +472,7 @@ class Modeling:
         print("\nEvaluando modelo con datos de prueba...")
 
         # Levanto df_etiquetas
-        # df_etiquetas = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+        # df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
 
         # Predecir las etiquetas para los datos de prueba
         # X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)  # Quito cuotas de casas de apuestas de X_test
@@ -503,7 +502,7 @@ class Modeling:
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
         # df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
         # df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
-        # df_conf_mat.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/find_best_hyper/data/{self.pais}/df_conf_matrix.xlsx')
+        # df_conf_mat.to_excel(f'./find_best_hyper/data/{self.pais}/df_conf_matrix.xlsx')
 
         if export:
             # df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
@@ -555,11 +554,11 @@ def main():
 
     # Definicion de variables
     var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "england"  # Ponelo en miniscula
+    pais = "inglaterra"  # Ponelo en miniscula
     export = True
 
     # Procesamiento
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = False, True, True
 
     if data_unders:
         print(" Data understanding ".center(120, "#"))
@@ -574,9 +573,27 @@ def main():
     # Si no extraigo datos
     else:
         # Levanto datos ya extraidos
-        df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-        df_part_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part_jug.xlsx')
-        df_jug = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx')
+        df_part = pd.read_excel(f'./p2_data_understanding/data/{pais}/df_part.xlsx')
+        df_part_jug = pd.read_excel(f'./p2_data_understanding/data/{pais}/df_part_jug.xlsx')
+        df_jug = pd.read_excel(f'./p2_data_understanding/data/{pais}/df_jug.xlsx')
+
+        # Si hay datos en df_missing --> Al parecer funciona bien. Exporto los df concatenados?
+        try:
+            # Levanto datos de partidos missing
+            df_part_missing = pd.read_excel(f'./p6_deployment/data_next_matches/{pais}/data_understanding/df_part_missing.xlsx')
+            df_part_jug_missing = pd.read_excel(f'./p6_deployment/data_next_matches/{pais}/data_understanding/df_part_jug_missing.xlsx')
+
+            # Concateno los partidos extraidos y los missing
+            df_part_concat = pd.concat([df_part, df_part_missing], axis=0)
+            df_part_jug_concat = pd.concat([df_part_jug, df_part_jug_missing], axis=0)
+
+            # Elimino duplicados para verificar que efectivamente los missing no estaban ya en los extraidos
+            df_part = df_part_concat.drop_duplicates().reset_index(drop=True)
+            df_part_jug = df_part_jug_concat.drop_duplicates().reset_index(drop=True)
+            print(f"Nº de filas repetidas: {len(df_part_concat) - len(df_part)}")
+            print(f"Nº de filas repetidas: {len(df_part_jug_concat) - len(df_part_jug)}")
+        except:
+            print("No hay datos de missing matches, o bien, fallo la concatenacion de los dfs.")
 
         #du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
         # du.describe_data(df_part, df_part_jug, df_jug)
@@ -590,19 +607,19 @@ def main():
         thr_nan_col = 0.7  # Porcentaje maximo de nan values en una columna
         n_dias = 30  # 30 es como N_ULT_PART igual a 5...
         n_anios_historial = 3
-        thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
-        thr_fs = None  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+        thr_corr = None  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
+        thr_fs = 0.2  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
 
         # Preparo el dataset para el analisis
         df_part, df_part_jug, df_jug = dp.format_data(df_part, df_part_jug, df_jug, export=False)
         df_part, df_part_jug, df_jug = dp.clean_data(df_part, df_part_jug, df_jug, thr_nan_col=thr_nan_col, export=export)
-        df = dp.integrate_data(df_part, df_part_jug, df_jug, export=export)
+        df = dp.integrate_data(df_part, df_part_jug, df_jug, export=export) 
         df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
 
     elif not data_unders:
         # Levanto dataset para prueba
-        df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
+        df = pd.read_excel(f'./p3_data_preparation/data/{pais}/df_selected.xlsx')
         print(df.head(1), df.shape)
 
     if modeling:
