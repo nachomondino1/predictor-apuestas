@@ -12,3 +12,5 @@ apuestasEnv/
 
 # Ignorar carpetas pycache (pycache se utiliza para almacenar archivos de caché compilados (bytecode) que aceleran la carga de módulos en ejecuciones posteriores. )
 __pycache__/
+data/
+data_next_matches/
