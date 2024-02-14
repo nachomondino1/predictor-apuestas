@@ -116,14 +116,19 @@ def convert_columns_to_int(df, df_etiquetas=None):
             l_valor_int = le.transform(l_valor_str)
 
             # Guardo string y su equivalente numerico
-            df_etiquetas = df_etiquetas.append(pd.DataFrame({'variable': col, 'valor_orig': l_valor_str, 'valor_int': l_valor_int}))  # Funciona bien
+            df_etiquetas_col = pd.DataFrame({'variable': col, 'valor_orig': l_valor_str, 'valor_int': l_valor_int})
+            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
             # print(df_etiquetas)
             
     # Por fila
     for i, row in df_etiquetas.iterrows():
 
-        # Reemplazo valores string por numero
-        df = df.replace(row['valor_orig'], row['valor_int'])
+        # Obtener el nombre de la columna a la que se le realizará el reemplazo
+        nombre_columna = row['variable']
+
+        # Reemplazar valores en la columna específica
+        df.loc[:, nombre_columna] = df[nombre_columna].replace(row['valor_orig'], row['valor_int'])
+
 
     return df, df_etiquetas
 
