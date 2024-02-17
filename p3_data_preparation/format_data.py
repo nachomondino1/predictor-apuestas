@@ -10,47 +10,55 @@ def convert_posesion_to_int(df):
     ejemplo '65%'.
     :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
     """
-    posesion = "posesion_de_balon"
-    l_tit = ['loc', 'vis']
+    posesion = "ball_possession"
+    l_tit = ['home', 'away']
 
     for tit in l_tit:
         df[f'{posesion}_{tit}'] = df[f'{posesion}_{tit}'].apply(
             lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
+        
+        # Verifica si todos los elementos de la columna son de tipo float
+        if not all(isinstance(value, (float, np.floating)) for value in df[f'{posesion}_{tit}']):
+            # Si no todos los elementos son de tipo float, raise una advertencia
+            raise Warning(f"Not all elements in the column '{posesion}' are float.")
     
-        # df[f"{posesion}_{tit}"] = df[f"{posesion}_{tit}"].astype(float)  # a diferencia de Pycharm, creo que es necesario convertir la columna a float
-        print(f"Verificacion de dtype de {posesion} (deberia ser float):", df[f"{posesion}_{tit}"].dtype)
     return df
 
-def convert_valor_mercado_to_int(df):
-   """
+def convert_value_to_int(df):
+    """
     Transforma el valor de mercado de string a float.
 
-    :param df: Dataframe con columna 'valor_mercado' cuyos valores son un string, por ejemplo, '€1.2M'.
-    :return: Dataframe con la columna 'valor_mercado' interpretada como float, por ejemplo, 1.200.000.
+    :param df: Dataframe con columna 'value' cuyos valores son un string, por ejemplo, '€1.2M'.
+    :return: Dataframe con la columna 'value' interpretada como float, por ejemplo, 1.200.000.
     """
-   d = {'M': 1000000, 'K': 1000}
+    def convertir_value(value_str):
+        d = {'M': 1000000, 'K': 1000}
 
-   def convertir_valor_mercado(valor_mercado_str):
+        # Si no se tiene el dato del valor de mercado
+        if value_str == "€0":
+            return None
 
-       # Si no se tiene el dato del valor de mercado
-       if valor_mercado_str == "€0":
-           return None
+        # Si se tiene el dato del valor de mercado
+        else:
+            for elem in d.keys():
+                if elem in value_str:
+                    value_int = float(value_str.replace("€", "").replace(elem, "")) * d[elem]
+                    return value_int
+            return None
+    
+    # Reemplazo strings por numbers
+    df['value'] = df['value'].apply(convertir_value)
 
-       # Si se tiene el dato del valor de mercado
-       else:
-           for elem in d.keys():
-               if elem in valor_mercado_str:
-                   valor_mercado_int = float(valor_mercado_str.replace("€", "").replace(elem, "")) * d[elem]
-                   return valor_mercado_int
-           return None
+    # Verifica si todos los elementos de la columna son de tipo float
+    if not all(isinstance(value, (float, np.floating)) for value in df['value']):
+        # Si no todos los elementos son de tipo float, raise una advertencia
+        raise Warning(f"Not all elements in the column 'value' are float.")
 
-   df['valor_mercado'] = df['valor_mercado'].apply(convertir_valor_mercado)
-   print("Verificacion de dtype de 'valor_de_mercado' (deberia ser float):", df["valor_mercado"].dtype)
-   return df
+    return df
 
-def keep_goles_int(df):
+def convert_goles_to_int(df):
     """
-    Elimina las filas que hacen que goles_loc y goles_vis no sea integer como debe. Puede ser por NaN o por string "-".
+    Elimina las filas que hacen que goals_home y goals_away no sea integer como debe. Puede ser por NaN o por string "-".
     :param df:
     :return:
     """
@@ -59,8 +67,8 @@ def keep_goles_int(df):
     # Por partido
     for i, row in df.iterrows():
         try:
-            int(row['goles_loc'])
-            int(row['goles_vis'])
+            int(row['goals_home'])
+            int(row['goals_away'])
         # Si los goles no pueden ser transofrmados a integer
         except:
             # Guardo indice para eliminar la fila
@@ -68,14 +76,24 @@ def keep_goles_int(df):
 
     # Elimino filas del dataframe
     print(f"Cantidad de partidos eliminados por no tener goles integer: {len(l_filas_a_borrar)/len(df)*100:.1f}%")
-    print(df.shape)
     df = df.drop(l_filas_a_borrar)
-    print(df.shape)
 
     # Convierto columnas goles a integer
-    df['goles_loc'] = df['goles_loc'].astype(int)
-    df['goles_vis'] = df['goles_vis'].astype(int)
-    print(f"Verificacion de dtype de goles (deberia ser int):", df[f"goles_loc"].dtype, df[f"goles_vis"].dtype)
+    df['goals_home'] = df['goals_home'].astype(int)
+    df['goals_away'] = df['goals_away'].astype(int)
+    print(f"Verificacion de dtype de goles (deberia ser int):", df[f"goals_home"].dtype, df[f"goals_away"].dtype)
+    return df
+
+def convert_capacity_to_int(df):
+
+    l_columns = ['capacity', 'attendance']
+
+    for col in l_columns:
+        # Reemplazar los espacios en blanco en los valores de la columna
+        df[col] = df[col].str.replace(' ', '')
+
+        # Convertir la columna al tipo de datos correcto (entero)
+        df[col] = df[col].astype(int)
     return df
 
 def convert_columns_to_int(df, df_etiquetas=None):
@@ -96,7 +114,7 @@ def convert_columns_to_int(df, df_etiquetas=None):
 
     # Codifico variables string en numericas
     if df_etiquetas is None:
-        df_etiquetas = pd.DataFrame(columns=['variable', 'valor_orig', 'valor_int'])
+        df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
 
         # Por variable string
         for col in l_columnas_a_codificar:
@@ -116,7 +134,7 @@ def convert_columns_to_int(df, df_etiquetas=None):
             l_valor_int = le.transform(l_valor_str)
 
             # Guardo string y su equivalente numerico
-            df_etiquetas_col = pd.DataFrame({'variable': col, 'valor_orig': l_valor_str, 'valor_int': l_valor_int})
+            df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': l_valor_str, 'int_value': l_valor_int})
             df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
             # print(df_etiquetas)
             
@@ -127,8 +145,7 @@ def convert_columns_to_int(df, df_etiquetas=None):
         nombre_columna = row['variable']
 
         # Reemplazar valores en la columna específica
-        df.loc[:, nombre_columna] = df[nombre_columna].replace(row['valor_orig'], row['valor_int'])
-
+        df.loc[:, nombre_columna] = df[nombre_columna].replace(row['str_value'], row['int_value'])
 
     return df, df_etiquetas
 
@@ -146,9 +163,9 @@ def revert_columns_from_int(df, df_etiquetas, columns=None):
     # Por columna
     for col in df.columns:
 
-        # col_etiquetas = col if col != 'y_pred' else 'equipo_ganador'
-        if col == "y_pred":
-            col_etiquetas = 'equipo_ganador'
+        # col_etiquetas = col if col != 'predicted_result' else 'result'
+        if col == "predicted_result":
+            col_etiquetas = 'result'
         else:
             col_etiquetas = col
 
@@ -156,29 +173,29 @@ def revert_columns_from_int(df, df_etiquetas, columns=None):
         if col_etiquetas in l_col_etiquetadas:
 
             # Transformo int a etiqueta
-            mapping = df_etiquetas.loc[df_etiquetas['variable'] == col_etiquetas].set_index('valor_int')['valor_orig']
+            mapping = df_etiquetas.loc[df_etiquetas['variable'] == col_etiquetas].set_index('int_value')['str_value']
             df[col] = df[col].map(mapping)
     return df
 
 def prueba():
     # Levanto datasets
-    pais = 'argentina'
-    df_part = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_part.xlsx')
-    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{pais}/df_jug.xlsx", index_col=0)
+    country = 'argentina'
+    df_match = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{country}/df_match.xlsx')
+    df_player = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{country}/df_player.xlsx", index_col=0)
 
     # Entidad partido WhoScored: fecha, resultados de medio tiempo y final
-    df_part['fecha'] = pd.to_datetime(df_part['fecha'] + ' ' + df_part['hora'], format='%a, %d-%b-%y %H:%M')
-    df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
-    df_part[['ht_goles_loc', 'ht_goles_vis']] = df_part['ht_result'].str.split(' : ', expand=True)  # Separar ht_result en ht_goles_loc y ht_goles_vis
-    df_part[['goles_loc', 'goles_vis']] = df_part['ft_result'].str.split(' : ', expand=True)  # Separar ft_result en goles_loc y goles_vis
-    df_part = df_part.drop(['hora', 'ht_result', 'ft_result'], axis=1)
+    df_match['fecha'] = pd.to_datetime(df_match['fecha'] + ' ' + df_match['hora'], format='%a, %d-%b-%y %H:%M')
+    # df_match['fecha'] = df_match['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
+    df_match[['ht_goals_home', 'ht_goals_away']] = df_match['ht_result'].str.split(' : ', expand=True)  # Separar ht_result en ht_goals_home y ht_goals_away
+    df_match[['goals_home', 'goals_away']] = df_match['ft_result'].str.split(' : ', expand=True)  # Separar ft_result en goals_home y goals_away
+    df_match = df_match.drop(['hora', 'ht_result', 'ft_result'], axis=1)
 
     # Entidad jugador: fecha
-    df_jug['fecha_nac'] = pd.to_datetime(df_jug['fecha_nac'], format='%d-%m-%Y')
+    df_player['fecha_nac'] = pd.to_datetime(df_player['fecha_nac'], format='%d-%m-%Y')
 
     # Exporto pruebas
-    df_part.to_excel('/Users/nachomondino/Desktop/df_part_formated.xlsx', index=False)
-    df_jug.to_excel('/Users/nachomondino/Desktop/df_jug_formated.xlsx', index=False)
+    df_match.to_excel('/Users/nachomondino/Desktop/df_match_formated.xlsx', index=False)
+    df_player.to_excel('/Users/nachomondino/Desktop/df_player_formated.xlsx', index=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

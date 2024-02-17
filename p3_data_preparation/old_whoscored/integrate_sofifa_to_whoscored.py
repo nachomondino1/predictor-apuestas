@@ -8,7 +8,7 @@ from p3_data_preparation import clean_data
 from sklearn.preprocessing import StandardScaler
 
 
-def player_data_in_match(df_jug_part, df_jug):
+def player_data_in_match(df_player_part, df_player):
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de edad, overall rating,  valor de mercado y altura del equipo titular,
@@ -19,23 +19,23 @@ def player_data_in_match(df_jug_part, df_jug):
     """
     # Definicion de variables
     warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...
-    df_jug_buscados = pd.DataFrame(columns=['id_jug', 'nombre', 'equipo', 'fecha', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+    df_player_buscados = pd.DataFrame(columns=['id_jug', 'nombre', 'equipo', 'fecha', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
 
     # Levanto dataset de jugadores ya buscados, o bien, lo creo
-    try:  # cuidado que si mejoras la extraccion, el cambio puede que no se vea puesto que levanta el df_jug_encontrado viejo...
-        df_jug_buscados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina/df_integrated_jug_buscados.xlsx')
+    try:  # cuidado que si mejoras la extraccion, el cambio puede que no se vea puesto que levanta el df_player_encontrado viejo...
+        df_player_buscados = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina/df_integrated_jug_buscados.xlsx')
     except:
-        df_jug_buscados = pd.DataFrame(columns=['id_jug', 'nombre', 'equipo', 'fecha', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
+        df_player_buscados = pd.DataFrame(columns=['id_jug', 'nombre', 'equipo', 'fecha', 'edad', 'altura', 'overall_rating', 'valor_mercado', 'str_encont'])
 
     # Preparo datasets para facilitar integracion (Nombres de jugadores en minuscula, sin acentos y sin caracteres especiales)
-    df_jug = preparate_to_integrate(df_jug)
-    df_jug_part = clean_data.prepare_text_columns(df_jug_part, l_col_to_except=['temporada'])
+    df_player = preparate_to_integrate(df_player)
+    df_player_part = clean_data.prepare_text_columns(df_player_part, l_col_to_except=['temporada'])
 
     # Inicializo barra de progreso
-    progress_bar = tqdm(total=len(df_jug_part), ncols=80)
+    progress_bar = tqdm(total=len(df_player_part), ncols=80)
 
-    # Por jugador en df_jug_part
-    for i, row in df_jug_part.iterrows():  # for i in range(len(df_part)):
+    # Por jugador en df_player_part
+    for i, row in df_player_part.iterrows():  # for i in range(len(df_match)):
 
         # Obtengo equipo y año del partido
         nombre = row['nombre_jug']
@@ -44,26 +44,26 @@ def player_data_in_match(df_jug_part, df_jug):
         # print(f' Jugador Nº: {i} '.center(120, '#'))
 
         # Busco el fifa correspondiente segun la fecha del partido
-        fecha_part_fifa = search_fecha_actualizacion(df_jug, fecha)  # Pasarle lista  de posibles fechas en vez de df_jug...
+        fecha_part_fifa = search_fecha_actualizacion(df_player, fecha)  # Pasarle lista  de posibles fechas en vez de df_player...
 
         # Si el jugador no es nan
         if isinstance(nombre, str):
 
-            jugador_buscado = df_jug_buscados[
-                (df_jug_buscados['id_jug'] == row['id_jug']) &
-                (df_jug_buscados['fecha'] == fecha_part_fifa)].head(1)
+            jugador_buscado = df_player_buscados[
+                (df_player_buscados['id_jug'] == row['id_jug']) &
+                (df_player_buscados['fecha'] == fecha_part_fifa)].head(1)
 
             # Si el jugador no fue buscado aun
             if jugador_buscado.empty:
 
-                # Busco coincidencia en df_jug
-                edad, altura, overall_rating, valor_mercado, str_encontrado = find_player_in_ent_jug(df_jug, row, fecha_part_fifa)
+                # Busco coincidencia en df_player
+                edad, altura, overall_rating, valor_mercado, str_encontrado = find_player_in_ent_jug(df_player, row, fecha_part_fifa)
                 d_data = {'id_jug': row['id_jug'], 'nombre': nombre, 'equipo': equipo, 'fecha': fecha_part_fifa, 'edad': edad,
                           'altura': altura, 'overall_rating': overall_rating, 'valor_mercado': valor_mercado,
                           'str_encont': str_encontrado}
 
                 # Guardo jugador como buscado por mas que no lo haya encontrado
-                df_jug_buscados = df_jug_buscados.append(d_data, ignore_index=True)
+                df_player_buscados = df_player_buscados.append(d_data, ignore_index=True)
 
             # Si el jugador ya fue buscado
             else:
@@ -78,10 +78,10 @@ def player_data_in_match(df_jug_part, df_jug):
             # print(f"Mejor coincidencia: \n Edad: {edad}, Altura: {altura}, Overall rating: {overall_rating}, Valor mercado: {valor_mercado}, Jugador encontrado: {str_encontrado}")
 
             # Guardo datos
-            df_jug_part.loc[i, 'edad'] = edad
-            df_jug_part.loc[i, 'altura'] = altura
-            df_jug_part.loc[i, 'overall_rating'] = overall_rating
-            df_jug_part.loc[i, 'valor_mercado'] = valor_mercado
+            df_player_part.loc[i, 'edad'] = edad
+            df_player_part.loc[i, 'altura'] = altura
+            df_player_part.loc[i, 'overall_rating'] = overall_rating
+            df_player_part.loc[i, 'valor_mercado'] = valor_mercado
             progress_bar.update(1)
 
     # Cerrar la barra de progreso al finalizar
@@ -89,18 +89,18 @@ def player_data_in_match(df_jug_part, df_jug):
 
     '''
     # Exporto dataframe de jugadores encontrados solo si se encontraron nuevos jugadores
-    if len(df_jug_encontrados) > n_jug_encontrados_inicial:
-        print(f"Reemplazo datos puesto que se tienen {len(df_jug_encontrados) - n_jug_encontrados_inicial} jugadores nuevos")
-        df_jug_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_jug_encontrados.xlsx', index=False)
-    df_jug_no_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated_jug_no_encontrados.xlsx',index=False)
+    if len(df_player_encontrados) > n_jug_encontrados_inicial:
+        print(f"Reemplazo datos puesto que se tienen {len(df_player_encontrados) - n_jug_encontrados_inicial} jugadores nuevos")
+        df_player_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_integrated_jug_encontrados.xlsx', index=False)
+    df_player_no_encontrados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_integrated_jug_no_encontrados.xlsx',index=False)
     '''
-    # df_jug_buscados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina/df_integrated_jug_buscados.xlsx',index=False)
-    return df_jug_part
+    # df_player_buscados.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/argentina/df_integrated_jug_buscados.xlsx',index=False)
+    return df_player_part
 
-def find_player_in_ent_jug(df_jug, row, fecha_fifa):
+def find_player_in_ent_jug(df_player, row, fecha_fifa):
     """
     Encuentra coincidencias de jugadores en un dataframe.
-    :param df_jug: DataFrame que contiene los datos de los jugadores.
+    :param df_player: DataFrame que contiene los datos de los jugadores.
     :param nombre_jug_ent_part: Nombre del jugador a buscar.
     :param year_ent_part: Año o temporada en el que se requiere el jugador a buscar.
     :return: Diccionario con los datos del jugador coincidente. Las claves son 'edad', 'altura', 'overall_rating',
@@ -114,26 +114,26 @@ def find_player_in_ent_jug(df_jug, row, fecha_fifa):
         return fuzz.token_set_ratio(palabra, row[columna]) >= umbral
 
     # Selecciono los datos de jugadores segun el fifa que se requiera
-    df_jug_filt = df_jug[df_jug['fecha'] == fecha_fifa]  # df_jug_filt = df_jug[df_jug['fecha'].dt.year == year_ent_part]
+    df_player_filt = df_player[df_player['fecha'] == fecha_fifa]  # df_player_filt = df_player[df_player['fecha'].dt.year == year_ent_part]
 
     # Selecciono los datos de jugadores segun los nombres de jugadores mas parecidos al buscado
-    df_jug_filt = df_jug_filt[df_jug_filt.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', 90), axis=1)]
+    df_player_filt = df_player_filt[df_player_filt.apply(buscar_coincidencias, args=(row['nombre_jug'], 'nombre', 90), axis=1)]
 
     # Si encontro al menos un jugador con nombre similar
-    if len(df_jug_filt) > 0:
+    if len(df_player_filt) > 0:
 
         # Selecciono los datos de jugadores segun el nombre del equipo mas similar al buscado
-        df_jug_filt = df_jug_filt[df_jug_filt.apply(buscar_coincidencias, args=(row['equipo_actual'], 'equipo_actual', 60), axis=1)]
+        df_player_filt = df_player_filt[df_player_filt.apply(buscar_coincidencias, args=(row['equipo_actual'], 'equipo_actual', 60), axis=1)]
 
         # Si encontro al menos un equipo con nombre similar
-        if len(df_jug_filt) > 0:
+        if len(df_player_filt) > 0:
 
             # Extraigo datos del jugador
-            match_data['edad'] = df_jug_filt.iloc[0]['edad']
-            match_data['altura'] = df_jug_filt.iloc[0]['altura']
-            match_data['overall_rating'] = df_jug_filt.iloc[0]['overall_rating']
-            match_data['valor_mercado'] = df_jug_filt.iloc[0]['valor_mercado']
-            match_data['str_encont'] = df_jug_filt.iloc[0]['nombre']
+            match_data['edad'] = df_player_filt.iloc[0]['edad']
+            match_data['altura'] = df_player_filt.iloc[0]['altura']
+            match_data['overall_rating'] = df_player_filt.iloc[0]['overall_rating']
+            match_data['valor_mercado'] = df_player_filt.iloc[0]['valor_mercado']
+            match_data['str_encont'] = df_player_filt.iloc[0]['nombre']
 
     return match_data['edad'], match_data['altura'], match_data['overall_rating'], match_data['valor_mercado'], match_data['str_encont']
 
@@ -178,21 +178,21 @@ def search_fecha_actualizacion(df, fecha_part):
             return fecha
     return None
 
-def preparate_to_integrate(df_jug):
+def preparate_to_integrate(df_player):
 
     # Format data: fecha y posesion
-    df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')  # ya lo voy a extraer datetime...
-    df_jug = convert_valor_mercado_to_int(df_jug)
+    df_player['fecha'] = pd.to_datetime(df_player['fecha'], format='%b %d, %Y')  # ya lo voy a extraer datetime...
+    df_player = convert_valor_mercado_to_int(df_player)
 
     # Clean data
     # Hago limpieza de variables object antes de integrar para facilitar la integracion de datos
-    df_jug = clean_data.prepare_text_columns(df_jug, l_col_to_except=['id'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+    df_player = clean_data.prepare_text_columns(df_player, l_col_to_except=['id'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
     # Normalizo valor de mercado para evitar el error en entrenamiento de "ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed."
     scaler = StandardScaler()  # Crea un objeto StandardScaler
-    df_jug['valor_mercado'] = scaler.fit_transform(df_jug['valor_mercado'].values.reshape(-1, 1))
+    df_player['valor_mercado'] = scaler.fit_transform(df_player['valor_mercado'].values.reshape(-1, 1))
 
-    return df_jug
+    return df_player
 
 def convert_valor_mercado_to_int(df):
     """
@@ -224,16 +224,16 @@ def prueba():
     start = time.time()
     print("\nIntegrando los datos...")
 
-    pais = 'argentina'
+    country = 'argentina'
 
     # Levanto datasets
-    df_part = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_part_cleaned.xlsx")
-    df_jug = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{pais}/df_jug_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
-    print(df_part.head(1))
-    print(df_jug.head(1))
+    df_match = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{country}/df_match_cleaned.xlsx")
+    df_player = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data_preparation/data/{country}/df_player_cleaned.xlsx", index_col=0)  # A pesar de correr format_data con index=False, hace falta el index_col=0
+    print(df_match.head(1))
+    print(df_player.head(1))
 
     # Integro datasets
-    df_integrated = player_data_in_match(df_part, df_jug)
+    df_integrated = player_data_in_match(df_match, df_player)
     df_integrated.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=False)
 
     end = time.time()

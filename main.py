@@ -28,18 +28,19 @@ import pickle
 
 class DataUnderstanding:
 
-    def __init__(self, pais: str):
-        self.pais = pais
+    def __init__(self, id_country: int, country: str):
+        self.id_country = id_country
+        self.country = country
         self.make_directories()
 
     def make_directories(self):
-        ruta_base = f'./p2_data_understanding/data/{self.pais.lower()}/data_seg'
-        l_directorios = [f'{ruta_base}/por_temporada/df_part/',
-                         f'{ruta_base}/por_temporada/df_part_jug/',
-                         f'{ruta_base}/por_temporada/df_jug/',
-                         f'{ruta_base}/por_competicion/df_part/',
-                         f'{ruta_base}/por_competicion/df_part_jug/',
-                         f'{ruta_base}/por_competicion/df_jug/'
+        ruta_base = f'./p2_data_understanding/data/{self.country.lower()}/data_seg'
+        l_directorios = [f'{ruta_base}/per_season/df_match/',
+                         f'{ruta_base}/per_season/df_match_player/',
+                         f'{ruta_base}/per_season/df_player/',
+                         f'{ruta_base}/per_competition/df_match/',
+                         f'{ruta_base}/per_competition/df_match_player/',
+                         f'{ruta_base}/per_competition/df_player/'
                          ]
 
         for directorio in l_directorios:
@@ -48,177 +49,194 @@ class DataUnderstanding:
                 os.makedirs(directorio)
 
     def collect_initial_data(self, export: bool =True):
-
-        print(" Recolectando datos... ")
+        """
+        Collecting data from Flashscore and Sofifa
+        """
+        print(" Collecting data... ")
         # Definicion de variables
-        df_part_concat, df_part_jug_concat, df_jug_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        df_match_concat, df_match_player_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        l_to_avoid = ['Premier League']  # Pensar alguna manera para automatizar? 
 
-        # Selecciono competencias del pais
-        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencias.xlsx')
-        df_comp_pais = df_comp[df_comp['pais_flashscore'] == self.pais]  # Para extrar varios paises?: df = df_comp[df_comp['pais'].isin(l_paises)]
-        print(f' PAIS: {self.pais} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_pais['competicion_flashscore']}")
+        # Selecciono competencias del country
+        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+        df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
+        print(f' COUNTRY: {self.country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
-        # POR COMPETICION
-        for i, row in df_comp_pais.iterrows():
+        # POR COMPETITION
+        for i, row in df_comp_country.iterrows():
 
-            # Extraigo partidos de Flashscore (df_part y df_part_jug)
-            df_part, df_part_jug = scraper_flashscore.extract_data_flashscore(row['pais_flashscore'], row['competicion_flashscore'], row['is_cup'], n_temps_max=16, export=export)
-            df_part_concat = pd.concat([df_part_concat, df_part], axis=0)
-            df_part_jug_concat = pd.concat([df_part_jug_concat, df_part_jug], axis=0)
+            print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
-            # Si la competicion es una liga
+            if row["competition_flashscore"] not in l_to_avoid:
+
+                # Extraigo partidos de Flashscore (df_match y df_match_player)
+                df_match, df_match_player = scraper_flashscore.extract_data_flashscore(self.country, row['competition_flashscore'], n_seasons_max=16, export=export)
+
+                # Add columns: id_country, is_cup and id_competition
+                df_match['id_country'] = self.id_country
+                df_match['id_competition'] = row['id_competition']
+                df_match['is_cup'] = row['is_cup']
+
+                # Guardo datos de competition
+                df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
+                df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
+
+            # Si la competition es una liga
             if row['is_cup'] == 0:
 
-                # Extraigo datos de jugadores de Sofifa (df_jug)
-                df_jug = scraper_sofifa.extract_jugadores_sofifa(row['pais_flashscore'], row['competicion_flashscore'], export=export)
-                df_jug_concat = pd.concat([df_jug_concat, df_jug], axis=0)
+                # Extraigo datos de players de Sofifa (df_player)
+                df_player = scraper_sofifa.extract_players_sofifa(self.country, row['competition_sofifa'], export=export)
 
-        # Exporto datasets con competiciones del pais
+                # Add columns: id_country and id_competition
+                df_player['id_country'] = self.id_country
+                df_player['id_competition'] = row['id_competition']
+
+                # Save data
+                df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
+
+        # Supongamos que df es tu DataFrame original 
+        df_match_odds = df_match_concat.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
+        df_match_concat = df_match_concat.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+        
+        # Exporto datasets con competiciones del country
         if export:
-            df_part_concat.to_excel(f'./p2_data_understanding/data/{self.pais}/df_part.xlsx', index=False)
-            df_part_jug_concat.to_excel(f'./p2_data_understanding/data/{self.pais}/df_part_jug.xlsx', index=False)
-            df_jug_concat.to_excel(f'./p2_data_understanding/data/{self.pais}/df_jug.xlsx', index=False)
+            df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
+            df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_player.xlsx', index=True)
+            df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player.xlsx', index=True)
+            df_match_odds.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
 
-        return df_part_concat, df_part_jug_concat, df_jug_concat
+        return df_match_concat, df_match_player_concat, df_player_concat
 
-    def describe_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame):
+    def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame):
 
         print(" Describiendo datos... ")
-        describe_data.getting_to_know_data(df_part)
-        describe_data.getting_to_know_data(df_part_jug)
-        describe_data.getting_to_know_data(df_jug)
+        describe_data.getting_to_know_data(df_match)
+        describe_data.getting_to_know_data(df_match_player)
+        describe_data.getting_to_know_data(df_player)
 
         # Verifico unicidad de registros segun campos id
-        describe_data.verificar_unicidad_registros(df_part, columns_id='id_part')
+        describe_data.verificar_unicidad_registros(df_match)
 
         # Verifico consistencia en campos que relacionan entidades
-        describe_data.verificar_relacion_entidades(df_part, df_part_jug)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_jug_part, df_part)
+        describe_data.check_ids_in_both_dataframes(df_match, df_match_player)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de players: verificar_relacion_entidades(df_player_part, df_match)
 
 
 class DataPreparation:
 
-    def __init__(self, var_resp: str, pais: str):
+    def __init__(self, var_resp: str, country: str):
         self.var_resp = var_resp
-        self.pais = pais
+        self.country = country
         self.make_directories()
 
     def make_directories(self):
-        directorio = f'./p3_data_preparation/data/{self.pais.lower()}'
+        directorio = f'./p3_data_preparation/data/{self.country.lower()}'
 
         if not os.path.exists(directorio):
             # Si no existe, crear el directorio
             os.makedirs(directorio)
 
-    def format_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame, export: bool = True):
+    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame, export: bool = True):
         """
         Arreglo el data type de algunas variables.
 
-        :param df_part: Dataframe de los datos de los partidos. (DataFrame)
-        :param df_jug: Dataframe de los datos de los jugadores. (DataFrame)
+        :param df_match: Dataframe de los datos de los partidos. (DataFrame)
+        :param df_player: Dataframe de los datos de los players. (DataFrame)
         :param export: Booleano para indicar si se debe exportar el dataset generado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe formateado. (DataFrame)
         """
         start = time.time()
         print("\nFormateando los datos...")
 
-        # Dataframe partido
-        ## Fecha
-        df_part['fecha'] = pd.to_datetime(df_part['fecha'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-        # df_part['fecha'] = df_part['fecha'] - datetime.timedelta(hours=4)  # Resto 4 horas a la columna 'fecha' para que este en horario argentino
-        ## Posesion
-        df_part = format_data.convert_posesion_to_int(df_part)
-        ## Goles_loc y goles_vis  # Eliminar las filas cuyos goles no son float
-        df_part = format_data.keep_goles_int(df_part)
-        df_part_jug = df_part_jug[df_part_jug['id_part'].isin(df_part['id_part'])]
-        df_part_jug = df_part_jug.reset_index(drop=True)
-        df_part = df_part.reset_index(drop=True)
+        # Dataframe match
+        ## Date
+        df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+        ## Ball posession
+        df_match = format_data.convert_posesion_to_int(df_match)
+        ## Capacity & Attendance
+        df_match = format_data.convert_capacity_to_int(df_match)  # Ver si funciona
+        ## Goals (A pesar de que borra filas con goles = "-", son partidos especificos que se suspendieron. Ademas tiene que ver con el dtype)
+        df_match = format_data.convert_goles_to_int(df_match)
+        df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]  # df_match_player = df_match_player[df_match_player['id_match'].isin(df_match['id_match'])]
 
-        # Dataframe jugador
+        # Dataframe player
         ## Fecha
-        df_jug['fecha'] = pd.to_datetime(df_jug['fecha'], format='%b %d, %Y')
-        ## Valor de mercado
-        df_jug = format_data.convert_valor_mercado_to_int(df_jug)
+        df_player['date'] = pd.to_datetime(df_player['date'], format='%b %d, %Y')
+        ## Market value
+        df_player = format_data.convert_value_to_int(df_player)
 
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_formated.xlsx', index=False)
-            df_part_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_jug_formated.xlsx', index=False)
-            df_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_jug_formated.xlsx', index=False)
+            df_match.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_formated.xlsx', index=True)
+            df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_player_formated.xlsx', index=True)
+            df_player.to_excel(f'./p3_data_preparation/data/{self.country}/df_player_formated.xlsx', index=True)
 
-        return df_part, df_part_jug, df_jug
+        return df_match, df_match_player, df_player
 
-    def clean_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame, thr_nan_col: float, export: bool = True):
+    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame, thr_nan_col: float, export: bool = True):
         """
         Limpieza inicial de los dataframes
-        :param df_part:
-        :param df_part_jug:
-        :param df_jug:
+        :param df_match:
+        :param df_match_player:
+        :param df_player:
         :param export:
         :return:
         """
         start = time.time()
-        print("\nFormateando los datos...")
+        print("\nCleanning data...")
         warnings.filterwarnings('ignore')
 
         # ELIMINACION DE FILAS NAN SEGUN % NAN, O BIEN, SELECCION DE DATOS SEGUN TEMPORADA....
         ## Elimino filas con alto porcentaje de NaN values
-        n_filas = len(df_part)
-        df_part_jug = df_part_jug.dropna(subset=['jug_tit_loc_11', 'jug_tit_vis_11'], how='any').reset_index(drop=True)
-        df_part = df_part[df_part['id_part'].isin(df_part_jug['id_part'])].reset_index(drop=True)
-        print(f"De las {n_filas} filas, se eliminan {(n_filas - len(df_part))} por no tener formaciones del "
-              f"partido, quedan {len(df_part)} filas.")
+        n_filas = len(df_match)
+        df_match_player = df_match_player.dropna(subset=['player_start_home_11', 'player_start_away_11'], how='any')  # .reset_index(drop=True)
+        df_match = df_match[df_match.index.isin(df_match_player.index)] # df_match = df_match[df_match['id_match'].isin(df_match_player['id_match'])]  # .reset_index(drop=True)
+        print(f"De las {n_filas} filas, se eliminan {(n_filas - len(df_match))} por no tener formaciones del "
+              f"partido, quedan {len(df_match)} filas.")
 
         ## Elimino columnas con alto porcentaje de NaN values
         if thr_nan_col is not None:
-            # df_prop_nan = df_part.isna().mean()
-            # print("Porcentaje de Nan values por columna: \n", df_prop_nan)
-            # df_prop_nan.to_excel(f'/Users/nachomondino/Desktop/df_prop_nan.xlsx')
 
-            df_part = clean_data.eliminar_columnas_nan(df_part, porc_nan_max=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
-            df_part_jug = clean_data.eliminar_columnas_nan(df_part_jug, porc_nan_max=0.9)  # TEMPORAL? elimino columnas nan que quedan por el concat y luego la eliminacion de temporadas viejas
+            df_match = clean_data.delete_columns_nan(df_match, porc_nan_max=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
+            df_match_player = clean_data.delete_columns_nan(df_match_player, porc_nan_max=0.95)  # TEMPORAL? elimino columnas nan que quedan por el concat y luego la eliminacion de temporadas viejas
 
         # Dataframe partido:
-        ## Equipo_loc y equipo_vis
-        df_part = clean_data.prepare_text_columns(df_part, l_cols_to_process=['equipo_loc', 'equipo_vis'])  # Preparacion texto para facilitar construccion de datos bassado en equipos
-        df_part = clean_data.clean_teams_names(df_part)  # Eliminar strings adicionales en nombres de equipos
+        ## Team_home y team_away
+        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=['team_home', 'team_away'])  # Preparacion texto para facilitar construccion de datos bassado en equipos
+        df_match = clean_data.clean_teams_names(df_match)  # Eliminar strings adicionales en names de equipos
 
-        # Dataframe partido jugador:
-        ## jug_tit_loc_1, jug_tit_loc2, ..., jug_aus_sup_18
-        df_part_jug = clean_data.prepare_text_columns(df_part_jug, l_col_to_except=['id_part'])
+        # Dataframe partido player:
+        ## player_start_home_1, player_start_home2, ..., player_miss_away_18
+        df_match_player = clean_data.prepare_text_columns(df_match_player)
 
-        # Dataframe jugador:
-        ## Nombre de jugador
-        df_jug = clean_data.prepare_text_columns(df_jug, l_cols_to_process=['nombre'])  # Preaparo texto para integrar
-        ## Valor de mercado
+        # Dataframe player:
+        ## Player Name
+        df_player = clean_data.prepare_text_columns(df_player, l_cols_to_process=['name'])  # Preaparo texto para integrar
+        ## Market Value
         scaler = StandardScaler()  # Crea un objeto StandardScaler
-        df_jug['valor_mercado'] = scaler.fit_transform(df_jug['valor_mercado'].values.reshape(-1, 1))
+        df_player['value'] = scaler.fit_transform(df_player['value'].values.reshape(-1, 1))
 
         # Verificar que no haya outliers
         # algo (sacar de mi tesis)
 
-        # Describo datos post limpieza
-        du = DataUnderstanding(self.pais)
-        du.describe_data(df_part, df_part_jug, df_jug)
-
         end = time.time()
-        print(f"Limpieza inicial de datos en {(end - start) / 60:.1f} minutos")
+        print(f"Limpieza de datos en {(end - start) / 60:.1f} minutos")
 
         if export:
-            df_part.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_form_clean.xlsx', index=False)
-            df_part_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_jug_form_clean.xlsx', index=False)
-            df_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_jug_form_clean.xlsx', index=False)
+            df_match.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_form_clean.xlsx', index=True)
+            df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_player_form_clean.xlsx', index=True)
+            df_player.to_excel(f'./p3_data_preparation/data/{self.country}/df_player_form_clean.xlsx', index=True)
 
-        return df_part, df_part_jug, df_jug
+        return df_match, df_match_player, df_player
 
-    def integrate_data(self, df_part: pd.DataFrame, df_part_jug: pd.DataFrame, df_jug: pd.DataFrame, export: bool = True):
+    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame, export: bool = True):
         """
-        Integra los datos de partidos y jugadores en un solo dataframe.
+        Integra los datos de partidos y players en un solo dataframe.
 
-        :param df_part: Dataframe de los datos de los partidos.
-        :param df_part_jug: Dataframe de los datos de los jugadores en cada partido.
-        :param df_jug: Dataframe de los datos de los jugadores.
+        :param df_match: Dataframe de los datos de los partidos.
+        :param df_match_player: Dataframe de los datos de los players en cada partido.
+        :param df_player: Dataframe de los datos de los players.
         :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de
         lo contrario. (bool)
         :return: Dataframe integrado. (DataFrame)
@@ -226,76 +244,74 @@ class DataPreparation:
         start = time.time()
         print("\nIntegrando los datos...")
 
-        # Obtengo listado unicos de jugadores en df_jug (Sofifa) y df_part_jug (Flashscore) para agilizar vinculacion
-        df_part_jug_unique_players = unique_players_df_part_jug(df_part_jug)
-        df_jug_unique_players = unique_players_df_jug(df_jug)
+        # Mapeo jugadores por nombre
+        df_map_players_name_id = match_players_by_name(df_match_player, df_player)
 
-        # Vinculo con "id_jugador" a df_jug (Sofifa) y df_part_jug (Flashscore) utilizando los nombres de los jugadores
-        df_part_jug_vinc_df_jug = integrate_players_by_name(df_part_jug_unique_players, df_jug_unique_players)
-        
-        # Reemplazo los nombres de los jugadores por su id en df_part_jug (Flashscore)
-        df_part_jug = reemplazar_name_por_id(df_part_jug, df_part_jug_vinc_df_jug)
-
-        # Sintetizar la data de df_jug (Sofifa) en df_part (Flashscore) gracias al vinculo con df_part_jug (Flashscore) -->   Aca dentro hago esto:  # Traer fecha, equipo y no se que mas de df_part (Flashscore) y agregar a df_part_jug (Flashscore) para poder saber en que momento traer la info del jugador (Sofifa tiene varias veces un mismo jugador porque es el jugador en ≠ fifas)
-        df = player_data_in_match(df_part, df_part_jug, df_jug)
+        # Reemplazo nombre de jugadores por id en df_match_player
+        df_match_player = replace_players_name_with_id(df_match_player, df_map_players_name_id)
+    
+        # Sintetizar la data de df_player (Sofifa) en df_match (Flashscore) gracias al vinculo con df_match_player (Flashscore) -->   Aca dentro hago esto:  # Traer fecha, equipo y no se que mas de df_match (Flashscore) y agregar a df_match_player (Flashscore) para poder saber en que momento traer la info del player (Sofifa tiene varias veces un mismo player porque es el player en ≠ fifas)
+        df = integrate_player_data_in_match(df_match, df_match_player, df_player)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_part_jug_vinc_df_jug.to_excel(f'./p3_data_preparation/data/{self.pais}/df_part_jug_vinc_df_jug.xlsx', index=False)
-            df.to_excel(f'./p3_data_preparation/data/{self.pais}/df_integrated.xlsx', index=False)
-
+            df_map_players_name_id.to_excel(f"./p3_data_preparation/data/{self.country}/df_map_players_name_id.xlsx")
+            df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_player_with_id.xlsx', index=True)
+            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_integrated.xlsx', index=True)
         return df
 
-    def construct_data(self, df: pd.DataFrame, n_dias: int, n_anios_historial:int , export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_days: int, n_years_h2h: int , export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
-        :param df: Dataframe con datos de partidos incluyendo datos de jugadores. Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param df: Dataframe con datos de partidos incluyendo datos de players. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param N_ULT_PART: Número de últimos partidos a considerar para el cálculo de variables. (int)
         :param export: Booleano para indicar si se debe exportar el dataframe construido. True para exportar, False de lo contrario. (bool)
         :return: Dataframe construido. (DataFrame)
         """
         start = time.time()
-        print("\nConstruyendo nuevos datos...")
+        print("\nConstructing new data...")
 
-        # Construyo variables: "equipo_ganador" y puntos obtenidos
-        df = construct_data.determinar_equipo_ganador(df)
-        df = construct_data.determinar_puntos(df)
-        # df = construct_data.determinar_equipo_ganador_segun_casa_apuesta(df)
+        # Construyo variables: "result" y points obtenidos
+        df = construct_data.determine_result(df)
+        df = construct_data.determine_points(df)
 
         # Variables historicas
-        df = construct_data.historial_entre_si_segun_fecha(df, n_anios=n_anios_historial)
+        df = construct_data.h2h_by_date(df, n_years=n_years_h2h)  # Resetea el indice....
+
+        # Determino cuales son las variables stats automaticamente
+        l_stats = construct_data.determine_l_stats(df)
+        print(f"Stats a promediar en ultimos partidos: {l_stats}")
 
         # Por estadistica del partido
-        l_estadisticas = construct_data.determine_l_estadisticas(df)
-        print(f"Estadisticas a promediar en ultimos partidos: {l_estadisticas}")
+        for var in l_stats:
+            print(f"\tEstadistica a promediar: {var}", df[f"{var}_home"].dtype, df[f"{var}_away"].dtype)
 
-        for var in l_estadisticas:
-            print(f"\tEstadistica a promediar: {var}", df[f"{var}_loc"].dtype, df[f"{var}_vis"].dtype)
+            # Determine la diferencia de la estadistica entre equipo local y visitante de cada partido
+            df[f'dif_{var}'] = df[f'{var}_home'] - df[f'{var}_away']  # (e.g. dif_goles = goles_home - goles_away)
+            df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
 
-            # Determinar la diferencia de la estadistica entre equipo local y visitante de cada partido
-            df[f'dif_{var}'] = df[f'{var}_loc'] - df[f'{var}_vis']  # (e.g. dif_goles = goles_loc - goles_vis)
-            df = df.drop([f'{var}_loc', f'{var}_vis'], axis=1)  # (e.g. borro goles_loc y goles_vis)
-
-            # Determinar para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-            df = construct_data.determine_prom_en_ult_partidos(df, n_dias=n_dias, variable=var, tipo='mean')
+            # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
+            df = construct_data.determine_mean_in_last_match(df, n_days=n_days, variable=f'dif_{var}', tipo='mean')  # mean_last_match_dif_points_home
             df = df.drop([f'dif_{var}'], axis=1)
 
-            # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_loc y prom_dif_goles_vis)
-            df[f'dif_prom_ult_part_dif_{var}'] = df[f'prom_ult_part_dif_{var}_loc'] - df[f'prom_ult_part_dif_{var}_vis']
-            df = df.drop(columns=[f'prom_ult_part_dif_{var}_loc', f'prom_ult_part_dif_{var}_vis'], axis=1)
-
-        # Construyo variables de diferencias para las variables promedio de los jugadores
+            # Determine la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+            df[f'dif_mean_last_match_dif_{var}'] = df[f'mean_last_match_dif_{var}_home'] - df[f'mean_last_match_dif_{var}_away']  # KeyError: 'mean_last_match_dif_points_home'
+            df = df.drop(columns=[f'mean_last_match_dif_{var}_home', f'mean_last_match_dif_{var}_away'], axis=1)
+        
+        # Construyo variables de diferencias para las variables promedio de los players
         # df = construct_data.suma_rat_jug_aus(df)
-        df = construct_data.calculate_dif_col_jugadores(df)
+        df = df.drop(columns=['n_player_miss_home', 'n_player_miss_away'], axis=1)  # Temporalmente hasta que vea que hago con esta variable
+
+        df = construct_data.calculate_dif_col_players(df)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel(f'./p3_data_preparation/data/{self.pais}/df_constructed.xlsx', index=False)
+            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed.xlsx', index=True)
         return df
 
     def select_data(self, df: pd.DataFrame, thr_corr=None, thr_fs= None, export: bool = True):  # 1.3 minutos # Chequear cambios
@@ -312,8 +328,8 @@ class DataPreparation:
 
         # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
         n_col = len(df.columns)
-        df = df.drop(['id_part', 'pais', 'fecha'], axis=1)  # df = df.drop(['id_part', 'pais', 'competicion', 'temporada', 'fecha', 'cancha', 'es_copa'], axis=1)  # elimino aca por si thr_nan_col elimina una de ellas antes y por ende falla el programa
-        print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. id_part, fecha, etc).")
+        df = df.drop(['date'], axis=1)  
+        print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. id_match, fecha, etc).")
 
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -322,33 +338,44 @@ class DataPreparation:
         if thr_corr is not None:
             l_columnas_a_eliminar = select_data.eliminar_columnas_correlacionadas(df, self.var_resp, thr_corr)
             df = df.drop(l_columnas_a_eliminar, axis=1)
+            print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
 
         # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
             l_not_important_features = select_data.select_best_features(df, self.var_resp, thr_fs, graf=export)
             df = df.drop(l_not_important_features, axis=1)
+            print(f"\tSe eliminaron {len(l_not_important_features)} de {len(df.columns)-1+len(l_not_important_features)} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%: {l_not_important_features}")
+
+        print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
 
         end = time.time()
-        print(f"Las siguientes {len(df.drop(self.var_resp, axis=1).columns)} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_etiquetas.to_excel(f'./p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx', index=False)
-            df.to_excel(f'./p3_data_preparation/data/{self.pais}/df_selected.xlsx', index=False)
+            df_etiquetas.to_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx', index=True)
+            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_selected.xlsx', index=True)
         return df
 
 class Modeling:
 
-    def __init__(self, var_resp: str, var_pred: str, pais: str):
+    def __init__(self, var_resp: str, var_pred: str, country: str):
         if not isinstance(var_resp, str) or not isinstance(var_pred, str):
             raise TypeError("Los parámetros var_resp y var_pred deben ser cadenas de texto.")
-        if not isinstance(pais, str):
-            raise TypeError("El parámetro pais debe ser una cadena de texto.")
+        if not isinstance(country, str):
+            raise TypeError("El parámetro country debe ser una cadena de texto.")
 
         self.var_resp = var_resp
         self.var_pred = var_pred
-        self.pais = pais
+        self.country = country
+        self.make_directories()
 
+    def make_directories(self):
+        directorio = f'./p4_modeling/data/{self.country.lower()}'
+
+        if not os.path.exists(directorio):
+            # Si no existe, crear el directorio
+            os.makedirs(directorio)
+        
     def generate_test_design(self, df: pd.DataFrame, bal_type, test_val_size: float = 0.2, test_size: float = 0.5, fill_na=None, with_pca: bool = False, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
@@ -366,18 +393,14 @@ class Modeling:
         if fill_na is None:
 
             # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values (solo en variables selected)
-            df = clean_data.eliminar_filas_nan(df, porc_nan_max=0)  # df = df.dropna()
+            df = clean_data.delete_rows_nan(df, porc_nan_max=0)  # df = df.dropna()
 
             # Separo en X e y
             X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
-            # Separo conjunto de datos en train, validation y test --> Creo que no hace shuffle......
+            # Separo conjunto de datos en train, validation y test
             X_train, X_val_and_test, y_train, y_val_and_test = train_test_split(X, y, test_size=test_val_size, random_state=randint(1, 1000), shuffle=True)
             X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
-
-            # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
-            # X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
-            # X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
 
         # Si relleno NaN values
         else:
@@ -385,18 +408,16 @@ class Modeling:
             X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
             # Separo conjunto de datos en train, validation y test dejando los NaN values en df_train
-            X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X, y, test_val_size=test_val_size, test_size=test_size)
-
-            # Elimino variables odds del dataset de entrenamiento y validacion (de test no porque necesito calcular roi)
-            # X_train = X_train.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
-            # X_val = X_val.drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)
+            X_train, X_val, X_test, y_train, y_val, y_test = generate_test_design.separate_train_val_and_test(X, y, test_val_size=test_val_size, test_size=test_size, shuffle=True)
 
             # Relleno nan en el dataset de entrenamiento
-            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
+            X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
             print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
-        # Implemento PCA?
+        # Implemento PCA
         if with_pca:
+            print("Implementando PCA()...")
+
             # Selecciono los mejores hiperparametros
             pca = build_model.select_best_hiperparameters(PCA(), X_val, y_val, k=10)
 
@@ -406,7 +427,6 @@ class Modeling:
 
                 # Entreno el modelo
                 pca.fit(X_train)
-                print("Implementando PCA()...")
 
                 # Transformo X
                 X_train = pd.DataFrame(pca.transform(X_train))
@@ -420,22 +440,18 @@ class Modeling:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, tipo=bal_type)
             print(f"Shape X_train luego de balanceo: {X_train.shape}")
 
-        # Shuffle el dataset de entrenamiento (Funciona mal el shuffle)
-        df_train = pd.concat([X_train.reset_index(drop=True), y_train.reset_index(drop=True)], axis=1)  # concatena mal sin el reset_index()
-        df_train = df_train.sample(frac=1).reset_index(drop=True)
-        X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
         print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
 
         if export:
-            X_train.to_excel(f'./p4_modeling/data/{self.pais}/X_train.xlsx', index=False)
-            X_val.to_excel(f'./p4_modeling/data/{self.pais}/X_val.xlsx', index=False)
-            X_test.to_excel(f'./p4_modeling/data/{self.pais}/X_test.xlsx', index=False)
+            X_train.to_excel(f'./p4_modeling/data/{self.country}/X_train.xlsx', index=True)
+            X_val.to_excel(f'./p4_modeling/data/{self.country}/X_val.xlsx', index=True)
+            X_test.to_excel(f'./p4_modeling/data/{self.country}/X_test.xlsx', index=True)
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int):
         """
-        Selecciona el mejor modelo a partir de la precision.
+        Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
         :param X_val: Dataframe de validacion con variables predictoras. (DataFrame)
         :param y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
@@ -445,16 +461,17 @@ class Modeling:
         :return: Mejor modelo. (sklearn.ensemble?)
         """
         warnings.filterwarnings("ignore")
+        print("Training model...")
 
         # Find best hiperparameters
-        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=10)
+        model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=k)
 
         # Entreno el modelo
         model_best_params.fit(X_train, y_train)
 
         # Evaluo el modelo con Cross Validation
         cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-        print(f"\nPrecision promedio de validación cruzada: {cv_accuracy:.1f}%")
+        print(f"\nAccuracy promedio de validación cruzada: {cv_accuracy:.1f}%")
 
         return model_best_params, cv_accuracy
 
@@ -469,46 +486,57 @@ class Modeling:
         de lo contrario. (bool)
         :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
-        print("\nEvaluando modelo con datos de prueba...")
+        print("\nEvaluating trained model with test sets...")
 
         # Levanto df_etiquetas
-        # df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{self.pais}/df_etiquetas.xlsx')
+        df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx')
 
         # Predecir las etiquetas para los datos de prueba
-        # X_test_without_odds = X_test.copy().drop(['odds_loc', 'odds_emp', 'odds_vis', 'y_pred_ca'], axis=1)  # Quito cuotas de casas de apuestas de X_test
-        # y_pred = model.predict(X_test_without_odds)  # es un numpy array
         y_pred = model.predict(X_test)  # es un numpy array
+        y_pred_prob = model.predict_proba(X_test) # --> Supuestamente te da las probabilidad de cada clase... la tengo que probar. Funciona para todos los modelos?
+
+        # Guardo predicciones en DataFrame
+        df = pd.DataFrame({
+            'result': y_test,
+            'predicted_result': y_pred,
+            'probability_class_0': y_pred_prob[:, 0],
+            'probability_class_1': y_pred_prob[:, 1],  # Si hay más de dos clases, continúa añadiendo columnas
+            'probability_class_2': y_pred_prob[:, 2],  # Si hay más de dos clases, continúa añadiendo columnas
+            # Agregar más columnas si hay más clases
+        })
+        df.index = X_test.index
+        # df.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
+
+        # Agrego predicciones de bookmaker
+        df = asses_model.calculate_bookmaker_precision(df)
+        # df.to_excel('/Users/nachomondino/Desktop/df_results_con_odds.xlsx', index=True)
+
+        # Convierto 'result' y 'predicted_result' de numeros a clases (e.g. 'away', 'home', 'draw')
+        df = format_data.revert_columns_from_int(df, df_etiquetas)
+        # df.to_excel('/Users/nachomondino/Desktop/df_results_reverted.xlsx', index=True)
 
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100
         f1 = f1_score(y_test, y_pred, average='macro') * 100
-        print(f"\t- Precision de test: {test_accuracy:.1f}% \n\t- Recall de prueba: {recall:.1f}% \n\t- F1-score de prueba: {f1:.1f}% ")
+        print(f"\t- Accuracy de test: {test_accuracy:.1f}% \n\t- Recall de prueba: {recall:.1f}% \n\t- F1-score de prueba: {f1:.1f}% ")
+        test_precision_bookmaker = accuracy_score(df['result'], df['bookmaker_result']) * 100
+        print(f"\t- Precision de casa de apuesta: {test_precision_bookmaker:.1f}%")
 
-        """
-        # Colculo precision y cuota promedio de casa de apuesta
-        df_results = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred, 'y_pred_ca': X_test['y_pred_ca'],
-                                   'odds_loc': X_test['odds_loc'], 'odds_emp': X_test['odds_emp'],
-                                   'odds_vis': X_test['odds_vis']})
-        df_results = format_data.revert_columns_from_int(df_results, df_etiquetas)
-        # df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results_prueba.xlsx')
-        test_accuracy_ca = accuracy_score(df_results[self.var_resp], df_results['y_pred_ca']) * 100
-        print(f"\t- Precision de casa de apuesta: {test_accuracy_ca:.1f}%")
-        # Calcular la cuota promedio acertada por la casa de apuesta vs la cuota promedio acertada por mi algoritmo.
-        # print(f"\t- Cuota promedio de casa de apuesta: {test_accuracy_ca:.1f}%")
-        # print(f"\t- Cuota promedio de mi algoritmo: {test_accuracy_ca:.1f}%")
-        """
+        # Por estrategia de inversion
+            # Calcular el roi
+            # Guardar el mejor ROI
+        # Calculo de ROI --> ya tengo las cuotas!!!!!!!
+        roi = asses_model.calculate_roi(df)
 
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        # df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
-        # df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
-        # df_conf_mat.to_excel(f'./find_best_hyper/data/{self.pais}/df_conf_matrix.xlsx')
+        df_etiquetas_var_resp = df_etiquetas[df_etiquetas['variable'] == self.var_resp]  # solo etiquetas de la var resp
+        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, df_etiquetas_var_resp)
 
         if export:
-            # df_results.to_excel(f'./p4_modeling/data/{self.pais}/df_results.xlsx')
-            # df_conf_mat.to_excel(f'./p4_modeling/data/{self.pais}/df_conf_matrix.xlsx')
-            pass
-
+            df.to_excel(f'./p4_modeling/data/{self.country}/df_results.xlsx')
+            df_conf_mat.to_excel(f'./p4_modeling/data/{self.country}/df_conf_matrix.xlsx')
+    
         return test_accuracy, recall, f1
     
     def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=True):
@@ -516,13 +544,13 @@ class Modeling:
         Pruebo varios modelos 
         """
         # Definicion de variables
-        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su precision y roi
+        df_models = pd.DataFrame(columns=['model_name', 'model_trained', 'train_cv_accuracy', 'test_accuracy', 'test_recall', 'test_f1_score'])  # Datos del modelo y su accuracy y roi
         l_modelos = [RandomForestClassifier(), xgb.XGBClassifier(), LogisticRegression(), SVC(), MLPClassifier(), GradientBoostingClassifier()]  # [DecisionTreeClassifier()]
 
         # Por modelo --> podria ponerlo como metodo en Modeling()
         for modelo in l_modelos:
 
-            model_name = str(modelo)[:str(modelo).find('(')]  # Defino el nombre del modelo (e.g. "RandomForest")
+            model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
             print(f" Modelo: {model_name} ".center(120, '-'))
 
             # Entreno modelo y evaluo su rendimiento
@@ -541,112 +569,127 @@ class Modeling:
         bm_test_rec = df_models.loc[idx, 'test_recall']
         bm_test_f1 = df_models.loc[idx, 'test_f1_score']
         # bm_test_roi = df_models.loc[idx, 'test_roi']
-        print(f"\nEl mejor modelo es: {bm_name} con: \n\t- Train Precision: {bm_train_acc:.1f}% \n\t- Test Precision: "
+        print(f"\nEl mejor modelo es: {bm_name} con: \n\t- Train Accuracy: {bm_train_acc:.1f}% \n\t- Test Accuracy: "
               f"{bm_test_acc:.1f}% \n\t- Test recall: {bm_test_rec:.1f}% \n\t- Test f1-score: {bm_test_f1:.1f}%") # f"\n\t- Test ROI: {bm_test_roi:.1f}%\n"
 
         if export:
-            df_models.to_excel(f'./p4_modeling/data/{self.pais}/df_modelos.xlsx')
-            pickle.dump(bm_params, open(f"./p4_modeling/data/{self.pais}/modelo.pkl", "wb"))
+            df_models.to_excel(f'./p4_modeling/data/{self.country}/df_modelos.xlsx')
+            pickle.dump(bm_params, open(f"./p4_modeling/data/{self.country}/modelo.pkl", "wb"))
 
         return df_models
 
 def main():
-
+    """
+    Extraction, processing and analysis of matches to predict match results.
+    """
     # Definicion de variables
-    var_resp, var_pred = 'equipo_ganador', 'y_pred'
-    pais = "inglaterra"  # Ponelo en miniscula
+    var_resp, var_pred = 'result', 'predicted_result'
+    data_unders, data_prep, modeling = True, False, False
     export = True
 
-    # Procesamiento
-    data_unders, data_prep, modeling = False, True, True
+    # Selecciono country a extraer por terminal
+    # df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    country = 'Germany'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    id_country = 59  # id_country = df_countries[df_countries['country_name'] == country]['id_country'].values[0]
 
+    # DATA UNDERSTANDING
     if data_unders:
         print(" Data understanding ".center(120, "#"))
-        du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
+        du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
 
         # Extriago datos o los levanto
-        df_part, df_part_jug, df_jug = du.collect_initial_data(export=export)
+        df_match, df_match_player, df_player = du.collect_initial_data(export=export)
 
         # Describo datos
-        du.describe_data(df_part, df_part_jug, df_jug)
-
-    # Si no extraigo datos
-    else:
+        du.describe_data(df_match, df_match_player, df_player)
+    elif data_prep:
         # Levanto datos ya extraidos
-        df_part = pd.read_excel(f'./p2_data_understanding/data/{pais}/df_part.xlsx')
-        df_part_jug = pd.read_excel(f'./p2_data_understanding/data/{pais}/df_part_jug.xlsx')
-        df_jug = pd.read_excel(f'./p2_data_understanding/data/{pais}/df_jug.xlsx')
+        df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
+        df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
+        df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx')
 
+        '''
+        # Que se fije si hay datos actualizados y, si hay, que los reemplace
         # Si hay datos en df_missing --> Al parecer funciona bien. Exporto los df concatenados?
         try:
             # Levanto datos de partidos missing
-            df_part_missing = pd.read_excel(f'./p6_deployment/data_next_matches/{pais}/data_understanding/df_part_missing.xlsx')
-            df_part_jug_missing = pd.read_excel(f'./p6_deployment/data_next_matches/{pais}/data_understanding/df_part_jug_missing.xlsx')
+            df_match_missing = pd.read_excel(f'./p6_deployment/data_next_matches/{country}/data_understanding/df_match_missing.xlsx')
+            df_match_player_missing = pd.read_excel(f'./p6_deployment/data_next_matches/{country}/data_understanding/df_match_player_missing.xlsx')
 
             # Concateno los partidos extraidos y los missing
-            df_part_concat = pd.concat([df_part, df_part_missing], axis=0)
-            df_part_jug_concat = pd.concat([df_part_jug, df_part_jug_missing], axis=0)
+            df_match_concat = pd.concat([df_match, df_match_missing], axis=0)
+            df_match_player_concat = pd.concat([df_match_player, df_match_player_missing], axis=0)
 
             # Elimino duplicados para verificar que efectivamente los missing no estaban ya en los extraidos
-            df_part = df_part_concat.drop_duplicates().reset_index(drop=True)
-            df_part_jug = df_part_jug_concat.drop_duplicates().reset_index(drop=True)
-            print(f"Nº de filas repetidas: {len(df_part_concat) - len(df_part)}")
-            print(f"Nº de filas repetidas: {len(df_part_jug_concat) - len(df_part_jug)}")
+            df_match = df_match_concat.drop_duplicates()  # .reset_index(drop=True)
+            df_match_player = df_match_player_concat.drop_duplicates()  # .reset_index(drop=True)
+            print(f"Nº de filas repetidas: {len(df_match_concat) - len(df_match)}")
+            print(f"Nº de filas repetidas: {len(df_match_player_concat) - len(df_match_player)}")
         except:
             print("No hay datos de missing matches, o bien, fallo la concatenacion de los dfs.")
+        '''
 
-        #du = DataUnderstanding(pais) # Creo objeto de clase DataPreparation
-        # du.describe_data(df_part, df_part_jug, df_jug)
+        # du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
+        # du.describe_data(df_match, df_match_player, df_player)
 
+    # DATA PREPARATION
     if data_prep:
         # Definicion de variables
         print(" Data preparation ".center(120, "#"))
-        dp = DataPreparation(var_resp, pais) # Creo objeto de clase DataPreparation
+        dp = DataPreparation(var_resp, country) # Creo objeto de clase DataPreparation
 
-        # Hiperparametros
+        # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         thr_nan_col = 0.7  # Porcentaje maximo de nan values en una columna
-        n_dias = 30  # 30 es como N_ULT_PART igual a 5...
-        n_anios_historial = 3
-        thr_corr = None  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
+        n_days = 30  # 30 es como N_ULT_PART igual a 5...
+        n_years_h2h = 3
+        thr_corr = 0.8  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = 0.2  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+        df_hiper_prep = pd.DataFrame(data={'thr_nan_col': [thr_nan_col], 'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs]}, index=[0])
+        print(df_hiper_prep)
+        
+        df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx', index_col=0)
+        print(df.head(2))
 
         # Preparo el dataset para el analisis
-        df_part, df_part_jug, df_jug = dp.format_data(df_part, df_part_jug, df_jug, export=False)
-        df_part, df_part_jug, df_jug = dp.clean_data(df_part, df_part_jug, df_jug, thr_nan_col=thr_nan_col, export=export)
-        df = dp.integrate_data(df_part, df_part_jug, df_jug, export=export) 
-        df = dp.construct_data(df, n_dias=n_dias, n_anios_historial=n_anios_historial, export=export)
+        # df_match, df_match_player, df_player = dp.format_data(df_match, df_match_player, df_player, export=export)
+        # df_match, df_match_player, df_player = dp.clean_data(df_match, df_match_player, df_player, thr_nan_col=thr_nan_col, export=export)
+        # df = dp.integrate_data(df_match, df_match_playser, df_player, export=export) 
+        # df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-
+        
+        if export:
+            df_hiper_prep.to_excel(f'./p3_data_preparation/data/{country}/df_hiper_prep.xlsx', index=False)
     elif not data_unders:
         # Levanto dataset para prueba
-        df = pd.read_excel(f'./p3_data_preparation/data/{pais}/df_selected.xlsx')
-        print(df.head(1), df.shape)
+        df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_selected.xlsx', index_col=0)
+        print(df.head(3), df.shape)
 
+    # MODELING
     if modeling:
-
-        df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1) # 'y_pred_ca' # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
-
-        # Definicion de variables
         print(" Modeling ".center(120, "#"))
-        mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
+        # Definicion de variables
+        mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
         modelo = LogisticRegression()
 
         # Hiperparametros
         test_val_size = 0.25  # Porcentaje del total de datos destinado a validacion y test.
         test_size = 0.5  # Porcentaje de test_val_size destinado a test.
-        bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
         fill_na = None  # Relleno de nan values [None, mode, ml]
+        bal_type = None # Tipo de balanceo a realizar [None, 'over', 'under']
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
+        df_hiper_mod = pd.DataFrame(data={'test_val_size': [test_val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'fill_na': [fill_na], 'k': [k]}, index=[0])        
+        print(df_hiper_mod)
 
         # Un solo modelo
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, fill_na=fill_na)
-        model_best_params, cv_accuracy = mo.build_model(modelo, X_val, y_val, X_train, y_train, k)
+        model_best_params, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k)
         test_accuracy, recall, f1 = mo.assess_model(model_best_params, X_test, y_test)  # accuracy, recall, f1, roi
-        # print(f"Metricas:\n - Precision train: {cv_accuracy}\n - Precision test: {test_accuracy}\n - Recall: {recall}\n - F1 Score: {f1}")
+        # print(f"Metricas:\n - Accuracy train: {cv_accuracy}\n - Accuracy test: {test_accuracy}\n - Recall: {recall}\n - F1 Score: {f1}")
 
         if export:
-            pickle.dump(model_best_params, open(f"./p4_modeling/data/{pais}/modelo.pkl", "wb"))
-
+            df_hiper_mod.to_excel(f'./p4_modeling/data/{country}/df_hiper_mod.xlsx', index=True)
+            pickle.dump(model_best_params, open(f"./p4_modeling/data/{country}/modelo.pkl", "wb"))
+    
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     main()

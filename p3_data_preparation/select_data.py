@@ -25,13 +25,11 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
     :param umbral:
     :return: List. Columnas a eliminar por correlacion alta.
     """
+    print('\nEliminacion de columnas correlacionadas:')
     # Definicion de variables
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
-    n_col_inicial = len(df.columns)
-    print('\nEliminacion de columnas correlacionadas:')
 
     # Calculo matriz de correlacion
-    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Elimino odds para evitar eliminarlas y que eliminen otras variables
     df_correlacion = df.corr().abs()
     # df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
 
@@ -58,7 +56,6 @@ def eliminar_columnas_correlacionadas(df, var_resp, umbral):
         else:
             columnas_eliminar.add(col2)
 
-    print(f"\tSe eliminaron {len(columnas_eliminar)} de {n_col_inicial} columnas por tener una correlacion mayor a thr_corr={umbral*100:.0f}%: {columnas_eliminar}")
     return list(columnas_eliminar)
 
 class FeatureSelection():
@@ -288,17 +285,18 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     print('\nEliminacion de columnas menos importantes:')
 
     # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
-    df = df.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # Elimino odds para evitar eliminarlas y que eliminen otras variables
     n_filas_inic = len(df)
     df = df.dropna()  # Es dificil que queden pocos registros porque borro filas y col con muchos nan antes
     print(f"\tDe las {n_filas_inic} filas iniciales, hago fs (pues uso ML y no puede tener NaN) solo con: {df.shape[0]}")  # es el largo solo para Feature Selection...
     if df.shape[0] < 0.2 * n_filas_inic:
-        print("\t WARNING! Estas haciendo la seleccion de variables mas importantes con muy pocas filas, lo cual hace poco confiable dicha " 
-              "seleccion y posiblemente entrenaras con pocos datos en Modeling. Posiblemente hay una/s columna/s con muchos NaN values. "
-              "Fijate de usar un thr_nan_col mas bajo en clean_data().")
+        warnings.warn("Feature selection with too little input data. Estas haciendo la seleccion de variables mas importantes con muy pocas filas, lo cual hace poco confiable dicha seleccion y posiblemente entrenaras con pocos datos en Modeling. Posiblemente hay una/s columna/s con muchos NaN values. Fijate de usar un thr_nan_col mas bajo en clean_data().", UserWarning)
+
+    print("\ndf post dropna\n", df.head(2))
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
+    print("\nX\n", X.head(2))
+    print("\ny\n", y.head(2))
     df_importance = pd.DataFrame(index=X.columns)
 
     # Detemino importancia de cada variable para cada modelo
@@ -314,7 +312,6 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
 
     # Determino columnas a eliminar por poco importancia
     l_not_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] < df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()
-    print(f"\tSe eliminaron {len(l_not_important_features)} de {len(X.columns)} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%: {l_not_important_features}")
 
     # Grafico importancias teniendo en cuenta todos los modelos
     if graf:
@@ -326,8 +323,8 @@ def prueba():
     from p3_data_preparation import format_data
 
     # Definicion de variables
-    var_resp = 'equipo_ganador'
-    pais = 'England'
+    var_resp = 'result'
+    country = 'inglaterra'
     warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
@@ -336,18 +333,19 @@ def prueba():
     export = False
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed.xlsx')
+    df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx')
     print(df.head())
 
     # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
     n_col = len(df.columns)
-    df = df.drop(['id_part', 'pais', 'fecha'], axis=1)
-    print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. id_part, fecha, etc).")
+    df = df.drop(['id_match', 'country', 'fecha'], axis=1)
+    print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. id_match, fecha, etc).")
 
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
     df, df_etiquetas = format_data.convert_columns_to_int(df)
-    df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_etiquetas.xlsx', index=False)
-    df.to_excel(f'/Users/nachomondino/Desktop/df_etiquetado.xlsx')
+    # df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_etiquetas.xlsx', index=False)
+    df_etiquetas.to_excel(f'/Users/nachomondino/Desktop/df_etiquetas.xlsx', index=False)
+    df.to_excel(f'/Users/nachomondino/Desktop/df_etiquetado.xlsx', index=False)
 
     # Elimino variables altamente correlacionadas
     if thr_corr is not None:
@@ -362,7 +360,7 @@ def prueba():
 
     print(f"Las siguientes {len(df.columns)} columnas son las seleccionadas: {list(df.columns)}")
     df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
-
+    
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     prueba()

@@ -4,12 +4,12 @@ from p3_data_preparation import clean_data
 from fuzzywuzzy import fuzz
 
 
-def fill_whoscored_with_flashscore(df_part_who, df_part_flash):
+def fill_whoscored_with_flashscore(df_match_who, df_match_flash):
     """
     Relleno NaN values en algunas columnas del dataset partido de Whoscored mediante los datos de Flashscore.
 
-    :param df_part_who: Dataframe de partidos de Whoscored. (DataFrame)
-    :param df_part_flash: Dataframe de partidos de Flashscore. (DataFrame)
+    :param df_match_who: Dataframe de partidos de Whoscored. (DataFrame)
+    :param df_match_flash: Dataframe de partidos de Flashscore. (DataFrame)
     :return: Dataframe de partidos de Whoscored rellenado con datos de Flashscore. (DataFrame)
     """
     # Defino columnas a rellenar
@@ -19,41 +19,41 @@ def fill_whoscored_with_flashscore(df_part_who, df_part_flash):
              'pases_comp_vis', 'offsides_loc', 'offsides_vis']
 
     # Preparo dfs para facilitar y mejorar integracion
-    df_part_flash = preparate_to_integrate(df_part_flash)
-    df_part_who = clean_data.prepare_text_columns(df_part_who, l_col_to_except=['temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+    df_match_flash = preparate_to_integrate(df_match_flash)
+    df_match_who = clean_data.prepare_text_columns(df_match_who, l_col_to_except=['temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
     # Hago copias para evitar SettingWithCopyWarning al crear columnas "fecha_sin_hora"
-    df_part_who_filt = df_part_who.copy()
-    df_part_flash_filt = df_part_flash.copy()
+    df_match_who_filt = df_match_who.copy()
+    df_match_flash_filt = df_match_flash.copy()
 
     # Selecciono partidos sin estadisticas de Whoscored y con estadisticas de Flashscore
-    df_part_who_filt = df_part_who_filt[df_part_who_filt['posesion_loc'].isnull()]  # Funciona bien
-    df_part_flash_filt = df_part_flash_filt.dropna(subset="remates_loc")  # Funciona bien
+    df_match_who_filt = df_match_who_filt[df_match_who_filt['posesion_loc'].isnull()]  # Funciona bien
+    df_match_flash_filt = df_match_flash_filt.dropna(subset="remates_loc")  # Funciona bien
 
     # Saco horas de fechas para poder compararlas (hay diferencia porque Whoscored tiene otro huso horario)
-    df_part_who_filt.loc[:, 'fecha_sin_hora'] = df_part_who_filt['fecha'].dt.date
-    df_part_flash_filt['fecha_sin_hora'] = df_part_flash_filt['fecha'].dt.date
+    df_match_who_filt.loc[:, 'fecha_sin_hora'] = df_match_who_filt['fecha'].dt.date
+    df_match_flash_filt['fecha_sin_hora'] = df_match_flash_filt['fecha'].dt.date
 
     # Por partido sin estadisticas en Whoscored
-    for idx_ws, row_ws in df_part_who_filt.iterrows():
+    for idx_ws, row_ws in df_match_who_filt.iterrows():
 
         # Selecciono partidos en Flashscore con la misma fecha
-        df_part_flash_filt_fecha = df_part_flash_filt[df_part_flash_filt['fecha_sin_hora'] == row_ws['fecha_sin_hora']]
+        df_match_flash_filt_fecha = df_match_flash_filt[df_match_flash_filt['fecha_sin_hora'] == row_ws['fecha_sin_hora']]
 
         # Por partido con la misma fecha
-        for idx_fs, row_fs in df_part_flash_filt_fecha.iterrows():
+        for idx_fs, row_fs in df_match_flash_filt_fecha.iterrows():
 
             # Si los equipos local y visitante son similares
             if buscar_coincidencias(row_fs['equipo_loc'], row_ws['equipo_loc'], umbral=70) and buscar_coincidencias(row_fs['equipo_vis'], row_ws['equipo_vis'], umbral=70):
                 cont_part_rell += 1
 
-                # Relleno con columnas de df_part_flash en caso que tenga datos
+                # Relleno con columnas de df_match_flash en caso que tenga datos
                 for col in l_col:
-                    df_part_who.loc[idx_ws, col] = df_part_flash.loc[idx_fs, col]
+                    df_match_who.loc[idx_ws, col] = df_match_flash.loc[idx_fs, col]
 
-    df_part_who.to_excel('/Users/nachomondino/Desktop/df_rellenado.xlsx', index=False)
-    print(f"Cantidad de partidos rellenados: {cont_part_rell} sobre {len(df_part_who_filt)} posibles.")
-    return df_part_who
+    df_match_who.to_excel('/Users/nachomondino/Desktop/df_rellenado.xlsx', index=False)
+    print(f"Cantidad de partidos rellenados: {cont_part_rell} sobre {len(df_match_who_filt)} posibles.")
+    return df_match_who
 
 def buscar_coincidencias(str1, str2, umbral):
     """
@@ -66,20 +66,20 @@ def buscar_coincidencias(str1, str2, umbral):
     """
     return fuzz.token_set_ratio(str1, str2) >= umbral
 
-def preparate_to_integrate(df_part_flash):
+def preparate_to_integrate(df_match_flash):
 
     # Format data: fecha y posesion
-    df_part_flash['fecha'] = pd.to_datetime(df_part_flash['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
-    df_part_flash = convert_posesion_to_int(df_part_flash)
+    df_match_flash['fecha'] = pd.to_datetime(df_match_flash['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
+    df_match_flash = convert_posesion_to_int(df_match_flash)
 
     # Clean data
     # Hago limpieza de variables object antes de integrar para facilitar la integracion de datos
-    df_part_flash = clean_data.prepare_text_columns(df_part_flash, l_col_to_except=['id', 'temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
+    df_match_flash = clean_data.prepare_text_columns(df_match_flash, l_col_to_except=['id', 'temporada'])  # Nombre de equipos minuscula, sin acentos y sin caracteres especiales
 
     # Remuevo strings adicionales en los nombres de los equipos
-    df_part_flash = clean_teams_names(df_part_flash)
+    df_match_flash = clean_teams_names(df_match_flash)
 
-    return df_part_flash
+    return df_match_flash
 
 def convert_posesion_to_int(df):
     """

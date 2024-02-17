@@ -31,11 +31,6 @@ def confusion_matrix(y_real, y_pred, df_etiquetas):
     # Calculo los numeros para la matriz de confusion
     confusion_matrix = metrics.confusion_matrix(y_real, y_pred)  # numpy.ndarray
 
-    # Imprimo matriz de confusion (evito este codigo porque tenes que cerrar el plot para que el programa continue)
-    # cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=y_real.unique())
-    # cm_display.plot(cmap='Blues')
-    # plt.show()
-
     # Convertir el array a un DataFrame de pandas
     df_cm = pd.DataFrame(confusion_matrix)
     df_cm.index.name = "Resultado real"
@@ -44,17 +39,135 @@ def confusion_matrix(y_real, y_pred, df_etiquetas):
     for i, row in df_etiquetas.iterrows():
 
         # Renombro columna
-        df_cm.rename(columns={row['valor_int']: row['valor_orig']}, inplace=True)
+        df_cm.rename(columns={row['int_value']: row['str_value']}, inplace=True)
 
         # Renombro filas
-        df_cm = df_cm.rename(index={row['valor_int']: row['valor_orig']})
-
+        df_cm = df_cm.rename(index={row['int_value']: row['str_value']})
     print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
+def calculate_bookmaker_precision(df_results):  # Falta desarrollar.
+    # df_results deberia tener el resultado real y el resultado predicho por mi modelo.
+
+    country = "england"
+
+    # Levantar df_match_odds....
+    df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
+    print(df_match_odds.head(1))
+
+    # Determino resultado segun casa de apuesta
+    df_match_odds = determine_result_segun_casa_apuesta(df_match_odds)
+    print(df_match_odds.head(1))
+
+    # Concateno df_results y df_match_odds
+    df_match_odds_in_test = df_match_odds[df_match_odds.index.isin(df_results.index)]
+    print(df_match_odds_in_test.shape)
+
+    df = pd.concat([df_results, df_match_odds_in_test], axis=1) # Hara match por index y quedaran filas sin result (puesto que solo tienen result las que estan en X_test)
+    print(df.head(1))
+
+    # Calcular la cuota promedio acertada por la casa de apuesta vs la cuota promedio acertada por mi algoritmo.
+    # print(f"\t- Cuota promedio de casa de apuesta: {test_precision_ca:.1f}%")
+    # print(f"\t- Cuota promedio de mi algoritmo: {test_precision_ca:.1f}%")
+    return df
+
+def determine_result_segun_casa_apuesta(df):
+    """
+    Se determina el 'result' segun la casa de apuestas
+    :param df: Dataframe. Unidad de analisis: match. Columnas: entre ellas odds_home, odds_draw, odds_away
+    :return: Dataframe pasado por parametro con nueva columna, 'bookmaker_result', que detalla el resultado del match
+    segun la casa de apuesta.
+    """
+    # FORMA 1
+    # Por fila
+    for i, row in df.iterrows():
+
+        # Determino la cuota minima de las 3 posibles
+        odds_min = min(row['odds_home'], row['odds_draw'], row['odds_away'])
+
+        # Si la cuota minima es la del team home
+        if row['odds_home'] == odds_min:
+            df.loc[i, 'bookmaker_result'] = "Home"
+
+        # Si la cuota minima es la del team away
+        elif row['odds_away'] == odds_min:
+            df.loc[i, 'bookmaker_result'] = "Away"
+
+        # Si la cuota minima es la del draw
+        else:
+            df.loc[i, 'bookmaker_result'] = "Draw"
+
+    # FORMA 2 (PROPUESTA POR CHAT GPT)
+    """
+    import numpy as np
+    # Determina la cuota mínima de cada fila y el resultado del apostador
+    df['odds_min'] = df[['odds_home', 'odds_draw', 'odds_away']].min(axis=1)
+    conditions = [
+        df['odds_home'] == df['odds_min'],
+        df['odds_away'] == df['odds_min']
+    ]
+    choices = ['Home', 'Away']
+    df['bookmaker_result'] = np.select(conditions, choices, default='Draw')
+
+    # Elimina la columna de la cuota mínima si no la necesitas
+    df.drop(columns=['odds_min'], inplace=True)
+    """
+    return df
+
+def calculate_roi(df):  # Mismo stake y apuesto a todos los partidos
+    """
+    Calcula ROI comparando las predicciones del modelo y los resultados reales.
+    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
+    :param var_resp: Nombre de la variable respuesta. (str)
+    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
+    :return: ROI del modelo. (float)
+    """
+    # Definicion de variables
+    ingresos = 0
+    inversion = len(df)  # Suponiendo 1 euro por cada partido del df_test
+
+    # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
+    df_correct = df[df['result'] == df['predicted_result']]
+    # print(df_correct.shape)
+
+    # Por registro
+    for idx in df_correct.index:
+
+        result_etiqueta = df_correct.loc[idx, 'result']
+
+        # Obtengo el ingreso obtenido segun la etiqueta
+        ingreso = df.loc[idx, 'odds_home'] if result_etiqueta == "Home" else df.loc[idx, 'odds_draw'] if result_etiqueta == "Draw" else df.loc[idx, 'odds_away']  # Vefificada
+        ingresos += ingreso
+        # print(f"Ganamos ${ingreso}")
+
+    # Calculo el ROI e imprimo resultados
+    roi = (ingresos - inversion) / inversion * 100
+    # print(f" RESULTADOS ".center(120, "#"))
+    print(f"Dinero invertido: ${inversion}")
+    print(f"Dinero luego de apuestas: ${ingresos}")
+    print(f"ROI: {roi:.2f}%")
+    return roi
+
+def calculate_estrategia_inversion():
+    """
+    Que calcule la precision y/o ROI obtenido con ≠ estrategias de inversion. Por ejemplo, 
+    - Cuando el predictor supera el 60% en clase predicha.
+    - Cuando el predictor se opone al resultado de la casa de apuesta
+    - etc...
+    """
+    # stake = # Podria variar y apostar mas en algunos partidos y menos en otros
+    # umbral_confianza = # Probabilidad minima de la clase predicha mas probable para apostar en ese partido
+    
+    # roi_est_1 = calculate_roi(stake="same", umbral_confianza=0.3)
+    # roi_est_2 = calculate_roi(stake="same", umbral_confianza=0.6)
+    # roi_est_3 = calculate_roi(stake="lineal", umbral_confianza=0.3) # Cuanta mas confianza tiene el predictor, mas dinero
+    # roi_est_4 = calculate_roi(stake="exponencial", umbral_confianza=0.3)
+    # etc
+    pass
+
 def prueba():
-    var_resp = 'equipo_ganador'
-    var_pred = 'y_pred'
+    var_resp = 'result'
+    var_pred = 'predict_result'
 
     df = pd.read_excel('/Users/nachomondino/Desktop/df_results.xlsx')
 

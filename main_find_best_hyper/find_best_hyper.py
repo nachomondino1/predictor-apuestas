@@ -12,11 +12,11 @@ from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 
 
-def find_best_hiperparameters(var_resp, var_pred, pais):
+def find_best_hiperparameters(var_resp, var_pred, country):
 
     # Definicion de variables
-    dp = DataPreparation(var_resp, pais)
-    mo = Modeling(var_resp, var_pred, pais)  # Creo objeto de clase Modeling
+    dp = DataPreparation(var_resp, country)
+    mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
     df_res = pd.DataFrame()
     df_hiper = pd.DataFrame(columns=['modelo', 'hiper', 'value', 'cuenta'])
     best_accuracy = 0.0
@@ -27,7 +27,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     d_params = {
         'construct': {
             'n_dias_ult_part': [30, 45, 60],  # Nº dias para determinar promedio de estadisticas como posesion
-            'n_anios_historial': [3]  # Probar 3 # Nº años para determinar historial entre equipos
+            'n_years_h2h': [3]  # Probar 3 # Nº años para determinar h2h entre equipos
         },
         'select': {
             'thr_corr': [0.7, 0.5, None], # Correlacion minima para considerar correlacion entre variables
@@ -48,22 +48,22 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     print(f"Numero de iteraciones totales: {n_iter}")
 
     # Levanto dataset formateado e integrado (estos no cambian entre iteraciones)
-    df_integrated = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_integrated.xlsx')
+    df_integrated = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_integrated.xlsx')
 
     # Por combinacion de parametros de construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
         # Asigno valor a cada hiperpametro
-        n_dias_ult_part, n_anios_historial = param_values_2[0], param_values_2[1]
+        n_dias_ult_part, n_years_h2h = param_values_2[0], param_values_2[1]
         print(f" Iteracion Construct Nº {i} ".center(120, "#"))
-        print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_anios_historial: {n_anios_historial}')
+        print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}')
 
         # Construyo datos
         try:
-            df_constructed = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_constructed_{n_dias_ult_part}_{n_anios_historial}.xlsx')
+            df_constructed = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{country}/df_constructed_{n_dias_ult_part}_{n_years_h2h}.xlsx')
         except FileNotFoundError:
-            df_constructed = dp.construct_data(df_integrated, n_dias=n_dias_ult_part, n_anios_historial=n_anios_historial, export=False)
-            df_constructed.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_constructed_{n_dias_ult_part}_{n_anios_historial}.xlsx', index=False)
+            df_constructed = dp.construct_data(df_integrated, n_days=n_dias_ult_part, n_years_h2h=n_years_h2h, export=False)
+            df_constructed.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{country}/df_constructed_{n_dias_ult_part}_{n_years_h2h}.xlsx', index=False)
 
         # Por combinacion de parametros de select_data
         for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
@@ -77,7 +77,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
             df_sel = dp.select_data(df_constructed, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
             # df_sel.to_excel('/Users/nachomondino/Desktop/df_sel.xlsx', index=False)
 
-            df_sel = df_sel.drop(['odds_loc', 'odds_emp', 'odds_vis'], axis=1)  # 'y_pred_ca'  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
+            df_sel = df_sel.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)  # 'bookmaker_result'  # Temporalmente, las elimino para que no entrene con ellas... dsp las usare para el ROI tal vez
 
             # Por combinacion de parametros de modeling
             for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
@@ -86,7 +86,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                 test_val_size, test_size, fill_na, bal_type, with_pca, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3], param_values_5[4], param_values_5[5]
                 print(f" Iteracion Modeling Nº {i}.{j}.{h} ".center(120, "#"))
                 print(f" Iteracion Nº {cont_iter} ")
-                print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_anios_historial: {n_anios_historial}')
+                print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}')
                 print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")
                 print(f"Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; fill_na: {fill_na} ; bal_type: {bal_type} ; with_pca: {with_pca} ; k: {k}")
 
@@ -121,7 +121,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                             df_hiper.loc[fila_deseada.index, 'cuenta'] += 1
                         else:
                             hiper_data = [{'modelo': model_name, 'hiper': hiper, 'value': value, 'cuenta': 1}]
-                            df_hiper = pd.concat([df_hiper, pd.DataFrame(hiper_data)], axis=0).reset_index(drop=True)
+                            df_hiper = pd.concat([df_hiper, pd.DataFrame(hiper_data)], axis=0)  # .reset_index(drop=True)
 
                 # Selecciono el mejor modelo
                 idx = df_models['test_accuracy'].idxmax()
@@ -139,7 +139,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                       )
 
                 # Guardo datos en dataframe
-                row_data = {'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_anios_historial,
+                row_data = {'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h,
                             'thr_corr': thr_corr, 'thr_fs': thr_fs,
                             'fill_na': fill_na, 'bal_type': bal_type, 'with_pca': with_pca ,
                             'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
@@ -148,8 +148,8 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
                             'test_recall': bm_test_rec, 'test_f1': bm_test_f1,
                             'train_accuracy': bm_train_acc, 'test_accuracy': bm_test_acc}
                 df_res = df_res.append(row_data, ignore_index=True)
-                df_res.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_best_mod.xlsx', index=False)
-                df_hiper.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_best_hiper_per_mod.xlsx', index=False)
+                df_res.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{country}/df_best_mod.xlsx', index=False)
+                df_hiper.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{country}/df_best_hiper_per_mod.xlsx', index=False)
 
                 cont_iter += 1
                 # Verificar si la precisión actual es la mejor hasta ahora
@@ -163,7 +163,7 @@ def find_best_hiperparameters(var_resp, var_pred, pais):
     # Imprimir los hiperparámetros óptimos y la precisión correspondiente
     print("Mejores hiperparámetros:", best_hyperparameters)
     print("Precisión obtenida:", best_accuracy)
-    df_res.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{pais}/df_best_mod.xlsx', index=False)
+    df_res.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/main_find_best_hyper/data/{country}/df_best_mod.xlsx', index=False)
     return best_hyperparameters
 
 def define_n_iterations(d_params):
@@ -181,8 +181,8 @@ def define_n_iterations(d_params):
     return n_iter
 
 def main():
-    pais, var_resp, var_pred = "england", 'equipo_ganador', 'y_pred'
-    find_best_hiperparameters(var_resp, var_pred, pais)
+    country, var_resp, var_pred = "england", 'result', 'y_pred'
+    find_best_hiperparameters(var_resp, var_pred, country)
 
 if __name__ == '__main__':
     main()

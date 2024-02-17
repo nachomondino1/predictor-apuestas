@@ -7,19 +7,19 @@ from sklearn.model_selection import GridSearchCV
 
 def prepare_text_columns(df, l_cols_to_process=[], l_col_to_except=[]):
     '''
-    Prepara el texto de las columnas que contengan strings.
+    Prepara el texto de las columns que contengan strings.
     :param df: Dataframe.
-     :param l_cols_to_process: Lista. Columnas del tipo object a procesar.
-    :param l_col_to_except: Lista. Columnas del tipo object que omitir en el procesamiento.
-    :return: Dataframe con columnas que contienen strings ya preparados para ser analizados
+     :param l_cols_to_process: Lista. Columns del tipo object a procesar.
+    :param l_col_to_except: Lista. Columns del tipo object que omitir en el procesamiento.
+    :return: Dataframe con columns que contienen strings ya preparados para ser analizados
     '''
-    # Si l_cols_to_process está vacía, procesar todas las columnas de texto
+    # Si l_cols_to_process está vacía, procesar todas las columns de texto
     if not l_cols_to_process:
         l_cols_to_process = df.select_dtypes(include='object').columns.tolist()
 
-    # Filtrar las columnas que se procesarán y que no están en la lista de excepciones
+    # Filtrar las columns que se procesarán y que no están en la lista de excepciones
     l_text_columns = [col for col in l_cols_to_process if col not in l_col_to_except]
-    print("Columnas tipo object a preparar:", l_text_columns)
+    print("\nColumns tipo object a preparar:", l_text_columns)
 
     # Creo objeto de la clase
     tp = TextPreparation()
@@ -32,13 +32,13 @@ def prepare_text_columns(df, l_cols_to_process=[], l_col_to_except=[]):
 def clean_teams_names(df):
     """
     Limpia y cambia el nombre de algunos equipos en el dataframe.
-    :param df: Dataframe. Unidad de analisis: partido. Columnas: al menos "equipo_loc" y "equipo_vis"
+    :param df: Dataframe. Unidad de analisis: partido. Columns: al menos "team_home" y "team_away"
     :return: Dataframe. El pasado por parametro con nombres de equipos modificados y limpios
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
     d_sub_strings_adic = {'vencedor': '', 'equipo que avanza': ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
-    df['equipo_loc'] = df['equipo_loc'].replace(d_sub_strings_adic, regex=True).str.strip()
-    df['equipo_vis'] = df['equipo_vis'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
     return df
 
 # TRATAMIENTO DE NAN VALUES
@@ -51,18 +51,18 @@ def fill_nan_values(X, y, type):
     :return: (Dataframe)
     """
     # Definicion de variables
-    X_filled = X.copy()    # Crear una copia del dataframe original dado que realizare cambios en las columnas y valores
+    X_filled = X.copy()    # Crear una copia del dataframe original dado que realizare cambios en las columns y valores
     nan_threshold = 0.2  # cuidado que si hago eliminacion de col antes por un valor inferior, esta lista esta vacia y no hace fillna...
 
-    # Determino las columnas con mucho NaN (mas de nan_threshold%)
-    l_columnas_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
-    print("Columnas consideradas con mucho NaN:", l_columnas_con_nan)
+    # Determino las columns con mucho NaN (mas de nan_threshold%)
+    l_columns_con_nan = X.columns[X.isna().mean() > nan_threshold].tolist()  # e.g. ['historial_entre_si', 'dif_edad_tit', 'dif_alt_tit', 'dif_rat_tit', 'dif_edad_sup', 'dif_alt_sup', 'dif_rat_sup']
+    print("Columns consideradas con mucho NaN:", l_columns_con_nan)
 
-    # Si hay al menos una columna sin NaN (sino no tengo columnas para X_train y falla con ValueError)
-    if len(l_columnas_con_nan) < len(X.columns):
+    # Si hay al menos una columna sin NaN (sino no tengo columns para X_train y falla con ValueError)
+    if len(l_columns_con_nan) < len(X.columns):
 
         # Por columna a rellenar
-        for col in l_columnas_con_nan:
+        for col in l_columns_con_nan:
             # print(f"Columna a rellenar: {col}")
 
             # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
@@ -72,14 +72,14 @@ def fill_nan_values(X, y, type):
             # OPCION 2: Llenar los valores faltantes con ML
             elif type == "ml":
 
-                # Elimino registros NaN en las columnas con bajo % de NaN (para poder usarlas en X_train)
-                X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
+                # Elimino registros NaN en las columns con bajo % de NaN (para poder usarlas en X_train)
+                X_filled_dropna = X_filled.dropna(subset=X_filled.drop(l_columns_con_nan, axis=1).columns)
 
                 # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
                 # Separo test de train y val puesto que test tendra los NaN values para la columna
-                X_train_val = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columnas_con_nan)  # df con columna!=nan # e.g. (2728, 11)
+                X_train_val = X_filled_dropna.loc[X[col].notnull()].drop(columns=l_columns_con_nan)  # df con columna!=nan # e.g. (2728, 11)
                 y_train_val = X_filled_dropna.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
-                X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columnas_con_nan)  # e.g. (378, 11)
+                X_test = X_filled_dropna.loc[X[col].isnull()].drop(columns=l_columns_con_nan)  # e.g. (378, 11)
                 # Separo en train y val
                 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
@@ -96,79 +96,79 @@ def fill_nan_values(X, y, type):
                 predicted_values_index = X_test.index
                 X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
 
-        # Elimino los registros NaN en las columnas que preferi usar para entrenar en vez de rellenar
-        X_filled = X_filled.dropna(subset=X_filled.drop(l_columnas_con_nan, axis=1).columns)
+        # Elimino los registros NaN en las columns que preferi usar para entrenar en vez de rellenar
+        X_filled = X_filled.dropna(subset=X_filled.drop(l_columns_con_nan, axis=1).columns)
         y = y.loc[X_filled.index]  # Selecciono las y solo de los registros en X_filled
-        X_filled = X_filled.reset_index(drop=True)  # Reseteo index en X
-        y = y.reset_index(drop=True) # Reseteo index en y
+        X_filled = X_filled  # .reset_index(drop=True)  # Reseteo index en X
+        y = y  # .reset_index(drop=True) # Reseteo index en y
         return X_filled, y
 
     else:
-        # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
+        # Elimino rows con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
         df = pd.concat([X, y], axis=1)
         df = df.dropna()
-        X = df.drop('equipo_ganador', axis=1)
-        y = df['equipo_ganador']
+        X = df.drop('result', axis=1)
+        y = df['result']
         return X, y
 
-def eliminar_filas_nan(df, porc_nan_max):
+def delete_rows_nan(df, porc_nan_max):
     """
-    Elimina las filas de un DataFrame que contienen un porcentaje alto de valores NaN.
+    Elimina las rows de un DataFrame que contienen un percentage alto de valores NaN.
 
     :param df: DataFrame de entrada. (DataFrame)
-    :param porc_nan_max: Porcentaje maximo tolerado de NaN values en una fila (Float) [0-1]
-    :return: DataFrame resultante después de eliminar las filas con valores NaN. (DataFrame)
+    :param porc_nan_max: Percentage maximo tolerado de NaN values en una fila (Float) [0-1]
+    :return: DataFrame resultante después de delete las rows con valores NaN. (DataFrame)
     """
-    # Elimino filas segun umbral
-    porcentaje_nan = df.isnull().mean(axis=1)  # Calcula el porcentaje de valores NaN en cada fila
-    filas_a_eliminar = porcentaje_nan[porcentaje_nan > porc_nan_max].index  # Obtiene las filas que superan el umbral
-    print(f"De las {len(df)} filas, se eliminarom {len(filas_a_eliminar)/len(df)*100:.0f}%, quedan {len(df) - len(filas_a_eliminar)} filas.")
+    # Elimino rows segun umbral
+    percentage_nan = df.isnull().mean(axis=1)  # Calcula el percentage de valores NaN en cada fila
+    rows_to_delete = percentage_nan[percentage_nan > porc_nan_max].index  # Obtiene las rows que superan el umbral
+    print(f"De las {len(df)} rows, se delete {len(rows_to_delete)/len(df)*100:.0f}%, quedan {len(df) - len(rows_to_delete)} rows.")
 
-    # Elimino filas segun umbral
-    df_filtrado = df.drop(filas_a_eliminar)  # Elimina las filas con valores NaN
+    # Elimino rows segun umbral
+    df_filtrado = df.drop(rows_to_delete)  # Elimina las rows con valores NaN
     return df_filtrado
 
-def eliminar_columnas_nan(df, porc_nan_max):
+def delete_columns_nan(df, porc_nan_max):
     """
-    Elimina las columnas de un DataFrame que contienen un porcentaje alto de valores NaN.
+    Elimina las columns de un DataFrame que contienen un percentage alto de valores NaN.
 
     :param df: DataFrame de entrada. (DataFrame)
-    :param porc_nan_max: Porcentaje maximo tolerado de NaN values en una columna. (Float) [0-1]
-    :return: DataFrame resultante después de eliminar las columnas con valores NaN. (DataFrame)
+    :param porc_nan_max: Percentage maximo tolerado de NaN values en una columna. (Float) [0-1]
+    :return: DataFrame resultante después de delete las columns con valores NaN. (DataFrame)
     """
     # Calcula la proporción de NaN en cada columna
     prop_nan = df.isna().mean()
 
-    # Identifica las columnas con una proporción de NaN mayor al umbral
-    columnas_eliminar = prop_nan[prop_nan > porc_nan_max].index
+    # Identifica las columns con una proporción de NaN mayor al umbral
+    columns_delete = prop_nan[prop_nan > porc_nan_max].index
 
-    # Elimina las columnas identificadas del DataFrame
-    df_sin_nan = df.drop(columnas_eliminar, axis=1).reset_index(drop=True)  # es clave el drop=True para eliminar el indice viejo sino agrega la columna "index"
-    print(f"De las {len(df.columns)} columnas, se eliminaron {len(list(columnas_eliminar))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columnas_eliminar)}")
+    # Elimina las columns identificadas del DataFrame
+    df_sin_nan = df.drop(columns_delete, axis=1)  # .reset_index(drop=True)  # es clave el drop=True para delete el indice viejo sino agrega la columna "index"
+    print(f"De las {len(df.columns)} columns, se deleteon {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
     return df_sin_nan
 
 def prueba():
-    pais = 'argentina_south_america'
+    country = 'argentina_south_america'
     thr_nan_col = 0.2
 
     # Levanto dataset
-    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_constructed_False_180_30_3.xlsx')
+    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_constructed_False_180_30_3.xlsx')
 
     # Eliminacion de NaN values
-    # Elimino filas y columnas con alto porcentaje de NaN values
+    # Elimino rows y columns con alto percentage de NaN values
     largo_inicial = len(df)
     df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')
-    print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de filas, quedan {len(df)} filas.")
+    print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de rows, quedan {len(df)} rows.")
 
     if thr_nan_col is not None:
         prop_nan = df.isna().mean()
         print(prop_nan)
-        df = eliminar_columnas_nan(df, umbral=thr_nan_col)  # 2º elimino columnas con mucho NaN # ojo que asi puede borrar odds
+        df = delete_columns_nan(df, thr_nan_col)  # 2º elimino columns con mucho NaN # ojo que asi puede borrar odds
 
     # Verificar que no haya outliers
     # ...
 
-    # Normalizo columnas con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
+    # Normalizo columns con valores mas grandes para evitar ValueError: Solver produced non-finite parameter weights. The input data may contain large values and need to be preprocessed.
     # scaler = StandardScaler()  # Crea un objeto StandardScaler
     # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
     # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))

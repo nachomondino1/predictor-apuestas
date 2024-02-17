@@ -1,27 +1,28 @@
 import pandas as pd
+import numpy as np
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
 from random import randint
 
-def balance_dataset(X, y, tipo):
-
+def balance_dataset(X, y, tipo):  # Borra indice original de X e y
+    
     # Balanceamos segun variable respuesta
     if tipo == 'over':  # Genera overfitting
         oversampler = RandomOverSampler()  #
-        X_bal, y_bal = oversampler.fit_resample(X, y)
+        X, y = oversampler.fit_resample(X, y)
 
     elif tipo == 'under':  # Genera underfitting si no hago shuffle despues
         undersampler = RandomUnderSampler()  # Funciona igual que mi funcion pero no cambia dtypes, por lo que, no arroja errores
-        X_bal, y_bal = undersampler.fit_resample(X, y)
+        X, y = undersampler.fit_resample(X, y)
 
     else:
         print("El tipo ingresado para balancear los datos no es una opcion")
         raise ValueError(f"Error: El tipo de balanceo '{tipo}', no es una opcion")
 
-    return X_bal, y_bal
+    return X, y
 
-def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5):
+def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=True):
     """
     Separa un dataframe en train, validación y test según el porcentaje de corte indicado.
     Los conjuntos de validación y prueba no deben contener registros con NaN.
@@ -34,7 +35,7 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5):
     :return: X_train, X_val, X_test, y_train, y_val, y_test.
     """
     # Concatenar X e y y luego shuffle del DataFrame
-    df = pd.concat([X, y], axis=1).sample(frac=1).reset_index(drop=True)
+    df = pd.concat([X, y], axis=1).sample(frac=1)  # .reset_index(drop=True)
 
     # Todos los registros con al menos un NaN value los guardo en el conjunto de entrenamiento
     df_train = df.loc[df.isna().any(axis=1)]
@@ -51,27 +52,27 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5):
     # print(df_train.shape)
 
     # Defino df_val_test segun los registros que quedan
-    df_val_test = df.loc[~df.index.isin(df_train.index)].reset_index(drop=True)
+    df_val_test = df.loc[~df.index.isin(df_train.index)]  # .reset_index(drop=True)
     X_val_and_test, y_val_and_test = df_val_test.drop(y.name, axis=1), df_val_test[y.name]
     # print(df_val_test.shape)
 
     # Separo en test y val
-    X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
+    X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=shuffle)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 def prueba():
 
     from p3_data_preparation import clean_data
 
-    pais = 'argentina_south_america'
-    var_resp = 'equipo_ganador'
+    country = 'argentina_south_america'
+    var_resp = 'result'
     bal_type = None
     test_val_size = 0.2
     test_size = 0.5
     fill_na = 'ml'
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{pais}/df_selected.xlsx')
+    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_selected.xlsx')
 
     # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
     if fill_na is None:
@@ -102,7 +103,7 @@ def prueba():
 
     # Shuffle el dataset de entrenamiento
     df_train = pd.concat([X_train, y_train], axis=1)
-    df_train = df_train.sample(frac=1).reset_index(drop=True)
+    df_train = df_train.sample(frac=1)  # .reset_index(drop=True)
     X_train, y_train = df_train.drop(var_resp, axis=1), df_train[var_resp]
 
     print(f'Train: {X_train.shape} {y_train.shape}')
