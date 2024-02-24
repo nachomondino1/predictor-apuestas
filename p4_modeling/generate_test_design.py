@@ -5,20 +5,20 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
 from random import randint
 
-def balance_dataset(X, y, tipo):  # Borra indice original de X e y
+def balance_dataset(X, y, bal_type):  # Borra indice original de X e y
     
     # Balanceamos segun variable respuesta
-    if tipo == 'over':  # Genera overfitting
+    if bal_type == 'over':  # Genera overfitting
         oversampler = RandomOverSampler()  #
         X, y = oversampler.fit_resample(X, y)
 
-    elif tipo == 'under':  # Genera underfitting si no hago shuffle despues
+    elif bal_type == 'under':  # Genera underfitting si no hago shuffle despues
         undersampler = RandomUnderSampler()  # Funciona igual que mi funcion pero no cambia dtypes, por lo que, no arroja errores
         X, y = undersampler.fit_resample(X, y)
 
     else:
-        print("El tipo ingresado para balancear los datos no es una opcion")
-        raise ValueError(f"Error: El tipo de balanceo '{tipo}', no es una opcion")
+        print("El bal_type ingresado para balancear los datos no es una opcion")
+        raise ValueError(f"Error: El bal_type de balanceo '{bal_type}', no es una opcion")
 
     return X, y
 
@@ -35,7 +35,7 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=
     :return: X_train, X_val, X_test, y_train, y_val, y_test.
     """
     # Concatenar X e y y luego shuffle del DataFrame
-    df = pd.concat([X, y], axis=1).sample(frac=1)  # .reset_index(drop=True)
+    df = pd.concat([X, y], axis=1).sample(frac=1)
 
     # Todos los registros con al menos un NaN value los guardo en el conjunto de entrenamiento
     df_train = df.loc[df.isna().any(axis=1)]
@@ -93,12 +93,12 @@ def prueba():
         X_train, X_val, X_test, y_train, y_val, y_test = separate_train_val_and_test(X, y, test_val_size=test_val_size, test_size=test_size)
 
         # Relleno nan en el dataset de entrenamiento
-        X_train, y_train = clean_data.fill_nan_values(X_train, y_train, type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
+        X_train, y_train = clean_data.drop_and_fill_nan_values(X_train, y_train, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las precisiones casi siempre seran mayores que dropna() en train y test, lo que cuenta es la precision en next_matches o en un dataset que no haya sido filleado...
         print(f"Se realizó el rellenado de NaN values. Shape X_train luego de rellenado: {X_train.shape}")
 
     # Balanceo el dataset de entrenamiento
     if bal_type is not None:
-        X_train, y_train = balance_dataset(X_train, y_train, tipo=bal_type)
+        X_train, y_train = balance_dataset(X_train, y_train, fill_type=bal_type)
         print(f"Shape X_train luego de balanceo: {X_train.shape}")
 
     # Shuffle el dataset de entrenamiento
