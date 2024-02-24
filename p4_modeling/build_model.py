@@ -4,7 +4,7 @@ from sklearn.metrics import accuracy_score  # Metrica de precision
 import time
 
 
-def select_best_hiperparameters(model, X, y, k):
+def select_best_hiperparameters(model, X, y, k, _print: bool = False):
     """
     Selecciona los mejores hiperparametros para un modelo.
 
@@ -14,8 +14,9 @@ def select_best_hiperparameters(model, X, y, k):
     :param k: Numero de folds. (int)
     :return: Modelo actualizado con los hiperparametros optimos pero aun sin ajustar. (sklearn.ensemble)  # sklearn.ensemble._forest.RandomForestClassifier
     """
-    start = time.time()
-    print(f"\nSeleccionando mejores hiperparametros para {model} con k={k}")
+    if _print:
+        start = time.time()
+        print(f"\nSeleccionando mejores hiperparametros para {model} con k={k}")
 
     # Definicion de hiperparametros a considerar para cada modelo
     d_params = {
@@ -28,17 +29,17 @@ def select_best_hiperparameters(model, X, y, k):
             'max_features': ['auto'],
         },
         'RandomForestClassifier': {
-            'n_estimators': [100, 200],  # Número de árboles en el bosque.
-            'criterion': ['entropy'],  # 'gini'  # Función para medir la calidad de una división.
-            'max_depth': [3, 7], # Podria reemplazar 10 y 15 por 8 # Profundidad máxima de los árboles.
+            'n_estimators': [100, 500],  # Número de árboles en el bosque.
+            'criterion': ['entropy'],  # Función para medir la calidad de una división.
+            'max_depth': [3, 5, 7], # Podria reemplazar 10 y 15 por 8 # Profundidad máxima de los árboles.
             'min_samples_split': [2, 10],  # Número mínimo de muestras requeridas para realizar una división en un nodo interno.
             'min_samples_leaf': [1, 4], # Número mínimo de muestras requeridas para estar en un nodo hoja.
-            'max_features': ['auto'],  # Número máximo de características a considerar al buscar la mejor división.
+            'max_features': ['sqrt'],  # Número máximo de características a considerar al buscar la mejor división.
             'bootstrap': [True],  # Indica si se deben realizar muestras bootstrap al construir árboles.
         },
-        'XGBClassifier': {  # ValueError: DataFrame.dtypes for data must be int, float, bool or category. When categorical type is supplied, The experimental DMatrix parameter`enable_categorical` must be set to `True`.  Invalid columns:dt_loc: object
+        'XGBClassifier': {  # ValueError: DataFrame.dtypes for data must be int, float, bool or category. When categorical fill_type is supplied, The experimental DMatrix parameter`enable_categorical` must be set to `True`.  Invalid columns:dt_loc: object
             'n_estimators': [100, 500, 1000],  # Número de árboles en el ensamblado.
-            'learning_rate': [0.01, 0.1, 0.3],  # Tasa de aprendizaje que controla la contribución de cada árbol.
+            'learning_rate': [0.01, 0.1],  # Tasa de aprendizaje que controla la contribución de cada árbol.
             'max_depth': [3, 7, 10, 15, 20],  # Profundidad máxima de cada árbol.
             # 'min_child_weight': [1, 3, 5],  # Peso mínimo requerido en una hoja del árbol.
             'subsample': [0.8, 1.0],  # Proporción de muestras utilizadas para entrenar cada árbol.
@@ -49,7 +50,7 @@ def select_best_hiperparameters(model, X, y, k):
         },
         'GradientBoostingClassifier': {  # Puede performar mejor que Random pero con estos hiper tarda 39.9 minutos --> saco 1000 de n_estim y pongo 200 y saco max depth de 7
             'n_estimators': [100, 200, 500], # 1000 # Número de árboles en el ensamblado.
-            'learning_rate': [0.01, 0.1, 1],  # Tasa de aprendizaje que controla la contribución de cada árbol.
+            'learning_rate': [0.01, 0.1],  # Tasa de aprendizaje que controla la contribución de cada árbol.
             'max_depth': [3, 5],  # 7  # Profundidad máxima de cada árbol.
             # 'min_samples_split': [1, 5, 10],  # Número mínimo de muestras requeridas para dividir un nodo interno.
             # 'min_samples_leaf': [2, 4],  # Número mínimo de muestras requeridas en cada hoja del árbol.
@@ -60,19 +61,19 @@ def select_best_hiperparameters(model, X, y, k):
         'LogisticRegression': {
             'penalty': ['l1', 'l2'],  # Tipo de regularización a aplicar.
             'C': [0.1, 1.0, 5.0],  # Podria probar un 3.0 en vez de 5  # Inverso de la fuerza de regularización.
-            'solver': ['saga', 'liblinear'], # Podria prescindir de 'lbfgs' # Algoritmo a utilizar en la optimización del problema.
-            'fit_intercept': [True, False],  # Mas del 75% de las veces es True # Especifica si se debe ajustar o no el intercepto.
-            'max_iter': [4000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
+            'solver': ['saga', 'liblinear', 'lbfgs'], # Algoritmo a utilizar en la optimización del problema.
+            'fit_intercept': [True, False],  # Especifica si se debe ajustar o no el intercepto.  # Mas del 75% de las veces es True
+            'max_iter': [100, 1000, 2000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
             'multi_class': ['auto'],  # Esquema de clasificación multiclase.
         },
         'SVC': {
             'C': [0.1, 1.0, 5.0],  # Parámetro de regularización.
             'kernel': ['poly', 'rbf'], # 'linear', 'sigmoid' # Función kernel utilizada para transformar los datos de entrada.
-            # 'gamma': ['scale', 'auto'],  # Coeficiente para el kernel RBF, 'poly' y 'sigmoid'.
+            'gamma': ['scale', 'auto'],  # Coeficiente para el kernel RBF, 'poly' y 'sigmoid'.
             'degree': [3, 5],  # Grado del kernel polinomial.
             'coef0': [0.0,  0.5, 1.0],  # Término independiente en funciones kernel polinomiales y sigmoide.
-            # 'shrinking': [True, False],  # Activa o desactiva el uso de la heurística de encogimiento.
-            # 'probability': [True, False],  # Habilita o deshabilita la estimación de probabilidades.
+            'shrinking': [True, False],  # Activa o desactiva el uso de la heurística de encogimiento.
+            # 'probability': [True, False],  # Habilita o deshabilita la estimación de probabilidades. --> no tiene sentido probarlo aqui
             # 'tol': [1e-3, 1e-4, 1e-5],  # Siempre gana 1e-3 (y es el valor default) y ChatGPT no me lo dio como hiper tipico
             'decision_function_shape': ['ovo'],  # Siempre le gana ovo (One Vs One) a ovr (One Vs Rest)
         },
@@ -127,11 +128,50 @@ def select_best_hiperparameters(model, X, y, k):
 
     # Actualizar los hiperparámetros de model con los mejores hiperparámetros encontrados
     model.set_params(**best_params)
-    print("\tMejores hiperparametros:", model)
-
-    end = time.time()
-    print(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
+    if _print:
+        end = time.time()
+        print("\tMejores hiperparametros:", model)
+        print(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
     return model
+
+def bayer_optimization_hiperparameters(model, X, y, k): # No probada
+    # import optuna
+    # from sklearn.model_selection import train_test_split
+
+    def objective(trial):
+        params = {
+            'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
+            'max_depth': trial.suggest_int('max_depth', 3, 15),
+            'learning_rate': trial.suggest_uniform('learning_rate', 0.01, 0.3)
+        }
+
+        # Inicializa el modelo con los hiperparámetros sugeridos por Optuna
+        model_instance = model(**params)
+        model_instance.fit(X_train, y_train)
+        
+        # Realiza predicciones en el conjunto de prueba
+        y_pred = model_instance.predict(X_test)
+        
+        # Calcula la métrica de evaluación (en este caso, precisión)
+        score = accuracy_score(y_test, y_pred)
+        return score
+
+    # Divide los datos en conjunto de entrenamiento y prueba
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Inicializa el estudio de Optuna
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=50)  # Número de iteraciones de búsqueda
+
+    # Imprime los mejores hiperparámetros encontrados
+    print("Mejores hiperparámetros:", study.best_params)
+
+     # Obtiene los mejores hiperparámetros encontrados
+    best_params = study.best_params
+
+    # Inicializa el modelo con los mejores hiperparámetros
+    best_model = model(**best_params)
+    return best_model
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
     """
@@ -173,7 +213,12 @@ def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que
     return cv_accuracy
 
 def prueba():
-    pass
+
+    modelo = RandomForestClassifier()
+    X_val = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/X_val.xlsx')
+    y_val = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/X_val.xlsx')
+ 
+    best_model = bayer_optimization_hiperparameters(RandomForestClassifier, X, y, 5)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
