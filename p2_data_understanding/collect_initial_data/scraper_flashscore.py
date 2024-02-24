@@ -123,7 +123,7 @@ class FlashscoreCrawler(Crawler):
             d_new_row_df_match_player.update(self.extract_lineups())
             d_new_row_df_match.update(self.extract_coaches())
         
-        return d_new_row_df_match_player, d_new_row_df_match
+        return d_new_row_df_match, d_new_row_df_match_player
 
     def extract_next_match_data(self):
         """
@@ -140,9 +140,14 @@ class FlashscoreCrawler(Crawler):
         if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
             d_new_row_df_match.update(self.extract_odds())
 
-        ## Si tiene hoja "Formaciones", extraigo campos
-        d_new_row_df_match_player.update(self.extract_bajas_pre_partido()) # FALTARIA TMB SECCION POSIBLES BAJAS.
-       
+        ## Si tiene hoja "Formations", extraigo campos
+        boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
+        if super().click_boton(boton_formations) is not False:
+            d_new_row_df_match_player.update(self.extract_lineups())
+            d_new_row_df_match.update(self.extract_coaches())
+        else:
+            d_new_row_df_match_player.update(self.extract_bajas_pre_partido()) # FALTARIA TMB SECCION POSIBLES BAJAS.
+            
         return d_new_row_df_match, d_new_row_df_match_player
 
     def extract_basic_data_from_summary(self, extract_goals=True):
@@ -369,7 +374,7 @@ class FlashscoreCrawler(Crawler):
         return l_items_filt
 
 
-def extract_data_flashscore(country: str, competition: str, n_seasons_max: int = 0, export: bool = True):
+def extract_data(country: str, competition: str, n_seasons_max: int = 0, export: bool = True):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -448,7 +453,7 @@ def extract_data_flashscore(country: str, competition: str, n_seasons_max: int =
     crawler.driver.close()
     return df_match, df_match_player
 
-def extract_next_matches_flashscore(country: str, competition: str, n_days): # -> tuple[pd.DataFrame, pd.DataFrame]
+def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.DataFrame, pd.DataFrame]
     
     # Definicion de variables
     df_match, df_match_player = pd.DataFrame(), pd.DataFrame()
@@ -496,7 +501,7 @@ def extract_next_matches_flashscore(country: str, competition: str, n_days): # -
     crawler.driver.close()
     return df_match, df_match_player
 
-def extract_data_faltante_flashcore(country, competition, l_ids_already_collected):  # Se podria usar la misma funcion que extract_normal pero agregando l_ids_already_collected para filtrar partidos... y  tal vez n_seasons_max=1.
+def extract_missing_data(country, competition, l_ids_already_collected, _print: bool = False):  # Se podria usar la misma funcion que extract_normal pero agregando l_ids_already_collected para filtrar partidos... y  tal vez n_seasons_max=1.
     """
     Extrae los partidos aun no extraidos de una competencia de un country.
     """
@@ -508,50 +513,49 @@ def extract_data_faltante_flashcore(country, competition, l_ids_already_collecte
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "_")
     competicion_form = competition.lower().replace(" ", "-")  # formateo competition para las rutas de archivo y urls
-    # ruta_base = f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p6_deployment/data_next_matches/{country_form}/data_understanding/"
 
     # Ingreso a pagina de competition
     url = f'https://www.flashscore.com/football/{country_form}/{competicion_form}'
     crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
-    print(url)
+    if _print:
+        print(url)
 
     # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
     crawler.accept_cookies()
     season_year = crawler.extract_season_year()
-    print(f" {season_year} ".center(120, "-"))
+    if _print:
+        print(f" {season_year} ".center(120, "-"))
 
     # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la temporada)
     crawler.click_show_more_matches()
 
     # Extraigo partidos (items) y sus ids
     l_ids = crawler.extract_id_matches()
-    progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
-    print(f"Partidos recolectados de la temporada {season_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
+    l_ids_filt = [id_match for id_match in l_ids if id_match not in l_ids_already_collected]
+    if _print:
+        print(f"Partidos recolectados de la temporada {season_year} (e.g. en premier league deberian ser 380): {len(l_ids_filt)}")
+        progress_bar = tqdm(total=len(l_ids_filt), ncols=80)  # Inicializo barra de progreso
 
     # POR PARTIDO (c/u identificado con un id)
-    for id_match in l_ids:
+    for id_match in l_ids_filt:
 
-        # Si el partido aun no fue extraido
-        if id_match not in l_ids_already_collected:
+        # Ingreso a pagina de informacion del partido
+        url_partido = f'https://www.flashscore.com/match/{id_match}/#/match-summary'
+        crawler.driver.get(url_partido)
 
-            # Ingreso a pagina de informacion del partido
-            url_partido = f'https://www.flashscore.com/match/{id_match}/#/match-summary'
-            crawler.driver.get(url_partido)
+        # Extraigo todos los datos del partido
+        d_new_row_df_match, d_new_row_df_match_player = crawler.extract_match_data()
+        d_new_row_df_match.update({'season': season_year})
 
+        # Guardo datos del partido
+        df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])
+        df_match_player = pd.concat([df_match_player, pd.DataFrame(d_new_row_df_match_player, index=[id_match])])
+        if _print:
             progress_bar.update(1)
-        
-        else:
-            print(f"El id {id_match} ya está en l_ids_already_collected, por ende, no se extrae")
-            break
 
     # Cerrar la barra de progreso al finalizar
-    progress_bar.close()
-
-    # Guardo datos por seguridad
-    # if export:
-    #     # Guardo partidos
-    #     df_match.to_excel(f'{ruta_base}/df_match_new_matches_{competicion_form}_{season_year_form}_{country_form}.xlsx', index=False)
-    #     df_match_player.to_excel(f'{ruta_base}/df_match_player_new_matches_{competicion_form}_{season_year_form}_{country_form}.xlsx', index=False)
+    if _print:
+        progress_bar.close()
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
@@ -564,7 +568,7 @@ def prueba():
     n_seasons_max = 16
 
     # Extraigo partidos
-    df_match, df_match_player = extract_data_flashscore(country, competition, n_seasons_max, export=False)
+    df_match, df_match_player = extract_data(country, competition, n_seasons_max, export=False)
     
     # Exporto datasets
     df_match.to_excel('/Users/nachomondino/Desktop/df_match.xlsx', index=True)
