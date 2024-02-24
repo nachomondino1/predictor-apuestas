@@ -196,12 +196,36 @@ def extract_players_sofifa(country, league, export=True):
     return df_player
 
 def prueba():
-    # Agregar: Definir que competition y que country queres extraer aquí segun df_comp...
+    # Seleccionar pais  
     country = "England"
-    league = "Premier League"
+    liga = "Premier League"
 
-    extract_players_sofifa(country, league, export=True)
+    df_player = extract_players_sofifa(country, liga, export=True)
+    df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=False)
 
+    """ A y B
+    # Levanto datasets
+    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+
+    # Determino competencias a extraer
+    id_country = df_countries[df_countries['country_name'] == country]['id_country'].values[0]
+    l_comp = df_comp[(df_comp['id_country']==id_country) & (df_comp['is_cup']==0)]['competition_sofifa']
+
+    df_player_concat = pd.DataFrame()
+
+    # Por liga
+    for liga in l_comp:
+
+        # Extraigo competicion
+        df_player = extract_players_sofifa(country, liga, export=True)
+
+        # Guardo datos
+        df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
+    
+    df_player_concat.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=False)
+    """
+    
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     prueba()
