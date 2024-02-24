@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 
-def eliminar_columnas_correlacionadas(df, var_resp, umbral):
+def delete_correlated_columns(df, var_resp, umbral):
     """
     Identificacion de las columnas con un correlacion alta (mayor al umbral)
     :param df:
@@ -108,7 +108,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def random_forest(self, X, y, k=10, graf=False):
+    def random_forest(self, X, y, k: int = 5, graf=False):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
@@ -121,7 +121,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Verificar si se deben buscar los mejores hiperparámetros
-        model = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(X_train, y_train)
@@ -156,7 +156,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def rfe(self, X, y, graf=False):
+    def rfe(self, X, y, k: int = 5, graf=False):
         """
         Calculo de importancia de cada variable segun rfe.
 
@@ -172,7 +172,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=10)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=k, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
         rfe = RFE(estimator=model, n_features_to_select=n_features)
 
         # Entreno modelo
@@ -191,7 +191,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def lasso_selection(self, X, y, graf=False):
+    def lasso_selection(self, X, y, k:int = 5, graf=False):
         """
         Calculo de importancia de cada variable segun lasso.
 
@@ -204,7 +204,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model = select_best_hiperparameters(Lasso(), X_val, y_val, k=10)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(Lasso(), X_val, y_val, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo
         model.fit(X_train, y_train)
@@ -268,7 +268,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-def select_best_features(df, var_resp, thr_fs, graf=True):
+def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: bool = True):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -279,87 +279,108 @@ def select_best_features(df, var_resp, thr_fs, graf=True):
     :param graf: Boolean. True para graficar variables y sus importancias. De lo contrario, False.
     :return: Lista de variables mas importantes. (list)
     """
+    print('\n Feature Selection...')
     # Definicion de variables
     fs = FeatureSelection()
+    k = 10
     graficar_cada_metodo = False
-    print('\nEliminacion de columnas menos importantes:')
-
-    # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
-    n_filas_inic = len(df)
-    df = df.dropna()  # Es dificil que queden pocos registros porque borro filas y col con muchos nan antes
-    print(f"\tDe las {n_filas_inic} filas iniciales, hago fs (pues uso ML y no puede tener NaN) solo con: {df.shape[0]}")  # es el largo solo para Feature Selection...
-    if df.shape[0] < 0.2 * n_filas_inic:
-        warnings.warn("Feature selection with too little input data. Estas haciendo la seleccion de variables mas importantes con muy pocas filas, lo cual hace poco confiable dicha seleccion y posiblemente entrenaras con pocos datos en Modeling. Posiblemente hay una/s columna/s con muchos NaN values. Fijate de usar un thr_nan_col mas bajo en clean_data().", UserWarning)
-
-    print("\ndf post dropna\n", df.head(2))
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
-    print("\nX\n", X.head(2))
-    print("\ny\n", y.head(2))
-    df_importance = pd.DataFrame(index=X.columns)
+
+    # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
+    print("\tReemplazo y remuevo NaN values (uso ML y no puede tener input NaN)... ", end="")
+
+    ## Determino las columns con mucho NaN (mas de nan_threshold%)
+    l_columns_con_poco_nan, l_columns_con_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=75, _print=False)
+
+    ## Elimino registros NaN en las columns con bajo % de NaN (para poder usarlas en X_train)
+    X = X.dropna(subset=l_columns_con_poco_nan)
+    X = clean_data.delete_columns_nan(X, porc_nan_max=0.99)  # Elimino columnas que quedan nan tras el dropna anterior. Esto evita error al rellenar una columna vacia.
+    l_columnas_to_fill = X.drop(l_columns_con_poco_nan, axis=1).columns
+    
+    ## Relleno filas
+    X = clean_data.fill_nan_values(X, l_columnas_to_fill, fill_type='mode')  
+    y = y[y.index.isin(X.index)]
+    print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
 
     # Detemino importancia de cada variable para cada modelo
+    print("\t Calculando importancias de variables segun varios modelos...")
+    df_importance = pd.DataFrame(index=X.columns)
     # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
     df_importance = df_importance.merge(fs.via(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.random_forest(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.rfe(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    # df_importance.to_excel('/Users/nachomondino/Desktop/df_importance_prueba.xlsx')
+    df_importance = df_importance.merge(fs.random_forest(X, y, k=k, graf=graficar_cada_metodo), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.rfe(X, y, k=k, graf=graficar_cada_metodo), left_index=True, right_index=True)
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)
-    # df_normalized.to_excel('/Users/nachomondino/Desktop/df_normalized_prueba.xlsx')
 
-    # Determino columnas a eliminar por poco importancia
-    l_not_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] < df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()
+    # Determino columnas mas importantes
+    l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()
 
     # Grafico importancias teniendo en cuenta todos los modelos
     if graf:
         fs.graficar_importancia_atrib(X=df_normalized['suma_de_imp_norm'], y=df_normalized.index)
-
-    return l_not_important_features
+    
+    return l_important_features
 
 def prueba():
     from p3_data_preparation import format_data
 
     # Definicion de variables
     var_resp = 'result'
-    country = 'inglaterra'
+    country = 'england'
+    export = False
     warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
-    thr_corr = 0.7  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
-    thr_fs = 0.2  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
+    thr_corr = None  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)
+    thr_fs = None  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
     export = False
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx')
+    df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx', index_col=0)
     print(df.head())
 
     # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)
-    n_col = len(df.columns)
-    df = df.drop(['id_match', 'country', 'fecha'], axis=1)
-    print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. id_match, fecha, etc).")
+    # n_col = len(df.columns)
+    df = df.drop(['date'], axis=1)  
+    # print(f"Se eliminó {n_col - len(df.columns)} de {n_col} columnas puesto que no sirven para el analisis (e.g. id_match, fecha, etc).")
 
+    # Elimino columnas con 100% de nan values (puede que construyas y queden con todo nan...)
+    df = clean_data.delete_columns_nan(df, porc_nan_max=0.99)
+    print(df.head(2))
+    
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
     df, df_etiquetas = format_data.convert_columns_to_int(df)
-    # df_etiquetas.to_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_etiquetas.xlsx', index=False)
-    df_etiquetas.to_excel(f'/Users/nachomondino/Desktop/df_etiquetas.xlsx', index=False)
-    df.to_excel(f'/Users/nachomondino/Desktop/df_etiquetado.xlsx', index=False)
+    if export:     
+        df_etiquetas.to_excel(f'/Users/nachomondino/Desktop/df_etiquetas.xlsx', index=False)
+        df.to_excel(f'/Users/nachomondino/Desktop/df_etiquetado.xlsx', index=False)
 
     # Elimino variables altamente correlacionadas
     if thr_corr is not None:
-        l_columnas_a_eliminar = eliminar_columnas_correlacionadas(df, var_resp, thr_corr)
+        l_columnas_a_eliminar = delete_correlated_columns(df, var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
+        print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
         # df.to_excel(f'/Users/nachomondino/Desktop/df_eliminado_corr.xlsx')
 
     # Selecciono las variables mas importantes (feature selection)
     if thr_fs is not None:
-        l_not_important_features = select_best_features(df, var_resp, thr_fs=thr_fs, graf=True)
-        df = df.drop(l_not_important_features, axis=1)
+        n_cols = len(df.columns)
+        l_important_features = select_best_features(df, var_resp, thr_fs, graf=export)
+        df = df.loc[:, l_important_features + [var_resp]]
+        print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas importantes: {l_important_features}")
 
-    print(f"Las siguientes {len(df.columns)} columnas son las seleccionadas: {list(df.columns)}")
-    df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
+    print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(var_resp, axis=1).columns)}")
+
+    print(df.shape)
+    df = clean_data.verification_no_nan(df) # Funciona espectacular.
+    print(df.shape)
+    df = clean_data.delete_rows_nan(df, porc_nan_max=0)  # df = df.dropna()
+    print(df.shape)
+
+    if export:
+        df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
     
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
