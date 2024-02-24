@@ -46,39 +46,42 @@ def confusion_matrix(y_real, y_pred, df_etiquetas):
     print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
-def calculate_bookmaker_precision(df_results):  # Falta desarrollar.
-    # df_results deberia tener el resultado real y el resultado predicho por mi modelo.
 
-    country = "england"
+def convert_pred_str_to_int(df, name_var_str, name_var_int, df_etiquetas_y): # Esto funciona bien
+    """
+    Obtengo las predicciones segun la casa de apuestas
+    """
+    # Convertir de str a num
+    for idx, row in df_etiquetas_y.iterrows():
+        # print(f"{row['str_value']} --> {row['int_value']}")
+        
+        # Obtengo indices de partidos con determinado resultado
+        idx_to_change = df[df[name_var_str] == row['str_value']].index
 
-    # Levantar df_match_odds....
-    df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
-    print(df_match_odds.head(1))
+        # Reemplazar valores en la columna específica
+        df.loc[idx_to_change, name_var_int] = row['int_value']
 
-    # Determino resultado segun casa de apuesta
-    df_match_odds = determine_result_segun_casa_apuesta(df_match_odds)
-    print(df_match_odds.head(1))
-
-    # Concateno df_results y df_match_odds
-    df_match_odds_in_test = df_match_odds[df_match_odds.index.isin(df_results.index)]
-    print(df_match_odds_in_test.shape)
-
-    df = pd.concat([df_results, df_match_odds_in_test], axis=1) # Hara match por index y quedaran filas sin result (puesto que solo tienen result las que estan en X_test)
-    print(df.head(1))
-
-    # Calcular la cuota promedio acertada por la casa de apuesta vs la cuota promedio acertada por mi algoritmo.
-    # print(f"\t- Cuota promedio de casa de apuesta: {test_precision_ca:.1f}%")
-    # print(f"\t- Cuota promedio de mi algoritmo: {test_precision_ca:.1f}%")
     return df
 
-def determine_result_segun_casa_apuesta(df):
+def convert_pred_int_to_str(df, name_var_int, name_var_str, df_etiquetas_y): # Esto funciona bien
     """
-    Se determina el 'result' segun la casa de apuestas
-    :param df: Dataframe. Unidad de analisis: match. Columnas: entre ellas odds_home, odds_draw, odds_away
-    :return: Dataframe pasado por parametro con nueva columna, 'bookmaker_result', que detalla el resultado del match
-    segun la casa de apuesta.
+    Obtengo las predicciones segun la casa de apuestas
     """
-    # FORMA 1
+    # Convertir de str a num
+    for idx, row in df_etiquetas_y.iterrows():
+        # print(f"{row['int_value']} --> {row['str_value']}")
+        
+        # Obtengo indices de partidos con determinado resultado
+        idx_to_change = df[df[name_var_int] == row['int_value']].index
+
+        # Reemplazar valores en la columna específica
+        df.loc[idx_to_change, name_var_str] = row['str_value']
+
+    return df
+
+
+def determine_bookmaker_result(df, var_pred):
+    
     # Por fila
     for i, row in df.iterrows():
 
@@ -87,34 +90,43 @@ def determine_result_segun_casa_apuesta(df):
 
         # Si la cuota minima es la del team home
         if row['odds_home'] == odds_min:
-            df.loc[i, 'bookmaker_result'] = "Home"
+            df.loc[i, var_pred] = "Home"
 
         # Si la cuota minima es la del team away
         elif row['odds_away'] == odds_min:
-            df.loc[i, 'bookmaker_result'] = "Away"
+            df.loc[i, var_pred] = "Away"
 
         # Si la cuota minima es la del draw
         else:
-            df.loc[i, 'bookmaker_result'] = "Draw"
+            df.loc[i, var_pred] = "Draw"
 
-    # FORMA 2 (PROPUESTA POR CHAT GPT)
-    """
-    import numpy as np
-    # Determina la cuota mínima de cada fila y el resultado del apostador
-    df['odds_min'] = df[['odds_home', 'odds_draw', 'odds_away']].min(axis=1)
-    conditions = [
-        df['odds_home'] == df['odds_min'],
-        df['odds_away'] == df['odds_min']
-    ]
-    choices = ['Home', 'Away']
-    df['bookmaker_result'] = np.select(conditions, choices, default='Draw')
-
-    # Elimina la columna de la cuota mínima si no la necesitas
-    df.drop(columns=['odds_min'], inplace=True)
-    """
     return df
 
-def calculate_roi(df):  # Mismo stake y apuesto a todos los partidos
+def calculate_probas_bookmarker(df_match_odds): # Funciona bien. Comprobado.
+    """
+    Calcula las probabilidades de cada resultado (Home, Draw y Away) segun la casa de apuesta
+    """
+    # Por partido
+    for idx, row in df_match_odds.iterrows():
+
+        # Calcular probabilidades a partir de invertir las cuotas
+        prob_home = 1 / row['odds_home']
+        prob_draw = 1 / row['odds_draw']
+        prob_away = 1 / row['odds_away']
+
+        # Sumo las probabilidades (deberia ser >1 por el margen de ganancia de la casa de apuesta)
+        sum_prob = prob_home + prob_draw + prob_away
+
+        # Calculo probabilidades sin el margen
+        prob_home = prob_home / sum_prob
+        prob_draw = prob_draw / sum_prob
+        prob_away = prob_away / sum_prob
+
+        df_match_odds.loc[idx, ['prob_home_bm', 'prob_draw_bm', 'prob_away_bm']] = [prob_home, prob_draw, prob_away]
+
+    return df_match_odds
+
+def calculate_roi(df):  # Mismo stake y apuesto a todos los partidos # Deberia adaptarlo para pred en int (en vez de str)?? --> dificulta el calculo de cuotas...
     """
     Calcula ROI comparando las predicciones del modelo y los resultados reales.
     :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
