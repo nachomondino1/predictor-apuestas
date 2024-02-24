@@ -101,14 +101,14 @@ def match_unique_players(df_match_player_up, df_player_up): # Es la que hay que 
 
 def replace_players_name_with_id(df_match_player, df_map_players_name_id):
 
-    print("Replacing player's names by id in df_match_player...")
+    print("\nReplacing player's names by id in df_match_player...")
     progress_bar = tqdm(total=len(df_map_players_name_id), ncols=80)
 
     # Por jugador
     for i, row in df_map_players_name_id.iterrows():
 
         # Reemplazo su name por su id en df_match_player
-        df_match_player = df_match_player.replace(row['player_name'], row['id_player'])
+        df_match_player = df_match_player.replace(row['player_name'], row['id_player'])  # Si no hizo match, asigna nan pues id_player es nan.
         progress_bar.update(1)
 
     progress_bar.close()

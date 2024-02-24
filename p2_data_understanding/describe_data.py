@@ -52,18 +52,18 @@ def prueba():
 
     # Levanto datasets
     df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx')  #     df_match = pd.read_excel(f'./p3_data_preparation/data/{country}/df_match_formated.xlsx')
-    df_player_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_match.xlsx')
+    df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx')
     df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index_col=0)  #     df_player = pd.read_excel(f'./p3_data_preparation/data/{country}/df_player_formated.xlsx', index_col=0)
 
     getting_to_know_data(df_match)
-    getting_to_know_data(df_player_match)
+    getting_to_know_data(df_match_player)
     getting_to_know_data(df_player)
 
     # Verifico unicidad de registros segun campos id
     verificar_unicidad_registros(df_match)
 
     # Verifico consistencia en campos que relacionan entidades
-    check_ids_in_both_dataframes(df_match, df_player_match)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_player_part, df_match)
+    check_ids_in_both_dataframes(df_match, df_match_player)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_player_part, df_match)
 
 if __name__ == "__main__":
     prueba()
