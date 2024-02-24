@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 import datetime
+import warnings
 
 def convert_posesion_to_int(df):
     """
@@ -20,7 +21,7 @@ def convert_posesion_to_int(df):
         # Verifica si todos los elementos de la columna son de tipo float
         if not all(isinstance(value, (float, np.floating)) for value in df[f'{posesion}_{tit}']):
             # Si no todos los elementos son de tipo float, raise una advertencia
-            raise Warning(f"Not all elements in the column '{posesion}' are float.")
+            warnings.warn(f"Not all elements in the column '{posesion}' are float.")
     
     return df
 
@@ -52,7 +53,7 @@ def convert_value_to_int(df):
     # Verifica si todos los elementos de la columna son de tipo float
     if not all(isinstance(value, (float, np.floating)) for value in df['value']):
         # Si no todos los elementos son de tipo float, raise una advertencia
-        raise Warning(f"Not all elements in the column 'value' are float.")
+        warnings.warn(f"Not all elements in the column 'value' are float.")
 
     return df
 
@@ -89,11 +90,16 @@ def convert_capacity_to_int(df):
     l_columns = ['capacity', 'attendance']
 
     for col in l_columns:
-        # Reemplazar los espacios en blanco en los valores de la columna
-        df[col] = df[col].str.replace(' ', '')
 
-        # Convertir la columna al tipo de datos correcto (entero)
-        df[col] = df[col].astype(int)
+         # Comprobar si la columna contiene valores de tipo cadena (string)
+        if df[col].dtype == 'object':
+            # Reemplazar los espacios en blanco en los valores de la columna
+            df[col] = df[col].str.replace(' ', '')
+
+            # Convertir la columna al tipo de datos correcto (entero)
+            df[col] = df[col].astype(float) # Pues si tiene nan, es float.
+        else:
+            print(f"Fallo la conversion de la columna {col} a float")
     return df
 
 def convert_columns_to_int(df, df_etiquetas=None):
@@ -146,7 +152,7 @@ def convert_columns_to_int(df, df_etiquetas=None):
 
         # Reemplazar valores en la columna específica
         df.loc[:, nombre_columna] = df[nombre_columna].replace(row['str_value'], row['int_value'])
-
+        
     return df, df_etiquetas
 
 def revert_columns_from_int(df, df_etiquetas, columns=None):
