@@ -11,7 +11,6 @@ import warnings
 # Importo librerias
 import string
 import requests
-from nltk.stem import SnowballStemmer
 
 class TextPreparation:
     """Techniques to prepare text"""
@@ -67,11 +66,14 @@ class TextPreparation:
         open('vacias.txt', 'wb').write(r.content)
 
     def stemming(self, df, columns):
+        # from nltk.stem import SnowballStemmer
+
         """Aplica stemming a los textos"""
-        spanish_stemmer = SnowballStemmer('spanish')
-        for col in columns:
-            df[col] = df[col].apply(lambda x: [spanish_stemmer.stem(word) for word in x])
-        return df
+        # spanish_stemmer = SnowballStemmer('spanish')
+        # for col in columns:
+        #     df[col] = df[col].apply(lambda x: [spanish_stemmer.stem(word) for word in x])
+        # return df
+        pass
 
 def prepare_text_columns(df, l_cols_to_process=[], l_col_to_except=[]):
     '''

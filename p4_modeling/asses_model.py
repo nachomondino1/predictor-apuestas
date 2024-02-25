@@ -1,6 +1,5 @@
 import pandas as pd
 from sklearn import metrics
-import matplotlib.pyplot as plt
 # from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 def calculate_precision(df_result, var_resp, var_pred):
@@ -194,6 +193,8 @@ if __name__ == "__main__":
 
 
 ''' Funciones de caro
+import matplotlib.pyplot as plt
+
 def graficar_curva_roc(self) -> None:
     y_true = self.y_bal.values
     classes = np.unique(y_true)
