@@ -1,6 +1,7 @@
 # Ignorar directorio de dependencias
 apuestasEnv/
 frontEnv/
+backEnv/
 
 # Ignorar un archivo específico en un directorio específico
 /Users/nachomondino/Documents/GitHub/predictor-apuestas/apuestasEnv
