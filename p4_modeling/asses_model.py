@@ -78,7 +78,6 @@ def convert_pred_int_to_str(df, name_var_int, name_var_str, df_etiquetas_y): # E
 
     return df
 
-
 def determine_bookmaker_result(df, var_pred):
     
     # Por fila
