@@ -272,7 +272,7 @@ class DataPreparationNew(DataPreparation):
         df_constructed = self.construct_data(df_concat, n_days, n_years_h2h, export=False)
         print(df_constructed.head(2))
         print(df_constructed.shape)
-        df_constructed.to_excel("/Users/nachomondino/Desktop/df_constructed_prueba.xlsx")
+        # df_constructed.to_excel("/Users/nachomondino/Desktop/df_constructed_prueba.xlsx")
 
         # 4) Selecciono solo los partidos nuevos de los datos construidos 
         df_new = df_constructed[df_constructed.index.isin(df_new.index)]
@@ -282,7 +282,7 @@ class DataPreparationNew(DataPreparation):
         # 3) Relleno datos no disponibles en partidos nuevos (rating formacion titular, etc) usando los partidos viejos
         df_new = copy_last_matches_mean_value(df_new, df, n_days)
         df_new = copy_last_matches_value(df_new, df) 
-        df_new.to_excel("/Users/nachomondino/Desktop/prueba_2.xlsx")
+        # df_new.to_excel("/Users/nachomondino/Desktop/prueba_2.xlsx")
 
         # # VERIFICAR QUE EL DATASET NO TIENEN NAN  --> Aca o en select_data? Para eliminar solo si no tiene datos en las variables selected y no borrar mal.
         # df_sin_dup = df_new.dropna()
@@ -448,7 +448,7 @@ def copy_last_matches_mean_value(df_new: pd.DataFrame, df: pd.DataFrame, n_days:
 
         df_new = determine_mean_in_last_matches_next_matches(df_new, df, n_days=n_days, variable=var, tipo="mean") # (e.g. mean_last_match_dif_mean_val_player_sub)
     
-    df_new.to_excel(f'/Users/nachomondino/Desktop/df_copy_last_matchs_mean_value.xlsx', index=False)
+    # df_new.to_excel(f'/Users/nachomondino/Desktop/df_copy_last_matchs_mean_value.xlsx', index=False)
     return df_new
 
 def main():
