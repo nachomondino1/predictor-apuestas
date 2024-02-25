@@ -10,5 +10,5 @@
 ## Actualizar el Virtual Environment luego de agregar una libreria: 
 
 - Cada vez que agreguemos librerias nuevas al virtual environment, debemos 
-actualizar el archivo de reuirements.txt corriendo el comando: 
+actualizar el archivo de requirements.txt corriendo el comando: 
 `pip freeze > requirements.txt`
