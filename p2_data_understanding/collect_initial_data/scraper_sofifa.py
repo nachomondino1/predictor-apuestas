@@ -1,6 +1,8 @@
 # Importo librerias
+import sys
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-from dspy.data_understanding.web_scraping.selenium import Crawler
+from p2_data_understanding.collect_initial_data.web_scraping_selenium import Crawler
 from selenium.webdriver.common.keys import Keys
 from tqdm import tqdm
 
@@ -197,8 +199,8 @@ def extract_players_sofifa(country, league, export=True):
 
 def prueba():
     # Seleccionar pais  
-    country = "England"
-    liga = "Premier League"
+    country = "Argentina"
+    liga = "Liga Profesional de Fútbol"
 
     df_player = extract_players_sofifa(country, liga, export=True)
     df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=False)

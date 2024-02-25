@@ -2,7 +2,7 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-from dspy.data_understanding.web_scraping.selenium import Crawler
+from p2_data_understanding.collect_initial_data.web_scraping_selenium import Crawler
 from tqdm import tqdm
 import warnings
 from datetime import datetime, timedelta

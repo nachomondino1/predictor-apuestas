@@ -1,11 +1,77 @@
+import sys
+sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
-from dspy.data_preparation.text_preparation import TextPreparation
 from p4_modeling.build_model import select_best_hiperparameters
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 import warnings
+
+# Importo librerias
+import string
+import requests
+from nltk.stem import SnowballStemmer
+
+class TextPreparation:
+    """Techniques to prepare text"""
+
+    def __init__(self):  # no defino df como atributo puesto que es muy importante que el usuario reciba el df de cada funcion.
+        pass
+
+    def to_lower(self, df, columns):
+        """Convierte a minúscula los textos"""
+        for col in columns:
+            df[col] = df[col].str.lower()
+        return df
+
+    def delete_accent(self, df, columns):
+        """Remueve acentos de los textos"""
+        d = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u'}
+        for col in columns:
+            df[col] = df[col].replace(d, regex=True)
+        return df
+
+    def delete_special_characters(self, df, columns):
+        """Remueve caracteres especiales de los textos"""
+        d = {'ã': 'a', 'â': 'a', 'ä': 'a', 'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ø': 'o',
+             'û': 'u', 'ü': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
+        for col in columns:
+            df[col] = df[col].replace(d, regex=True)
+        return df
+
+    def delete_punctuation(self, df, columns):
+        """Elimina signos de puntuación de los textos"""
+        for col in columns:
+            df[col] = df[col].str.replace(f'[{string.punctuation}]', ' ', regex=True)
+        return df
+
+    def tokenize(self, df, columns):
+        """Tokeniza los textos"""
+        for col in columns:
+            df[col] = df[col].str.split()
+        return df
+
+    def stop_word_removal(self, df, columns):
+        """Elimina palabras vacías de los textos"""
+        url = 'https://raw.githubusercontent.com/7PartidasDigital/AnaText/master/datos/diccionarios/vacias.txt'
+        palabras_vacias = pd.read_csv(url, squeeze=True)
+        for col in columns:
+            df[col] = df[col].apply(lambda x: [word for word in x if word not in palabras_vacias])
+        return df
+
+    def download_stop_word_removal_file(self):
+        """Descarga el archivo de palabras vacías"""
+        url = 'https://raw.githubusercontent.com/7PartidasDigital/AnaText/master/datos/diccionarios/vacias.txt'
+        r = requests.get(url, allow_redirects=True)
+        open('vacias.txt', 'wb').write(r.content)
+
+    def stemming(self, df, columns):
+        """Aplica stemming a los textos"""
+        spanish_stemmer = SnowballStemmer('spanish')
+        for col in columns:
+            df[col] = df[col].apply(lambda x: [spanish_stemmer.stem(word) for word in x])
+        return df
 
 def prepare_text_columns(df, l_cols_to_process=[], l_col_to_except=[]):
     '''
@@ -205,22 +271,21 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, _print
     return df
 
 def prueba():
-    country = 'argentina_south_america'
-    thr_nan_col = 0.2
+    country = 'England'
 
     # Levanto dataset
-    df = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p3_data_preparation/data/{country}/df_constructed_False_180_30_3.xlsx')
+    df = pd.read_excel(f'p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
+    print(df.head(2))
 
     # Eliminacion de NaN values
-    # Elimino rows y columns con alto percentage de NaN values
-    largo_inicial = len(df)
-    df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')
-    print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de rows, quedan {len(df)} rows.")
+    # largo_inicial = len(df)
+    # df = df.dropna(subset=['dif_prom_ult_part_dif_remates'], how='any')
+    # print(f"Se eliminó el {(largo_inicial - len(df)) / largo_inicial * 100:.0f}% de rows, quedan {len(df)} rows.")
 
-    if thr_nan_col is not None:
-        prop_nan = df.isna().mean()
-        print(prop_nan)
-        df = delete_columns_nan(df, thr_nan_col)  # 2º elimino columns con mucho NaN # ojo que asi puede borrar odds
+    # Preparacion de texto
+    df = prepare_text_columns(df, l_cols_to_process=['team_home', 'team_away'])  # Preparacion texto para facilitar construccion de datos bassado en equipos
+    df = clean_teams_names(df)  # Eliminar strings adicionales en names de equipos
+    print(df.head(2))
 
     # Verificar que no haya outliers
     # ...
@@ -229,8 +294,8 @@ def prueba():
     # scaler = StandardScaler()  # Crea un objeto StandardScaler
     # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
     # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
-    #
-    # df.to_excel('/Users/nachomondino/Desktop/df_cleaned_prueba.xlsx', index=False)
+    
+    df.to_excel('/Users/nachomondino/Desktop/df_cleaned_prueba.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
