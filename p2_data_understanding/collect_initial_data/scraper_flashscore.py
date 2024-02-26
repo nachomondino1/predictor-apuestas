@@ -60,11 +60,16 @@ class FlashscoreCrawler(Crawler):
         """
         Click en boton "Show more matches" hasta que ya no haya mas. Es decir, carga todos los partidos.
         """
+        n_clicks = 0
         while True:
-            xpath_button = './/div[@id="live-table"]//div[@class="leagues--static event--leagues summary-results" or @class="leagues--static event--leagues results"]//a[@class="event__more event__more--static"]' # ‘.//div[@id="live-table”]//div[@class”leagues--static event--leagues summary-results" or @class=“leagues--static event--leagues results”]//a[@class=“event__more event__more--static”]’
-            boton_mostrar = super().extract_tag(xpath=xpath_button, sec_wait=self.SEC_WAIT_MAX*2)
+            xpath_button = './/div[@id="live-table"]//div[@class="leagues--static event--leagues summary-results" or @class="leagues--static event--leagues results"]//a[@class="event__more event__more--static"]' 
+            boton_mostrar = super().extract_tag(xpath=xpath_button, sec_wait=self.SEC_WAIT_MAX*2, print_fail=False)
+
             if super().click_boton(boton_mostrar) is False:
+                print(f"Hizo {n_clicks} clicks en el boton 'Show More Matches'.")
                 break
+
+            n_clicks += 1
     
     def extract_id_matches(self):
         """
@@ -197,10 +202,11 @@ class FlashscoreCrawler(Crawler):
         # Por formation ("Formation inicial", "Suplentes" y  "Ausentes")
         for formation, titularidad in d_formations.items():
 
-            SEC_WAIT = self.SEC_WAIT_MIN if formation=='Missing Players' else self.SEC_WAIT_MAX  # Jugadores ausentes muchas veces no esta. Esto agiliza la extraccion.
+            SEC_WAIT = self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
 
             # Si existe dicha formation
             tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]/div[@class="section"]/div[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True)
+            # print(formation, SEC_WAIT)
 
             if tag_lineup:
 
@@ -285,32 +291,25 @@ class FlashscoreCrawler(Crawler):
         # print(d_new_row)
         return d_new_row
 
-    def extract_odds(self): # Se podria obtener de hoja "Odds"
-
+    def extract_odds(self):
+        """
+        Extrae cuotas de casa de apuestas Bet365. 
+        Tambien se podria obtener de la hoja "Odds".
+        """
         # Definicion de variables
         d_new_row = {}
-        l_odds = ['odds_home', 'odds_draw', 'odds_away']
 
         # Extraer las oddss en una lista
-        odds_elements = super().extract_tags(xpath='.//div[@class="cellWrapper"]', sec_wait=self.SEC_WAIT_MAX, print_fail=False)
+        l_odds_elements = super().extract_tags(xpath='.//div[@class="oddsRowContent"]//div[@class="cellWrapper"]//span[@class="oddsValueInner"]', sec_wait=self.SEC_WAIT_MAX, print_fail=True)
 
-        # Por odds (local, emp y vis)
-        for i, columna in enumerate(l_odds, start=0):
+        if len(l_odds_elements) > 0:
+            l_text_odds_elements = [elem.text for elem in l_odds_elements]
 
-            odds_element = odds_elements[i]
-            odds_str = odds_element.get_attribute('title')  # odds_str = super().extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]', attribute='title', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # 3.00 » 2.25
-
-            # Si cambió durante el match
-            if '»' in odds_str:
-                d_new_row[columna] = odds_str.split('»')[0].strip()  # 3.00
-
-            # Si no cambió durante el match
-            else:
-                d_new_row[columna] = super().extract_tag(tag_inicial=odds_element, xpath='.//span[@class="oddsValueInner"]', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # d_new_row[columna] = super().extract_tag(xpath=f'.//div[@class="cellWrapper"][{i}]//span[@class="oddsValueInner"]', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
-
-        # print(d_new_row)
+            d_new_row['odds_home'] = l_text_odds_elements[0]
+            d_new_row['odds_draw'] = l_text_odds_elements[1]
+            d_new_row['odds_away'] = l_text_odds_elements[2]
         return d_new_row
-    
+
     def extract_bajas_pre_partido(self):
 
         d_new_row = {}
