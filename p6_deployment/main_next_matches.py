@@ -46,7 +46,7 @@ class DataUnderstandingNew():
         df_match = pd.read_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index_col=0)
 
         # Definicion de variables
-        df_match_concat, df_match_player_concat = pd.DataFrame(), pd.DataFrame()
+        df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         l_competencies = df_match['id_competition'].unique()
         if _print:
             print(f"Competiciones a extraer del pais {self.country}: {l_competencies}")
@@ -66,22 +66,21 @@ class DataUnderstandingNew():
             df_match_next['id_country'] = self.id_country
             df_match_next['id_competition'] = id_competition
             df_match_next['is_cup'] = is_cup
+            df_match_odds = df_match_next.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
+            df_match_next = df_match_next.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
             # Guarda datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match_next], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_next], axis=0)
-            
-        # Supongamos que df es tu DataFrame original 
-        df_match_odds = df_match_concat.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-        df_match_concat = df_match_concat.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+            df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
         # Exporto datasets
         if export:
             df_match_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_match_next.xlsx', index=True)
             df_match_player_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_match_player_next.xlsx', index=True)
-            df_match_odds.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_match_next_odds.xlsx', index=True)
+            df_match_odds_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_match_next_odds.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat
 
     def collect_missing_data(self, df_match: pd.DataFrame, export: bool = True, _print=False):
         """
@@ -89,13 +88,13 @@ class DataUnderstandingNew():
         """
         print(" Collecting data... ")
         # Definicion de variables
-        df_match_miss, df_match_player_miss, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx') # /Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/df_competencias.xlsx'
         df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
         if _print:
             print(f' COUNTRY: {self.country} '.center(120, '#'))
 
-        # Levanto datos viejos 
+        # Solo extriago las competencias que tengo en los datos viejos 
         l_competencies = df_match['id_competition'].unique()
 
         # POR COMPETITION (solo las que hay en df_match)
@@ -108,32 +107,29 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss_matches, df_match_player_miss_matches = extract_missing_data(self.country, competition, list(df_match.index))
+            df_match_miss, df_match_player_miss = extract_missing_data(self.country, competition, list(df_match.index))
             if _print:
                print(f"Cantidad de partidos faltantes en df_match: {df_match_miss_matches.shape[0]}")
 
             # Add columns: id_country, is_cup and id_competition
-            df_match_miss_matches['id_country'] = self.id_country
-            df_match_miss_matches['id_competition'] = id_competition
-            df_match_miss_matches['is_cup'] = is_cup
-
-            # Concateno dfs
-            df_match_miss = pd.concat([df_match_miss, df_match_miss_matches], axis=0)
-            df_match_player_miss = pd.concat([df_match_player_miss, df_match_player_miss_matches], axis=0)
-    
-        # Si hay al menos un partido missing
-        if len(df_match_miss) > 0:
-            # Supongamos que df es tu DataFrame original 
+            df_match_miss['id_country'] = self.id_country
+            df_match_miss['id_competition'] = id_competition
+            df_match_miss['is_cup'] = is_cup
             df_match_odds = df_match_miss.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
             df_match_miss = df_match_miss.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
-            # Exporto datasets
-            if export:
-                df_match_miss.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_miss.xlsx', index=True)
-                df_match_player_miss.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_player_miss.xlsx', index=True)
-                df_match_odds.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_odds_miss.xlsx', index=True)
+            # Concateno dfs
+            df_match_concat = pd.concat([df_match_concat, df_match_miss], axis=0)
+            df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_miss], axis=0)
+            df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
-        return df_match_miss, df_match_player_miss, df_match_odds
+        # Exporto datasets
+        if export and len(df_match_miss) > 0:
+            df_match_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_miss.xlsx', index=True)
+            df_match_player_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_player_miss.xlsx', index=True)
+            df_match_odds_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_odds_miss.xlsx', index=True)
+
+        return df_match_concat, df_match_player_concat, df_match_odds_concat
 
     def describe_data_new(self, df_match, df_match_player):  # Podria usar describe_data de main.py
 
@@ -556,7 +552,7 @@ def main():
     if data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
-        df_match, df_match_player = du.collect_initial_data_new(n_days=n_days, export=export)
+        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(n_days=n_days, export=export)
 
         # Describo datos
         du.describe_data_new(df_match, df_match_player)
@@ -565,6 +561,7 @@ def main():
         # Levanto datos ya extraidos
         df_match = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_match_next.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_match_player_next.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
         print("\n DF MATCH \n", df_match.head(2))
         print("\n DF MATCH PLAYER \n", df_match_player.head(2))
 
@@ -594,6 +591,8 @@ def main():
     elif not data_unders:
         # Levanto dataset para prueba
         df = pd.read_excel(f'./p6_deployment/data/{country}/data_preparation/df_selected.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
+        df_match_next = pd.read_excel(f'p6_deployment/data/{country.lower()}/data_understanding/df_match_next.xlsx', index_col=0)
         print(df.head(2), df.shape)
 
     # MODELING
@@ -609,12 +608,6 @@ def main():
         df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{country}/df_etiquetas.xlsx')
         df_etiquetas_y = df_etiquetas[df_etiquetas['variable'] == var_resp]  # solo etiquetas de la var resp
 
-        # Levanto df_match_odds
-        df_match_odds_next = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
-
-        # Genero df con id y prediccion y le agrego equipos y fecha? o ya es suficiente con predicciones.xlsx?
-        df_match_next = pd.read_excel(f'p6_deployment/data/{country.lower()}/data_understanding/df_match_next.xlsx', index_col=0)
-
         # Levanto modelo ya entrenado
         loaded_model = pickle.load(open(f"./p4_modeling/data/{country}/modelo.pkl", "rb"))
 
@@ -626,7 +619,7 @@ def main():
         df_pred = pd.DataFrame({var_pred: y_pred}, index=df.index)
         
         # Concateno conjunto de datos
-        df_concat = pd.concat([df_match_next, df_match_odds_next, df_pred_proba, df_pred], axis=1)
+        df_concat = pd.concat([df_match_next, df_match_odds, df_pred_proba, df_pred], axis=1)
 
         # Traduzco predicciones numericas a etiquetas
         df_concat = format_data.convert_pred_int_to_str(df_concat, name_var_int=var_pred, name_var_str=f'{var_pred}_str', df_etiquetas_y=df_etiquetas_y)

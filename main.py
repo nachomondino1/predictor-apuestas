@@ -49,18 +49,28 @@ class DataUnderstanding:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
 
-    def collect_initial_data(self, export: bool =True):
+    def collect_initial_data(self, export: bool = True):
         """
         Collecting data from Flashscore and Sofifa
         """
         print(" Collecting data... ")
         # Definicion de variables
-        df_match_concat, df_match_player_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        # l_to_avoid = ['Premier League']  # Pensar alguna manera para automatizar? 
+
+        try:
+            df_match_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match.xlsx', index_col=0)
+            df_match_player_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match_player.xlsx', index_col=0)
+            df_match_odds_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index_col=0)
+            df_player_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_player.xlsx', index_col=0)
+            print(df_match_concat.shape, df_match_player_concat.shape, df_match_odds_concat.shape, df_player_concat.shape)
+
+            l_competition_already_extracted = df_match_concat['id_competition'].unique()
+        except:
+            df_match_concat, df_match_player_concat, df_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            l_competition_already_extracted = []
 
         # Selecciono competencias del country
         df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-        df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
+        df_comp_country = df_comp[(df_comp['id_country'] == self.id_country) & ~(df_comp['id_competition'].isin(l_competition_already_extracted))]
         print(f' COUNTRY: {self.country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
         # POR COMPETITION
@@ -74,10 +84,13 @@ class DataUnderstanding:
             df_match['id_country'] = self.id_country
             df_match['id_competition'] = row['id_competition']
             df_match['is_cup'] = row['is_cup']
+            df_match_odds = df_match.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
+            df_match = df_match.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
             # Guardo datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
+            df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
             # Si la competition es una liga
             if row['is_cup'] == 0:
@@ -92,18 +105,14 @@ class DataUnderstanding:
                 # Save data
                 df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
 
-        # Supongamos que df es tu DataFrame original 
-        df_match_odds = df_match_concat.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-        df_match_concat = df_match_concat.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
-        
         # Exporto datasets con competiciones del country
         if export:
             df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
             df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_player.xlsx', index=True)
             df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player.xlsx', index=True)
-            df_match_odds.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
+            df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat, df_player_concat
+        return df_match_concat, df_match_player_concat, df_player_concat, df_match_odds_concat
 
     def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame):
 
@@ -661,7 +670,7 @@ def main():
     """
     # Definicion de variables
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, False, True
+    data_unders, data_prep, modeling = True, False, False
     export = True
     
     # Hiperparametros
@@ -681,10 +690,11 @@ def main():
     if data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
-        df_match, df_match_player, df_player = du.collect_initial_data(export=export)
+        df_match, df_match_player, df_player, df_match_odds = du.collect_initial_data(export=export)
 
         # Describo datos
         du.describe_data(df_match, df_match_player, df_player)
+        
     elif data_prep:
         # Levanto datos ya extraidos
         df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
