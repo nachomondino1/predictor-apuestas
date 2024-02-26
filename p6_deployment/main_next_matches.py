@@ -1,9 +1,10 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
+import pandas as pd
+import numpy as np
 import datetime
 import re
-import pandas as pd
 import os
 from main import DataUnderstanding, DataPreparation
 ## Data understanding
@@ -451,6 +452,39 @@ def copy_last_matches_mean_value(df_new: pd.DataFrame, df: pd.DataFrame, n_days:
     # df_new.to_excel(f'/Users/nachomondino/Desktop/df_copy_last_matchs_mean_value.xlsx', index=False)
     return df_new
 
+def calculate_roi_dif_stake(df):
+    """
+    Calcula ROI comparando las predicciones del modelo y los resultados reales.
+    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
+    :param var_resp: Nombre de la variable respuesta. (str)
+    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
+    :return: ROI del modelo. (float)
+    """
+    # Definicion de variables
+    dinero_a_invertir = 5000
+    n_part = len(df)
+    stake_base = dinero_a_invertir / n_part
+
+    # calcular cuotas de mi modelo
+    df = asses_model.cuotas_de_mi_modelo(df)
+    df = asses_model.calculate_multiplicador(df)
+
+    # Por partido
+    for i, row in df.iterrows():
+
+        # Calculo stake usando mulplicador
+        mod = stake_base * row['multiplicador']
+        df.loc[i, 'mod'] = mod
+
+        stake_mod = stake_base + mod
+        if stake_mod < 0:
+            stake_mod = 0
+
+        df.loc[i, 'stake_mod'] = stake_mod
+    df.to_excel("/Users/nachomondino/Desktop/df_cuotas_next_matches.xlsx")
+    # dinero_a_invertir = sum(df['stake_mod'])
+    return df
+
 def main():
     """
     Recoleccion de proximos partidos
@@ -471,7 +505,7 @@ def main():
     export = True
 
     # Hiperparametro
-    n_days = 7  # Numero de dias maximo desde hoy para extraer partidos
+    n_days = 1  # Numero de dias maximo desde hoy para extraer partidos
  
     # MISSING MATCHES
     if run_missing:  # Lo puedo correr atemporal de los proximos partidos, dado que tarda,esta bueno correlo seguido para no tener una gran extraccion y tarde mucho
@@ -560,45 +594,46 @@ def main():
     elif not data_unders:
         # Levanto dataset para prueba
         df = pd.read_excel(f'./p6_deployment/data/{country}/data_preparation/df_selected.xlsx', index_col=0)
-        print(df.head(), df.shape)
+        print(df.head(2), df.shape)
 
     # MODELING
     if modeling:
+     
         directorio = f'./p6_deployment/data/{country.lower()}/modeling'
         if not os.path.exists(directorio):
             # Si no existe, crear el directorio
             os.makedirs(directorio)
 
         print(" Modeling ".center(120, "#"))
+         # Levanto df_etiquetas
+        df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{country}/df_etiquetas.xlsx')
+        df_etiquetas_y = df_etiquetas[df_etiquetas['variable'] == var_resp]  # solo etiquetas de la var resp
+
+        # Levanto df_match_odds
+        df_match_odds_next = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
+
+        # Genero df con id y prediccion y le agrego equipos y fecha? o ya es suficiente con predicciones.xlsx?
+        df_match_next = pd.read_excel(f'p6_deployment/data/{country.lower()}/data_understanding/df_match_next.xlsx', index_col=0)
+
         # Levanto modelo ya entrenado
         loaded_model = pickle.load(open(f"./p4_modeling/data/{country}/modelo.pkl", "rb"))
 
         # Realizo predicciones sobre los nuevos partidos
-        y_pred = loaded_model.predict(df)
         y_pred_prob = loaded_model.predict_proba(df)
+        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
+        nombres_clases = df_etiquetas_y.set_index('int_value').reindex(loaded_model.classes_ )['str_value']  # Reordeno segun el orden de las clases en y_pred_prob
+        df_pred_proba = pd.DataFrame(y_pred_prob, columns=nombres_clases, index=df.index)
+        df_pred = pd.DataFrame({var_pred: y_pred}, index=df.index)
+        
+        # Concateno conjunto de datos
+        df_concat = pd.concat([df_match_next, df_match_odds_next, df_pred_proba, df_pred], axis=1)
 
-        # Asignar las predicciones a una nueva columna
-        df_res = df.copy()
-        df_res['predicted_result'] = y_pred
-        df_res['probability_class_0'] = y_pred_prob[:, 0]
-        df_res['probability_class_1'] = y_pred_prob[:, 1]
-        df_res['probability_class_2'] = y_pred_prob[:, 2]
-    
         # Traduzco predicciones numericas a etiquetas
-        df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{country}/df_etiquetas.xlsx')
-        # df_etiquetas_y = df_etiquetas[df_etiquetas['variable'] == var_resp]  # solo etiquetas de la var resp
-        # from p4_modeling import asses_model
-        # df = asses_model.convert_pred_int_to_str(df, name_var_int=var_resp, name_var_str=f'{var_resp}_str', df_etiquetas_y= df_etiquetas_y)
-        df = format_data.revert_columns_from_int(df_res, df_etiquetas, columns=['predicted_result'])
-        # df.to_excel(f'./p6_deployment/data/{country}/modeling/predicciones.xlsx')
-
-        # Genero df con id y prediccion y le agrego equipos y fecha? o ya es suficiente con predicciones.xlsx?
-        df_match_next = pd.read_excel(f'p6_deployment/data/{country.lower()}/data_understanding/df_match_next.xlsx', index_col=0)
-        df_match_odds_next = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
-
-        df_concat = pd.concat([df_match_next, df_match_odds_next, df], axis=1)
+        df_concat = format_data.convert_pred_int_to_str(df_concat, name_var_int=var_pred, name_var_str=f'{var_pred}_str', df_etiquetas_y=df_etiquetas_y)
         df_concat.to_excel(f'./p6_deployment/data/{country}/modeling/predicciones.xlsx')
-        df_concat.to_excel(f'/Users/nachomondino/Desktop/predicciones.xlsx')
+
+        # Determino estrategia de inversion
+        df = calculate_roi_dif_stake(df_concat)
 
     end = time.time()
     print(f"Main_next_matches en {(end - start)/60:.1f} minutos")

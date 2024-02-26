@@ -155,32 +155,36 @@ def convert_columns_to_int(df, df_etiquetas=None):
         
     return df, df_etiquetas
 
-def revert_columns_from_int(df, df_etiquetas, columns=None):
+def convert_pred_str_to_int(df, name_var_str, name_var_int, df_etiquetas_y): # Esto funciona bien
     """
-    Convierte las variables numéricas a sus valores originales utilizando el DataFrame df_etiquetas.
-    :param df: DataFrame que contiene las variables a revertir. (DataFrame)
-    :param df_etiquetas: DataFrame que contiene las etiquetas originales y los valores enteros correspondientes. (DataFrame)
-    :param columns: Lista de columnas a revertir. Si no se proporciona, se revertirán todas las columnas en df_etiquetas.
-                    (list, opcional)
-    :return: DataFrame con las variables revertidas a sus valores originales.
+    Obtengo las predicciones segun la casa de apuestas
     """
-    l_col_etiquetadas = df_etiquetas['variable'].unique()
+    # Convertir de str a num
+    for idx, row in df_etiquetas_y.iterrows():
+        # print(f"{row['str_value']} --> {row['int_value']}")
+        
+        # Obtengo indices de partidos con determinado resultado
+        idx_to_change = df[df[name_var_str] == row['str_value']].index
 
-    # Por columna
-    for col in df.columns:
+        # Reemplazar valores en la columna específica
+        df.loc[idx_to_change, name_var_int] = row['int_value']
 
-        # col_etiquetas = col if col != 'predicted_result' else 'result'
-        if col == "predicted_result":
-            col_etiquetas = 'result'
-        else:
-            col_etiquetas = col
+    return df
 
-        # Si es una columna etiquetada
-        if col_etiquetas in l_col_etiquetadas:
+def convert_pred_int_to_str(df, name_var_int, name_var_str, df_etiquetas_y): # Esto funciona bien
+    """
+    Obtengo las predicciones segun la casa de apuestas
+    """
+    # Convertir de str a num
+    for idx, row in df_etiquetas_y.iterrows():
+        # print(f"{row['int_value']} --> {row['str_value']}")
+        
+        # Obtengo indices de partidos con determinado resultado
+        idx_to_change = df[df[name_var_int] == row['int_value']].index
 
-            # Transformo int a etiqueta
-            mapping = df_etiquetas.loc[df_etiquetas['variable'] == col_etiquetas].set_index('int_value')['str_value']
-            df[col] = df[col].map(mapping)
+        # Reemplazar valores en la columna específica
+        df.loc[idx_to_change, name_var_str] = row['str_value']
+
     return df
 
 def prueba():

@@ -73,7 +73,7 @@ def select_best_hiperparameters(model, X, y, k, _print: bool = False):
             'degree': [3, 5],  # Grado del kernel polinomial.
             'coef0': [0.0,  0.5, 1.0],  # Término independiente en funciones kernel polinomiales y sigmoide.
             'shrinking': [True, False],  # Activa o desactiva el uso de la heurística de encogimiento.
-            # 'probability': [True, False],  # Habilita o deshabilita la estimación de probabilidades. --> no tiene sentido probarlo aqui
+            'probability': [True],  # Habilita o deshabilita la estimación de probabilidades. --> no tiene sentido probarlo aqui
             # 'tol': [1e-3, 1e-4, 1e-5],  # Siempre gana 1e-3 (y es el valor default) y ChatGPT no me lo dio como hiper tipico
             'decision_function_shape': ['ovo'],  # Siempre le gana ovo (One Vs One) a ovr (One Vs Rest)
         },
