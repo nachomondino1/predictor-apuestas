@@ -17,15 +17,16 @@ def getting_to_know_data(df):
     print("\nPrimeras 5 filas del dataframe:")
     pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
     pd.set_option("display.precision", 2)  # mostrar maximo dos decimales
-    print(df.head())  # y .tail es para ver las ultimas filas
+    print(df.head(1))  # y .tail es para ver las ultimas filas
 
     # Displaying Data Types
     print("\nDataframe info:")
     df.info()
 
     # Showing Basics Statistics
-    print("\nDataframe basic statistics:")
-    print(df.describe(include='all'))  # basic descriptive statistics for all numeric columns
+    if len(df.columns) > 0:
+        print("\nDataframe basic statistics:")
+        print(df.describe(include='all'))  # basic descriptive statistics for all numeric columns
 
 def verificar_unicidad_registros(df):
 
