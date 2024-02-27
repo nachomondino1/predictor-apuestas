@@ -38,9 +38,11 @@ class DataUnderstanding:
         ruta_base = f'./p2_data_understanding/data/{self.country.lower()}/data_seg'
         l_directorios = [f'{ruta_base}/per_season/df_match/',
                          f'{ruta_base}/per_season/df_match_player/',
+                         f'{ruta_base}/per_season/df_match_odds/',
                          f'{ruta_base}/per_season/df_player/',
                          f'{ruta_base}/per_competition/df_match/',
                          f'{ruta_base}/per_competition/df_match_player/',
+                        f'{ruta_base}/per_competition/df_match_odds/',
                          f'{ruta_base}/per_competition/df_player/'
                          ]
 
@@ -54,15 +56,13 @@ class DataUnderstanding:
         Collecting data from Flashscore and Sofifa
         """
         print(" Collecting data... ")
-        # Definicion de variables
-
+        # Levanto partidos ya extraidos (para no volver a extraer la/s competicione/s ya extraidas)
         try:
             df_match_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match.xlsx', index_col=0)
             df_match_player_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match_player.xlsx', index_col=0)
             df_match_odds_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index_col=0)
             df_player_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_player.xlsx', index_col=0)
-            print(df_match_concat.shape, df_match_player_concat.shape, df_match_odds_concat.shape, df_player_concat.shape)
-
+            # print(df_match_concat.shape, df_match_player_concat.shape, df_match_odds_concat.shape, df_player_concat.shape)
             l_competition_already_extracted = df_match_concat['id_competition'].unique()
         except:
             df_match_concat, df_match_player_concat, df_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -78,14 +78,14 @@ class DataUnderstanding:
             print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
             # Extraigo partidos de Flashscore (df_match y df_match_player)
-            df_match, df_match_player = scraper_flashscore.extract_data(self.country, row['competition_flashscore'], n_seasons_max=16, export=export)
+            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.country, row['competition_flashscore'], n_seasons_max=16, export=export)
 
             # Add columns: id_country, is_cup and id_competition
             df_match['id_country'] = self.id_country
             df_match['id_competition'] = row['id_competition']
             df_match['is_cup'] = row['is_cup']
-            df_match_odds = df_match.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-            df_match = df_match.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+            # df_match_odds = df_match.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
+            # df_match = df_match.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
             # Guardo datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
@@ -105,6 +105,13 @@ class DataUnderstanding:
                 # Save data
                 df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
 
+            # Exporto por seguridad
+            if export:
+                df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match.xlsx', index=True)
+                df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_player.xlsx', index=True)
+                df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player.xlsx', index=True)
+                df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_odds.xlsx', index=True)
+        
         # Exporto datasets con competiciones del country
         if export:
             df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
@@ -112,13 +119,14 @@ class DataUnderstanding:
             df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player.xlsx', index=True)
             df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat, df_player_concat, df_match_odds_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat
 
-    def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame):
+    def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player: pd.DataFrame):
 
         print(" Describiendo datos... ")
         describe_data.getting_to_know_data(df_match)
         describe_data.getting_to_know_data(df_match_player)
+        describe_data.getting_to_know_data(df_match_odds)
         describe_data.getting_to_know_data(df_player)
 
         # Verifico unicidad de registros segun campos id
@@ -600,7 +608,7 @@ class Modeling:
         # Agrego predicciones de bookmaker
         df_match_odds = asses_model.calculate_probas_bookmarker(df_match_odds) # Caculo probabilidades segun casa de apuesta
         df_match_odds = asses_model.determine_bookmaker_result(df_match_odds, self.var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
-        df_match_odds = asses_model.convert_pred_str_to_int(df_match_odds, name_var_str=self.var_pred_bm, name_var_int='y_pred_bm', df_etiquetas_y= df_etiquetas_y) # Agrego columna con prediccion numerica (e.g. "Home" --> 2)
+        df_match_odds = format_data.convert_pred_str_to_int(df_match_odds, name_var_str=self.var_pred_bm, name_var_int='y_pred_bm', df_etiquetas_y= df_etiquetas_y) # Agrego columna con prediccion numerica (e.g. "Home" --> 2)
         y_pred_bm = df_match_odds['y_pred_bm'].values
 
         # Calculo precision de casa de apuesta
@@ -609,20 +617,14 @@ class Modeling:
 
         # Concateno dfs
         df_concat = pd.concat([df_pred, df_pred_proba, df_match_odds], axis=1)
-        df_concat.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx')
        
         # Convierto de int a str 1) resultado real y 2) predicciones del modelo 
         df_concat = format_data.convert_pred_int_to_str(df_concat, name_var_int=self.var_resp, name_var_str=f'{self.var_resp}_str', df_etiquetas_y=df_etiquetas_y)
         df_concat = format_data.convert_pred_int_to_str(df_concat, name_var_int=self.var_pred, name_var_str=f'{self.var_pred}_str', df_etiquetas_y=df_etiquetas_y)
 
-        # Por estrategia de inversion
-            # Calcular el roi
-            # Guardar el mejor ROI
-        # Calculo de ROI --> ya tengo las cuotas!!!!!!!
-        roi = asses_model.calculate_roi_same_stake(df_concat)
-        roi_dif_stake = asses_model.calculate_roi_dif_stake(df_concat)
-        best_roi = max(roi, roi_dif_stake)
-        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1, 'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec, 'best_roi': best_roi}
+        # Calculoo ROI
+        roi = asses_model.calculate_estrategia_inversion(df_concat)
+        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1, 'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec, 'ROI': roi}
         print(d_metrics)
 
         if export:
@@ -670,7 +672,7 @@ def main():
     """
     # Definicion de variables
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = True, False, False
+    data_unders, data_prep, modeling = False, True, False
     export = True
     
     # Hiperparametros
@@ -690,19 +692,19 @@ def main():
     if data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
-        df_match, df_match_player, df_player, df_match_odds = du.collect_initial_data(export=export)
+        df_match, df_match_player, df_match_odds, df_player = du.collect_initial_data(export=export)
 
         # Describo datos
-        du.describe_data(df_match, df_match_player, df_player)
-        
+        du.describe_data(df_match, df_match_player, df_match_odds, df_player)
+
     elif data_prep:
         # Levanto datos ya extraidos
         df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
         df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx')
 
-        # du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
-        # du.describe_data(df_match, df_match_player, df_player)
+        du.describe_data(df_match, df_match_player, df_match_odds, df_player)
 
     # DATA PREPARATION
     if data_prep:
@@ -712,20 +714,18 @@ def main():
         n_years_h2h = 3  # Años para construir el historial entre los equipos
         thr_corr = 0.7  # Correlacion umbral para la eliminacion de variables altamente correlacionadas
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
-
         df_hiper_prep = pd.DataFrame(data={'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na]}, index=[0])
-        print(df_hiper_prep)
         
-        df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed_90_3.xlsx', index_col=0)
-        print(df.head(2))
+        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed_90_3.xlsx', index_col=0)
+        # print(df.head(2))
 
         # Preparo el dataset para el analisis
-        # df_match, df_match_player, df_player = dp.format_data(df_match, df_match_player, df_player, export=False)
-        # df_match, df_match_player, df_player = dp.clean_data(df_match, df_match_player, df_player, export=export)
-        # df = dp.integrate_data(df_match, df_match_player, df_player, export=export) 
+        df_match, df_match_player, df_player = dp.format_data(df_match, df_match_player, df_player, export=False)
+        df_match, df_match_player, df_player = dp.clean_data(df_match, df_match_player, df_player, export=export)
+        df = dp.integrate_data(df_match, df_match_player, df_player, export=export) 
         # df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, export=export)
-        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-        df = dp.nan_values_treatment(df, fill_na=fill_na, export=export)
+        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
+        # df = dp.nan_values_treatment(df, fill_na=fill_na, export=export)
         
         if export:
             df_hiper_prep.to_excel(f'./p3_data_preparation/data/{country}/df_hiper_prep.xlsx', index=False)
@@ -739,7 +739,7 @@ def main():
     if modeling:
         print(" Modeling ".center(120, "#"))
         
-        modelo = RandomForestClassifier()  # LogisticRegression # RandomForestClassifier(criterion='entropy', max_depth=5, n_estimators=500)
+        modelo = RandomForestClassifier()  # LogisticRegression(), RandomForestClassifier()
         model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
 
         build_specific_model = True
@@ -775,7 +775,6 @@ def main():
         bal_type = None # bal_type de balanceo a realizar [None, 'over', 'under']
         k = 5  # Numero de folds para seleccionar best parameters y para entrenar modelo
         df_hiper_mod = pd.DataFrame(data={'test_val_size': [test_val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}, index=[0])        
-        print(df_hiper_mod)
 
         # Analizo datos con un modelo
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, test_val_size, test_size, fill_na=fill_na, export=export)

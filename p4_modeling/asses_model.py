@@ -46,39 +46,6 @@ def confusion_matrix(y_real, y_pred, df_etiquetas):
     print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
-
-def convert_pred_str_to_int(df, name_var_str, name_var_int, df_etiquetas_y): # Esto funciona bien
-    """
-    Obtengo las predicciones segun la casa de apuestas
-    """
-    # Convertir de str a num
-    for idx, row in df_etiquetas_y.iterrows():
-        # print(f"{row['str_value']} --> {row['int_value']}")
-        
-        # Obtengo indices de partidos con determinado resultado
-        idx_to_change = df[df[name_var_str] == row['str_value']].index
-
-        # Reemplazar valores en la columna específica
-        df.loc[idx_to_change, name_var_int] = row['int_value']
-
-    return df
-
-def convert_pred_int_to_str(df, name_var_int, name_var_str, df_etiquetas_y): # Esto funciona bien
-    """
-    Obtengo las predicciones segun la casa de apuestas
-    """
-    # Convertir de str a num
-    for idx, row in df_etiquetas_y.iterrows():
-        # print(f"{row['int_value']} --> {row['str_value']}")
-        
-        # Obtengo indices de partidos con determinado resultado
-        idx_to_change = df[df[name_var_int] == row['int_value']].index
-
-        # Reemplazar valores en la columna específica
-        df.loc[idx_to_change, name_var_str] = row['str_value']
-
-    return df
-
 def determine_bookmaker_result(df, var_pred):
     
     # Por fila
@@ -125,111 +92,54 @@ def calculate_probas_bookmarker(df_match_odds): # Funciona bien. Comprobado.
 
     return df_match_odds
 
-def calculate_roi_same_stake(df, _print: bool = False):  # Mismo stake y apuesto a todos los partidos # Deberia adaptarlo para pred en int (en vez de str)?? --> dificulta el calculo de cuotas...
+def calculate_estrategia_inversion(df: pd.DataFrame, stake_base: int = 100):
     """
-    Calcula ROI comparando las predicciones del modelo y los resultados reales.
-    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
-    :param var_resp: Nombre de la variable respuesta. (str)
-    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
-    :return: ROI del modelo. (float)
+    Que calcule la precision y/o ROI obtenido con ≠ estrategias de inversion. Por ejemplo, 
+    - Cuando el predictor supera el 60% en clase predicha.
+    - Cuando el predictor se opone al resultado de la casa de apuesta
+    - etc...
+
+    # stake = # Podria variar y apostar mas en algunos partidos y menos en otros
+    # umbral_confianza = # Probabilidad minima de la clase predicha mas probable para apostar en ese partido
+    
+    # roi_est_1 = calculate_roi(stake="same", umbral_confianza=0.3)
+    # roi_est_2 = calculate_roi(stake="same", umbral_confianza=0.6)
+    # roi_est_3 = calculate_roi(stake="linear", umbral_confianza=0.3) # Cuanta mas confianza tiene el predictor, mas dinero
+    # roi_est_4 = calculate_roi(stake="exponencial", umbral_confianza=0.3)
+    # etc
     """
-    # Definicion de variables
-    ingresos = 0
-    stake = 100  # Suponiendo 1000 pesos por cada partido del df_test
-    n_partidos_a_invertir = len(df) # Suponiendo que invierto en todos los partidos
-    dinero_a_invertir = stake * n_partidos_a_invertir  
+    # Calculo cuotas segun probabilidades del modelo
+    df = calculate_odds_model(df)
 
-    # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    df_correct = df[df['result_str'] == df['predicted_result_str']]
-    if _print:
-        print(df_correct.shape)
+    # Stake fijo
+    df_roi1 = construct_stake_modified(df, stake_base, type_stake='equal')
+    roi1 = calculate_roi(df_roi1)
+    
+    # Stake lineal 1
+    df_roi2 = construct_stake_modified(df, stake_base, type_stake="linear", x1=-1, y1=-1, x2=1, y2=1)
+    roi2 = calculate_roi(df_roi2)
 
-    # Por registro
-    for idx in df_correct.index:
+    # Stake lineal 2 --> apuesto cuando es + seguro y cuando lo hace, con + dinero
+    df_roi3 = construct_stake_modified(df, stake_base, type_stake="linear", x1=0, y1=-1, x2=1, y2=3)
+    roi3 = calculate_roi(df_roi3)
 
-        cuota_home =  df_correct.loc[idx, 'odds_home'] 
-        cuota_draw = df_correct.loc[idx, 'odds_draw'] 
-        cuota_away = df_correct.loc[idx, 'odds_away'] 
-        result_etiqueta = df_correct.loc[idx, 'result_str']
+    # Stake lineal 3 
+    df_roi4 = construct_stake_modified(df, stake_base, type_stake="linear", x1=0, y1=-1, x2=1, y2=5)
+    roi4 = calculate_roi(df_roi4)
 
-        # Obtengo el ingreso obtenido segun la etiqueta
-        cuota = cuota_home if result_etiqueta == "Home" else cuota_draw if result_etiqueta == "Draw" else cuota_away  # Vefificada
-        ingresos += stake * cuota
-        if _print:
-            print(f"Ganamos ${stake * cuota}")
+    # Stake lineal 4
+    df_roi5 = construct_stake_modified(df, stake_base, type_stake="linear", x1=0, y1=-2, x2=1, y2=5)
+    roi5 = calculate_roi(df_roi5)
 
-    # Calculo el ROI e imprimo resultados
-    roi = (ingresos - dinero_a_invertir) / dinero_a_invertir * 100
-    # print(f" RESULTADOS ".center(120, "#"))
-    print(f"Dinero invertido: ${dinero_a_invertir}")
-    print(f"Dinero luego de apuestas: ${ingresos}")
-    print(f"ROI: {roi:.2f}%")
-    return roi
+    # Stake exponencial  # aun tengo problema con los x1 e y1 negativos...
+    # df_roi4 = construct_stake_modified(df, stake_base, type_stake="exponential")
+    # roi4 = calculate_roi(df_roi4)
+    
+    # Selecciono el mejor ROI
+    best_roi = max(roi1, roi2, roi3, roi4)
+    return best_roi
 
-
-def calculate_roi_dif_stake(df):  # Mismo stake y apuesto a todos los partidos # Deberia adaptarlo para pred en int (en vez de str)?? --> dificulta el calculo de cuotas...
-    """
-    Calcula ROI comparando las predicciones del modelo y los resultados reales.
-    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
-    :param var_resp: Nombre de la variable respuesta. (str)
-    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
-    :return: ROI del modelo. (float)
-    """
-    # Definicion de variables
-    ingresos = 0
-    stake_base = 100  # Suponiendo 1000 pesos por cada partido del df_test
-    n_partidos_a_invertir = len(df) # Suponiendo que invierto en todos los partidos
-    # dinero_a_invertir = stake_base * n_partidos_a_invertir  
-
-    # calcular cuotas de mi modelo
-    df = cuotas_de_mi_modelo(df)
-    df = calculate_multiplicador(df)
-
-    # mean_dif_cuota_bm_mod = df['dif_cuota_bm_mod'].mean()
-    for i, row in df.iterrows():
-        mod = stake_base * row['multiplicador']
-        df.loc[i, 'mod'] = mod
-
-        stake_mod = stake_base + mod
-        if stake_mod < 0:
-            stake_mod = 0
-
-        df.loc[i, 'stake_mod'] = stake_mod
-    df.to_excel("/Users/nachomondino/Desktop/df_cuotas.xlsx")
-
-    dinero_a_invertir = sum(df['stake_mod'])
-
-    # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    df_correct = df[df['result_str'] == df['predicted_result_str']]
-    print(df_correct.shape)
-     
-    # Por registro
-    for idx, row in df_correct.iterrows():
-
-        cuota_home =  row['odds_home']  # df_correct.loc[idx, 'odds_home'] 
-        cuota_draw = row['odds_draw']  # df_correct.loc[idx, 'odds_draw'] 
-        cuota_away = row['odds_away'] # df_correct.loc[idx, 'odds_away'] 
-        result_etiqueta = row['result_str']  # df_correct.loc[idx, 'result_str']
-
-        # Obtengo el ingreso obtenido segun la etiqueta
-        cuota = cuota_home if result_etiqueta == "Home" else cuota_draw if result_etiqueta == "Draw" else cuota_away  # Vefificada
-
-        stake = row['stake_mod']
-        
-        ingreso = stake * cuota        
-
-        ingresos += ingreso
-        # print(f"Ganamos ${ingreso}")
-
-    # Calculo el ROI e imprimo resultados
-    roi = (ingresos - dinero_a_invertir) / dinero_a_invertir * 100
-    # print(f" RESULTADOS ".center(120, "#"))
-    print(f"Dinero invertido: ${dinero_a_invertir}")
-    print(f"Dinero luego de apuestas: ${ingresos}")
-    print(f"ROI: {roi:.2f}%")
-    return roi
-
-def cuotas_de_mi_modelo(df):
+def calculate_odds_model(df: pd.DataFrame):
     """
     Calcula las probabilidades de cada resultado (Home, Draw y Away) segun la casa de apuesta
     """
@@ -242,50 +152,110 @@ def cuotas_de_mi_modelo(df):
         cuota_away = 1 / row['Away']
         cuota_min = min(cuota_home, cuota_draw, cuota_away)
 
-
+        # Determino diferencia entre cuotas de mi modelo y de casa de apuesta
         pred_mod = df.loc[idx, 'predicted_result_str']
-        cuota_bm = row['odds_home'] if pred_mod == "Home" else row['odds_draw']  if pred_mod == "Draw" else row['odds_away']   # Vefificada
+        cuota_bm = row['odds_home'] if pred_mod == "Home" else row['odds_draw'] if pred_mod == "Draw" else row['odds_away']
         dif_cuota_bm_mod = cuota_bm - cuota_min
 
-        df.loc[idx, ['odds_home_mod', 'odds_draw_mod', 'odds_away_mod', 'cuota_min', 'cuota_bm', 'dif_cuota_bm_mod']] = [cuota_home, cuota_draw, cuota_away, cuota_min, cuota_bm, dif_cuota_bm_mod]
-
+        df.loc[idx, 'dif_cuota_bm_mod'] = dif_cuota_bm_mod
+        # df.loc[idx, ['odds_home_mod', 'odds_draw_mod', 'odds_away_mod', 'cuota_min', 'cuota_bm', 'dif_cuota_bm_mod']] = [cuota_home, cuota_draw, cuota_away, cuota_min, cuota_bm, dif_cuota_bm_mod]
     return df
 
-def calculate_multiplicador(df):
+def construct_stake_modified(df: pd.DataFrame, stake_base, type_stake, x1: float = -1, y1: float = -1, x2: float = 1, y2: float = 1):
+    """
+    Construye multiplicador y luego se lo aplica al stake base para construir la columna "stake_mod".
+    """
+    df = calculate_multiplicador(df, x1, y1, x2, y2, type_stake)
 
-    y2, y1 = 1, -2
-   
-    max_val = max(df['dif_cuota_bm_mod'])
-    min_val = min(df['dif_cuota_bm_mod'])
-    x2 = np.percentile(df['dif_cuota_bm_mod'], 98)
-    x1 = np.percentile(df['dif_cuota_bm_mod'], 2)
+    # Por partido
+    for i, row in df.iterrows():
+        
+        # Calculo stake mod
+        stake_mod = stake_base * (1 + row['multiplicador'])
 
-    print(max_val, min_val)
-    print(y2, x2, y1, x1)
-    
-    m = (y2-y1) / (x2-x1)
-    b = y1-m*x1
+        # Si el stake se vuelve negativo tras aplicar el multiplicador
+        if stake_mod < 0:
+            stake_mod = 0
 
-    df['multiplicador'] = df['dif_cuota_bm_mod'] * m + b
+        df.loc[i, 'stake_mod'] = stake_mod
     return df
 
+def calculate_multiplicador(df: pd.DataFrame, x1: float, y1: float, x2: float, y2: float, type_stake: str = "equal"):
+    """
+    Construye columna multiplicador. Cada fila tiene su multiplicador segun las probabilidades del modelo y de la casa de apuesta para ese partido.
+    """
+    # Linear
+    if type_stake == "equal":  
+        df['multiplicador'] = 0
 
-def calculate_estrategia_inversion():
+    elif type_stake == "linear":  # y= m * x + b
+        m = (y2-y1) / (x2-x1)
+        b = y1-m*x1
+
+        df['multiplicador'] = df['dif_cuota_bm_mod'] * m + b
+
+    elif type_stake == "exponential":  # y=a * b^x
+
+        # Transformación logarítmica de los valores de x e y  (no pueden ser valores negativos)
+        x2 = x2 - x1 + 3
+        y2 = y2 - y1 + 3
+        x1 = 3
+        y1 = 3
+        # print(x2, y2, x1, y1)
+
+        # Resolver el sistema de ecuaciones
+        A = np.array([[1, np.log(x1)], [1, np.log(x2)]])
+        b = np.array([np.log(y1), np.log(y2)])
+        # print("Z: ", A, b)
+
+        a, log_b = np.linalg.solve(A, b)
+        # print("X: ", a, log_b)
+
+        # Calcular b a partir de su logaritmo
+        b = np.exp(log_b)     
+        # print("W: ", a, b)
+
+        df['multiplicador'] = a * (b ** df['dif_cuota_bm_mod'])
+        
+        df.to_excel('/Users/nachomondino/Desktop/AAAA.xlsx')
+    else:
+        pass
+    return df
+
+def calculate_roi(df: pd.DataFrame):
     """
-    Que calcule la precision y/o ROI obtenido con ≠ estrategias de inversion. Por ejemplo, 
-    - Cuando el predictor supera el 60% en clase predicha.
-    - Cuando el predictor se opone al resultado de la casa de apuesta
-    - etc...
+    Calcula ROI comparando las predicciones del modelo y los resultados reales.
+    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
+    :param var_resp: Nombre de la variable respuesta. (str)
+    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
+    :return: ROI del modelo. (float)
     """
-    # stake = # Podria variar y apostar mas en algunos partidos y menos en otros
-    # umbral_confianza = # Probabilidad minima de la clase predicha mas probable para apostar en ese partido
-    
-    # roi_est_1 = calculate_roi(stake="same", umbral_confianza=0.3)
-    # roi_est_2 = calculate_roi(stake="same", umbral_confianza=0.6)
-    # roi_est_3 = calculate_roi(stake="lineal", umbral_confianza=0.3) # Cuanta mas confianza tiene el predictor, mas dinero
-    # roi_est_4 = calculate_roi(stake="exponencial", umbral_confianza=0.3)
-    # etc
-    pass
+    ingresos = 0
+    dinero_a_invertir = sum(df['stake_mod'])
+
+    # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
+    df_correct = df[df['result_str'] == df['predicted_result_str']]
+    # print(df_correct.shape)
+     
+    # Por registro
+    for idx, row in df_correct.iterrows():
+
+        result_etiqueta = row['result_str']
+
+        # Obtengo el ingreso obtenido segun la etiqueta
+        cuota = row['odds_home'] if result_etiqueta == "Home" else row['odds_draw'] if result_etiqueta == "Draw" else row['odds_away']  # Vefificada
+        # print(cuota)
+           
+        ingresos += row['stake_mod'] * cuota
+        # print(f"Ganamos ${ingreso}")
+ 
+    # Calculo el ROI e imprimo resultados
+    roi = (ingresos - dinero_a_invertir) / dinero_a_invertir * 100
+    print(f" RESULTADOS ".center(120, "#"))
+    print(f"Dinero invertido: ${dinero_a_invertir:.0f}")
+    print(f"Dinero luego de apuestas: ${ingresos:.0f}")
+    print(f"ROI: {roi:.1f}%")
+    return roi
 
 def prueba():
     var_resp = 'result'

@@ -108,6 +108,7 @@ class FlashscoreCrawler(Crawler):
         # Reinicio diccionario en el que guardar datos del nuevo match
         d_new_row_df_match = {}
         d_new_row_df_match_player = {}
+        d_new_row_df_match_odds = {}
 
         # EXTRACCION DE CAMPOS
         ## Extraigo campos de hoja "summary"
@@ -120,7 +121,7 @@ class FlashscoreCrawler(Crawler):
 
         ## Si existe la seccion "odds pre-match", extraigo odds de Bet365
         if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las oddss pero no hay valores...
-            d_new_row_df_match.update(self.extract_odds())
+            d_new_row_df_match_odds.update(self.extract_odds())
 
         ## Si tiene hoja "Formations", extraigo campos
         boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
@@ -128,7 +129,7 @@ class FlashscoreCrawler(Crawler):
             d_new_row_df_match_player.update(self.extract_lineups())
             d_new_row_df_match.update(self.extract_coaches())
         
-        return d_new_row_df_match, d_new_row_df_match_player
+        return d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds
 
     def extract_next_match_data(self):
         """
@@ -137,13 +138,14 @@ class FlashscoreCrawler(Crawler):
         # Reinicio diccionario en el que guardar datos del nuevo partido
         d_new_row_df_match = {}
         d_new_row_df_match_player = {}
+        d_new_row_df_match_odds = {}
 
         # Extraigo campos de hoja "Resumen"
         d_new_row_df_match.update(self.extract_basic_data_from_summary(extract_goals=False))
 
         #  Si existe la seccion "Cuotas pre-partido", extraigo cuotas de Bet365
         if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
-            d_new_row_df_match.update(self.extract_odds())
+            d_new_row_df_match_odds.update(self.extract_odds())
 
         ## Si tiene hoja "Formations", extraigo campos
         boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
@@ -153,7 +155,7 @@ class FlashscoreCrawler(Crawler):
         else:
             d_new_row_df_match_player.update(self.extract_bajas_pre_partido()) # FALTARIA TMB SECCION POSIBLES BAJAS.
             
-        return d_new_row_df_match, d_new_row_df_match_player
+        return d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds
 
     def extract_basic_data_from_summary(self, extract_goals=True):
         """
@@ -385,7 +387,7 @@ def extract_data(country: str, competition: str, n_seasons_max: int = 0, export:
     warnings.filterwarnings("ignore")  # /Users/nachomondino/Documents/GitHub/predictor-apuestas/data_understanding/collect_data/scraper_flashscore.py:175: FutureWarning: In a future version, object-dtype columns with all-bool values will not be included in reductions with bool_only=True. Explicitly cast to bool dtype instead. df_match = pd.concat([df_match, pd.DataFrame(d_new_row, index=[0])])
     path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"  # path_driver_exe = "./p2_data_understanding/collect_initial_data/chromedriver"
     crawler = FlashscoreCrawler(headless=True, path=path_driver_exe, browser="Chrome")
-    df_match, df_match_player = pd.DataFrame(), pd.DataFrame()
+    df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
@@ -428,12 +430,13 @@ def extract_data(country: str, competition: str, n_seasons_max: int = 0, export:
             crawler.driver.get(url_match)
 
             # Extraigo todos los datos del partido
-            d_new_row_df_match, d_new_row_df_match_player = crawler.extract_match_data()
+            d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds = crawler.extract_match_data()
             d_new_row_df_match.update({'season': season_year})
 
             # Guardo datos del partido
             df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])
             df_match_player = pd.concat([df_match_player, pd.DataFrame(d_new_row_df_match_player, index=[id_match])])
+            df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_new_row_df_match_odds, index=[id_match])])
             progress_bar.update(1)
 
         progress_bar.close()
@@ -442,20 +445,22 @@ def extract_data(country: str, competition: str, n_seasons_max: int = 0, export:
             # Guardo partidos de la season (por seguridad)
             df_match.to_excel(f'{ruta_base}/per_season/df_match/{competition_form}_{season_year}.xlsx', index=True)
             df_match_player.to_excel(f'{ruta_base}/per_season/df_match_player/{competition_form}_{season_year}.xlsx', index=True)
+            df_match_odds.to_excel(f'{ruta_base}/per_season/df_match_odds/{competition_form}_{season_year}.xlsx', index=True)
 
     if export:
         # Guardo partidos de la competition
         df_match.to_excel(f'{ruta_base}/per_competition/df_match/{competition_form}.xlsx', index=True)
         df_match_player.to_excel(f'{ruta_base}/per_competition/df_match_player/{competition_form}.xlsx', index=True)
+        df_match_odds.to_excel(f'{ruta_base}/per_competition/df_match_odds/{competition_form}.xlsx', index=True)
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    return df_match, df_match_player
+    return df_match, df_match_player, df_match_odds
 
 def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.DataFrame, pd.DataFrame]
     
     # Definicion de variables
-    df_match, df_match_player = pd.DataFrame(), pd.DataFrame()
+    df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
     crawler = FlashscoreCrawler(headless=True, path=path_driver_exe, browser="Chrome")
 
@@ -485,12 +490,13 @@ def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.
         crawler.driver.get(url_match)
 
         # Extraigo datos del partido
-        d_new_row_df_match, d_new_row_df_match_player = crawler.extract_next_match_data()
+        d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds = crawler.extract_next_match_data()
         d_new_row_df_match.update({'season': season_year})
 
         # GUARDADO DE DATOS EN DATAFRAME
         df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])
         df_match_player = pd.concat([df_match_player, pd.DataFrame(d_new_row_df_match_player, index=[id_match])])
+        df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_new_row_df_match_odds, index=[id_match])])
         progress_bar.update(1)
 
     # Cerrar la barra de progreso al finalizar
@@ -498,14 +504,14 @@ def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    return df_match, df_match_player
+    return df_match, df_match_player, df_match_odds
 
 def extract_missing_data(country, competition, l_ids_already_collected, _print: bool = False):  # Se podria usar la misma funcion que extract_normal pero agregando l_ids_already_collected para filtrar partidos... y  tal vez n_seasons_max=1.
     """
     Extrae los partidos aun no extraidos de una competencia de un country.
     """
   # DEFINCION DE PARAMETROS & VARIABLES
-    df_match, df_match_player = pd.DataFrame(), pd.DataFrame()
+    df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
     crawler = FlashscoreCrawler(headless=True, path=path_driver_exe, browser="Chrome")
 
@@ -543,12 +549,13 @@ def extract_missing_data(country, competition, l_ids_already_collected, _print: 
         crawler.driver.get(url_partido)
 
         # Extraigo todos los datos del partido
-        d_new_row_df_match, d_new_row_df_match_player = crawler.extract_match_data()
+        d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds = crawler.extract_match_data()
         d_new_row_df_match.update({'season': season_year})
 
         # Guardo datos del partido
         df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])
         df_match_player = pd.concat([df_match_player, pd.DataFrame(d_new_row_df_match_player, index=[id_match])])
+        df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_new_row_df_match_odds, index=[id_match])])
         if _print:
             progress_bar.update(1)
 
@@ -558,7 +565,7 @@ def extract_missing_data(country, competition, l_ids_already_collected, _print: 
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    return df_match, df_match_player
+    return df_match, df_match_player, df_match_odds
 
 def prueba():
     # Selecciono country a extraer y obtengo las competencias y su categoria

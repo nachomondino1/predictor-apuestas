@@ -16,6 +16,8 @@ from p3_data_preparation import format_data, select_data, clean_data, construct_
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
 import pickle
+from p4_modeling import asses_model
+
 
 class DataUnderstandingNew():
 
@@ -60,14 +62,14 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Extraigo proximos partidos
-            df_match_next, df_match_player_next = extract_next_matches(self.country, competition, n_days=n_days)
+            df_match_next, df_match_player_next, df_match_odds = extract_next_matches(self.country, competition, n_days=n_days)
 
             # Add columns: id_country, is_cup and id_competition
             df_match_next['id_country'] = self.id_country
             df_match_next['id_competition'] = id_competition
             df_match_next['is_cup'] = is_cup
-            df_match_odds = df_match_next.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-            df_match_next = df_match_next.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+            # df_match_odds = df_match_next.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
+            # df_match_next = df_match_next.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
             # Guarda datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match_next], axis=0)
@@ -107,7 +109,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss = extract_missing_data(self.country, competition, list(df_match.index))
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_missing_data(self.country, competition, list(df_match.index))
             if _print:
                print(f"Cantidad de partidos faltantes en df_match: {df_match_miss_matches.shape[0]}")
 
@@ -115,13 +117,13 @@ class DataUnderstandingNew():
             df_match_miss['id_country'] = self.id_country
             df_match_miss['id_competition'] = id_competition
             df_match_miss['is_cup'] = is_cup
-            df_match_odds = df_match_miss.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-            df_match_miss = df_match_miss.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+            # df_match_odds = df_match_miss.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
+            # df_match_miss = df_match_miss.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
             # Concateno dfs
             df_match_concat = pd.concat([df_match_concat, df_match_miss], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_miss], axis=0)
-            df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds], axis=0)
+            df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds_miss], axis=0)
 
         # Exporto datasets
         if export and len(df_match_miss) > 0:
@@ -448,39 +450,6 @@ def copy_last_matches_mean_value(df_new: pd.DataFrame, df: pd.DataFrame, n_days:
     # df_new.to_excel(f'/Users/nachomondino/Desktop/df_copy_last_matchs_mean_value.xlsx', index=False)
     return df_new
 
-def calculate_roi_dif_stake(df):
-    """
-    Calcula ROI comparando las predicciones del modelo y los resultados reales.
-    :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
-    :param var_resp: Nombre de la variable respuesta. (str)
-    :param var_pred: Nombre de la variable con la predicción del modelo. (str)
-    :return: ROI del modelo. (float)
-    """
-    # Definicion de variables
-    dinero_a_invertir = 5000
-    n_part = len(df)
-    stake_base = dinero_a_invertir / n_part
-
-    # calcular cuotas de mi modelo
-    df = asses_model.cuotas_de_mi_modelo(df)
-    df = asses_model.calculate_multiplicador(df)
-
-    # Por partido
-    for i, row in df.iterrows():
-
-        # Calculo stake usando mulplicador
-        mod = stake_base * row['multiplicador']
-        df.loc[i, 'mod'] = mod
-
-        stake_mod = stake_base + mod
-        if stake_mod < 0:
-            stake_mod = 0
-
-        df.loc[i, 'stake_mod'] = stake_mod
-    df.to_excel("/Users/nachomondino/Desktop/df_cuotas_next_matches.xlsx")
-    # dinero_a_invertir = sum(df['stake_mod'])
-    return df
-
 def main():
     """
     Recoleccion de proximos partidos
@@ -497,11 +466,11 @@ def main():
     du = DataUnderstandingNew(id_country, country) # Creo objeto de clase DataPreparation
     dp = DataPreparationNew(id_country, country) # Creo objeto de clase DataPreparation
 
-    run_missing, data_unders, data_prep, modeling = True, True, True, True
+    run_missing, data_unders, data_prep, modeling = False, False, False, True
     export = True
 
     # Hiperparametro
-    n_days = 1  # Numero de dias maximo desde hoy para extraer partidos
+    n_days = 3  # Numero de dias maximo desde hoy para extraer partidos
  
     # MISSING MATCHES
     if run_missing:  # Lo puedo correr atemporal de los proximos partidos, dado que tarda,esta bueno correlo seguido para no tener una gran extraccion y tarde mucho
@@ -554,8 +523,12 @@ def main():
         # Extriago datos o los levanto
         df_match, df_match_player, df_match_odds = du.collect_initial_data_new(n_days=n_days, export=export)
 
-        # Describo datos
-        du.describe_data_new(df_match, df_match_player)
+        if len(df_match) > 0:
+            # Describo datos
+            du.describe_data_new(df_match, df_match_player)
+        else:
+            data_prep, modeling, export = False, False, False
+            print("No hay proximos partidos para los cuales predecir su resultado.")
     
     elif data_prep:
         # Levanto datos ya extraidos
@@ -565,8 +538,7 @@ def main():
         print("\n DF MATCH \n", df_match.head(2))
         print("\n DF MATCH PLAYER \n", df_match_player.head(2))
 
-        #du = DataUnderstanding(country) # Creo objeto de clase DataPreparation
-        # du.describe_data(df_match, df_match_player, df_player)
+        # du.describe_data(df_match, df_match_player, df_match_odds, df_player)
 
     # DATA PREPARATION
     if data_prep:
@@ -591,8 +563,6 @@ def main():
     elif not data_unders:
         # Levanto dataset para prueba
         df = pd.read_excel(f'./p6_deployment/data/{country}/data_preparation/df_selected.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
-        df_match_next = pd.read_excel(f'p6_deployment/data/{country.lower()}/data_understanding/df_match_next.xlsx', index_col=0)
         print(df.head(2), df.shape)
 
     # MODELING
@@ -604,7 +574,11 @@ def main():
             os.makedirs(directorio)
 
         print(" Modeling ".center(120, "#"))
-         # Levanto df_etiquetas
+        # Levanto datasets
+        df_match_next = pd.read_excel(f'p6_deployment/data/{country.lower()}/data_understanding/df_match_next.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./p6_deployment/data/{country.lower()}/data_understanding/df_match_next_odds.xlsx', index_col=0)
+
+        # Levanto df_etiquetas
         df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{country}/df_etiquetas.xlsx')
         df_etiquetas_y = df_etiquetas[df_etiquetas['variable'] == var_resp]  # solo etiquetas de la var resp
 
@@ -623,10 +597,11 @@ def main():
 
         # Traduzco predicciones numericas a etiquetas
         df_concat = format_data.convert_pred_int_to_str(df_concat, name_var_int=var_pred, name_var_str=f'{var_pred}_str', df_etiquetas_y=df_etiquetas_y)
-        df_concat.to_excel(f'./p6_deployment/data/{country}/modeling/predicciones.xlsx')
 
         # Determino estrategia de inversion
-        df = calculate_roi_dif_stake(df_concat)
+        df_concat = asses_model.calculate_odds_model(df_concat)
+        df = asses_model.construct_stake_modified(df_concat, stake_base=7000, type_stake='linear', x1=0, y1=-1, x2=1, y2=3)
+        df.to_excel(f'./p6_deployment/data/{country}/modeling/predicciones.xlsx')
 
     end = time.time()
     print(f"Main_next_matches en {(end - start)/60:.1f} minutos")
