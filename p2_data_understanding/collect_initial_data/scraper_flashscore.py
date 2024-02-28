@@ -375,7 +375,7 @@ class FlashscoreCrawler(Crawler):
         return l_items_filt
 
 
-def extract_data(country: str, competition: str, n_seasons_max: int = 0, export: bool = True):
+def extract_data(id_country, country: str, id_competicion, competition: str, is_cup, n_seasons_max: int = 0, export: bool = True):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -431,7 +431,7 @@ def extract_data(country: str, competition: str, n_seasons_max: int = 0, export:
 
             # Extraigo todos los datos del partido
             d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds = crawler.extract_match_data()
-            d_new_row_df_match.update({'season': season_year})
+            d_new_row_df_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
 
             # Guardo datos del partido
             df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])
@@ -457,7 +457,7 @@ def extract_data(country: str, competition: str, n_seasons_max: int = 0, export:
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds
 
-def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.DataFrame, pd.DataFrame]
+def extract_next_matches(id_country, country: str, id_competicion, competition: str, is_cup, n_days): # -> tuple[pd.DataFrame, pd.DataFrame]
     
     # Definicion de variables
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -491,7 +491,7 @@ def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.
 
         # Extraigo datos del partido
         d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds = crawler.extract_next_match_data()
-        d_new_row_df_match.update({'season': season_year})
+        d_new_row_df_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
 
         # GUARDADO DE DATOS EN DATAFRAME
         df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])
@@ -506,7 +506,7 @@ def extract_next_matches(country: str, competition: str, n_days): # -> tuple[pd.
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds
 
-def extract_missing_data(country, competition, l_ids_already_collected, _print: bool = False):  # Se podria usar la misma funcion que extract_normal pero agregando l_ids_already_collected para filtrar partidos... y  tal vez n_seasons_max=1.
+def extract_missing_data(id_country, country: str, id_competicion, competition: str, is_cup, l_ids_already_collected, _print: bool = False):  # Se podria usar la misma funcion que extract_normal pero agregando l_ids_already_collected para filtrar partidos... y  tal vez n_seasons_max=1.
     """
     Extrae los partidos aun no extraidos de una competencia de un country.
     """
@@ -550,7 +550,7 @@ def extract_missing_data(country, competition, l_ids_already_collected, _print: 
 
         # Extraigo todos los datos del partido
         d_new_row_df_match, d_new_row_df_match_player, d_new_row_df_match_odds = crawler.extract_match_data()
-        d_new_row_df_match.update({'season': season_year})
+        d_new_row_df_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
 
         # Guardo datos del partido
         df_match = pd.concat([df_match, pd.DataFrame(d_new_row_df_match, index=[id_match])])

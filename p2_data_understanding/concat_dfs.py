@@ -8,7 +8,7 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
     """
     # Levanto competiciones del country
     df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-    df_comp_pais = df_comp[df_comp['id_country'] == id_country]  # Para extrar varios paises?: df = df_comp[df_comp['country'].isin(l_paises)]
+    df_comp_pais = df_comp[df_comp['id_country'] == id_country]
     print("Competiciones del country:\n", df_comp_pais)
 
     # Por dataframe (e.f. df_match, df_match_player)
@@ -26,13 +26,11 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
 
             # Levanto su dataframe
             try:
-                df = pd.read_excel(f'{ruta_base_comp}/{competicion_form}.xlsx', index_col=0)
+                if dataframe == "df_player":
+                    df = pd.read_excel(f'{ruta_base_comp}/{competicion_form}.xlsx')
+                else:
+                    df = pd.read_excel(f'{ruta_base_comp}/{competicion_form}.xlsx', index_col=0)
                 print(f"Shape df: {df.shape}")
-
-                if dataframe == "df_match":
-                    df['id_country'] = id_country
-                    df['id_competition'] = row['id_competition']
-                    df['is_cup'] =  row['is_cup']
 
                 # Concateno dataframes
                 df_concat = pd.concat([df_concat, df], axis=0)
@@ -42,7 +40,9 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
                 print(f"No existe el dataframe para la competition {competicion_form}")
 
         # Me fijo si hay duplicados (no deberia)
-        df_sin_duplicados = df_concat.drop_duplicates()  # .reset_index(drop=True)
+        df_check_dup = df_concat.copy()
+        df_check_dup['columna_id'] = df_concat.index
+        df_sin_duplicados = df_check_dup.drop_duplicates()
       
         # Si hay duplicados
         if len(df_concat)-len(df_sin_duplicados) > 0:
@@ -50,7 +50,7 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
             print(f"Hay filas repetidas en {dataframe}. Nº de filas repetidas: {len(df_concat)-len(df_sin_duplicados)}")
             # Exporto los duplicados para ver que filas son
             df_dup = df[~df.index.isin(df_sin_duplicados.index)]
-            df_dup.to_excel(f'/Users/nachomondino/Desktop/{dataframe}_duplicados.xlsx', index=True)
+            # df_dup.to_excel(f'/Users/nachomondino/Desktop/{dataframe}_duplicados.xlsx', index=True)
             print(df_dup)
 
         if export:
@@ -75,7 +75,11 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
 
             try:
                 # Levanto el dataframe
-                df = pd.read_excel(f'{ruta_base}/{filename}')  # index_col=0
+                if dataframe == "df_player":
+                    df = pd.read_excel(f'{ruta_base}/{filename}')  
+                else:
+                    df = pd.read_excel(f'{ruta_base}/{filename}', index_col=0)  
+            
                 print(df.head(1))
                 print(f"Shape df: {df.shape}")
 
@@ -87,19 +91,17 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
                 print("Falló")
 
         # Me fijo si hay duplicados (no deberia)
-        df_sin_duplicados = df_concat.drop_duplicates()  # .reset_index(drop=True)
+        df_sin_duplicados = df_concat.drop_duplicates()
         print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
 
         if export:
             df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
-if __name__ == "__main__":
-    
-
-    # Definicion de variables
+def prueba():
+     # Definicion de variables
     country = "England"
     export = True
-    competicion, temporada = False, True
+    competicion, temporada = True, False
     
     # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./p2_data_understanding/data/df_countries.xlsx')
@@ -108,7 +110,7 @@ if __name__ == "__main__":
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes = ["df_match", "df_match_player"]
+        l_dataframes = ["df_match", "df_match_player", 'df_match_odds', 'df_player']
         concat_dfs_per_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country
@@ -117,3 +119,6 @@ if __name__ == "__main__":
         l_filenames = ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]
         competition = "premier_league"
         concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export)
+
+if __name__ == "__main__":
+    prueba()

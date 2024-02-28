@@ -62,14 +62,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Extraigo proximos partidos
-            df_match_next, df_match_player_next, df_match_odds = extract_next_matches(self.country, competition, n_days=n_days)
-
-            # Add columns: id_country, is_cup and id_competition
-            df_match_next['id_country'] = self.id_country
-            df_match_next['id_competition'] = id_competition
-            df_match_next['is_cup'] = is_cup
-            # df_match_odds = df_match_next.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-            # df_match_next = df_match_next.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+            df_match_next, df_match_player_next, df_match_odds = extract_next_matches(self.id_country, self.country, id_competition, competition, is_cup, n_days=n_days)
 
             # Guarda datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match_next], axis=0)
@@ -109,16 +102,9 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_missing_data(self.country, competition, list(df_match.index))
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_missing_data(self.id_country, self.country, id_competition, competition, is_cup, list(df_match.index))
             if _print:
                print(f"Cantidad de partidos faltantes en df_match: {df_match_miss_matches.shape[0]}")
-
-            # Add columns: id_country, is_cup and id_competition
-            df_match_miss['id_country'] = self.id_country
-            df_match_miss['id_competition'] = id_competition
-            df_match_miss['is_cup'] = is_cup
-            # df_match_odds = df_match_miss.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-            # df_match_miss = df_match_miss.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
 
             # Concateno dfs
             df_match_concat = pd.concat([df_match_concat, df_match_miss], axis=0)
@@ -600,7 +586,7 @@ def main():
 
         # Determino estrategia de inversion
         df_concat = asses_model.calculate_odds_model(df_concat)
-        df = asses_model.construct_stake_modified(df_concat, stake_base=7000, type_stake='linear', x1=0, y1=-1, x2=1, y2=3)
+        df = asses_model.construct_stake_modified(df_concat, stake_base=7000, type_stake='linear', m=3, b=-1)
         df.to_excel(f'./p6_deployment/data/{country}/modeling/predicciones.xlsx')
 
     end = time.time()

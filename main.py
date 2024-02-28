@@ -78,14 +78,7 @@ class DataUnderstanding:
             print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
             # Extraigo partidos de Flashscore (df_match y df_match_player)
-            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.country, row['competition_flashscore'], n_seasons_max=16, export=export)
-
-            # Add columns: id_country, is_cup and id_competition
-            df_match['id_country'] = self.id_country
-            df_match['id_competition'] = row['id_competition']
-            df_match['is_cup'] = row['is_cup']
-            # df_match_odds = df_match.loc[:, ['odds_home', 'odds_draw', 'odds_away']]
-            # df_match = df_match.drop(['odds_home', 'odds_draw', 'odds_away'], axis=1)
+            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data( self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], n_seasons_max=16, export=export)
 
             # Guardo datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
@@ -96,11 +89,7 @@ class DataUnderstanding:
             if row['is_cup'] == 0:
 
                 # Extraigo datos de players de Sofifa (df_player)
-                df_player = scraper_sofifa.extract_players_sofifa(self.country, row['competition_sofifa'], export=export)
-
-                # Add columns: id_country and id_competition
-                df_player['id_country'] = self.id_country
-                df_player['id_competition'] = row['id_competition']
+                df_player = scraper_sofifa.extract_players_sofifa(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
 
                 # Save data
                 df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
@@ -614,6 +603,7 @@ class Modeling:
         # Calculo precision de casa de apuesta
         test_precision_bookmaker = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
         dif_prec = test_accuracy - test_precision_bookmaker
+        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1, 'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec}
 
         # Concateno dfs
         df_concat = pd.concat([df_pred, df_pred_proba, df_match_odds], axis=1)
@@ -623,8 +613,8 @@ class Modeling:
         df_concat = format_data.convert_pred_int_to_str(df_concat, name_var_int=self.var_pred, name_var_str=f'{self.var_pred}_str', df_etiquetas_y=df_etiquetas_y)
 
         # Calculoo ROI
-        roi = asses_model.calculate_estrategia_inversion(df_concat)
-        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1, 'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec, 'ROI': roi}
+        d_roi = asses_model.calculate_roi_by_betting_strategy(df_concat)
+        d_metrics.update(d_roi)
         print(d_metrics)
 
         if export:
@@ -702,7 +692,7 @@ def main():
         df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
-        df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx')
+        df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index_col=0)
 
         du.describe_data(df_match, df_match_player, df_match_odds, df_player)
 
@@ -716,16 +706,16 @@ def main():
         thr_fs = 0.3  # Peso minimo de una variable para ser considerada como importante [0-1] (siendo 1 el peso de la variable mas importante y 0 la menos)
         df_hiper_prep = pd.DataFrame(data={'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na]}, index=[0])
         
-        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed_90_3.xlsx', index_col=0)
+        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
         # print(df.head(2))
 
         # Preparo el dataset para el analisis
         df_match, df_match_player, df_player = dp.format_data(df_match, df_match_player, df_player, export=False)
         df_match, df_match_player, df_player = dp.clean_data(df_match, df_match_player, df_player, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player, export=export) 
-        # df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, export=export)
-        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-        # df = dp.nan_values_treatment(df, fill_na=fill_na, export=export)
+        df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, export=export)
+        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
+        df = dp.nan_values_treatment(df, fill_na=fill_na, export=export)
         
         if export:
             df_hiper_prep.to_excel(f'./p3_data_preparation/data/{country}/df_hiper_prep.xlsx', index=False)
