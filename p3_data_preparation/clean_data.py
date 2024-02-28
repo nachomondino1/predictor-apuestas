@@ -246,7 +246,7 @@ def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funcio
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
-def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, _print: bool = False):
+def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_min: int = 0, _print: bool = False):
     """
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
@@ -256,8 +256,8 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, _print
     # Elimino filas con al menos un nan (tal como lo haria en Modeling)
     df_drop_na = delete_rows_nan(df, porc_nan_max=0, _print=False)
 
-    # Si no quedan registros
-    if len(df_drop_na) == 0:
+    # Si quedan menos registros que n_reg_min
+    if len(df_drop_na) <= n_reg_min:
         text = "Cuidado, el dataframe podria generar error en Modeling por no quedar registros con los cuales entrenar el modelo"
         warnings.warn(text, UserWarning)
 

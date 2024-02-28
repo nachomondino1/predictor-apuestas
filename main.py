@@ -367,7 +367,7 @@ class DataPreparation:
         if fill_na is None:
             print("\n Dropping rows with NaN values...")
             # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values (solo en variables selected)
-            df = clean_data.drop_columns_until_drop_nan_not_empty(df) # elimina las columnas hasta que pueda hacer dropna() # CAMBIAR NOMBRE DE FUNCION
+            df = clean_data.drop_columns_until_drop_nan_not_empty(df, n_reg_min=100) # elimina las columnas hasta que pueda hacer dropna() # CAMBIAR NOMBRE DE FUNCION
             df = clean_data.delete_rows_nan(df, porc_nan_max=0, _print=True)  # df = df.dropna()
 
         # Si relleno NaN values
