@@ -106,7 +106,7 @@ class SofifaCrawler(Crawler):
         return date_str
         
 
-def extract_players_sofifa(country, league, export=True):
+def extract_players_sofifa(id_country, country, id_competition, league, export=True):
     """
     Obtengo datos de players mediante scrapear sofifa.com
 
@@ -174,6 +174,8 @@ def extract_players_sofifa(country, league, export=True):
                     # Agrego columnas ya extraidas
                     d_data['fifa'] = fifa
                     d_data['date'] = date_str
+                    d_data['id_country'] = id_country
+                    d_data['id_competition'] = id_competition
                     # print(d_data)
 
                     # Guardo los datos del jugador para dicho año
@@ -187,11 +189,12 @@ def extract_players_sofifa(country, league, export=True):
 
         # Exporto datos del fifa (Por seguridad)
         if export:
-            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player/{fifa}.xlsx', index=False)
+            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player/{fifa}_{league}.xlsx', index=False)
 
     # Exporto dataset final
     if export:
-        df_player.to_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index=False)
+        df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/{league}.xlsx', index=False)
+        df_player.to_excel(f'./p2_data_understanding/data/{country}/df_player_{league}.xlsx', index=False)
 
     # Cierro webdriver
     crawler.driver.close()
@@ -199,11 +202,11 @@ def extract_players_sofifa(country, league, export=True):
 
 def prueba():
     # Seleccionar pais  
-    country = "Argentina"
-    liga = "Liga Profesional de Fútbol"
+    country = "England"
+    liga = "Championship"
 
     df_player = extract_players_sofifa(country, liga, export=True)
-    df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=False)
+    # df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=False)
 
     """ A y B
     # Levanto datasets

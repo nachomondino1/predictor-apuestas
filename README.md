@@ -17,3 +17,4 @@ actualizar el archivo de requirements.txt corriendo el comando:
 - 1. Crear nueva rama en Github 
 - 2. Ir a VSC, abrir la terminal y para ver todas las ramas creadas remotas correr: `git fetch`
 - 3. Elegis tu rama y corres: `git checkout <nombre_de_rama>`
+
