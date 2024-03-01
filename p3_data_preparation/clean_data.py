@@ -107,8 +107,9 @@ def clean_teams_names(df):
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
     d_sub_strings_adic = {"winner": '', "advancing to next round": ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
-    df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
-    df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['team_name'] = df['team_name'].replace(d_sub_strings_adic, regex=True).str.strip()
+    # df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
+    # df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
     return df
 
 def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"): 
