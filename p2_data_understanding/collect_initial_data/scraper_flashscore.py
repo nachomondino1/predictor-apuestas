@@ -18,7 +18,7 @@ class FlashscoreCrawler(Crawler):
         super().__init__(headless, path, browser)
         self.child_driver = self.driver
         self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
-        self.SEC_WAIT_MED = 2  # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MED = 1.5  # Espera para elementos que casi siempre estan
         self.SEC_WAIT_MAX = 5  # Espera para elementos que casi siempre estan
         self._print = _print # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
 
@@ -156,9 +156,17 @@ class FlashscoreCrawler(Crawler):
         d_row_match = {}
         d_row_match_player = {}
         d_row_match_odds = {}
+        d_row_match_teams = {}
+        d_row_match_coaches = {}
+        d_row_match_players = {}
 
         # Extraigo campos de hoja "Resumen"
-        d_row_match.update(self.extract_basic_data_from_summary(extract_goals=False))
+        ### Match information
+        d_row_match.update(self.extract_match_information())
+        ### Teams
+        d_id, d_comp = self.extract_teams()
+        d_row_match.update(d_id)
+        d_row_match_teams.update(d_comp)
 
         #  Si existe la seccion "Cuotas pre-partido", extraigo cuotas de Bet365
         if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las cuotas pero no hay valores...
@@ -167,12 +175,22 @@ class FlashscoreCrawler(Crawler):
         ## Si tiene hoja "Formations", extraigo campos
         boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
         if super().click_boton(boton_formations) is not False:
-            d_row_match_player = self.extract_lineups()
-            d_row_match.update(self.extract_coaches())
+            ### Alineaciones titulares, suplentes y ausentes
+            d_id, d_comp = self.extract_lineups()
+            d_row_match_player.update(d_id)
+            d_row_match_players.update(d_comp)
+
+            ### Coaches
+            d_id, d_comp = self.extract_coaches()
+            d_row_match.update(d_id)
+            d_row_match_coaches.update(d_comp)
         else:
-            d_row_match_player.update(self.extract_bajas_pre_partido()) # FALTARIA TMB SECCION POSIBLES BAJAS.
+            ### Jugadores ausentes
+            d_id, d_comp = self.extract_bajas_pre_partido() # FALTARIA TMB SECCION POSIBLES BAJAS.
+            d_row_match_player.update(d_id)
+            d_row_match_players.update(d_comp)
             
-        return d_row_match, d_row_match_player, d_row_match_odds
+        return d_row_match, d_row_match_player, d_row_match_odds, d_row_match_teams, d_row_match_coaches, d_row_match_players
 
     def extract_match_information(self):
         """
@@ -210,17 +228,19 @@ class FlashscoreCrawler(Crawler):
             url_team_home = super().extract_tag(tag_inicial=tag_team_home, xpath='./a', attribute='href', sec_wait=self.SEC_WAIT_MIN, print_fail=False)
             team_home = tag_team_home.text
 
-            id_team_home = obtain_id_from_url(url_team_home)
-            d_row_id['id_team_home'] = id_team_home
-            d_row[id_team_home] = {"team_name": team_home, "url_team": url_team_home}
+            if url_team_home is not None:
+                id_team_home = obtain_id_from_url(url_team_home)
+                d_row_id['id_team_home'] = id_team_home
+                d_row[id_team_home] = {"team_name": team_home, "url_team": url_team_home}
 
         if tag_team_away is not None:
             url_team_away = super().extract_tag(tag_inicial=tag_team_away, xpath='./a', attribute='href', sec_wait=self.SEC_WAIT_MIN, print_fail=False)
             team_away = tag_team_away.text
 
-            id_team_away = obtain_id_from_url(url_team_away)
-            d_row_id['id_team_away'] = id_team_away
-            d_row[id_team_away] = {"team_name": team_away, "url_team": url_team_away}
+            if url_team_away is not None:
+                id_team_away = obtain_id_from_url(url_team_away)
+                d_row_id['id_team_away'] = id_team_away
+                d_row[id_team_away] = {"team_name": team_away, "url_team": url_team_away}
 
         if self._print:
             print(f"Extracting teams: {d_row}")
@@ -321,7 +341,6 @@ class FlashscoreCrawler(Crawler):
                 d_row_id['id_coach_home'] = id_coach_home    
                 d_row[id_coach_home] = {"coach_name": coach_home, "url_coach": url_coach_home}
 
-
             if coach_away__tag:
                 # Obtengo url de coach away
                 url_coach_away = coach_away__tag.get_attribute('href')
@@ -330,7 +349,6 @@ class FlashscoreCrawler(Crawler):
 
                 d_row_id['id_coach_away'] = id_coach_away
                 d_row[id_coach_away] = {"coach_name": coach_away, "url_coach": url_coach_away}
-
 
         if self._print:
             print(f"Extracting coaches: {d_row}")
@@ -392,6 +410,7 @@ class FlashscoreCrawler(Crawler):
         Extrae listado de jugadores ausentes para el proximo partido.
         """
         d_row = {}
+        d_row_comp = {}
 
         # Extraer bajas
         tag_bajas = super().extract_tag(xpath=f'.//div[@id="detail"]//div[text()="Will not play"]', sec_wait=self.SEC_WAIT_MIN, print_fail=True)
@@ -403,18 +422,31 @@ class FlashscoreCrawler(Crawler):
             l_tags_player_away = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
 
             if l_tags_player_home:
-                l_names_home = [self.extract_name(tag) for tag in l_tags_player_home]
-                for i, name in enumerate(l_names_home):
-                    d_row[f'player_miss_home_{i + 1}'] = name
+                # Obtengo urls de jugadores
+                l_urls_home = [tag.get_attribute('href') for tag in l_tags_player_home]
+                
+                # Obtengo id y name de dichas urls
+                l_ids_home = [obtain_id_from_url(url) for url in l_urls_home]
+                l_names_home = [obtain_name_from_url(url) for url in l_urls_home]
 
+                # Guardo datos
+                for i, url in enumerate(l_urls_home):
+                    d_row[f'id_player_miss_home_{i + 1}'] = l_ids_home[i]
+                    d_row_comp[l_ids_home[i]] = {"player_name": l_names_home[i], "player_url": url}
+                
             if l_tags_player_away:
-                l_names_away = [self.extract_name(tag) for tag in l_tags_player_away]
-                for i, name in enumerate(l_names_away):
-                    d_row[f'player_miss_away_{i + 1}'] = name
+                l_urls_away = [tag.get_attribute('href') for tag in l_tags_player_away]
+
+                l_ids_away = [obtain_id_from_url(url) for url in l_urls_away]
+                l_names_away = [obtain_name_from_url(url) for url in l_urls_away]
+
+                for i, url in enumerate(l_urls_away):
+                    d_row[f'id_player_miss_away_{i + 1}'] = l_ids_away[i]
+                    d_row_comp[l_ids_away[i]] = {"player_name": l_names_away[i], "player_url": url}
 
         if self._print:
-            print(f"Extracting bajas pre partido: {d_row}")
-        return d_row
+            print(f"Extracting lineups: {d_row}")
+        return d_row, d_row_comp
 
     def select_items_by_date(self, l_items, n_days):
         """
@@ -470,10 +502,11 @@ def obtain_id_from_url(url: str):
     :param url: Url de equipo o jugador. (e.g. 'https://www.flashscore.com/team/west-ham/Cxq57r8g/') (String)
     :return: Id contenido dentro de la url. (e.g. Cxq57r8g) (String) 
     """
-    url = url[:-1]  # elimino el ultimo "/"
-    pos_ini = url.rfind("/") + 1
-    id_team = url[pos_ini:]
-    return id_team
+    if isinstance(url, str):
+        url = url[:-1]  # elimino el ultimo "/"
+        pos_ini = url.rfind("/") + 1
+        id_team = url[pos_ini:]
+        return id_team
 
 def obtain_name_from_url(url: str):
     """
@@ -481,13 +514,14 @@ def obtain_name_from_url(url: str):
     :param url: Url de jugador o entrenador (e.g. 'https://www.flashscore.com/player/roerslev-rasmussen-mads/pp1zpsrr/'). (String)
     :return: Nombre del jugador o dt contendio dentro de la url (e.g. roerslev-rasmussen-mads). (String)
     """
-    url= url[:-1]  # elimino el ultimo "/"
-    pos_fin = url.rfind("/")
-    url_rest = url[:pos_fin]
-    pos_ini = url_rest.rfind("/") + 1
-    name = url[pos_ini:pos_fin]
-    name = name.replace('-', ' ')
-    return name
+    if isinstance(url, str):
+        url= url[:-1]  # elimino el ultimo "/"
+        pos_fin = url.rfind("/")
+        url_rest = url[:pos_fin]
+        pos_ini = url_rest.rfind("/") + 1
+        name = url[pos_ini:pos_fin]
+        name = name.replace('-', ' ')
+        return name
 
 def extract_data(id_country, country: str, id_competicion, competition: str, is_cup, n_seasons_max: int = 0, export: bool = True):
     """
@@ -523,8 +557,11 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
     print(f'Cantidad de seasons: {len(l_urls_seasons)}')
 
     # POR season
-    for url_season in l_urls_seasons:  # De mas reciente a menos reciente
+    for n_season, url_season in enumerate(l_urls_seasons):  # for url_season in l_urls_seasons:  # De mas reciente a menos reciente
 
+        if n_season > 9:
+            crawler.SEC_WAIT_MED = crawler.SEC_WAIT_MIN
+         
         # Ingreso a pagina de season e imprimo año de la season
         crawler.driver.get(url_season)
         season_year = crawler.extract_season_year()
@@ -567,6 +604,9 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
             df_match.to_excel(f'{ruta_base}/per_season/df_match/{competition_form}_{season_year}.xlsx', index=True)
             df_match_player.to_excel(f'{ruta_base}/per_season/df_match_player/{competition_form}_{season_year}.xlsx', index=True)
             df_match_odds.to_excel(f'{ruta_base}/per_season/df_match_odds/{competition_form}_{season_year}.xlsx', index=True)
+            df_teams.to_excel(f'{ruta_base}/per_competition/df_teams/{competition_form}.xlsx', index=True)
+            df_coaches.to_excel(f'{ruta_base}/per_competition/df_coaches/{competition_form}.xlsx', index=True)
+            df_player.to_excel(f'{ruta_base}/per_competition/df_player/{competition_form}.xlsx', index=True)
     
     if export:
         # Guardo partidos de la competition
@@ -584,18 +624,19 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
 def check_new_rows(df: pd.DataFrame, d_row: dict, _print: bool = False):
     """
     Chequea si las key en d_row estan en el indice de df. En caso de que no esten, guardo d_row en df con la key como indice.
-    :param df:
-    :param d_row:
+    :param df: Dataframe.
+    :param d_row: Diccionario con columna id como key.
     :param _print: True para imprimir por pantalla funcionamiento de la funcion. De lo contrario, False.
     """
-    if _print:
-        print(f"{len(d_row.keys())} posibles nuevas filas para agregar a df...")
-
     for key, value in d_row.items():
+        # print(f'\n Key: {key} ; value: {value}')
 
-        if key not in df.index:
+        if (key not in df.index) and (key is not None):
+            # print(f'Agrego {key} al indice')
             df.loc[key] = value
+
     if _print:
+        print(f"Posibles nuevas filas para agregar a df: {len(d_row.keys())}")
         print("Tamaño df luego de añadir nuevas filas: ", df.shape)
         print(df.head(2))
     return df
@@ -604,8 +645,10 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     
     # Definicion de variables
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
-    crawler = FlashscoreCrawler(headless=True, path=path_driver_exe, browser="Chrome")
+    df_teams = pd.DataFrame(columns=['team_name', 'url_team'])
+    df_coaches = pd.DataFrame(columns=['coach_name', 'url_coach'])
+    df_player = pd.DataFrame(columns=['player_name', 'player_url'])
+    crawler = FlashscoreCrawler(headless=True)  # path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
 
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
@@ -633,13 +676,18 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
         crawler.driver.get(url_match)
 
         # Extraigo datos del partido
-        d_row_match, d_row_match_player, d_row_match_odds = crawler.extract_next_match_data()
+        d_row_match, d_row_match_player, d_row_match_odds, d_row_match_teams, d_row_match_coaches, d_row_match_players = crawler.extract_next_match_data()
         d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
 
         # GUARDADO DE DATOS EN DATAFRAME
         df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
         df_match_player = pd.concat([df_match_player, pd.DataFrame(d_row_match_player, index=[id_match])])
         df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_row_match_odds, index=[id_match])])
+
+        # Guardo solo si las filas son nuevas
+        df_teams = check_new_rows(df_teams, d_row_match_teams)
+        df_coaches = check_new_rows(df_coaches, d_row_match_coaches)
+        df_player = check_new_rows(df_player, d_row_match_players)
         progress_bar.update(1)
 
     # Cerrar la barra de progreso al finalizar
@@ -647,7 +695,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    return df_match, df_match_player, df_match_odds
+    return df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player
 
 def extract_missing_data(id_country, country: str, id_competicion, competition: str, is_cup, l_ids_already_collected, _print: bool = False):  # Se podria usar la misma funcion que extract_normal pero agregando l_ids_already_collected para filtrar partidos... y  tal vez n_seasons_max=1.
     """
@@ -655,8 +703,10 @@ def extract_missing_data(id_country, country: str, id_competicion, competition: 
     """
   # DEFINCION DE PARAMETROS & VARIABLES
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
-    crawler = FlashscoreCrawler(headless=True, path=path_driver_exe, browser="Chrome")
+    df_teams = pd.DataFrame(columns=['team_name', 'url_team'])
+    df_coaches = pd.DataFrame(columns=['coach_name', 'url_coach'])
+    df_player = pd.DataFrame(columns=['player_name', 'player_url'])
+    crawler = FlashscoreCrawler(headless=True) # path = "/Users/nachomondino/Documents/chrome_driver/chromedriver"
 
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "_")
@@ -692,13 +742,19 @@ def extract_missing_data(id_country, country: str, id_competicion, competition: 
         crawler.driver.get(url_partido)
 
         # Extraigo todos los datos del partido
-        d_row_match, d_row_match_player, d_row_match_odds = crawler.extract_match_data()
+        d_row_match, d_row_match_player, d_row_match_odds, d_row_match_teams, d_row_match_coaches, d_row_match_players = crawler.extract_match_data()
         d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
 
         # Guardo datos del partido
         df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
         df_match_player = pd.concat([df_match_player, pd.DataFrame(d_row_match_player, index=[id_match])])
         df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_row_match_odds, index=[id_match])])
+
+        # Guardo solo si las filas son nuevas
+        df_teams = check_new_rows(df_teams, d_row_match_teams)
+        df_coaches = check_new_rows(df_coaches, d_row_match_coaches)
+        df_player = check_new_rows(df_player, d_row_match_players)
+        
         if _print:
             progress_bar.update(1)
 
@@ -708,7 +764,7 @@ def extract_missing_data(id_country, country: str, id_competicion, competition: 
 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
-    return df_match, df_match_player, df_match_odds
+    return df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player
 
 def prueba():
     # Selecciono country a extraer y obtengo las competencias y su categoria
@@ -716,10 +772,11 @@ def prueba():
     country = 'England'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     id_competicion = 101
     competition = 'Premier League'
+    is_cup = 0
     n_seasons_max = 16
 
     # Extraigo partidos
-    df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = extract_data(id_country, country, id_competicion, competition, n_seasons_max, export=False)
+    df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max, export=False)
     
     # Exporto datasets
     df_match.to_excel('/Users/nachomondino/Desktop/df_match.xlsx', index=True)
