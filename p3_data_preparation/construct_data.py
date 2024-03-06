@@ -51,52 +51,29 @@ def construct_percentaje_column(df, col_num, col_den):
     df[f'perc_{col_num}_of_{col_den}_away'] = df[f'{col_num}_away'] / df[f'{col_den}_away']
     return df
 
-def determine_mean_in_last_matches(df, n_days, variable, tipo):
+def determine_stats_columns(df):
     """
-     Obtiene el promedio de las stats en los ultimos matchs
+    Determina automáticamente las variables que deben ser promediadas en los últimos partidos.
+    :param df: DataFrame.
+    :return: Lista de variables a ser promediadas.
+    """
+    # Definicion variables
+    keywords_prohibidas = ['_player_', 'team_', 'odds_', 'coach_']  # Definir palabras clave prohibidas
+    pattern = r'[a-z_\(\)%]+\_(home|away)' # Patrón regex para encontrar columnas relevantes
 
-     :param df: DataFrame.
-     :param n_days: Integer. Numero de dias de los cuales obtener los datos.
-     :param variable: String. Nombre de la variable a promediar.
-     :param tipo: String. Tipo de cálculo a realizar ('mean' para promedio, 'sum' para suma).
-     :return: DataFrame con stats promediadas
-     """
-    # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=False)  #ignore_index=True
+    # Obtener nombres de columnas relevantes
+    relevant_columns = df.filter(regex=pattern, axis=1).columns
 
-    # Por team
-    for team in df['id_team_home'].unique():
+    # Filtrar columnas relevantes excluyendo las palabras clave prohibidas
+    relevant_columns = [col for col in relevant_columns if not any(keyword in col for keyword in keywords_prohibidas)]
 
-        # Obtengo los matchs que jugó el team
-        df_equipo = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
-        # print(f"Team: {team}")
-        # print(f"Las filas son la cantidad total de matchs del team: {df_equipo.shape}")
-        # print(df_equipo.loc[:, ['id_team_home', 'id_team_away']].head(5))
+    # Extraer los nombres de las estadísticas
+    stats = set()
+    for col in relevant_columns:
+        stat = re.sub(r'_(home|away)$', '', col)
+        stats.add(stat)
 
-        # Por match del team
-        for idx, row in df_equipo.iterrows():
-
-            home_or_away = 'home' if row['id_team_home'] == team else 'away'
-            limit_date = row['date'] - timedelta(days=n_days)
-            # print(f"Match Nº: {idx}")
-
-            # Selecciono los ultimos matchs del team
-            df_equipo_last_matches = df_equipo.loc[(df_equipo['date'] >= limit_date) & (df_equipo['date'] < row['date'])]
-            # print(f"Las filas son las cantidad de match en ultimos {n_days} dias: {df_equipo_last_matches.shape}")
-            # df_equipo_last_matches.to_excel('/Users/nachomondino/Desktop/df_equipo_last_matches.xlsx')
-
-            # Necesito la posesion segun si fue home o away en cada uno de esos matchs...
-            s_valores_home = df_equipo_last_matches.loc[df_equipo_last_matches['id_team_home'] == team, variable]
-            s_valores_away = df_equipo_last_matches.loc[df_equipo_last_matches['id_team_away'] == team, variable] * -1  # -1 puesto que valores positivos en dif_variable es para el home y valores negativos es favor del away
-            s_valores = pd.concat([s_valores_home, s_valores_away], ignore_index=True)
-            # print(f"Valores del team en estadistica dif_{variable}: {s_valores}")
-
-            if len(s_valores) > 0:
-                value = s_valores.mean() if tipo == "mean" else (s_valores.sum() if tipo == "sum" else None)
-                # print(f"Valor: {value} \n")
-                df.loc[idx, f'{tipo}_last_match_{variable}_{home_or_away}'] = value
-
-    return df
+    return list(stats)
 
 def h2h_by_date(df, n_years, segun_localia: bool = False):
     """
@@ -160,6 +137,53 @@ def h2h_by_date(df, n_years, segun_localia: bool = False):
                     df.loc[idx, 'h2h_date'] = h2h
     return df
 
+def determine_mean_in_last_matches(df, n_days, variable, tipo):
+    """
+     Obtiene el promedio de las stats en los ultimos matchs
+
+     :param df: DataFrame.
+     :param n_days: Integer. Numero de dias de los cuales obtener los datos.
+     :param variable: String. Nombre de la variable a promediar.
+     :param tipo: String. Tipo de cálculo a realizar ('mean' para promedio, 'sum' para suma).
+     :return: DataFrame con stats promediadas
+     """
+    # Ordeno por fecha ascendente
+    df = df.sort_values(by='date', ascending=False)  #ignore_index=True
+
+    # Por team
+    for team in df['id_team_home'].unique():
+
+        # Obtengo los matchs que jugó el team
+        df_equipo = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
+        # print(f"Team: {team}")
+        # print(f"Las filas son la cantidad total de matchs del team: {df_equipo.shape}")
+        # print(df_equipo.loc[:, ['id_team_home', 'id_team_away']].head(5))
+
+        # Por match del team
+        for idx, row in df_equipo.iterrows():
+
+            home_or_away = 'home' if row['id_team_home'] == team else 'away'
+            limit_date = row['date'] - timedelta(days=n_days)
+            # print(f"Match Nº: {idx}")
+
+            # Selecciono los ultimos matchs del team
+            df_equipo_last_matches = df_equipo.loc[(df_equipo['date'] >= limit_date) & (df_equipo['date'] < row['date'])]
+            # print(f"Las filas son las cantidad de match en ultimos {n_days} dias: {df_equipo_last_matches.shape}")
+            # df_equipo_last_matches.to_excel('/Users/nachomondino/Desktop/df_equipo_last_matches.xlsx')
+
+            # Necesito la posesion segun si fue home o away en cada uno de esos matchs...
+            s_valores_home = df_equipo_last_matches.loc[df_equipo_last_matches['id_team_home'] == team, variable]
+            s_valores_away = df_equipo_last_matches.loc[df_equipo_last_matches['id_team_away'] == team, variable] * -1  # -1 puesto que valores positivos en dif_variable es para el home y valores negativos es favor del away
+            s_valores = pd.concat([s_valores_home, s_valores_away], ignore_index=True)
+            # print(f"Valores del team en estadistica dif_{variable}: {s_valores}")
+
+            if len(s_valores) > 0:
+                value = s_valores.mean() if tipo == "mean" else (s_valores.sum() if tipo == "sum" else None)
+                # print(f"Valor: {value} \n")
+                df.loc[idx, f'{tipo}_last_match_{variable}_{home_or_away}'] = value
+
+    return df
+
 def suma_rat_player_missing(df):  # Ojo falla en calculo cuando uno de los dos equipos no tiene players missing (o sea, las variables missing son nan) --> en ese caso tiene que hacer la diferencia igual...
     """
     Calculo la suma del rating de los players missing dado que cada team tiene distinto numero de missing.
@@ -206,30 +230,6 @@ def calculate_dif_col_players(df):
     df['dif_n_player_miss'] = df['n_player_miss_home'] - df['n_player_miss_away']
     df = df.drop(["n_player_miss_home", "n_player_miss_away"], axis=1) 
     return df
-
-def determine_stats_columns(df):
-    """
-    Determina automáticamente las variables que deben ser promediadas en los últimos partidos.
-    :param df: DataFrame.
-    :return: Lista de variables a ser promediadas.
-    """
-    # Definicion variables
-    keywords_prohibidas = ['_player_', 'team_', 'odds_', 'coach_']  # Definir palabras clave prohibidas
-    pattern = r'[a-z_\(\)%]+\_(home|away)' # Patrón regex para encontrar columnas relevantes
-
-    # Obtener nombres de columnas relevantes
-    relevant_columns = df.filter(regex=pattern, axis=1).columns
-
-    # Filtrar columnas relevantes excluyendo las palabras clave prohibidas
-    relevant_columns = [col for col in relevant_columns if not any(keyword in col for keyword in keywords_prohibidas)]
-
-    # Extraer los nombres de las estadísticas
-    stats = set()
-    for col in relevant_columns:
-        stat = re.sub(r'_(home|away)$', '', col)
-        stats.add(stat)
-
-    return list(stats)
 
 # Para proximos partidos
 def h2h_by_date_new_matches(df_new, df, n_years):
