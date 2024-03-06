@@ -1,140 +1,146 @@
-# Juntar entidades jugadores, partido y atrib_playeradores
 import pandas as pd
 from fuzzywuzzy import fuzz
 import warnings
 import time
 from tqdm import tqdm
-import math
 
 
-def match_players_by_name(df_match_player, df_player):
+def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integrate, thr_coincidence_min: int, _print: bool = False):
     """
-    Match entre jugadores de Flashscore y de Sofifa mediante name de jugadores
-    """
-    # Obtengo listado de jugadores unicos tanto en df_player (Sofifa) como en df_match_player (Flashscore) para agilizar vinculacion
-    df_match_player_unique_players = unique_players_df_match_player(df_match_player)
-    df_player_unique_players = df_player.drop_duplicates(subset=['id_player']).loc[:, ['id_player', 'name']]
-
-    # Vinculo con "id_player" a df_player (Sofifa) y df_match_player (Flashscore) utilizando los nombres de los jugadores
-    df_map_players_name_id = match_unique_players(df_match_player_unique_players, df_player_unique_players)
-    return df_map_players_name_id
-
-def unique_players_df_match_player(df_match_player):
-    """
-    Obtencion de listado de jugadores unicos de df_match_player. Un mismo jugador se repite varias veces porque esta en mas
-    de un partido.
-    :param df_match_player: Dataframe. Unidad de analisis: partido. Columnas: una por jugador segun formaciones.
-    :return: Dataframe. Unidad de analisis: jugador. Una sola columna con nombres de los jugadores en df_match_player
-    (sin repetidos).
+    Vinculo datasets mediante columna string.
+    En el caso de teams: column_to_relation = 'team_name' y column_to_integrate="id_team" (index de df2)
+    df1 tiene team_name como columna (la unica)
+    df2 tiene team_name como columnas y id_team como index
+    
+    :param column_to_relation: Nombre de columna con la cual relacionar ambos dataframes. (String)
+    :param column_to_integrate: por default es le indice de ambos dataframes pasados como parametro... (String)
+    :return: Dataframe con column_to_relation y column_to_integrate de ambos dataframes. (DataFrame)
     """
     # Definicion de variables
-    set_unique_players = set()
-
-    # Por columna (e.g. player_start_home_7)
-    for col in list(df_match_player.columns):
-
-        # Obtengo jugadores unicos y agrego al set
-        l_unique_players = df_match_player[col].unique()
-        set_unique_players.update(l_unique_players)  #  Uso set puesto que un jugador puede estar en mas de una columna
-
-    # Creo dataframe con listado de jugadores unicos
-    df = pd.DataFrame(list(set_unique_players), columns=['player_name'])
-    df = df.dropna() # No se porque le queda un na
-    return df
-
-def match_unique_players(df_match_player_up, df_player_up): # Es la que hay que eficientizar (Le agregue progress bar para ver velocidad)
-    """
-    Vinculo datasets de los jugadores de Sofifa y los jugadores de Flashscore segun name de jugador.
-    :param df_match_player_up: Dataframe. Unidad de analisis: jugador. Una sola columna con name de los jugadores en
-    df_match_player (sin repetidos).
-    :param df_player_up: Dataframe. Unidad de analisis: jugador. Columnas id_player y name. La columna "name" tiene los
-    nombres de los jugadores en df_player (sin repetidos).
-    :return: Dataframe. Unidad de analisis: jugador. df_match_player pasado como parametro con columna "id_player" de
-    df_player gracias a vincular nombres de jugadores de sendos dataframes.
-    """
-    print("Matching players from Sofifa and Flashscore by name...")
-
-    # Definicion de variables
-    df_match_player_with_id = df_match_player_up.copy()  # Creo copia del dataframe df_match_player en el que agregar la columna "id_player"
-    l_umbrales = [95, 90, 85, 80, 75]
-    n_pos_matchs, n_matchs = len(df_match_player_up), 0
-
-    # Funcion que hace una busqueda aproximada de un string en una columna
-    def buscar_coincidencias(row, palabra, columna, umbral):
-        return fuzz.token_set_ratio(palabra, row[columna]) >= umbral
+    df_map = df1.copy()  # Creo copia del dataframe df_match_player en el que agregar la columna "id_player"
+    n_matchs, n_pos_matchs = 0, len(df1)
+    print(f"Mapping Sofifa and Flashscore by {column_to_relation}...")
 
     # Inicializo barra de progreso
-    progress_bar = tqdm(total=len(df_match_player_up), ncols=80)
+    progress_bar = tqdm(total=n_pos_matchs, ncols=80)
 
-    # Por jugador en df_match_player
-    for i, row in df_match_player_up.iterrows():
+    # Por fila en df1
+    for i, row in df1.iterrows():
+
+        str_to_fetch = row[column_to_relation]  # (e.g. Manchester City)
+        df2_filt = df2.copy()
+        if _print:
+            print(f"\n VALUE TO FETCH: {str_to_fetch}")
+            print("Shape df2_filt: ", df2_filt.shape)
+
+        # Calculo el porcentaje de coincidencia con cada posible string en df2
+        df2_filt['porcentaje_coincidencia'] = df2_filt.apply(lambda row: calculate_coincidence(str_to_fetch, row[column_to_relation]), axis=1)
+        
+        # Selecciono la opcion con mayor coincidencia
+        df2_filt = df2_filt.sort_values(by='porcentaje_coincidencia', ascending=False) 
+        row_best_coincidende = df2_filt.iloc[0] # Selecciono la primera fila
+        if _print:
+            pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
+            print("Mejores coincidencias: \n", df2_filt.head(5))
+            print("Mejor coincidencia: ", row_best_coincidende.values)
+
+        # Si la mejor opcion tiene mayor coincidencia que la minima deseada (mayor a thr_coincidence_min)
+        if row_best_coincidende['porcentaje_coincidencia'] >= thr_coincidence_min:
+
+            # Hago match
+            # Agrego column_to_integrate a df_map
+            df_map.loc[i, f'{column_to_integrate}_sofifa'] = row_best_coincidende.name
+            df_map.loc[i, f'{column_to_relation}_sofifa'] =  row_best_coincidende[column_to_relation]  # team_name
+            df_map.loc[i, f'porcentaje_coincidencia'] = row_best_coincidende['porcentaje_coincidencia']
+
+            # Elimino string que ya hizo match en df2 para agilizar la busqueda y evitar Falsos positivos
+            df2 = df2.drop(row_best_coincidende.name)
+            n_matchs += 1
+            if _print:
+                print(df_map.loc[i].values)
+                print(df2.shape)
+                print(f"MATCH: '{str_to_fetch}' <--> '{row_best_coincidende['team_name']}'. Coincidencia: {row_best_coincidende['porcentaje_coincidencia']}")
+      
+        elif _print:
+            print(f'No hizo match puesto que la opcion con mas coincidencia fue {row_best_coincidende['porcentaje_coincidencia']} (menor a {thr_coincidence_min}). La mejor coincidencia para "{str_to_fetch}" fue "{row_best_coincidende['team_name']}".')
+    
         progress_bar.update(1)
-
-        # Filtro inicial. Me quedo con los jugadores con name mas parecido (agiliza enormemente la funcion)
-        df_player_filt_ini = df_player_up[df_player_up.apply(buscar_coincidencias, args=(row['player_name'], 'name', min(l_umbrales)), axis=1)]
-
-        # Por umbral
-        for umbral in l_umbrales:
-
-            # Selecciono los jugadores con name mas parecido al buscado
-            df_player_filt = df_player_filt_ini[df_player_filt_ini.apply(buscar_coincidencias, args=(row['player_name'], 'name', umbral), axis=1)]
-
-            # Si hay al menos un posible match
-            if len(df_player_filt) >= 1:
-
-                # Agrego id_player de Sofifa como columna en df_match_player
-                df_match_player_with_id.loc[i, 'id_player'] = df_player_filt.id_player.values[0]
-                df_match_player_with_id.loc[i, 'nombre_sofifa'] = df_player_filt.name.values[0]  # temporalmente para analizar calidad de match
-
-                # Elimino jugador de df_player que hizo match para agilizar la busqueda
-                df_player_up = df_player_up.drop(df_player_filt.index[0])
-                n_matchs += 1
-                break    
     progress_bar.close()
 
-    try:
-        print(f"De los {n_pos_matchs} jugadores en df_match_player, hizo match para {n_matchs/n_pos_matchs*100:.2f}% de ellos, es decir, para {n_matchs}.")
-    except ZeroDivisionError:
-        print("No se cuenta con las formaciones de ningun partido de df_match, por ende, df_match_player no tiene que integrar a df_match.")
+    if n_pos_matchs > 0:
+        print(f"De los {n_pos_matchs} strings en df1, hizo match para {n_matchs}, es decir para el {n_matchs/n_pos_matchs*100:.2f}% de ellos.")
+    else:
+        print("Warning! No se cuenta con las formaciones de ningun partido de df_match, por ende, df_match_player no tiene que integrar a df_match.")
+    return df_map
 
-    return df_match_player_with_id
+def calculate_coincidence(str1, str2):
+    """
+    Calcula porcentaje de coincidencia entre dos strings pasados como parametro
+    :param str1: Primer string a comparar. (String)
+    :param str2: Segundo string a comparar. (String)
+    """
+    coincidencia = fuzz.token_set_ratio(str1, str2)
+    return coincidencia
+    
+# DF_TEAMS TO DF_MATCH
+def integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa):
+    """
+    Integra datos de equipos desde Sofifa hasta df_match.
+    """
+    print("\n Integrating team's data to df_match using mapping...")
+    
+    # Por columna de equipos en df_match
+    for col_team in ['id_team_home', 'id_team_away']:
 
-def replace_players_name_with_id(df_match_player, df_map_players_name_id):
+        # Obtengo valores unicos
+        l_id_teams = df_match[col_team].unique()
 
-    print("\nReplacing player's names by id in df_match_player...")
-    progress_bar = tqdm(total=len(df_map_players_name_id), ncols=80)
+        # Por equipo
+        for id_team_fs in l_id_teams:
 
-    # Por jugador
-    for i, row in df_map_players_name_id.iterrows():
+            # Obtengo partidos del equipo
+            l_idxs = df_match[df_match[col_team] == id_team_fs].index
 
-        # Reemplazo su name por su id en df_match_player
-        df_match_player = df_match_player.replace(row['player_name'], row['id_player'])  # Si no hizo match, asigna nan pues id_player es nan.
-        progress_bar.update(1)
+            # Busco el mapeo del equipo con sofifa
+            row_map = df_map_teams_fs_so[df_map_teams_fs_so.index == id_team_fs]
 
-    progress_bar.close()
-    return df_match_player
+            if len(row_map) > 0:
 
-def integrate_player_data_in_match(df_match, df_match_player, df_player): 
+                # Busco id_team_sofifa
+                id_team_sofifa = row_map['id_team_sofifa'].values[0]
+
+                # Busco datos en df_teams_sofifa usando id_team_sofifa
+                row_team_sofifa = df_teams_sofifa[df_teams_sofifa.index == id_team_sofifa]
+
+                # Si el valor es un id    
+                if (not pd.isna(id_team_sofifa)) and (len(row_team_sofifa) > 0):
+                    df_match.loc[l_idxs, f'{col_team}_int_prestige'] =  row_team_sofifa['international_prestige'].values[0]
+                    df_match.loc[l_idxs, f'{col_team}_dom_prestige'] =  row_team_sofifa['domestic_prestige'].values[0]
+                    df_match.loc[l_idxs, f'{col_team}_rival_team'] =  row_team_sofifa['id_rival_team'].values[0]
+
+    return df_match
+
+# DF_PLAYER, DF_PLAYER_FIFA_SOFIFA Y DF_MATCH_PLAYER TO DF_MATCH
+def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_player_sofifa, df_player_fifa_sofifa, _print: bool = False): 
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de age, overall rating, value de mercado y height del equipo titular,
     suplente y los ausentes para cada equipo.
+   
     :param df_match: Dataframe. Unidad de analisis: partido. Columnas: equipos, arbitros, estadisticas del partido, etc.
     :param df_match_player: Dataframe. Unidad de analisis: partido. Columnas: id_match y una por jugador segun formaciones.
     Celdas: id de jugador (en vez de name).
     :param df_player: Dataframe. Unidad de analisis: jugador. Columnas: id_player y datos del jugador como age y overall
     rating.
+
     :return: Dataframe. Dataframe con los datos de todos los dataframes pasados como parametro. Tod@ en un solo
     dataframe para poder entrenar un modelo con ellos.
     """
-    print("\nIntegrating all dataframes in just one dataframe...")
+    print("\n Integrating players's data to df_match using mapping...")
     # Definicion de variables
     warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...
-    l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se debe procesar con sup...
+    l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se lo proceso con sup.
     l_condicion = ['home', 'away']
-
-    # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
-    df_player['fifa_year'] = df_player['fifa'].str.split(' ').str[-1]
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -143,66 +149,71 @@ def integrate_player_data_in_match(df_match, df_match_player, df_player):
         for condicion in l_condicion:
 
             # Defino pattern y con el, selecciono las variables a procesar
-            pattern = f'player_{titularidad}_[a-z]*[_]*{condicion}_[0-9]+'  # CAMBIE EL PATTERN PARA QUE SUP Y SUP_ING SEAN PROCESADOS JUNTOS. VERIFICAR QUE FUNCIONA..
-            l_col_to_preprocess = df_match_player.filter(regex=pattern, axis=1).columns.tolist()  # LISTA DE COLUMNAS QUE CONTIENEN NOMBRES DE JUGADOR # con regex las que dicen jug... VER CODIGO DE UNO DE LOS PROYECTOS DE KAGGLE...
-            print(f'Columnas a procesar: {l_col_to_preprocess}')
+            pattern = f'id_player_{titularidad}_[a-z]*[_]*{condicion}_[0-9]+'
+            l_col_to_preprocess = df_match_player.filter(regex=pattern, axis=1).columns.tolist()
+            print(f"Integrating players: {titularidad} {condicion}")
+            if _print:
+                print(f'Columnas a procesar: {l_col_to_preprocess}')
 
             # Inicializo barra de progreso
             progress_bar = tqdm(total=len(df_match_player), ncols=80)
 
             # Por partido
-            for i, row in df_match.iterrows():
+            for id_match, row_match in df_match.iterrows():
 
-                progress_bar.update(1)
-                # print(f' Partido Nº: {i} '.center(120, '#'))
-
-                # Busco el fifa correspondiente segun la fecha del partido
-                year_fifa = search_fecha_fifa(row['date'])
-                # print(f"Fecha partido: {row['fecha']} --> Fifa a buscar: {fecha_part_fifa}")
-
-                # Reinicio variables
                 l_mean_age, l_mean_hei, l_mean_rating, l_mean_val = [], [], [], []
+                
+                # Busco el fifa correspondiente segun la fecha del partido
+                year_fifa = search_fecha_fifa(row_match['date'])
+                if _print:
+                    print(f' Partido Nº: {i} '.center(120, '#'))
+                    print(f"Fecha partido: {row['fecha']} --> Fifa a buscar: {year_fifa}")
 
-                # Por jugador
+                # Por columna jugador en df_match_player
                 for col_player in l_col_to_preprocess:
 
                     # Busco id del jugador en df_match_player
-                    id_player_ent_part = df_match_player.loc[i, col_player]
-                    # print(f"\t Id jugador a buscar en Sofifa: {id_player_ent_part}")
+                    id_player_fs = df_match_player.loc[id_match, col_player]
+                    if _print:
+                        print(f"\t Id jugador a buscar en Sofifa: {id_player_fs}")
 
                     # Si el id_player no es nan
-                    if not math.isnan(id_player_ent_part):  # hay mucho nan sobretodo columnas de jugadores ausentes (e.g. player_aus_vis_12)
+                    if not pd.isna(id_player_fs):  # hay mucho nan sobretodo columnas de jugadores ausentes (e.g. player_aus_vis_12)
 
-                        # Busco el id y la fecha en df_player (Sofifa)
-                        df_player_filt = df_player[(df_player['id_player'] == id_player_ent_part) & (df_player['fifa_year'] == year_fifa)]
+                        # Busco el mapeo del equipo con sofifa
+                        row_map = df_map_fs_so[df_map_fs_so.index == id_player_fs]
 
-                        # Guardo datos del jugador
-                        if len(df_player_filt) > 0:
-                            l_mean_age.append(df_player_filt.age.values[0])
-                            l_mean_hei.append(df_player_filt.height.values[0])
-                            l_mean_rating.append(df_player_filt.overall_rating.values[0])
-                            l_mean_val.append( df_player_filt.value.values[0])
-                            # print("Ejemplo de lista promedio de age: ", l_mean_age)
+                        if len(row_map) > 0:
+
+                            # Busco id_team_sofifa
+                            id_player_sofifa = row_map['id_player_sofifa'].values[0]
+
+                            # Busco el id y la fecha en df_player (Sofifa)
+                            df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'] == id_player_sofifa) & (df_player_fifa_sofifa['fifa_year'] == year_fifa)]
+
+                            # Guardo datos del jugador
+                            if len(df_player_filt) > 0:
+                                height = df_player_sofifa.loc[id_player_sofifa, 'height']
+                                l_mean_age.append(df_player_filt.age.values[0])
+                                l_mean_hei.append(height)  # l_mean_hei.append(df_player_filt.height.values[0])
+                                l_mean_rating.append(df_player_filt.overall_rating.values[0])
+                                l_mean_val.append( df_player_filt.value.values[0])
+                                # print("Ejemplo de lista promedio de age: ", l_mean_age)
 
                 # Guardo promedios de age, height, overall_rating y market value
-                try:
-                    df_match.loc[i, f'mean_age_player_{titularidad}_{condicion}'] = sum(l_mean_age) / len(l_mean_age)
-                    df_match.loc[i, f'mean_hei_player_{titularidad}_{condicion}'] = sum(l_mean_hei) / len(l_mean_hei)
-                    df_match.loc[i, f'mean_rat_player_{titularidad}_{condicion}'] = sum(l_mean_rating) / len(l_mean_rating)
-                    df_match.loc[i, f'mean_val_player_{titularidad}_{condicion}'] = sum(l_mean_val) / len(l_mean_val)
+                if len(l_mean_age) > 0:
+                    df_match.loc[id_match, f'mean_age_player_{titularidad}_{condicion}'] = sum(l_mean_age) / len(l_mean_age)
+                    df_match.loc[id_match, f'mean_hei_player_{titularidad}_{condicion}'] = sum(l_mean_hei) / len(l_mean_hei)
+                    df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = sum(l_mean_rating) / len(l_mean_rating)
+                    df_match.loc[id_match, f'mean_val_player_{titularidad}_{condicion}'] = sum(l_mean_val) / len(l_mean_val)
 
                     # Calculo nro de jugadores lesionados
                     if titularidad == 'miss':
-                        df_match.loc[i, f'n_player_{titularidad}_{condicion}'] = len(l_mean_rating)
+                        df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_mean_rating)
                         # print("Numero de ausentes: ", len(l_mean_rating))
 
-                except ZeroDivisionError:
-                    # print("Aparentemente no hay datos de jugadores para el partido")
-                    pass
-
-            # Cerrar la barra de progreso al finalizar
+                progress_bar.update(1)
             progress_bar.close()
-
     return df_match
 
 def search_fecha_fifa(fecha_part):

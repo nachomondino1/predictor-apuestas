@@ -13,7 +13,7 @@ from time import sleep
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
 
-    def __init__(self, headless: bool, path=None, browser="Chrome"):
+    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
         """Initialize attributes of the parent class."""
         if browser == "Chrome":
             self.driver = self.inicialize_chrome_driver(headless, path)
@@ -24,7 +24,7 @@ class Crawler:
         else:
             print("La libreria no posee ese browser")
 
-    def inicialize_chrome_driver(self, headless: bool = True, path=None):
+    def inicialize_chrome_driver(self, headless: bool, path: str):
         """
           Initialize a Chrome WebDriver.
 
@@ -52,11 +52,15 @@ class Crawler:
         options.add_argument("--disable-gpu")
         options.add_argument("--incognito")
         options.add_argument("--disable-popup-blocking")
-        options.headless = headless  # Al parecer funciona ok
+
+        if headless:
+            options.add_argument("--headless")
 
         if path is None:
+            print("Creacion de ChromeDriver con install()")
             service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
         else:
+            print("Creacion de ChromeDriver desde archivo ejectuable")
             service = path
 
         # Inicializo el webdriver (Defino a Chrome como Web Browser)

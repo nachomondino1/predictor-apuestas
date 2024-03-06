@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from sklearn import metrics
-# from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_curve, auc, classification_report
 
 def calculate_precision(df_result, var_resp, var_pred):
     """
@@ -21,7 +20,7 @@ def calculate_precision(df_result, var_resp, var_pred):
             n_aciertos += 1
     return n_aciertos / len(df_result) * 100
 
-def confusion_matrix(y_real, y_pred, df_etiquetas):
+def confusion_matrix(y_real, y_pred):
     """
     Muestra matriz de confusion del modelo
     :param df_result: Dataframe test. Con variable respuesta y con la prediccion del modelo
@@ -34,16 +33,6 @@ def confusion_matrix(y_real, y_pred, df_etiquetas):
     # Convertir el array a un DataFrame de pandas
     df_cm = pd.DataFrame(confusion_matrix)
     df_cm.index.name = "Resultado real"
-
-    # Cambio numeros de conf matrix por etiquetas
-    for i, row in df_etiquetas.iterrows():
-
-        # Renombro columna
-        df_cm.rename(columns={row['int_value']: row['str_value']}, inplace=True)
-
-        # Renombro filas
-        df_cm = df_cm.rename(index={row['int_value']: row['str_value']})
-    print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
 def determine_bookmaker_result(df, var_pred):
@@ -56,15 +45,15 @@ def determine_bookmaker_result(df, var_pred):
 
         # Si la cuota minima es la del team home
         if row['odds_home'] == odds_min:
-            df.loc[i, var_pred] = "Home"
+            df.loc[i, var_pred] = 1
 
         # Si la cuota minima es la del team away
         elif row['odds_away'] == odds_min:
-            df.loc[i, var_pred] = "Away"
+            df.loc[i, var_pred] = 2
 
         # Si la cuota minima es la del draw
         else:
-            df.loc[i, var_pred] = "Draw"
+            df.loc[i, var_pred] = 0
 
     return df
 
@@ -147,7 +136,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100):
     d['best_roi'] = max(d.values())
     return d
 
-def calculate_odds_model(df: pd.DataFrame):
+def calculate_odds_model(df: pd.DataFrame):  # Mejor uso dif_prob_mod_bm como x (en vez de dif_cuotas_mod_bm)
     """
     Calcula las probabilidades de cada resultado (Home, Draw y Away) segun la casa de apuesta
     """
@@ -155,14 +144,14 @@ def calculate_odds_model(df: pd.DataFrame):
     for idx, row in df.iterrows():
 
         # Calcular probabilidades a partir de invertir las cuotas
-        cuota_home = 1 / row['Home']
-        cuota_draw = 1 / row['Draw']
-        cuota_away = 1 / row['Away']
+        cuota_home = 1 / row['prob_class_1']
+        cuota_draw = 1 / row['prob_class_0']
+        cuota_away = 1 / row['prob_class_2']
         cuota_min = min(cuota_home, cuota_draw, cuota_away)
 
         # Determino diferencia entre cuotas de mi modelo y de casa de apuesta
-        pred_mod = df.loc[idx, 'predicted_result_str']
-        cuota_bm = row['odds_home'] if pred_mod == "Home" else row['odds_draw'] if pred_mod == "Draw" else row['odds_away']
+        pred_mod = df.loc[idx, 'predicted_result']
+        cuota_bm = row['odds_home'] if pred_mod == 1 else row['odds_draw'] if pred_mod == 0 else row['odds_away']
         dif_cuota_bm_mod = cuota_bm - cuota_min
 
         df.loc[idx, 'dif_cuota_bm_mod'] = dif_cuota_bm_mod
@@ -236,7 +225,7 @@ def calculate_multiplier(df: pd.DataFrame, m: float, b: float, x1: float, y1: fl
         pass
     return df
 
-def calculate_roi(df: pd.DataFrame, _print: bool = True):
+def calculate_roi(df: pd.DataFrame, _print: bool = False):
     """
     Calcula ROI comparando las predicciones del modelo y los resultados reales.
     :param df_result: Dataframe de prueba con la variable respuesta y la predicción del modelo. (DataFrame)
@@ -249,23 +238,25 @@ def calculate_roi(df: pd.DataFrame, _print: bool = True):
     dinero_a_invertir = sum(df['stake_mod'])
 
     # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    df_correct = df[df['result_str'] == df['predicted_result_str']]
+    df_correct = df[df['result'] == df['predicted_result']]
     if _print:
         print(df_correct.shape)
      
     # Por partido acertado
     for idx, row in df_correct.iterrows():
 
-        result_etiqueta = row['result_str']
+        result_etiqueta = row['result']
 
         # Obtengo el ingreso obtenido segun la etiqueta
-        cuota = row['odds_home'] if result_etiqueta == "Home" else row['odds_draw'] if result_etiqueta == "Draw" else row['odds_away']  # Vefificada
+        cuota = row['odds_home'] if result_etiqueta == 1 else row['odds_draw'] if result_etiqueta == 0 else row['odds_away']  # Vefificada
         
         # Calculo ingresos por acertar el resultado
         ingresos += row['stake_mod'] * cuota
  
     # Calculo el ROI
     roi = (ingresos - dinero_a_invertir) / dinero_a_invertir * 100
+    cuota_media_ganada = ingresos / dinero_a_invertir
+    # cuota_media_apostada = sum() --> no tengo la cuota apostada en cada partido... la eestoy calculando en el ciclo for...
     if _print:
         print(f"\t ROI: {roi:.1f}%. ${dinero_a_invertir:.0f} --> ${ingresos:.0f}")
     return roi

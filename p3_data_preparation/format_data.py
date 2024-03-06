@@ -11,17 +11,15 @@ def convert_posesion_to_int(df):
     ejemplo '65%'.
     :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
     """
-    posesion = "ball_possession"
-    l_tit = ['home', 'away']
+    func = lambda x: float(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan
 
-    for tit in l_tit:
-        df[f'{posesion}_{tit}'] = df[f'{posesion}_{tit}'].apply(
-            lambda x: int(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan)
-        
-        # Verifica si todos los elementos de la columna son de tipo float
-        if not all(isinstance(value, (float, np.floating)) for value in df[f'{posesion}_{tit}']):
-            # Si no todos los elementos son de tipo float, raise una advertencia
-            warnings.warn(f"Not all elements in the column '{posesion}' are float.")
+    df["ball_possession_home"] = df["ball_possession_home"].apply(func)
+    df["ball_possession_away"] = df["ball_possession_away"].apply(func)
+    
+    # Verifica si todos los elementos de la columna son de tipo float
+    if not all(isinstance(value, float) for value in df["ball_possession_home"]):
+        # Si no todos los elementos son de tipo float, raise una advertencia
+        warnings.warn(f"Not all elements in the column '' are float.")
     
     return df
 
@@ -116,7 +114,7 @@ def convert_columns_to_int(df, df_etiquetas=None):
 
     # Obtener columnas de tipo objeto
     l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
-    print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
+    print(f"Columnas str a convertir a int: {list(l_columnas_a_codificar)}")
 
     # Codifico variables string en numericas
     if df_etiquetas is None:
@@ -128,7 +126,7 @@ def convert_columns_to_int(df, df_etiquetas=None):
             # Quito NaN de la columna para evitar codificar el valor NaN
             df_sin_na = df.dropna(subset=[col])
 
-            # Convierto columna a int
+            # Convierto columna a int  --> WARNING: Try using .loc[row_indexer,col_indexer] = value instead
             df_sin_na[col] = le.fit_transform(df_sin_na[col].astype(str)) # agregue el "as_type(str)" porque tiraba error sino desde que uso vsc en vez Pycharm
 
             # Reemplazar los valores de la columna en los índices sin Nan
@@ -151,41 +149,39 @@ def convert_columns_to_int(df, df_etiquetas=None):
         nombre_columna = row['variable']
 
         # Reemplazar valores en la columna específica
-        df.loc[:, nombre_columna] = df[nombre_columna].replace(row['str_value'], row['int_value'])
+        try:
+            df.loc[:, nombre_columna] = df[nombre_columna].replace(row['str_value'], row['int_value'])
+        except:  # id_coach_home no siempre esta en df_match_next
+            pass
         
     return df, df_etiquetas
 
-def convert_pred_str_to_int(df, name_var_str, name_var_int, df_etiquetas_y): # Esto funciona bien
+def revert_columns_from_int(df, df_teams):
     """
-    Obtengo las predicciones segun la casa de apuestas
+    Convierte las variables id a string utilizando el DataFrame df_teams.
+
+    :param df: DataFrame que contiene las variables teams como ids. (DataFrame)
+    :param df_teams: DataFrame que contiene la relacion entre ids y nombres de equipos
+    :return: DataFrame con las variables teams como strings.
     """
-    # Convertir de str a num
-    for idx, row in df_etiquetas_y.iterrows():
-        # print(f"{row['str_value']} --> {row['int_value']}")
-        
-        # Obtengo indices de partidos con determinado resultado
-        idx_to_change = df[df[name_var_str] == row['str_value']].index
+    for col in ['id_team_home', 'id_team_away']:
 
-        # Reemplazar valores en la columna específica
-        df.loc[idx_to_change, name_var_int] = row['int_value']
+        # Por fila
+        for i, row in df.iterrows():
 
+            # Busco equipo en df_teams
+            row_val = df_teams[df_teams.index == row[col]]
+
+            # Si encontró el equipo en df_teams
+            if len(row_val) > 0:
+                
+                # Reemplazo id por string
+                str_value = row_val['team_name'].values[0]
+                df.loc[i, col] = str_value
+            else:
+                print(f"El valor {row[col]} no está en df_teams.")
     return df
 
-def convert_pred_int_to_str(df, name_var_int, name_var_str, df_etiquetas_y): # Esto funciona bien
-    """
-    Obtengo las predicciones segun la casa de apuestas
-    """
-    # Convertir de str a num
-    for idx, row in df_etiquetas_y.iterrows():
-        # print(f"{row['int_value']} --> {row['str_value']}")
-        
-        # Obtengo indices de partidos con determinado resultado
-        idx_to_change = df[df[name_var_int] == row['int_value']].index
-
-        # Reemplazar valores en la columna específica
-        df.loc[idx_to_change, name_var_str] = row['str_value']
-
-    return df
 
 def prueba():
     # Levanto datasets
