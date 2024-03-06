@@ -8,24 +8,24 @@ def getting_to_know_data(df):
     :param df: Dataframe
     :return: funcion sin retorno
     """
-    print("\nDESCRIPCION DE DATAFRAME:".center(120))
-
     # Data frame's dimensionality
     print("\nDataframe shape: ", df.shape)
 
-    # See firsts 5 Dataframe's rows
-    print("\nPrimeras 5 filas del dataframe:")
-    pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
+    # See firsts 2 Dataframe's rows
+    print("\nPrimeras 2 filas del dataframe:")
     pd.set_option("display.precision", 2)  # mostrar maximo dos decimales
-    print(df.head())  # y .tail es para ver las ultimas filas
+    if len(df.columns) < 50:
+        pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
+    print(df.head(2))  # y .tail es para ver las ultimas filas
 
     # Displaying Data Types
     print("\nDataframe info:")
     df.info()
 
     # Showing Basics Statistics
-    print("\nDataframe basic statistics:")
-    print(df.describe(include='all'))  # basic descriptive statistics for all numeric columns
+    if len(df.columns) > 0:
+        print("\nDataframe basic statistics:")
+        print(df.describe(include='all'))  # basic descriptive statistics for all numeric columns
 
 def verificar_unicidad_registros(df):
 
@@ -34,12 +34,16 @@ def verificar_unicidad_registros(df):
     df_dup = df.index[indices_duplicados]
 
     if len(df_dup) > 0:
-        print(f"\t El índice tiene valores duplicados. Indices duplicados: {list(indices_duplicados)}")
+        print(f"\t El índice tiene valores duplicados.") # Indices duplicados: {list(indices_duplicados)}")
     else:
         print("\tEl índice no tiene valores duplicados.")
 
-def check_ids_in_both_dataframes(df1, df2):
-    todos_en_df2 = df1.index.isin(df2.index).all()
+def check_ids_in_both_dataframes(df1, df2, column: str = None):
+
+    if column is None:
+        todos_en_df2 = df1.index.isin(df2.index).all()
+    else:
+        todos_en_df2 = df1.index.isin(df2[column]).all()
 
     if todos_en_df2:
         print("\tTodos los valores del índice de df1 están en el índice de df2.")

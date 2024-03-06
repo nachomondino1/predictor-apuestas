@@ -10,5 +10,11 @@
 ## Actualizar el Virtual Environment luego de agregar una libreria: 
 
 - Cada vez que agreguemos librerias nuevas al virtual environment, debemos 
-actualizar el archivo de reuirements.txt corriendo el comando: 
+actualizar el archivo de requirements.txt corriendo el comando: 
 `pip freeze > requirements.txt`
+
+## Como crear una nueva rama: 
+- 1. Crear nueva rama en Github 
+- 2. Ir a VSC, abrir la terminal y para ver todas las ramas creadas remotas correr: `git fetch`
+- 3. Elegis tu rama y corres: `git checkout <nombre_de_rama>`
+

@@ -106,9 +106,10 @@ def clean_teams_names(df):
     :return: Dataframe. El pasado por parametro con nombres de equipos modificados y limpios
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
-    d_sub_strings_adic = {'vencedor': '', 'equipo que avanza': ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
-    df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
-    df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
+    d_sub_strings_adic = {"winner": '', "advancing to next round": ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
+    df['team_name'] = df['team_name'].replace(d_sub_strings_adic, regex=True).str.strip()
+    # df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
+    # df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
     return df
 
 def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"): 
@@ -246,7 +247,7 @@ def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funcio
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
-def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, _print: bool = False):
+def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = True):
     """
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
@@ -254,22 +255,25 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, _print
     warnings.simplefilter("always")
 
     # Elimino filas con al menos un nan (tal como lo haria en Modeling)
-    df_drop_na = delete_rows_nan(df, porc_nan_max=0, _print=False)
+    df_drop_na = delete_rows_nan(df, 0, _print=False)
+    if _print:
+        print("\n Cantidad de filas df: ", df_drop_na.shape[0])
 
-    # Si no quedan registros
-    if len(df_drop_na) == 0:
-        text = "Cuidado, el dataframe podria generar error en Modeling por no quedar registros con los cuales entrenar el modelo"
-        warnings.warn(text, UserWarning)
+    # Si quedan menos registros que n_reg_min
+    if len(df_drop_na) <= n_reg_min:
+        # text = "Cuidado, el dataframe podria generar error en Modeling por no quedar registros con los cuales entrenar el modelo"
+        # warnings.warn(text, UserWarning)
 
         porc_nan_max = porc_nan_max - 0.05
-        if _print:
-            print("porc_nan_max: ", porc_nan_max)
 
         # Elimino columnas con mucho nan
         df = delete_columns_nan(df, porc_nan_max)
+        if _print:
+            print("porc_nan_max: ", porc_nan_max)
+            print("Columnas restantes en df", df.shape[1])
 
         # Vuelvo a verificar si quedan filas nan          
-        df = drop_columns_until_drop_nan_not_empty(df, porc_nan_max)
+        df = drop_columns_until_drop_nan_not_empty(df, porc_nan_max, n_reg_min=n_reg_min)
     return df
 
 def prueba():
