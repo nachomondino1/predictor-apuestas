@@ -131,7 +131,9 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
 
         # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
         if fill_type == "mode":  #     raise KeyError(key) from err --> KeyError: 0
-            X_filled[col].fillna(X[col].mode()[0], inplace=True)
+
+            mode_value = X[col].mode()[0]
+            X_filled[col] = X_filled[col].fillna(mode_value)
 
         # OPCION 2: Llenar los valores faltantes con ML
         elif fill_type == "ml":
@@ -247,7 +249,7 @@ def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funcio
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
-def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = True):
+def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = False):
     """
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
@@ -261,8 +263,6 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_
 
     # Si quedan menos registros que n_reg_min
     if len(df_drop_na) <= n_reg_min:
-        # text = "Cuidado, el dataframe podria generar error en Modeling por no quedar registros con los cuales entrenar el modelo"
-        # warnings.warn(text, UserWarning)
 
         porc_nan_max = porc_nan_max - 0.05
 
@@ -274,6 +274,7 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_
 
         # Vuelvo a verificar si quedan filas nan          
         df = drop_columns_until_drop_nan_not_empty(df, porc_nan_max, n_reg_min=n_reg_min)
+
     return df
 
 def prueba():
