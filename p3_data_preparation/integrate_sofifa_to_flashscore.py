@@ -116,7 +116,13 @@ def integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa):
                 if (not pd.isna(id_team_sofifa)) and (len(row_team_sofifa) > 0):
                     df_match.loc[l_idxs, f'{col_team}_int_prestige'] =  row_team_sofifa['international_prestige'].values[0]
                     df_match.loc[l_idxs, f'{col_team}_dom_prestige'] =  row_team_sofifa['domestic_prestige'].values[0]
-                    df_match.loc[l_idxs, f'{col_team}_rival_team'] =  row_team_sofifa['id_rival_team'].values[0]
+
+                    # Rival team (# no quiero guardar el id_team_rival de sofifa sino el de Flashscore...)
+                    id_sofifa_rival_team = row_team_sofifa['id_rival_team'].values[0] 
+                    row_fs_rival_team = df_map_teams_fs_so[df_map_teams_fs_so['id_team_sofifa'] == id_sofifa_rival_team]
+                    if len(row_fs_rival_team)==1:
+                        id_fs_rival_team = row_fs_rival_team.index.values[0]
+                        df_match.loc[l_idxs, f'{col_team}_rival_team'] =  id_fs_rival_team
 
     return df_match
 
