@@ -78,8 +78,11 @@ WSGI_APPLICATION = 'pagina_web.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+       'ENGINE': 'django.db.backends.mysql',
+       'NAME': 'predictor_apuestas', # name of the db we created in Workbench
+       'HOST': 'localhost',
+       'USER': 'root',
+       'PASSWORD': 'MiComidaFavoritaMilanesa_2024' # This is only for development
     }
 }
 
