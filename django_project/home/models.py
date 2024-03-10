@@ -15,12 +15,30 @@ class Competitions(models.Model):
    competition_sofifa = models.CharField(max_length=255)
    is_cup = models.BooleanField()
 
-
 class TeamsFlashscore(models.Model):
    id_team = models.CharField(primary_key=True, max_length=100)
    team_name = models.CharField(max_length=255)
    url_team = models.URLField()
 
+class Predictions(models.Model):
+   id_predic = models.CharField(primary_key=True, max_length=100)
+   date = models.DateTimeField()
+   id_team_home = models.ForeignKey(TeamsFlashscore, related_name='id_team_home', on_delete=models.PROTECT)
+   id_team_away = models.ForeignKey(TeamsFlashscore, related_name='id_team_away', on_delete=models.PROTECT)
+   odds_home = models.DecimalField(max_digits=4, decimal_places=2)
+   odds_draw = models.DecimalField(max_digits=4, decimal_places=2)
+   odds_away =  models.DecimalField(max_digits=4, decimal_places=2)
+   over = models.CharField(max_length=100)
+   prob_home_bmy =  models.DecimalField(max_digits=4, decimal_places=2)
+   prob_draw_bmy =  models.DecimalField(max_digits=4, decimal_places=2)
+   prob_away_bmy =  models.DecimalField(max_digits=4, decimal_places=2)
+   predicted_result = models.IntegerField()
+   prob_class_1 =  models.DecimalField(max_digits=4, decimal_places=2)
+   prob_class_0 =  models.DecimalField(max_digits=4, decimal_places=2)
+   prob_class_2 =  models.DecimalField(max_digits=4, decimal_places=2)
+   dif_prob_mod_bm =  models.DecimalField(max_digits=4, decimal_places=2)
+   multiplier =  models.DecimalField(max_digits=4, decimal_places=2)
+   stake_mod =  models.DecimalField(max_digits=8, decimal_places=3)
 
 class TeamsSofifa(models.Model):
    id_team_sofifa = models.CharField(primary_key=True, max_length=100)
@@ -33,18 +51,15 @@ class TeamsSofifa(models.Model):
    url_team = models.URLField()
    id_country = models.ForeignKey(Countries, on_delete=models.PROTECT)
 
-
 class CoachesFlashscore(models.Model):
    id_coach = models.CharField(primary_key=True, max_length=100)
    coach_name = models.CharField(max_length=255)
    url_coach = models.URLField()
 
-
 class PlayersFlashscore(models.Model):
    id_player = models.CharField(primary_key=True, max_length=100)
    player_name = models.CharField(max_length=255)
    player_url  = models.URLField()
-
 
 class PlayersSofifa(models.Model):
    id_player_sofifa = models.CharField(primary_key=True, max_length=100)
