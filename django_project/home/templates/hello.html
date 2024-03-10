@@ -8,4 +8,9 @@
 {% else %}
 <h1>Hello World</h1>
 {% endif %}
+<ul>
+    {% for pred in predictions %}
+    <li>{{ pred }}</li>
+    {% endfor %}
+</ul>
 </body>
