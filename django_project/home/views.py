@@ -21,10 +21,15 @@ def say_hello(request):
     # queryset = Predictions.objects.filter(id_team_home__contains='Man')
     # queryset = Predictions.objects.filter(date__day=10)
     # queryset = Predictions.objects.filter(Q(odds_home__lt=10) | Q(odds_home__gt=5))
-
+    """ 
     queryset = Predictions.objects.values_list(
         "id_team_home", "id_team_away", "predicted_result"
     ).distinct()  # only read some columns from the table
+
+    queryset = Predictions.objects.select_related() --> join, the other side has 1 values
+    queryset = Predictions.objects.prefetch_related() --> join, the other side has n values
+    """
+    queryset = Predictions.objects.all()
     return render(
         request, "hello.html", {"name": "Caro & Nacho Co", "predictions": queryset}
     )

@@ -1,3 +1,19 @@
+<style>
+    /* Agrega un poco de estilo para mejorar la presentación */
+    li {
+        list-style-type: none;
+        background-color: #f2f2f2;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+    }
+
+    li span {
+        font-weight: bold;
+        margin-right: 5px;
+    }
+</style>
+
 <html>
 
 <body>
@@ -10,7 +26,15 @@
 {% endif %}
 <ul>
     {% for pred in predictions %}
-    <li>{{ pred }}</li>
+    <li><span>Date:</span> {{ pred.date }},
+        <span>Home Team:</span> {{ pred.id_team_home }},
+        <span>Away Team:</span> {{ pred.id_team_away }},
+        <span>Results: </span> {{pred.predicted_result }},
+        <span>Prob Home:</span> {{pred.prob_home_bm}},
+        <span>Prob Draw:</span> {{pred.prob_draw_bm}},
+        <span>Prob Away:</span> {{pred.prob_away_bm}}
+    </li>
     {% endfor %}
 </ul>
+
 </body>
