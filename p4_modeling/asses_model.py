@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn import metrics
+import warnings
 
 def calculate_precision(df_result, var_resp, var_pred):
     """
@@ -81,7 +82,7 @@ def calculate_probas_bookmarker(df_match_odds): # Funciona bien. Comprobado.
 
     return df_match_odds
 
-def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100):
+def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100, _print: bool = False):
     """
     Determine the ROI for different betting strategies.
     Cosas a agregar:
@@ -89,80 +90,80 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100):
     - Desarrollo de tipo de stake poly
     """
     d = {}
+
     # Calculo cuotas segun probabilidades del modelo
-    df = calculate_odds_model(df)
+    df = calculate_dif_probas(df)
 
     # Stake fijo # es como linear con m=0 y b=0
-    print("Estrategia 1: Stake fijo")
-    df_roi1 = construct_stake_modified(df, stake_base, type_stake='equal')
-    roi1 = calculate_roi(df_roi1)
-    d['roi_stake_fijo'] = roi1
+    df_roi1 = construct_stake_modified(df, stake_base, type_relation='equal')
+    d['roi_stake_fijo'] = calculate_roi(df_roi1, _print=_print)
 
-    # Stake lineal 1
-    print("\n Estrategia 2: Stake lineal, casi todos los partidos el mismo stake. (m=0.2 y b=0)")
-    df_roi2 = construct_stake_modified(df, stake_base, type_stake="linear",  m=0.2, b=0)
-    roi2 = calculate_roi(df_roi2)
-    d['roi_stake_var_m.2_b0'] = roi2
+    # Stake lineal 4 --> apuesto mas cuando mi modelo esta mas que un 10% seguro que la casa de apuesta (me gustaria que si esta menos seguro, que la apuesta sea 0...)
+    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=-0.1)
+    d['roi_m3_b-0.1'] = calculate_roi(df_roi5, _print=_print)
 
-    # Stake lineal 2
-    print("\n Estrategia 3: Stake lineal, relacion 1:1 stake y dif_cuotas. (m=1 y b=0)")
-    df_roi3 = construct_stake_modified(df, stake_base, type_stake="linear", m=1, b=0)
-    roi3 = calculate_roi(df_roi3)
-    d['roi_stake_var_m1_b0'] = roi3
+    df_roi8 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=-0.3)
+    d['roi_m3_b-0.3'] = calculate_roi(df_roi8, _print=_print)
+
+    df_roi7 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=-0.5)
+    d['roi_m3_b-0.5'] = calculate_roi(df_roi7, _print=_print)
+
+    # Stake lineal 5 --> no tiene mucho sentido apostar cuando mi modelo esta menos seguro incluso que la casa de apuesta...
+    df_roi6 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=+0.1)
+    d['roi_m3_b0.1'] = calculate_roi(df_roi6, _print=_print)
 
     # Stake lineal 3 
-    print("\n Estrategia 4: Stake lineal, relacion 3:1 stake y dif_cuotas. (m=3 y b=0)")
-    df_roi4 = construct_stake_modified(df, stake_base, type_stake="linear",  m=3, b=0)
-    roi4 = calculate_roi(df_roi4)
-    d['roi_stake_var_m3_b0'] = roi4
+    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=7, b=-0.1)
+    d['roi_m7_b-0.1'] = calculate_roi(df_roi4, _print=_print)
 
-    # Stake lineal 4
-    print("\n Estrategia 5: Stake lineal, relacion 3:1 stake y dif_cuotas y apuesto cuando esta mas seguro. (m=3 y b=-1)")
-    df_roi5 = construct_stake_modified(df, stake_base, type_stake="linear", m=3, b=-1)
-    roi5 = calculate_roi(df_roi5)
-    d['roi_stake_var_m3_b-1'] = roi5
+    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=7, b=-0.5)
+    d['roi_m7_b-0.5'] = calculate_roi(df_roi4, _print=_print)
 
-    # Stake lineal 5
-    print("\n Estrategia 6: Stake lineal, relacion 3:1 stake y dif_cuotas y apuesto cuando esta menos seguro. (m=3 y b=1)")
-    df_roi6 = construct_stake_modified(df, stake_base, type_stake="linear", m=3, b=1)
-    roi6 = calculate_roi(df_roi6)
-    d['roi_stake_var_m3_b1'] = roi6
+    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=15, b=-0.1)
+    d['roi_m15_b-0.1'] = calculate_roi(df_roi4, _print=_print)
+
+    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=15, b=-0.5)
+    d['roi_m15_b-0.5'] = calculate_roi(df_roi4, _print=_print)
 
     # Stake exponencial  # aun tengo problema con los x1 e y1 negativos...
-    # df_roi4 = construct_stake_modified(df, stake_base, type_stake="exponential")
+    # df_roi4 = construct_stake_modified(df, stake_base, type_relation="exponential")
     # roi4 = calculate_roi(df_roi4)
     
     # Selecciono el mejor ROI
-    d['best_roi'] = max(d.values())
+    filtered_values = [value for value in d.values() if not pd.isna(value)] # Quito ROI que puedan ser nan
+    d['best_roi'] = max(filtered_values)
     return d
 
-def calculate_odds_model(df: pd.DataFrame):  # Mejor uso dif_prob_mod_bm como x (en vez de dif_cuotas_mod_bm)
+def calculate_dif_probas(df: pd.DataFrame, _print: bool = False):  # Mejor uso dif_prob_mod_bm como x (en vez de dif_cuotas_mod_bm)
     """
     Calcula las probabilidades de cada resultado (Home, Draw y Away) segun la casa de apuesta
     """
     # Por partido
     for idx, row in df.iterrows():
 
-        # Calcular probabilidades a partir de invertir las cuotas
-        cuota_home = 1 / row['prob_class_1']
-        cuota_draw = 1 / row['prob_class_0']
-        cuota_away = 1 / row['prob_class_2']
-        cuota_min = min(cuota_home, cuota_draw, cuota_away)
+        # Obtengo probabilidad del resultado predicho por el modelo
+        prob_max = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
 
-        # Determino diferencia entre cuotas de mi modelo y de casa de apuesta
-        pred_mod = df.loc[idx, 'predicted_result']
-        cuota_bm = row['odds_home'] if pred_mod == 1 else row['odds_draw'] if pred_mod == 0 else row['odds_away']
-        dif_cuota_bm_mod = cuota_bm - cuota_min
+        # Obtengo probabilidad de la casa de apuesta para el resultado predicho por el modelo
+        pred_mod = row['predicted_result']
+        prob_bm_in_pred_result = row['prob_home_bm'] if pred_mod == 1 else row['prob_draw_bm'] if pred_mod == 0 else row['prob_away_bm']
+     
+        # Calculo diferencia de probabilidad entre mi modelo y bm para el predicted_result 
+        dif_prob_mod_bm = prob_max - prob_bm_in_pred_result
+        df.loc[idx, 'dif_prob_mod_bm'] = dif_prob_mod_bm
+        if _print:
+            print(f"Partido {idx}")
+            print(f"Probabilidad resultado predicho: {prob_max}")
+            print(f"Probabilidad bm para el resultado predicho: {prob_bm_in_pred_result}")
+            print(f"Diferencia de probabilidad para el resultado predicho: {dif_prob_mod_bm}")
 
-        df.loc[idx, 'dif_cuota_bm_mod'] = dif_cuota_bm_mod
-        # df.loc[idx, ['odds_home_mod', 'odds_draw_mod', 'odds_away_mod', 'cuota_min', 'cuota_bm', 'dif_cuota_bm_mod']] = [cuota_home, cuota_draw, cuota_away, cuota_min, cuota_bm, dif_cuota_bm_mod]
     return df
 
-def construct_stake_modified(df: pd.DataFrame, stake_base, type_stake, m: float = None, b: float = None, x1: float = -1, y1: float = -1, x2: float = 1, y2: float = 1):
+def construct_stake_modified(df: pd.DataFrame, stake_base, type_relation: str = 'equal', x1: float = -1, y1: float = -1, x2: float = 1, y2: float = 1,  m: float = None, b: float = None, dif_prob_mod_bm_min: float = -0.5):
     """
     Construye multiplier y luego se lo aplica al stake base para construir la columna "stake_mod".
     """
-    df = calculate_multiplier(df, m, b, x1, y1, x2, y2, type_stake)
+    df = calculate_multiplier(df, type_relation=type_relation, x1=x1, y1=y1, x2=x2, y2=y2, m=m, b=b, dif_prob_mod_bm_min=dif_prob_mod_bm_min)
 
     # Por partido
     for i, row in df.iterrows():
@@ -177,27 +178,30 @@ def construct_stake_modified(df: pd.DataFrame, stake_base, type_stake, m: float 
         df.loc[i, 'stake_mod'] = stake_mod
     return df
 
-def calculate_multiplier(df: pd.DataFrame, m: float, b: float, x1: float, y1: float, x2: float, y2: float, type_stake: str = "equal"):
+def calculate_multiplier(df: pd.DataFrame, type_relation, x1, y1, x2, y2, m, b, dif_prob_mod_bm_min):
     """
     Construye columna multiplier. Cada fila tiene su multiplier segun las probabilidades del modelo y de la casa de apuesta para ese partido.
     """
     # Linear
-    if type_stake == "equal":  
+    if type_relation == "equal":  
         df['multiplier'] = 0
 
-    elif type_stake == "linear":  # y= m * x + b
+    elif type_relation == "linear":  # y= m * x + b
 
         # Si la pendiente no fue pasada como parametro, calculo la pendiente y ordenada al origen
         if m is None:
             m = (y2-y1) / (x2-x1)
-            b = y1-m*x1            
+            b = y1 - m*x1            
+            
+        df['multiplier'] = df['dif_prob_mod_bm'] * m + b
 
-        df['multiplier'] = df['dif_cuota_bm_mod'] * m + b
+        # Aplicar la condición: si 'dif_prob_mod_bm' es menor a dif_prob_mod_bm_min, asigna -1 a 'multiplier'
+        df.loc[df['dif_prob_mod_bm'] < dif_prob_mod_bm_min, 'multiplier'] = -1
 
-    elif type_stake == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
+    elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass
 
-    elif type_stake == "exponential":  # y=a * b^x
+    elif type_relation == "exponential":  # y=a * b^x
 
         # Transformación logarítmica de los valores de x e y  (no pueden ser valores negativos)
         x2 = x2 - x1 + 3
@@ -218,9 +222,8 @@ def calculate_multiplier(df: pd.DataFrame, m: float, b: float, x1: float, y1: fl
         b = np.exp(log_b)     
         # print("W: ", a, b)
 
-        df['multiplier'] = a * (b ** df['dif_cuota_bm_mod'])
+        df['multiplier'] = a * (b ** df['dif_prob_mod_bm'])
         
-        df.to_excel('/Users/nachomondino/Desktop/AAAA.xlsx')
     else:
         pass
     return df
@@ -235,27 +238,35 @@ def calculate_roi(df: pd.DataFrame, _print: bool = False):
     """
     # Definicion de variables
     ingresos = 0
-    dinero_a_invertir = sum(df['stake_mod'])
 
+    # Elimino partidos con odds NaN
+    df_sin_odds_nan = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away'])
+    if len(df) != len(df_sin_odds_nan):
+        warnings.warn(f'Se eliminaron {len(df)-len(df_sin_odds_nan)} partidos de {len(df)} por tener odds=NaN')
+    dinero_a_invertir = sum(df_sin_odds_nan['stake_mod'])
+    
     # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    df_correct = df[df['result'] == df['predicted_result']]
+    df_correct = df_sin_odds_nan[df_sin_odds_nan['result'] == df_sin_odds_nan['predicted_result']]
+    if len(df_correct) == len(df_sin_odds_nan):
+        warnings.warn(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
     if _print:
-        print(df_correct.shape)
-     
+        print(f"De {df.shape[0]} partidos, acerté {df_correct.shape[0]}")
+        print(f"Dinero a invertir: {dinero_a_invertir}")
+    
     # Por partido acertado
     for idx, row in df_correct.iterrows():
 
-        result_etiqueta = row['result']
-
         # Obtengo el ingreso obtenido segun la etiqueta
-        cuota = row['odds_home'] if result_etiqueta == 1 else row['odds_draw'] if result_etiqueta == 0 else row['odds_away']  # Vefificada
+        cuota_ganada = row['odds_home'] if row['result'] == 1 else (row['odds_draw'] if row['result'] == 0 else row['odds_away'])  # Vefificada
         
         # Calculo ingresos por acertar el resultado
-        ingresos += row['stake_mod'] * cuota
- 
+        ingresos += row['stake_mod'] * cuota_ganada
+        if _print:
+            print(f"Cuota ganada: {cuota_ganada} Stake: {row['stake_mod']} --> Ingresos: {ingresos}")
+
     # Calculo el ROI
     roi = (ingresos - dinero_a_invertir) / dinero_a_invertir * 100
-    cuota_media_ganada = ingresos / dinero_a_invertir
+    # cuota_media_ganada = ingresos / dinero_a_invertir
     # cuota_media_apostada = sum() --> no tengo la cuota apostada en cada partido... la eestoy calculando en el ciclo for...
     if _print:
         print(f"\t ROI: {roi:.1f}%. ${dinero_a_invertir:.0f} --> ${ingresos:.0f}")
@@ -265,12 +276,9 @@ def prueba():
     var_resp = 'result'
     var_pred = 'predict_result'
 
-    df = pd.read_excel('/Users/nachomondino/Desktop/df_results.xlsx')
+    df_predicciones = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/modeling/df_predicciones.xlsx', index_col=0)
+    d_roi = calculate_roi_by_betting_strategy(df_predicciones, _print=True)
 
-    calculate_precision(df, var_resp=var_resp, var_pred=var_pred)
-
-    # confusion_matrix(df, var_resp, var_pred)
-    # df_cm.to_excel('/Users/nachomondino/Desktop/cm.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
