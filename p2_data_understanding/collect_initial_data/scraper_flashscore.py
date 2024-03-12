@@ -394,12 +394,15 @@ class FlashscoreCrawler(Crawler):
         # Extraer las oddss en una lista
         l_odds_elements = super().extract_tags(xpath='.//div[@class="oddsRowContent"]//div[@class="cellWrapper"]//span[@class="oddsValueInner"]', sec_wait=self.SEC_WAIT_MAX, print_fail=True)
 
-        if len(l_odds_elements) > 0:
+        if len(l_odds_elements) > 0: 
             l_text_odds_elements = [elem.text for elem in l_odds_elements]
 
-            d_row['odds_home'] = l_text_odds_elements[0]
-            d_row['odds_draw'] = l_text_odds_elements[1]
-            d_row['odds_away'] = l_text_odds_elements[2]
+            try: # Fallo para argentina en LPG 2010/11    d_row['odds_draw'] = l_text_odds_elements[1] IndexError: list index out of range
+                d_row['odds_home'] = l_text_odds_elements[0]
+                d_row['odds_draw'] = l_text_odds_elements[1]
+                d_row['odds_away'] = l_text_odds_elements[2]
+            except IndexError:
+                pass
 
         if self._print:
             print(f"Extracting odds: {d_row}")
