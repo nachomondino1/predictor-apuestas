@@ -60,7 +60,10 @@ def delete_correlated_columns(df, var_resp, umbral):
 
 class FeatureSelection():
 
-    def modelos_estadisticos(self, X, y, graf=False):
+    def __init__(self, graficar_cada_metodo: bool = False) -> None:
+        self.graficar_cada_metodo = graficar_cada_metodo
+
+    def modelos_estadisticos(self, X, y):
         """
         Calculo de importancia de cada variable segun los modelos estadisticos.
 
@@ -103,12 +106,12 @@ class FeatureSelection():
         # print("Resultados estadisticos: \n", df_importance)
 
         # Grafico variables y su importancia
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['mod_estadisticos'], y=df_importance.index)
 
         return df_importance
 
-    def random_forest(self, X, y, k: int = 5, graf=False):
+    def random_forest(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
@@ -130,12 +133,12 @@ class FeatureSelection():
         df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)
 
         # Grafico variables y su importancia
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['random_forest'], y=df_importance.index)
 
         return df_importance
 
-    def via(self, X, y, graf=False):
+    def via(self, X, y):
         """
         Calculo de importancia de cada variable segun via.
 
@@ -151,12 +154,12 @@ class FeatureSelection():
         df_importance = pd.DataFrame({'via': scores}, index=X.columns)
         # print("Resultados via: \n", df_importance)
 
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['via'], y=df_importance.index)
 
         return df_importance
 
-    def rfe(self, X, y, k: int = 5, graf=False):
+    def rfe(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun rfe.
 
@@ -165,33 +168,41 @@ class FeatureSelection():
         :param graf: Boolean. True para graficar importancia por variable. (bool)
         :return: Dataframe. Importancia por variable. (Dataframe)
         """
+        # warnings.filterwarnings('ignore')
         # Definicion de variables
         n_features = 1  # Número deseado de características seleccionadas hasta que se eliminan las menos relevantes
 
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
         # Separo en train y val
-        X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
+        X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
         model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=k, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        # model = LogisticRegression(solver='lbfgs', max_iter=10000)
+
         rfe = RFE(estimator=model, n_features_to_select=n_features)
 
         # Entreno modelo
-        X_selected = rfe.fit_transform(X_train, y_train)
+        rfe.fit_transform(X_train, y_train) # rfe.fit_transform(X_scaled, y)
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'rfe': rfe.ranking_}, index=X.columns)
         # print("Resultados rfe: \n", df_importance)
 
         # Convierto ranking en importancia (a mayor ranking, menor importancia)
-        df_importance['rfe'] = df_importance['rfe'].apply(lambda x: len(X.columns) - x + 1)
+        func = lambda x: len(X.columns) - x + 1
+        df_importance['rfe'] = df_importance['rfe'].apply(func)
         # print("Resultados rfe dsp convertir: \n", df_importance)
 
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['rfe'], y=df_importance.index)
 
         return df_importance
 
-    def lasso_selection(self, X, y, k:int = 5, graf=False):
+    def lasso_selection(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun lasso.
 
@@ -215,7 +226,7 @@ class FeatureSelection():
         # Convierto coeficiente en importancia (a mayor coef en valor abs, mas importancia)
         df_importance['lasso'] = df_importance['lasso'].apply(lambda x: abs(x))  # x es coef
 
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['lasso'], y=df_importance.index)
 
         return df_importance
@@ -268,7 +279,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: bool = True):
+def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: bool = False):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -281,36 +292,24 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     """
     print('\n Feature Selection...')
     # Definicion de variables
-    fs = FeatureSelection()
+    fs = FeatureSelection(graficar_cada_metodo=False)
     k = 10
-    graficar_cada_metodo = False
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
 
-    # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
-    print("\tReemplazo y remuevo NaN values (uso ML y no puede tener input NaN)... ", end="")
-
-    ## Determino las columns con mucho NaN (mas de nan_threshold%)
-    l_columns_con_poco_nan, l_columns_con_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=75, _print=False)
-
-    ## Elimino registros NaN en las columns con bajo % de NaN (para poder usarlas en X_train)
-    X = X.dropna(subset=l_columns_con_poco_nan)
-    X = clean_data.delete_columns_nan(X, porc_nan_max=0.99)  # Elimino columnas que quedan nan tras el dropna anterior. Esto evita error al rellenar una columna vacia.
-    l_columnas_to_fill = X.drop(l_columns_con_poco_nan, axis=1).columns
-    
-    ## Relleno filas
-    X = clean_data.fill_nan_values(X, l_columnas_to_fill, fill_type='mode')  
+    # Trato NaN values para evitar input=NaN puesto que uso algoritmos de ML para seleccionar variables mas importanetes
+    X = clean_data.drop_and_fill_nan_values(X, n_reg_min=int(0.2*len(X)), percentil_nan=75)
     y = y[y.index.isin(X.index)]
-    print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
+    print(np.any(np.isinf(X))) # Tiene que dar False
 
     # Detemino importancia de cada variable para cada modelo
     print("\t Calculando importancias de variables segun varios modelos...")
     df_importance = pd.DataFrame(index=X.columns)
-    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
-    df_importance = df_importance.merge(fs.via(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.random_forest(X, y, k=k, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.rfe(X, y, k=k, graf=graficar_cada_metodo), left_index=True, right_index=True)
+    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
+    df_importance = df_importance.merge(fs.via(X, y), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.random_forest(X, y, k=k), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.rfe(X, y, k=k), left_index=True, right_index=True)
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)
