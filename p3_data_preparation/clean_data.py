@@ -167,7 +167,7 @@ def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funcio
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
-def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = False):
+def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = False):
     """
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
@@ -191,7 +191,7 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_
             print("Columnas restantes en df", df.shape[1])
 
         # Vuelvo a verificar si quedan filas nan          
-        df = drop_columns_until_drop_nan_not_empty(df, porc_nan_max, n_reg_min=n_reg_min)
+        df = drop_columns_until_drop_na_min_rows(df, porc_nan_max, n_reg_min=n_reg_min)
 
     return df
 
@@ -255,29 +255,21 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
             warnings.warn(text)
     return X_filled
 
-def drop_and_fill_nan_values(X, n_reg_min: int = 500, percentil_nan: int = 75):
-
+def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"):
     """
     Elimino columnas con muy alto porcentaje de NaN values. Luego, elimino filas con NaN considerando solo las columnas con menos % de NaN values. 
     En las filas restantes, relleno las columnas con mucho NaN con la moda.
     """
     print("\tReemplazo y remuevo NaN values (uso ML y no puede tener input NaN)... ")
-    # Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-    X_sin_col_mucho_nan = drop_columns_until_drop_nan_not_empty(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
-    if len(X.columns) != len(X_sin_col_mucho_nan.columns):
-        l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
-        print(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para hacer la seleccion de datos. Columnas eliminadas: {l_col_eliminated}")
-        print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
-
     # Determino las columns con mucho NaN (mas de nan_threshold%)
-    l_columns_poco_nan, l_columns_mucho_nan = determine_columns_to_fill(X_sin_col_mucho_nan, percentil_nan=percentil_nan)
+    l_columns_poco_nan, l_columns_mucho_nan = determine_columns_to_fill(X, percentil_nan=percentil_nan)
 
     # Elimino registros NaN en las columns con bajo % de NaN 
-    X = X_sin_col_mucho_nan.dropna(subset=l_columns_poco_nan)  # df = clean_data.delete_rows_nan(X_sin_col_mucho_nan, porc_nan_max=0)
-    print(f"De las {len(X_sin_col_mucho_nan)} filas, se han eliminado {len(X_sin_col_mucho_nan)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
+    X = X.dropna(subset=l_columns_poco_nan)  # df = clean_data.delete_rows_nan(X_sin_col_mucho_nan, porc_nan_max=0)
+    # print(f"De las {len(X_sin_col_mucho_nan)} filas, se han eliminado {len(X_sin_col_mucho_nan)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
 
     ## Relleno filas
-    X = fill_nan_values(X, l_columns_mucho_nan, fill_type='mode')
+    X = fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_type)
     print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
     return X
 

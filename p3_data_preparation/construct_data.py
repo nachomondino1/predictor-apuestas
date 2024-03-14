@@ -74,8 +74,15 @@ def determine_number_matches_last_days(df: pd.DataFrame, n_days, _print: bool = 
     return df
 
 def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str):
+    n_col_1, n_col_2 = f'perc_{col_num}_of_{col_den}_home', f'perc_{col_num}_of_{col_den}_away'
+    
     df[f'perc_{col_num}_of_{col_den}_home'] = round(df[f'{col_num}_home'] / df[f'{col_den}_home'], 2)
     df[f'perc_{col_num}_of_{col_den}_away'] = round(df[f'{col_num}_away'] / df[f'{col_den}_away'], 2)
+
+    # Reemplazo los porcentajes mayores a uno o menores a cero por None (puesto que no pueden ser mayores a 1 o menores que 0)
+    func = lambda x: x if (x <= 1 and x >= 0) else None
+    df[n_col_1] = df[n_col_1].apply(func)
+    df[n_col_2] = df[n_col_2].apply(func)
     return df
 
 def determine_stats_columns(df: pd.DataFrame):
@@ -115,7 +122,7 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
     # Definicion de variables
     n_days = 365 * n_years
     l_equipos = df['id_team_home'].unique()
-    h2h_col_name = 'h2h_segun_loc' if segun_localia else 'h2h'
+    h2h_col_name = f'h2h_{n_years}_segun_loc' if segun_localia else f'h2h_{n_years}'
 
     # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
     df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
@@ -247,7 +254,7 @@ def calculate_dif_col_players(df: pd.DataFrame):
     :return:
     """
     # Defincion de variables
-    l_var_jug = ['mean_age', 'mean_hei', 'mean_rat', 'mean_val']
+    l_var_jug = ['mean_age', 'mean_hei', 'mean_rat', 'mean_val', 'mean_pot', 'mean_int_rep']
     l_titularidad = ['start', 'sub', 'miss']
 
     for titularidad in l_titularidad:

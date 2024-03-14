@@ -17,13 +17,17 @@ import plotly.graph_objects as go
 import numpy as np
 
 
-def delete_correlated_columns(df, var_resp, umbral):
+def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float = 0.7, _print: bool = False) -> list:
     """
-    Identificacion de las columnas con un correlacion alta (mayor al umbral)
-    :param df:
-    :param var_resp:
-    :param umbral:
-    :return: List. Columnas a eliminar por correlacion alta.
+    Identificación de las columnas con una alta correlacion.
+   
+    # Parameters
+    df: Dataframe con columnas numericas no? .(DataFrame)
+    var_resp: Nombre de la variable respuesta (String)
+    thr_corr: Correlacion umbral encima de la cual se considera que hay correlacion entre dos variables. (Float)
+   
+    # Returns
+    Columnas a eliminar por alta correlacion. (List)
     """
     print('\nEliminacion de columnas correlacionadas:')
     # Definicion de variables
@@ -31,30 +35,55 @@ def delete_correlated_columns(df, var_resp, umbral):
 
     # Calculo matriz de correlacion
     df_correlacion = df.corr().abs()
-    # df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
 
     # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
-    df_corr = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0)
+    df_corr_X = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0) # la borro del eje x e y
     df_corr_y = df_correlacion[var_resp].drop(var_resp, axis=0)
 
     # Obtener matriz triangular superior de correlacion (pues la matriz de correlacion es una matriz simetrica respecto de la diagonal)
-    df_corr_tri = df_corr.where(np.triu(np.ones(df_corr.shape), k=1).astype(bool))
+    df_corr_tri_X = df_corr_X.where(np.triu(np.ones(df_corr_X.shape), k=1).astype(bool))
+    if _print:
+        df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
+        df_corr_X.to_excel('/Users/nachomondino/Desktop/df_corr_X.xlsx')
+        df_corr_y.to_excel('/Users/nachomondino/Desktop/df_corr_y.xlsx')
+        df_corr_tri_X.to_excel('/Users/nachomondino/Desktop/df_corr_tri_X.xlsx')
 
-    # Buscar columnas con alta correlacion
-    columnas_correlacionadas = np.where(df_corr_tri > umbral)
-    for i, j in zip(*columnas_correlacionadas):
-        col1, col2 = df_corr.columns[i], df_corr.columns[j]
-        # print(f"\nColumna 1: {col1} ; Columna 2: {col2} --> Correlacion: {df_corr.loc[col1, col2]*100:.0f}%")
+    # EL OBJETIVO ES NO ELIMINAR COLUMNAS POR CORRELACION CON UNA COLUMNA QUE YA DECIDI ELIMINAR...\
+    l_cols = list(df_corr_tri_X.columns)
 
-        # Buscar correlacion de cada columna con variable objetivo
-        corr_col1, corr_col2 = df_corr_y.loc[col1], df_corr_y.loc[col2]
-        # print(f"Corr col 1: {corr_col1} ; Corr col 2: {corr_col2}")
+    # Por fila 
+    for col1, row in df_corr_tri_X.iterrows():
+        l_cols.remove(col1)  # Elimino columna 1 de l_cols para agilizar el procesamiento 
 
-        # Eliminar aquella columna con menor correlacion con la variable objetivo
-        if corr_col2 > corr_col1:
-            columnas_eliminar.add(col1)
-        else:
-            columnas_eliminar.add(col2)
+        # Si la columna 1 aun no fue eliminada por alta correlacion
+        if col1 not in columnas_eliminar:
+
+            # Por columna 
+            for col2 in l_cols:
+                
+                # Si la columna 2 aun no fue eliminada por alta correlacion
+                if col2 not in columnas_eliminar:
+
+                    corr = row[col2]
+
+                    # Si hay correlacion mayor a la umbral
+                    if corr > thr_corr:
+
+                        # Buscar correlacion de cada columna con variable objetivo
+                        corr_col1_y, corr_col2_y = df_corr_y.loc[col1], df_corr_y.loc[col2]
+            
+                        # Eliminar aquella columna con menor correlacion con la variable objetivo
+                        col_to_eliminate = col1 if corr_col2_y > corr_col1_y else col2
+                        columnas_eliminar.add(col_to_eliminate)
+                        if _print:
+                            print(f"\n Columna 1: {col1} y Columna 2: {col2} Correlacion: {corr*100:.0f}%")
+                            print(f"Busco la mayor correlacion con y: Corr col 1 e y: {corr_col1_y*100:.0f}% ; Corr col 2 e y: {corr_col2_y*100:.0f}%")
+                            print(f"Columna eliminada: {col_to_eliminate}")
+                        
+                        # Si eliminé la columna 1
+                        if col_to_eliminate == col1:
+                            # print(f"Dejo de probar si {col1} tiene correlacion con otras columnas puesto que ya fue eliminada por alta correlacion con {col2}")
+                            break
 
     return list(columnas_eliminar)
 
@@ -67,10 +96,13 @@ class FeatureSelection():
         """
         Calculo de importancia de cada variable segun los modelos estadisticos.
 
-        :param X: Dataframe con variables predictoras. (DataFrame)
-        :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
-        :return: Dataframe. Importancia por variable. (Dataframe)
+        # Parameters
+        X: Dataframe con variables predictoras. (DataFrame)
+        y: Dataframe solo con variable respuesta. (DataFrame)
+        graf: Boolean. True para graficar importancia por variable. (bool)
+
+        # Returns
+        Dataframe. Importancia por variable. (Dataframe)
         """
         # Definicion de variables
         l_features, l_scores = [], []
@@ -115,10 +147,13 @@ class FeatureSelection():
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
-        :param X: Dataframe con variables predictoras. (DataFrame)
-        :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
-        :return: Dataframe. Importancia por variable. (Dataframe)
+        # Parameters
+        X: Dataframe con variables predictoras. (DataFrame)
+        y: Dataframe solo con variable respuesta. (DataFrame)
+        graf: Boolean. True para graficar importancia por variable. (bool)
+        
+        # Returns
+        Dataframe. Importancia por variable. (Dataframe)
         """
         # Separo en train y val (para que select_best_hiperparameters() no tarde tanto)
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
@@ -142,10 +177,13 @@ class FeatureSelection():
         """
         Calculo de importancia de cada variable segun via.
 
-        :param X: Dataframe con variables predictoras. (DataFrame)
-        :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
-        :return: Dataframe. Importancia por variable. (Dataframe)
+        # Parameters
+        X: Dataframe con variables predictoras. (DataFrame)
+        y: Dataframe solo con variable respuesta. (DataFrame)
+        graf: Boolean. True para graficar importancia por variable. (bool)
+
+        # Return
+        Dataframe. Importancia por variable. (Dataframe)
         """
         # Entreno modelo
         scores, _ = f_regression(X, y)
@@ -299,9 +337,9 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     X, y = df.drop(var_resp, axis=1), df[var_resp]
 
     # Trato NaN values para evitar input=NaN puesto que uso algoritmos de ML para seleccionar variables mas importanetes
-    X = clean_data.drop_and_fill_nan_values(X, n_reg_min=int(0.2*len(X)), percentil_nan=75)
+    X = clean_data.drop_and_fill_nan_values(X, percentil_nan=75)
     y = y[y.index.isin(X.index)]
-    print(np.any(np.isinf(X))) # Tiene que dar False
+    # print(np.any(np.isinf(X))) # Tiene que dar False
 
     # Detemino importancia de cada variable para cada modelo
     print("\t Calculando importancias de variables segun varios modelos...")

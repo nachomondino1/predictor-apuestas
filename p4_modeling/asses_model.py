@@ -98,37 +98,21 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100, _
     df_roi1 = construct_stake_modified(df, stake_base, type_relation='equal')
     d['roi_stake_fijo'] = calculate_roi(df_roi1, _print=_print)
 
-    # Stake lineal 4 --> apuesto mas cuando mi modelo esta mas que un 10% seguro que la casa de apuesta (me gustaria que si esta menos seguro, que la apuesta sea 0...)
-    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=-0.1)
-    d['roi_m3_b-0.1'] = calculate_roi(df_roi5, _print=_print)
+    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=15, b=-2) # relacion m/b = -7.5
+    d['roi_m15_b-2'] = calculate_roi(df_roi5, _print=_print)
 
-    df_roi8 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=-0.3)
-    d['roi_m3_b-0.3'] = calculate_roi(df_roi8, _print=_print)
+    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=20, b=-3) # relacion m/b = -6
+    d['roi_m20_b-3'] = calculate_roi(df_roi5, _print=_print)
 
-    df_roi7 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=-0.5)
-    d['roi_m3_b-0.5'] = calculate_roi(df_roi7, _print=_print)
-
-    # Stake lineal 5 --> no tiene mucho sentido apostar cuando mi modelo esta menos seguro incluso que la casa de apuesta...
-    df_roi6 = construct_stake_modified(df, stake_base, type_relation="linear", m=3, b=+0.1)
-    d['roi_m3_b0.1'] = calculate_roi(df_roi6, _print=_print)
-
-    # Stake lineal 3 
-    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=7, b=-0.1)
-    d['roi_m7_b-0.1'] = calculate_roi(df_roi4, _print=_print)
-
-    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=7, b=-0.5)
-    d['roi_m7_b-0.5'] = calculate_roi(df_roi4, _print=_print)
-
-    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=15, b=-0.1)
-    d['roi_m15_b-0.1'] = calculate_roi(df_roi4, _print=_print)
-
-    df_roi4 = construct_stake_modified(df, stake_base, type_relation="linear",  m=15, b=-0.5)
-    d['roi_m15_b-0.5'] = calculate_roi(df_roi4, _print=_print)
-
-    # Stake exponencial  # aun tengo problema con los x1 e y1 negativos...
-    # df_roi4 = construct_stake_modified(df, stake_base, type_relation="exponential")
-    # roi4 = calculate_roi(df_roi4)
+    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=50, b=-8.33) # relacion m/b = -6
+    d['roi_m50_b-8.3'] = calculate_roi(df_roi5, _print=_print)
     
+    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=50, b=-1.66)  # relacion m/b = -30
+    d['roi_m50_b-1.66'] = calculate_roi(df_roi5, _print=_print)
+
+    df_roi5 = construct_stake_modified(df, stake_base, type_relation="linear", m=50, b=-1)  # relacion m/b = -50
+    d['roi_m50_b-1'] = calculate_roi(df_roi5, _print=_print)
+
     # Selecciono el mejor ROI
     filtered_values = [value for value in d.values() if not pd.isna(value)] # Quito ROI que puedan ser nan
     d['best_roi'] = max(filtered_values)
@@ -159,11 +143,11 @@ def calculate_dif_probas(df: pd.DataFrame, _print: bool = False):  # Mejor uso d
 
     return df
 
-def construct_stake_modified(df: pd.DataFrame, stake_base, type_relation: str = 'equal', x1: float = -1, y1: float = -1, x2: float = 1, y2: float = 1,  m: float = None, b: float = None, dif_prob_mod_bm_min: float = -0.5):
+def construct_stake_modified(df: pd.DataFrame, stake_base, type_relation: str = 'equal', x1: float = -1, y1: float = -1, x2: float = 1, y2: float = 1,  m: float = None, b: float = None):
     """
     Construye multiplier y luego se lo aplica al stake base para construir la columna "stake_mod".
     """
-    df = calculate_multiplier(df, type_relation=type_relation, x1=x1, y1=y1, x2=x2, y2=y2, m=m, b=b, dif_prob_mod_bm_min=dif_prob_mod_bm_min)
+    df = calculate_multiplier(df, type_relation=type_relation, x1=x1, y1=y1, x2=x2, y2=y2, m=m, b=b)
 
     # Por partido
     for i, row in df.iterrows():
@@ -178,7 +162,7 @@ def construct_stake_modified(df: pd.DataFrame, stake_base, type_relation: str = 
         df.loc[i, 'stake_mod'] = stake_mod
     return df
 
-def calculate_multiplier(df: pd.DataFrame, type_relation, x1, y1, x2, y2, m, b, dif_prob_mod_bm_min):
+def calculate_multiplier(df: pd.DataFrame, type_relation, x1, y1, x2, y2, m, b):
     """
     Construye columna multiplier. Cada fila tiene su multiplier segun las probabilidades del modelo y de la casa de apuesta para ese partido.
     """
@@ -194,9 +178,6 @@ def calculate_multiplier(df: pd.DataFrame, type_relation, x1, y1, x2, y2, m, b, 
             b = y1 - m*x1            
             
         df['multiplier'] = df['dif_prob_mod_bm'] * m + b
-
-        # Aplicar la condición: si 'dif_prob_mod_bm' es menor a dif_prob_mod_bm_min, asigna -1 a 'multiplier'
-        df.loc[df['dif_prob_mod_bm'] < dif_prob_mod_bm_min, 'multiplier'] = -1
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass

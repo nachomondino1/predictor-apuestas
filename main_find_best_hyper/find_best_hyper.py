@@ -22,7 +22,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
     df_iteration = pd.DataFrame()
     best_roi_max = -100
     cont_iter = 0
-    l_modelos = [RandomForestClassifier(), LogisticRegression()]  # GradientBoostingClassifier(), XGBClassifier(), MLPClassifier(), SVC()
+    l_modelos = [RandomForestClassifier(), LogisticRegression()] # SVC(), MLPClassifier(), GradientBoostingClassifier()]  # , XGBClassifier(), 
 
     # Creo directorio automaticamente
     make_directories(country)
@@ -30,21 +30,21 @@ def find_best_hiperparameters(var_resp, var_pred, country):
     # Definicion de hiperparametros
     d_params = {
         'construct': {
-            'n_dias_ult_part': [30, 45, 60],
-            'n_years_h2h': [5],
-            'segun_localia': [False, True],
+            'n_dias_ult_part': [30, 45],
+            'n_years_h2h': [3],
+            'segun_localia': [False],
         },
         'select': {
-            'thr_corr': [0.7, 0.9, None],
-            'thr_fs': [0.4, 0.3, 0.2, 0.1, None], 
+            'thr_corr': [0.7, 0.8, 0.9, None],
+            'thr_fs': [0.2, 0.1, None], 
         },
         'treat_nan': {
-            'fill_na': ['ml', 'mode', None],
+            'fill_na': [None], # 'ml', 'mode', 
         },
         'modeling': {
-            'test_val_size': [0.25],
-            'test_size': [0.5], 
-            'bal_type': ['under', None, 'over'],
+            'val_size': [0.125],
+            'test_size': [0.125], 
+            'bal_type': ['under', None], # 'over'
             'k': [10]
         }
     }
@@ -74,6 +74,9 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             df_constructed = dp.construct_data(df_integrated, n_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=False)
             df_constructed.to_excel(path, index=True)
 
+        # Etiqueto df_constructed
+        df_cons_etiquetado = dp.etiquetado(df_constructed, export=False)
+        
         # Por combinacion de parametros de select_data
         for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
@@ -87,7 +90,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             try:
                 df_sel = pd.read_excel(path, index_col=0)
             except FileNotFoundError:
-                df_sel = dp.select_data(df_constructed, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                df_sel = dp.select_data(df_cons_etiquetado, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
                 df_sel.to_excel(path, index=True)
           
             for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
@@ -96,20 +99,20 @@ def find_best_hiperparameters(var_resp, var_pred, country):
                 print(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
                 print(f"Hiper treat --> fill_na: {fill_na}")
 
-                df_sel_treated = dp.nan_values_treatment(df_sel, fill_na=fill_na, export=False)
+                df_sel_treated = dp.treat_nan_values(df_sel, fill_na=fill_na, export=False)
 
                 # Por combinacion de parametros de modeling
                 for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                     cont_iter += 1
 
                     # Asigno valor a cada hiperparametro
-                    test_val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                    val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
                     print(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
                     print(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
-                    print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> test_val_size: {test_val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                    print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
 
                     # Generar el diseño de la prueba
-                    X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, test_val_size=test_val_size, test_size=test_size, export=False)
+                    X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
 
                     # Si hay suficientes datos
                     if len(X_test) >= 100:
@@ -122,7 +125,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
                                     'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia,
                                     'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                     'fill_na': fill_na, 'bal_type': bal_type,
-                                    'test_val_size': test_val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                    'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
                                     'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
                                     'k': k}
                         row_data.update(d_best_model)
