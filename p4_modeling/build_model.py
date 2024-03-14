@@ -60,10 +60,10 @@ def select_best_hiperparameters(model, X, y, k, _print: bool = False):
         },
         'LogisticRegression': {
             'penalty': ['l1', 'l2'],  # Tipo de regularización a aplicar.
-            'C': [0.1, 1.0, 5.0],  # Podria probar un 3.0 en vez de 5  # Inverso de la fuerza de regularización.
-            'solver': ['saga', 'liblinear', 'lbfgs'], # Algoritmo a utilizar en la optimización del problema.
+            'C': [0.1, 1, 5, 10],  # Podria probar un 3.0 en vez de 5  # Inverso de la fuerza de regularización.
+            'solver': ['saga', 'liblinear'], # Algoritmo a utilizar en la optimización del problema.  # lbfgs no soporta penalty=l2
             'fit_intercept': [True, False],  # Especifica si se debe ajustar o no el intercepto.  # Mas del 75% de las veces es True
-            'max_iter': [100, 1000, 2000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
+            'max_iter': [1000],  # Podria prescindir de 1000 # Número máximo de iteraciones para la convergencia del algoritmo.
             'multi_class': ['auto'],  # Esquema de clasificación multiclase.
         },
         'SVC': {

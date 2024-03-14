@@ -773,10 +773,10 @@ def prueba():
     # Selecciono country a extraer y obtengo las competencias y su categoria
     id_country = 48
     country = 'England'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    id_competicion = 101
-    competition = 'Premier League'
+    id_competicion = 105
+    competition = 'Championship'
     is_cup = 0
-    n_seasons_max = 16
+    n_seasons_max = 20
 
     # Extraigo partidos
     df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max, export=False)
@@ -784,6 +784,7 @@ def prueba():
     # Exporto datasets
     df_match.to_excel('/Users/nachomondino/Desktop/df_match.xlsx', index=True)
     df_match_player.to_excel('/Users/nachomondino/Desktop/df_match_player.xlsx', index=True)
+    df_match_odds.to_excel('/Users/nachomondino/Desktop/df_match_odds.xlsx', index=True)
     df_teams.to_excel('/Users/nachomondino/Desktop/df_teams.xlsx', index=True)
     df_coaches.to_excel('/Users/nachomondino/Desktop/df_coaches.xlsx', index=True)
     df_player.to_excel('/Users/nachomondino/Desktop/df_player.xlsx', index=True)
