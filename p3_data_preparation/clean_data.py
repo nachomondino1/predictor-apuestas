@@ -7,11 +7,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 import warnings
-
-# Importo librerias
 import string
 import requests
 
+# 1) Preparacion de columnas string
 class TextPreparation:
     """Techniques to prepare text"""
 
@@ -112,86 +111,7 @@ def clean_teams_names(df):
     # df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
     return df
 
-def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"): 
-    """
-    Relleno NaN values en un Dataframe.
-    1) dropna teniendo en cuenta solo las columnas con menos nan + 2) imput (o fillna) solo de las columnas con mayor cant de nan  
-
-    :param X: (Dataframe)
-    :param y: (Dataframe)
-    :param fill_type: Tipo de relleno de datos como mode o ml. (String)
-    :param percentil_nan: A mayor valor, mas alto el porc_nan_max_col y, por ende, menos columnas son consideradas con mucho nan (es decir, menos relleno de datos).
-    :return: (Dataframe)
-    """
-    X_filled = X.copy()
-    
-    # Por columna a rellenar
-    for col in l_columns_to_fill:
-        # print(f"Columna a rellenar: {col}")
-
-        # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
-        if fill_type == "mode":  #     raise KeyError(key) from err --> KeyError: 0
-            X_filled[col].fillna(X[col].mode()[0], inplace=True)
-
-        # OPCION 2: Llenar los valores faltantes con ML
-        elif fill_type == "ml":
-
-            # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
-            ## Separo test de train y val puesto que test tendra los NaN values para la columna
-            X_train_val = X.loc[X[col].notnull()]  # df con columna!=nan # e.g. (2728, 11)
-            X_train_val = X_train_val.drop(columns=l_columns_to_fill) 
-            y_train_val = X.loc[X_train_val.index, col]  # y_train_val = X.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
-
-            ## Dejo en X_test los registros donde la columna es nan    
-            X_test = X.loc[X[col].isnull()]
-            X_test = X_test.drop(columns=l_columns_to_fill)  # e.g. (378, 11)
-
-            ## Separo en train y val
-            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
-
-            # Selecciono los mejores hiperparametros usando el set de validacion
-            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3)
-
-            # Entrenar el modelo con los datos de entrenamiento
-            model.fit(X_train, y_train)
-
-            # Predecir los valores faltantes
-            if len(X_test) > 0:
-                predicted_values = model.predict(X_test)
-
-                # Rellenar los valores faltantes en el dataframe
-                predicted_values_index = X_test.index
-                X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
-            else:
-                text = f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. "
-                warnings.warn(text)
-        else:
-            text = f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'."
-            warnings.warn(text)
-    return X_filled
-
-def replace_nan_with_zero(df, col1, col2):  # Esto solo para las columnas n_player_miss_home y n_player_miss_away. Si un equipo no tiene jug asusentes pero el otro si, entonces que reemplece nan por 0 (asi puedo restar home y away evitando el nan puesto que 7 - nan = nan)
-    """
-    Replace NaN values with 0 if one of the variables has an integer value and the other is NaN.
-    If both variables are NaN, do not replace any values.
-    If both variables take integer values, do not replace any values.
-
-    Parameters:
-    df (DataFrame): The pandas DataFrame containing the columns.
-    col1 (str): The name of the first column.
-    col2 (str): The name of the second column.
-
-    Returns:
-    DataFrame: The DataFrame with NaN values replaced by 0 according to the specified conditions.
-    """
-    # Replace NaN with 0 if one variable has an integer value and the other is NaN
-    condition_1 = df[col1].notnull() & df[col2].isnull()
-    condition_2 = df[col2].notnull() & df[col1].isnull()
-
-    df[col1] = np.where(condition_2, 0, df[col1])
-    df[col2] = np.where(condition_1, 0, df[col2])
-    return df
-
+# 2) Tratamiento de NaN values
 def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False):
     """
     Elimina las rows de un DataFrame que contienen un percentage alto de valores NaN.
@@ -247,7 +167,7 @@ def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funcio
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
-def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = True):
+def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = False):
     """
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
@@ -261,8 +181,6 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_
 
     # Si quedan menos registros que n_reg_min
     if len(df_drop_na) <= n_reg_min:
-        # text = "Cuidado, el dataframe podria generar error en Modeling por no quedar registros con los cuales entrenar el modelo"
-        # warnings.warn(text, UserWarning)
 
         porc_nan_max = porc_nan_max - 0.05
 
@@ -273,7 +191,108 @@ def drop_columns_until_drop_nan_not_empty(df, porc_nan_max: float = 0.95, n_reg_
             print("Columnas restantes en df", df.shape[1])
 
         # Vuelvo a verificar si quedan filas nan          
-        df = drop_columns_until_drop_nan_not_empty(df, porc_nan_max, n_reg_min=n_reg_min)
+        df = drop_columns_until_drop_na_min_rows(df, porc_nan_max, n_reg_min=n_reg_min)
+
+    return df
+
+def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"): 
+    """
+    Relleno NaN values en un Dataframe.
+    1) dropna teniendo en cuenta solo las columnas con menos nan + 2) imput (o fillna) solo de las columnas con mayor cant de nan  
+
+    :param X: (Dataframe)
+    :param y: (Dataframe)
+    :param fill_type: Tipo de relleno de datos como mode o ml. (String)
+    :param percentil_nan: A mayor valor, mas alto el porc_nan_max_col y, por ende, menos columnas son consideradas con mucho nan (es decir, menos relleno de datos).
+    :return: (Dataframe)
+    """
+    X_filled = X.copy()
+    
+    # Por columna a rellenar
+    for col in l_columns_to_fill:
+        # print(f"Columna a rellenar: {col}")
+
+        # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
+        if fill_type == "mode":  #     raise KeyError(key) from err --> KeyError: 0
+
+            mode_value = X[col].mode()[0]
+            X_filled[col] = X_filled[col].fillna(mode_value)
+
+        # OPCION 2: Llenar los valores faltantes con ML
+        elif fill_type == "ml":
+
+            # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
+            ## Separo test de train y val puesto que test tendra los NaN values para la columna
+            X_train_val = X.loc[X[col].notnull()]  # df con columna!=nan # e.g. (2728, 11)
+            X_train_val = X_train_val.drop(columns=l_columns_to_fill) 
+            y_train_val = X.loc[X_train_val.index, col]  # y_train_val = X.loc[X[col].notnull(), col]  # Solo la columna donde columna!=nan # e.g. (2728,)
+
+            ## Dejo en X_test los registros donde la columna es nan    
+            X_test = X.loc[X[col].isnull()]
+            X_test = X_test.drop(columns=l_columns_to_fill)  # e.g. (378, 11)
+
+            ## Separo en train y val
+            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
+
+            # Selecciono los mejores hiperparametros usando el set de validacion
+            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3)
+
+            # Entrenar el modelo con los datos de entrenamiento
+            model.fit(X_train, y_train)
+
+            # Predecir los valores faltantes
+            if len(X_test) > 0:
+                predicted_values = model.predict(X_test)
+
+                # Rellenar los valores faltantes en el dataframe
+                predicted_values_index = X_test.index
+                X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
+            else:
+                text = f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. "
+                warnings.warn(text)
+        else:
+            text = f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'."
+            warnings.warn(text)
+    return X_filled
+
+def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"):
+    """
+    Elimino columnas con muy alto porcentaje de NaN values. Luego, elimino filas con NaN considerando solo las columnas con menos % de NaN values. 
+    En las filas restantes, relleno las columnas con mucho NaN con la moda.
+    """
+    print("\tReemplazo y remuevo NaN values (uso ML y no puede tener input NaN)... ")
+    # Determino las columns con mucho NaN (mas de nan_threshold%)
+    l_columns_poco_nan, l_columns_mucho_nan = determine_columns_to_fill(X, percentil_nan=percentil_nan)
+
+    # Elimino registros NaN en las columns con bajo % de NaN 
+    X = X.dropna(subset=l_columns_poco_nan)  # df = clean_data.delete_rows_nan(X_sin_col_mucho_nan, porc_nan_max=0)
+    # print(f"De las {len(X_sin_col_mucho_nan)} filas, se han eliminado {len(X_sin_col_mucho_nan)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
+
+    ## Relleno filas
+    X = fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_type)
+    print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
+    return X
+
+def replace_nan_with_zero(df, col1, col2):  # Esto solo para las columnas n_player_miss_home y n_player_miss_away. Si un equipo no tiene jug asusentes pero el otro si, entonces que reemplece nan por 0 (asi puedo restar home y away evitando el nan puesto que 7 - nan = nan)
+    """
+    Replace NaN values with 0 if one of the variables has an integer value and the other is NaN.
+    If both variables are NaN, do not replace any values.
+    If both variables take integer values, do not replace any values.
+
+    Parameters:
+    df (DataFrame): The pandas DataFrame containing the columns.
+    col1 (str): The name of the first column.
+    col2 (str): The name of the second column.
+
+    Returns:
+    DataFrame: The DataFrame with NaN values replaced by 0 according to the specified conditions.
+    """
+    # Replace NaN with 0 if one variable has an integer value and the other is NaN
+    condition_1 = df[col1].notnull() & df[col2].isnull()
+    condition_2 = df[col2].notnull() & df[col1].isnull()
+
+    df[col1] = np.where(condition_2, 0, df[col1])
+    df[col2] = np.where(condition_1, 0, df[col2])
     return df
 
 def prueba():

@@ -394,12 +394,15 @@ class FlashscoreCrawler(Crawler):
         # Extraer las oddss en una lista
         l_odds_elements = super().extract_tags(xpath='.//div[@class="oddsRowContent"]//div[@class="cellWrapper"]//span[@class="oddsValueInner"]', sec_wait=self.SEC_WAIT_MAX, print_fail=True)
 
-        if len(l_odds_elements) > 0:
+        if len(l_odds_elements) > 0: 
             l_text_odds_elements = [elem.text for elem in l_odds_elements]
 
-            d_row['odds_home'] = l_text_odds_elements[0]
-            d_row['odds_draw'] = l_text_odds_elements[1]
-            d_row['odds_away'] = l_text_odds_elements[2]
+            try: # Fallo para argentina en LPG 2010/11    d_row['odds_draw'] = l_text_odds_elements[1] IndexError: list index out of range
+                d_row['odds_home'] = l_text_odds_elements[0]
+                d_row['odds_draw'] = l_text_odds_elements[1]
+                d_row['odds_away'] = l_text_odds_elements[2]
+            except IndexError:
+                pass
 
         if self._print:
             print(f"Extracting odds: {d_row}")
@@ -770,10 +773,10 @@ def prueba():
     # Selecciono country a extraer y obtengo las competencias y su categoria
     id_country = 48
     country = 'England'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    id_competicion = 101
-    competition = 'Premier League'
+    id_competicion = 105
+    competition = 'Championship'
     is_cup = 0
-    n_seasons_max = 16
+    n_seasons_max = 20
 
     # Extraigo partidos
     df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max, export=False)
@@ -781,6 +784,7 @@ def prueba():
     # Exporto datasets
     df_match.to_excel('/Users/nachomondino/Desktop/df_match.xlsx', index=True)
     df_match_player.to_excel('/Users/nachomondino/Desktop/df_match_player.xlsx', index=True)
+    df_match_odds.to_excel('/Users/nachomondino/Desktop/df_match_odds.xlsx', index=True)
     df_teams.to_excel('/Users/nachomondino/Desktop/df_teams.xlsx', index=True)
     df_coaches.to_excel('/Users/nachomondino/Desktop/df_coaches.xlsx', index=True)
     df_player.to_excel('/Users/nachomondino/Desktop/df_player.xlsx', index=True)

@@ -84,7 +84,8 @@ class SofifaCrawler(Crawler):
         url_team = super().extract_tag(tag_inicial=tag, xpath='.//td/a[starts-with(@href, "/team/")]', attribute='href')
         d_data['value'] = super().extract_tag(tag_inicial=tag, xpath='.//td[@data-col="vl"]', text=True)
         d_data['wage'] = super().extract_tag(tag_inicial=tag, xpath='.//td[@data-col="wg"]', text=True)
-
+        int_reputation_str = super().extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ir"]', text=True)
+        d_data['int_reputation'] = int(int_reputation_str.strip()) if int_reputation_str.strip().isdigit() else int_reputation_str
         d_data['id_team'] = extract_id_from_url_team(url_team)
         return d_data
     
@@ -145,9 +146,10 @@ def extract_players(id_country, country, id_competition, league, export=True):
     df_player, df_player_fifa = pd.DataFrame(), pd.DataFrame()
     # path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver" # path_driver_exe = "./p2_data_understanding/collect_initial_data/chromedriver"
     crawler = SofifaCrawler(headless=False)  # Usar False (con True no funciona)
+    league_form = league.lower().replace(" ", "-")
 
     # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados (age, height, or, pot, valor_merc, etc)
-    url_pagina = 'https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg'
+    url_pagina = 'https://sofifa.com/players?&showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg&showCol%5B%5D=ir' # 'https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg'
     crawler.driver.get(url_pagina)
 
     # Filtro listado de players segun la league del country que busco
@@ -205,11 +207,9 @@ def extract_players(id_country, country, id_competition, league, export=True):
                     d_row_player_temp['date'] = date_str
                     d_row_player_temp['id_country'] = id_country
                     d_row_player_temp['id_competition'] = id_competition
-                    # print(d_row_player_temp)
 
                     # Guardo los datos del jugador para dicho año
-                    df_player_fifa = pd.concat([df_player_fifa, pd.DataFrame(d_row_player_temp, index=[0])])
-
+                    df_player_fifa = pd.concat([df_player_fifa, pd.DataFrame(d_row_player_temp, index=[len(df_player_fifa)])])
                     progress_bar.update(1)
 
                 progress_bar.close()
@@ -218,23 +218,25 @@ def extract_players(id_country, country, id_competition, league, export=True):
 
         # Exporto datos del fifa (Por seguridad)
         if export:
-            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_sofifa/{fifa}_{league}.xlsx', index=True)
-            df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league}.xlsx', index=False)
+            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_sofifa/{fifa}_{league_form}.xlsx', index=True)
+            df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league_form}.xlsx', index=False)
 
     # Exporto dataset final
     if export:
-        df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_sofifa/{league}.xlsx', index=True)
-        df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_fifa_sofifa/{league}.xlsx', index=False)
+        df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_sofifa/{league_form}.xlsx', index=True)
+        df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_fifa_sofifa/{league_form}.xlsx', index=False)
 
     # Cierro webdriver
     crawler.driver.close()
     return df_player, df_player_fifa
 
 def extract_teams(id_country, country, league):
-    # DEFINCION DE PARAMETROS & VARIABLES   
+    """
+    Extraccion de equipos de la liga de un pais.
+    """
+    # Definicion de variables
     df_teams = pd.DataFrame()
-    path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver" # path_driver_exe = "./p2_data_understanding/collect_initial_data/chromedriver"
-    crawler = SofifaCrawler(headless=False, path=path_driver_exe)  # Usar False (con True no funciona)
+    crawler = SofifaCrawler(headless=False)  # Usar False (con True no funciona)
 
     # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados (age, height, or, pot, valor_merc, etc)
     url_pagina = "https://sofifa.com/teams"
@@ -292,18 +294,17 @@ def extract_all_teams():
     df_teams_concat = pd.DataFrame()
 
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx', index_col=0)
-    # print(df_countries.head(1))
     df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx', index_col="id_competition")
     # print(df_comp.head(1))
-    l_id_countries = [48]  # l_countries = df_comp['id_country'].unique()
+    l_id_countries = [6]  # l_countries = df_comp['id_country'].unique()
 
     # Por pais  
     for id_country in l_id_countries:
 
         # Obtengo ligas del pais
         country = df_countries[df_countries.index == id_country]['country_name'].values[0]
-        print(country)
         l_leagues = df_comp[(df_comp['id_country']==id_country) & (df_comp['is_cup']==0)]['competition_sofifa'].values
+        print(country)
         print(l_leagues)
 
         # Por competencia
@@ -312,26 +313,27 @@ def extract_all_teams():
         
             # Obtengo equipos del pais
             df_teams = extract_teams(id_country, country, league)
-            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}.xlsx', index=True)
+            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{league}.xlsx', index=True)
 
             # Guardo datos 
             df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
             print(df_teams_concat.shape)
     
-    df_teams_concat.to_excel('/Users/nachomondino/Desktop/prueba_prueba.xlsx', index=True)
+    df_teams_concat.to_excel('/Users/nachomondino/Desktop/df_teams_prueba.xlsx', index=True)
 
 def prueba():
     # Seleccionar pais  
-    id_country = 48
-    id_competition = 101
-    country = "England"
-    liga = "Championship"
+    id_country = 48 # 6
+    id_competition = 101 # 106
+    country = "England" # 'England'
+    liga = 'Championship' # "Liga Profesional de Fútbol" #'Championship'
+    # l_leagues = ['Premier League', 'Championship']
 
+    # for liga in l_leagues:
     df_player, df_player_fifa = extract_players(id_country, country, id_competition, liga, export=True)
-    df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=True)
-    df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}.xlsx', index=True)
-   
-   
+    df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}_{liga}.xlsx', index=True)
+    df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}_{liga}.xlsx', index=False)
+    
     # extract_all_teams()
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

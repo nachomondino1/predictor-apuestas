@@ -109,41 +109,10 @@ def convert_columns_to_int(df, df_etiquetas=None):
     para la conversión en lugar de ajustar un nuevo LabelEncoder.(DataFrame, opcional)
     :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
     """
-    # Definicion de variables
-    le = LabelEncoder()
+    df_encoder = create_encoder(df) if df_etiquetas is None else df_etiquetas
 
-    # Obtener columnas de tipo objeto
-    l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
-    print(f"Columnas str a convertir a int: {list(l_columnas_a_codificar)}")
-
-    # Codifico variables string en numericas
-    if df_etiquetas is None:
-        df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
-
-        # Por variable string
-        for col in l_columnas_a_codificar:
-
-            # Quito NaN de la columna para evitar codificar el valor NaN
-            df_sin_na = df.dropna(subset=[col])
-
-            # Convierto columna a int  --> WARNING: Try using .loc[row_indexer,col_indexer] = value instead
-            df_sin_na[col] = le.fit_transform(df_sin_na[col].astype(str)) # agregue el "as_type(str)" porque tiraba error sino desde que uso vsc en vez Pycharm
-
-            # Reemplazar los valores de la columna en los índices sin Nan
-            df.loc[df_sin_na.index, col] = df_sin_na[col]
-            df[col] = df[col].astype("float64")  # Convertir el dtype a int64
-
-            # Guardo etiquetas
-            l_valor_str = le.classes_
-            l_valor_int = le.transform(l_valor_str)
-
-            # Guardo string y su equivalente numerico
-            df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': l_valor_str, 'int_value': l_valor_int})
-            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
-            # print(df_etiquetas)
-            
-    # Por fila
-    for i, row in df_etiquetas.iterrows():
+    # Por valor etiquetado
+    for i, row in df_encoder.iterrows():
 
         # Obtener el nombre de la columna a la que se le realizará el reemplazo
         nombre_columna = row['variable']
@@ -153,9 +122,64 @@ def convert_columns_to_int(df, df_etiquetas=None):
             df.loc[:, nombre_columna] = df[nombre_columna].replace(row['str_value'], row['int_value'])
         except:  # id_coach_home no siempre esta en df_match_next
             pass
-        
-    return df, df_etiquetas
+    
+    return df, df_encoder if df_etiquetas is None else df
 
+def create_encoder(df):
+    """
+    Creacion de df_etiquetas
+    """
+    # Definicion de variables
+    df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
+    le = LabelEncoder()
+    l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
+    print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
+
+    # Columnas a codificar juntas
+    l_variables_a_cod_juntas = [['id_team_home', 'id_team_away'], ['id_coach_home', 'id_coach_away']] # Lista de columnas a codificar juntas
+    for columnas_a_codificar in l_variables_a_cod_juntas:
+        
+        # Obtengo valores a codificar evitando "NaN"
+        df_sin_na = df.dropna(subset=columnas_a_codificar)
+        valores_a_codificar = df_sin_na[columnas_a_codificar].values.flatten()
+
+        # Mapeo valor str con valor int
+        le.fit(valores_a_codificar)
+        d_mapeo = dict(zip(le.classes_, le.transform(le.classes_)))
+
+        for col in columnas_a_codificar:
+
+            # Reemplazo valor str por valor integer en DataFrame
+            df[col] = df[col].map(d_mapeo)
+
+            # Guardo string y su equivalente numerico
+            df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': list(d_mapeo.keys()), 'int_value': list(d_mapeo.values())})
+            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
+            
+            # Ya no codifico esta variable como "sola"
+            l_columnas_a_codificar.remove(col)
+
+    # Columnas a codificar solas
+    print("Columnas a codificar solas: ", l_columnas_a_codificar)
+    # Por variable string
+    for col in l_columnas_a_codificar:
+
+        # Obtengo valores a codificar evitando "NaN"
+        valores_a_codificar = df[col].dropna().unique()
+       
+        # Mapeo valor str con valor int
+        le.fit(valores_a_codificar)
+        d_mapeo = dict(zip(le.classes_, le.transform(le.classes_)))
+
+        # Reemplazo valor str por valor integer en DataFrame
+        df[col] = df[col].map(d_mapeo)
+
+        # Guardo string y su equivalente numerico
+        df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': list(d_mapeo.keys()), 'int_value': list(d_mapeo.values())})
+        df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
+
+    return df_etiquetas
+            
 def revert_columns_from_int(df, df_teams):
     """
     Convierte las variables id a string utilizando el DataFrame df_teams.
