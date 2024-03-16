@@ -75,7 +75,6 @@ class PlayerSofifa(models.Model):
    preferred_foot = models.CharField(max_length=255)
    url_player = models.URLField()
 
-
 class PlayerFifa(models.Model):
    id_player_sofifa = models.ForeignKey(PlayerSofifa, on_delete=models.PROTECT)
    age = models.IntegerField()
@@ -88,7 +87,6 @@ class PlayerFifa(models.Model):
    date = models.DateTimeField()
    id_country = models.ForeignKey(Country, on_delete=models.PROTECT)
    id_competition = models.ForeignKey(Competition, on_delete=models.PROTECT)
-
 
 class Match(models.Model):
    id_match = models.CharField(primary_key=True, max_length=100)
@@ -151,7 +149,6 @@ class Match(models.Model):
    pass_success_away = models.CharField(max_length=255)
    goal_kicks_home = models.IntegerField()
    goal_kicks_away = models.IntegerField()
-
 
 class FormationFlashscore(models.Model): # There is a maxium of 64 foreign keys in MySQL by default
  
@@ -245,7 +242,6 @@ class FormationFlashscore(models.Model): # There is a maxium of 64 foreign keys 
    id_player_miss_away_10 = models.CharField(max_length=255)  
    id_player_miss_away_11 = models.CharField(max_length=255) 
    id_player_miss_away_12 = models.CharField(max_length=255)
-
 
 class Odd(models.Model):
    id_match = models.OneToOneField(Match, on_delete=models.CASCADE, primary_key=True) # Cascade, set_null, set_default, protect
