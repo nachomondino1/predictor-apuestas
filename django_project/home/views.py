@@ -1,9 +1,11 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
 from django.db.models import (
     Q,
     F,
+    ExpressionWrapper
 )  # Q objects to create an 'OR' statament, F objects to create col1==col2
 from home.models import Predictions
 
@@ -29,7 +31,9 @@ def say_hello(request):
     queryset = Predictions.objects.select_related() --> join, the other side has 1 values
     queryset = Predictions.objects.prefetch_related() --> join, the other side has n values
     """
-    queryset = Predictions.objects.all()
+    prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
+    queryset = Predictions.objects.annotate(prob_home=prob_home)
+    # queryset = Predictions.objects.all()
     return render(
         request, "hello.html", {"name": "Caro & Nacho Co", "predictions": queryset}
     )
