@@ -40,6 +40,13 @@ class Predictions(models.Model):
    multiplier =  models.DecimalField(max_digits=4, decimal_places=2)
    stake_mod =  models.IntegerField()
 
+   def __str__(self) -> str: 
+      return self.id_team_home + " - " + self.id_team_away
+
+   class Meta:
+      ordering = ['id_team_home']
+   
+
 class TeamsSofifa(models.Model):
    id_team_sofifa = models.CharField(primary_key=True, max_length=100)
    team_name = models.CharField(max_length=255)
