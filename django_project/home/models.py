@@ -4,23 +4,23 @@ from django.db import models
 # To execute the migrations: python manage.py migrate
 # To see the SQL query behind the migration: python manage.py sqlmigrate <app_name> <sequence number of migration>
  
-class Countries(models.Model):
+class Country(models.Model):
    id_country = models.CharField(primary_key=True, max_length=100)
    country_name = models.CharField(max_length=255)
 
-class Competitions(models.Model):
-   id_country = models.ForeignKey(Countries, on_delete=models.PROTECT) # If we delete a country, the compretition is not deleted
+class Competition(models.Model):
+   id_country = models.ForeignKey(Country, on_delete=models.PROTECT) # If we delete a country, the compretition is not deleted
    id_competition = models.CharField(primary_key=True, max_length=100)
    competition_flashscore = models.CharField(max_length=255)
    competition_sofifa = models.CharField(max_length=255)
    is_cup = models.BooleanField()
 
-class TeamsFlashscore(models.Model):
+class TeamFlashscore(models.Model):
    id_team = models.CharField(primary_key=True, max_length=100)
    team_name = models.CharField(max_length=255)
    url_team = models.URLField()
 
-class Predictions(models.Model):
+class Prediction(models.Model):
    id_match = models.CharField(primary_key=True, max_length=100)
    date = models.DateTimeField()
    id_team_home = models.CharField(max_length=100) # models.ForeignKey(TeamsFlashscore, related_name='id_team_home', on_delete=models.PROTECT)
@@ -40,14 +40,14 @@ class Predictions(models.Model):
    multiplier =  models.DecimalField(max_digits=4, decimal_places=2)
    stake_mod =  models.IntegerField()
 
-   def __str__(self) -> str: 
-      return self.id_team_home + " - " + self.id_team_away
+   def __str__(self) -> str: # How we see this in the admin site
+      return f'{self.id_team_home} {self.id_team_away}'  
 
-   class Meta:
+   class Meta: # To order in alphabetical order the names in the admin site
       ordering = ['id_team_home']
    
 
-class TeamsSofifa(models.Model):
+class TeamSofifa(models.Model):
    id_team_sofifa = models.CharField(primary_key=True, max_length=100)
    team_name = models.CharField(max_length=255)
    home_stadium = models.CharField(max_length=255)
@@ -56,19 +56,19 @@ class TeamsSofifa(models.Model):
    id_rival_team_sofifa = models.CharField(max_length=255) # TODO: add unique param
    rival_team_name = models.CharField(max_length=255)
    url_team = models.URLField()
-   id_country = models.ForeignKey(Countries, on_delete=models.PROTECT)
+   id_country = models.ForeignKey(Country, on_delete=models.PROTECT)
 
-class CoachesFlashscore(models.Model):
+class CoachFlashscore(models.Model):
    id_coach = models.CharField(primary_key=True, max_length=100)
    coach_name = models.CharField(max_length=255)
    url_coach = models.URLField()
 
-class PlayersFlashscore(models.Model):
+class PlayerFlashscore(models.Model):
    id_player = models.CharField(primary_key=True, max_length=100)
    player_name = models.CharField(max_length=255)
    player_url  = models.URLField()
 
-class PlayersSofifa(models.Model):
+class PlayerSofifa(models.Model):
    id_player_sofifa = models.CharField(primary_key=True, max_length=100)
    player_name = models.CharField(max_length=255)
    height = models.IntegerField()
@@ -76,21 +76,21 @@ class PlayersSofifa(models.Model):
    url_player = models.URLField()
 
 
-class PlayersFifa(models.Model):
-   id_player_sofifa = models.ForeignKey(PlayersSofifa, on_delete=models.PROTECT)
+class PlayerFifa(models.Model):
+   id_player_sofifa = models.ForeignKey(PlayerSofifa, on_delete=models.PROTECT)
    age = models.IntegerField()
    overall_rating =  models.IntegerField()
    potential =  models.IntegerField()
    value = models.CharField(max_length=255)
    wage = models.CharField(max_length=255)
-   id_team_sofifa = models.ForeignKey(TeamsSofifa, on_delete=models.PROTECT)
+   id_team_sofifa = models.ForeignKey(TeamSofifa, on_delete=models.PROTECT)
    fifa = models.CharField(max_length=255)
    date = models.DateTimeField()
-   id_country = models.ForeignKey(Countries, on_delete=models.PROTECT)
-   id_competition = models.ForeignKey(Competitions, on_delete=models.PROTECT)
+   id_country = models.ForeignKey(Country, on_delete=models.PROTECT)
+   id_competition = models.ForeignKey(Competition, on_delete=models.PROTECT)
 
 
-class Matches(models.Model):
+class Match(models.Model):
    id_match = models.CharField(primary_key=True, max_length=100)
    date = models.DateTimeField()
    referee = models.CharField(max_length=255)
@@ -99,8 +99,8 @@ class Matches(models.Model):
    attendance = models.IntegerField()
    goals_home = models.IntegerField()
    goals_away = models.IntegerField()
-   id_team_home = models.ForeignKey(TeamsFlashscore, related_name = 'home_team', on_delete=models.PROTECT)
-   id_team_away = models.ForeignKey(TeamsFlashscore, related_name = 'away_team', on_delete=models.PROTECT)
+   id_team_home = models.ForeignKey(TeamFlashscore, related_name = 'home_team', on_delete=models.PROTECT)
+   id_team_away = models.ForeignKey(TeamFlashscore, related_name = 'away_team', on_delete=models.PROTECT)
    expected_goals_xg_home = models.DecimalField(max_digits=4, decimal_places=2)
    expected_goals_xg_away = models.DecimalField(max_digits=4, decimal_places=2)
    ball_possession_home = models.CharField(max_length=3)
@@ -135,10 +135,10 @@ class Matches(models.Model):
    dangerous_attacks_away = models.IntegerField()
    clearances_completed_home = models.IntegerField()
    clearances_completed_away = models.IntegerField()
-   id_coach_home = models.ForeignKey(CoachesFlashscore, related_name = 'home_team', on_delete=models.PROTECT)
-   id_coach_away = models.ForeignKey(CoachesFlashscore, related_name = 'away_team', on_delete=models.PROTECT)
-   id_country = models.ForeignKey(Countries, on_delete=models.PROTECT)
-   id_competition = models.ForeignKey(Competitions, on_delete=models.PROTECT)
+   id_coach_home = models.ForeignKey(CoachFlashscore, related_name = 'home_team', on_delete=models.PROTECT)
+   id_coach_away = models.ForeignKey(CoachFlashscore, related_name = 'away_team', on_delete=models.PROTECT)
+   id_country = models.ForeignKey(Country, on_delete=models.PROTECT)
+   id_competition = models.ForeignKey(Competition, on_delete=models.PROTECT)
    is_cup = models.BooleanField()
    season = models.CharField(max_length=9)
    red_cards_home = models.IntegerField()
@@ -153,33 +153,33 @@ class Matches(models.Model):
    goal_kicks_away = models.IntegerField()
 
 
-class FormationFlashscore(models.Model):
+class FormationFlashscore(models.Model): # There is a maxium of 64 foreign keys in MySQL by default
  
-   id_match = models.OneToOneField(Matches, primary_key=True, on_delete=models.CASCADE)
+   id_match = models.OneToOneField(Match, primary_key=True, on_delete=models.CASCADE)
 
-   id_player_start_home_1 = models.ForeignKey(PlayersFlashscore, related_name='start_home_1', on_delete=models.PROTECT)
-   id_player_start_home_2 = models.ForeignKey(PlayersFlashscore, related_name='start_home_2', on_delete=models.PROTECT) 
-   id_player_start_home_3 = models.ForeignKey(PlayersFlashscore, related_name='start_home_3', on_delete=models.PROTECT)
-   id_player_start_home_4 = models.ForeignKey(PlayersFlashscore, related_name='start_home_4', on_delete=models.PROTECT)
-   id_player_start_home_5 = models.ForeignKey(PlayersFlashscore, related_name='start_home_5', on_delete=models.PROTECT)
-   id_player_start_home_6 = models.ForeignKey(PlayersFlashscore, related_name='start_home_6', on_delete=models.PROTECT)
-   id_player_start_home_7 = models.ForeignKey(PlayersFlashscore, related_name='start_home_7', on_delete=models.PROTECT)
-   id_player_start_home_8 = models.ForeignKey(PlayersFlashscore, related_name='start_home_8', on_delete=models.PROTECT)  
-   id_player_start_home_9 = models.ForeignKey(PlayersFlashscore, related_name='start_home_9', on_delete=models.PROTECT)
-   id_player_start_home_10 = models.ForeignKey(PlayersFlashscore, related_name='start_home_10', on_delete=models.PROTECT)  
-   id_player_start_home_11 = models.ForeignKey(PlayersFlashscore, related_name='start_home_11', on_delete=models.PROTECT)
+   id_player_start_home_1 = models.ForeignKey(PlayerFlashscore, related_name='start_home_1', on_delete=models.PROTECT)
+   id_player_start_home_2 = models.ForeignKey(PlayerFlashscore, related_name='start_home_2', on_delete=models.PROTECT) 
+   id_player_start_home_3 = models.ForeignKey(PlayerFlashscore, related_name='start_home_3', on_delete=models.PROTECT)
+   id_player_start_home_4 = models.ForeignKey(PlayerFlashscore, related_name='start_home_4', on_delete=models.PROTECT)
+   id_player_start_home_5 = models.ForeignKey(PlayerFlashscore, related_name='start_home_5', on_delete=models.PROTECT)
+   id_player_start_home_6 = models.ForeignKey(PlayerFlashscore, related_name='start_home_6', on_delete=models.PROTECT)
+   id_player_start_home_7 = models.ForeignKey(PlayerFlashscore, related_name='start_home_7', on_delete=models.PROTECT)
+   id_player_start_home_8 = models.ForeignKey(PlayerFlashscore, related_name='start_home_8', on_delete=models.PROTECT)  
+   id_player_start_home_9 = models.ForeignKey(PlayerFlashscore, related_name='start_home_9', on_delete=models.PROTECT)
+   id_player_start_home_10 = models.ForeignKey(PlayerFlashscore, related_name='start_home_10', on_delete=models.PROTECT)  
+   id_player_start_home_11 = models.ForeignKey(PlayerFlashscore, related_name='start_home_11', on_delete=models.PROTECT)
 
-   id_player_start_away_1 = models.ForeignKey(PlayersFlashscore, related_name='start_away_1', on_delete=models.PROTECT)
-   id_player_start_away_2 = models.ForeignKey(PlayersFlashscore, related_name='start_away_2', on_delete=models.PROTECT)
-   id_player_start_away_3 = models.ForeignKey(PlayersFlashscore, related_name='start_away_3', on_delete=models.PROTECT) 
-   id_player_start_away_4 = models.ForeignKey(PlayersFlashscore, related_name='start_away_4', on_delete=models.PROTECT) 
-   id_player_start_away_5 = models.ForeignKey(PlayersFlashscore, related_name='start_away_5', on_delete=models.PROTECT)  
-   id_player_start_away_6 = models.ForeignKey(PlayersFlashscore, related_name='start_away_6', on_delete=models.PROTECT) 
-   id_player_start_away_7 = models.ForeignKey(PlayersFlashscore, related_name='start_away_7', on_delete=models.PROTECT)  
-   id_player_start_away_8 = models.ForeignKey(PlayersFlashscore, related_name='start_away_8', on_delete=models.PROTECT)  
-   id_player_start_away_9 = models.ForeignKey(PlayersFlashscore, related_name='start_away_9', on_delete=models.PROTECT) 
-   id_player_start_away_10 = models.ForeignKey(PlayersFlashscore, related_name='start_away_10', on_delete=models.PROTECT)   
-   id_player_start_away_11 = models.ForeignKey(PlayersFlashscore, related_name='start_away_11', on_delete=models.PROTECT)   
+   id_player_start_away_1 = models.ForeignKey(PlayerFlashscore, related_name='start_away_1', on_delete=models.PROTECT)
+   id_player_start_away_2 = models.ForeignKey(PlayerFlashscore, related_name='start_away_2', on_delete=models.PROTECT)
+   id_player_start_away_3 = models.ForeignKey(PlayerFlashscore, related_name='start_away_3', on_delete=models.PROTECT) 
+   id_player_start_away_4 = models.ForeignKey(PlayerFlashscore, related_name='start_away_4', on_delete=models.PROTECT) 
+   id_player_start_away_5 = models.ForeignKey(PlayerFlashscore, related_name='start_away_5', on_delete=models.PROTECT)  
+   id_player_start_away_6 = models.ForeignKey(PlayerFlashscore, related_name='start_away_6', on_delete=models.PROTECT) 
+   id_player_start_away_7 = models.ForeignKey(PlayerFlashscore, related_name='start_away_7', on_delete=models.PROTECT)  
+   id_player_start_away_8 = models.ForeignKey(PlayerFlashscore, related_name='start_away_8', on_delete=models.PROTECT)  
+   id_player_start_away_9 = models.ForeignKey(PlayerFlashscore, related_name='start_away_9', on_delete=models.PROTECT) 
+   id_player_start_away_10 = models.ForeignKey(PlayerFlashscore, related_name='start_away_10', on_delete=models.PROTECT)   
+   id_player_start_away_11 = models.ForeignKey(PlayerFlashscore, related_name='start_away_11', on_delete=models.PROTECT)   
 
    id_player_sub_home_1 = models.CharField(max_length=255)
    id_player_sub_home_2 = models.CharField(max_length=255)
@@ -247,8 +247,8 @@ class FormationFlashscore(models.Model):
    id_player_miss_away_12 = models.CharField(max_length=255)
 
 
-class Odds(models.Model):
-   id_match = models.OneToOneField(Matches, on_delete=models.CASCADE, primary_key=True) # Cascade, set_null, set_default, protect
+class Odd(models.Model):
+   id_match = models.OneToOneField(Match, on_delete=models.CASCADE, primary_key=True) # Cascade, set_null, set_default, protect
    odds_home = models.DecimalField(max_digits=5, decimal_places=2)
    odds_draw = models.DecimalField(max_digits=5, decimal_places=2)
    odds_away = models.DecimalField(max_digits=5, decimal_places=2)

@@ -7,7 +7,7 @@ from django.db.models import (
     F,
     ExpressionWrapper
 )  # Q objects to create an 'OR' statament, F objects to create col1==col2
-from home.models import Predictions
+from home.models import Prediction
 
 # A view function is a function that takes a request and returns a response.
 # It's a request handler and in some framewroks is called an action.
@@ -30,9 +30,12 @@ def say_hello(request):
 
     queryset = Predictions.objects.select_related() --> join, the other side has 1 values
     queryset = Predictions.objects.prefetch_related() --> join, the other side has n values
+
+    ExpressionWrapper --> More complex queries
+    objets = returns a manager = it's a gateway to the db
     """
     prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
-    queryset = Predictions.objects.annotate(prob_home=prob_home)
+    queryset = Prediction.objects.annotate(prob_home=prob_home)
     # queryset = Predictions.objects.all()
     return render(
         request, "hello.html", {"name": "Caro & Nacho Co", "predictions": queryset}
