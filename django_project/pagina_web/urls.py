@@ -17,6 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+# Customize admin appearance
+admin.site.site_header = 'Predictor Admin'
+# admin.site.index_title = 'Admin'
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('home/', include('home.urls')), 

@@ -14,27 +14,22 @@
     }
 </style>
 
-<html>
-
 <body>
-
-</html>
-{% if name %}
-<h1>Hello {{ name }}</h1>
-{% else %}
-<h1>Hello World</h1>
-{% endif %}
-<ul>
-    {% for pred in predictions %}
-    <li><span>Date:</span> {{ pred.date }},
-        <span>Home Team:</span> {{ pred.id_team_home }},
-        <span>Away Team:</span> {{ pred.id_team_away }},
-        <span>Results: </span> {{pred.predicted_result }},
-        <span>Prob Home:</span> {{pred.prob_home_bm}},
-        <span>Prob Draw:</span> {{pred.prob_draw_bm}},
-        <span>Prob Away:</span> {{pred.prob_away_bm}}
-    </li>
-    {% endfor %}
-</ul>
-
+    {% if name %}
+    <h1>Hello {{ name }}</h1>
+    {% else %}
+    <h1>Hello World</h1>
+    {% endif %}
+    <ul>
+        {% for pred in predictions %}
+        <li><span>Date:</span> {{ pred.date }},
+            <span>Home Team:</span> {{ pred.id_team_home }},
+            <span>Away Team:</span> {{ pred.id_team_away }},
+            <span>Results: </span> {{pred.predicted_result }},
+            <span>Prob Home:</span> {{pred.prob_home_bm}},
+            <span>Prob Draw:</span> {{pred.prob_draw_bm}},
+            <span>Prob Away:</span> {{pred.prob_away_bm}}
+        </li>
+        {% endfor %}
+    </ul>
 </body>

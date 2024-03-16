@@ -1,5 +1,4 @@
-from django.shortcuts import render
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import (
@@ -7,7 +6,11 @@ from django.db.models import (
     F,
     ExpressionWrapper
 )  # Q objects to create an 'OR' statament, F objects to create col1==col2
-from home.models import Predictions
+from home.models import Prediction
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import PredictionSerializer
 
 # A view function is a function that takes a request and returns a response.
 # It's a request handler and in some framewroks is called an action.
@@ -30,10 +33,42 @@ def say_hello(request):
 
     queryset = Predictions.objects.select_related() --> join, the other side has 1 values
     queryset = Predictions.objects.prefetch_related() --> join, the other side has n values
+
+    ExpressionWrapper --> More complex queries
+    objets = returns a manager = it's a gateway to the db
     """
     prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
-    queryset = Predictions.objects.annotate(prob_home=prob_home)
+    queryset = Prediction.objects.annotate(prob_home=prob_home)
     # queryset = Predictions.objects.all()
     return render(
         request, "hello.html", {"name": "Caro & Nacho Co", "predictions": queryset}
     )
+
+@api_view() # the request will be an instance of the framework
+def prediction_list(request):
+    queryset = Prediction.objects.all()
+    serializer = PredictionSerializer(queryset, many=True)
+    return Response(serializer.data)  # return HttpResponse('ok')
+""" 
+@api_view()
+def prediction_detail(request, team_name): # id = MLiWiTUt
+    prediction = Prediction.objects.get(id_team_home__contains=team_name)
+    serializer = PredictionSerializer(prediction)
+    return Response(serializer.data)
+"""
+"""
+OPTION 1: You can write the try and except every time or use get_object_or_404
+def prediction_detail(request, id_match): # id = MLiWiTUt
+    try: 
+        prediction = Prediction.objects.get(id_match=id_match)
+        serializer = PredictionSerializer(prediction)
+        return Response(serializer.data)
+    except Prediction.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+"""
+# OPTION 2: use get_object_or_404 that has the try and except inside
+@api_view() # http://127.0.0.1:8000/home/predictions/MLiWiTUt/
+def prediction_detail(request, id_match): # id = MLiWiTUt
+    prediction = get_object_or_404(Prediction, id_match=id_match)
+    serializer = PredictionSerializer(prediction)
+    return Response(serializer.data)
