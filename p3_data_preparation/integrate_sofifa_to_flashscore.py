@@ -212,15 +212,22 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                 if len(l_age) > 0:
                     df_match.loc[id_match, f'mean_age_player_{titularidad}_{condicion}'] = sum(l_age) / len(l_age)
                     df_match.loc[id_match, f'mean_hei_player_{titularidad}_{condicion}'] = sum(l_height) / len(l_height)
-                    df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = sum(l_rating) / len(l_rating)
-                    df_match.loc[id_match, f'mean_val_player_{titularidad}_{condicion}'] = sum(l_market_value) / len(l_market_value)
-                    df_match.loc[id_match, f'mean_pot_player_{titularidad}_{condicion}'] = sum(l_potential) / len(l_potential)
                     df_match.loc[id_match, f'mean_int_rep_player_{titularidad}_{condicion}'] = sum(l_int_reputation) / len(l_int_reputation)
 
                     # Calculo nro de jugadores lesionados
                     if titularidad == 'miss':
                         df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)
                         # print("Numero de ausentes: ", len(l_rating))
+
+                        df_match.loc[id_match, f'sum_rat_player_{titularidad}_{condicion}'] = sum(l_rating)
+                        df_match.loc[id_match, f'sum_val_player_{titularidad}_{condicion}'] = sum(l_market_value)
+                        df_match.loc[id_match, f'sum_pot_player_{titularidad}_{condicion}'] = sum(l_potential)
+
+                    else:
+                        df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = sum(l_rating) / len(l_rating)
+                        df_match.loc[id_match, f'mean_val_player_{titularidad}_{condicion}'] = sum(l_market_value) / len(l_market_value)
+                        df_match.loc[id_match, f'mean_pot_player_{titularidad}_{condicion}'] = sum(l_potential) / len(l_potential)
+
 
                 progress_bar.update(1)
             progress_bar.close()

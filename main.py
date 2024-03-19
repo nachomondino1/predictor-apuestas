@@ -333,11 +333,7 @@ class DataPreparation:
         # Construyo variables: "result" y points obtenidos
         df = construct_data.determine_result(df, self.var_resp)
         df = construct_data.determine_points(df)
-    
-        # Diferencia en cantidad de ultimos partidos
         df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
-        df['dif_n_matches_last_days'] = df['n_matches_last_days_home'] - df['n_matches_last_days_away']
-        df = df.drop(['n_matches_last_days_home', 'n_matches_last_days_away'], axis=1)  
 
         # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
         # df['perc_attendance'] = df["attendance"] / df["capacity"]
@@ -345,7 +341,7 @@ class DataPreparation:
      
         # STATS
         stats_columns = construct_data.determine_stats_columns(df)
-        relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
+        relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
         print(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
 
         # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
@@ -360,8 +356,6 @@ class DataPreparation:
        
         # PLAYER
         # Construyo variables de diferencias para las variables promedio de los players
-        df = clean_data.replace_nan_with_zero(df, 'n_player_miss_home', 'n_player_miss_away')  # Funciona perfecto
-        df = construct_data.suma_rat_player_missing(df)  # Funciona perfecto
         df = construct_data.calculate_dif_col_players(df)
     
         # TEAM
