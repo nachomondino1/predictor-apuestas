@@ -66,23 +66,24 @@ def calculate_probas_bookmarker(df_match_odds): # Funciona bien. Comprobado.
     for idx, row in df_match_odds.iterrows():
 
         # Calcular probabilidades a partir de invertir las cuotas
-        prob_home = 1 / row['odds_home']
-        prob_draw = 1 / row['odds_draw']
-        prob_away = 1 / row['odds_away']
+        prob_home_with_over = 1 / row['odds_home']
+        prob_draw_with_over = 1 / row['odds_draw']
+        prob_away_with_over = 1 / row['odds_away']
 
         # Sumo las probabilidades (deberia ser >1 por el margen de ganancia de la casa de apuesta)
-        sum_prob = prob_home + prob_draw + prob_away
+        sum_prob_with_over = prob_home_with_over + prob_draw_with_over + prob_away_with_over # Si no habria overround seria 100%
+        overround = sum_prob_with_over - 1
 
         # Calculo probabilidades sin el margen
-        prob_home = prob_home / sum_prob
-        prob_draw = prob_draw / sum_prob
-        prob_away = prob_away / sum_prob
+        prob_home = prob_home_with_over / sum_prob_with_over
+        prob_draw = prob_draw_with_over / sum_prob_with_over
+        prob_away = prob_away_with_over / sum_prob_with_over
 
-        df_match_odds.loc[idx, ['prob_home_bm', 'prob_draw_bm', 'prob_away_bm']] = [prob_home, prob_draw, prob_away]
+        df_match_odds.loc[idx, ['prob_home_bm', 'prob_draw_bm', 'prob_away_bm', 'overround']] = [prob_home, prob_draw, prob_away, overround]
 
     return df_match_odds
 
-def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100, _print: bool = False):
+def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _print: bool = False):
     """
     Determine the ROI for different betting strategies.
     Cosas a agregar:
@@ -118,7 +119,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 100, _
     d['best_roi'] = max(filtered_values)
     return d
 
-def calculate_dif_probas(df: pd.DataFrame, _print: bool = False):  # Mejor uso dif_prob_mod_bm como x (en vez de dif_cuotas_mod_bm)
+def calculate_dif_probas(df: pd.DataFrame, _print: bool = False):
     """
     Calcula las probabilidades de cada resultado (Home, Draw y Away) segun la casa de apuesta
     """
@@ -129,8 +130,8 @@ def calculate_dif_probas(df: pd.DataFrame, _print: bool = False):  # Mejor uso d
         prob_max = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
 
         # Obtengo probabilidad de la casa de apuesta para el resultado predicho por el modelo
-        pred_mod = row['predicted_result']
-        prob_bm_in_pred_result = row['prob_home_bm'] if pred_mod == 1 else row['prob_draw_bm'] if pred_mod == 0 else row['prob_away_bm']
+        predicted_result_mod = row['predicted_result']
+        prob_bm_in_pred_result = row['prob_home_bm'] if predicted_result_mod == 1 else row['prob_draw_bm'] if predicted_result_mod == 0 else row['prob_away_bm']
      
         # Calculo diferencia de probabilidad entre mi modelo y bm para el predicted_result 
         dif_prob_mod_bm = prob_max - prob_bm_in_pred_result

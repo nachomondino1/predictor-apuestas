@@ -4,7 +4,8 @@ from sklearn.preprocessing import LabelEncoder
 import datetime
 import warnings
 
-def convert_posesion_to_int(df):
+# main.py
+def convert_ball_possession_to_int(df):
     """
     Transformo posesion de string a float
     :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
@@ -23,7 +24,7 @@ def convert_posesion_to_int(df):
     
     return df
 
-def convert_value_to_int(df):
+def convert_market_value_to_int(df):
     """
     Transforma el valor de mercado de string a float.
 
@@ -55,7 +56,7 @@ def convert_value_to_int(df):
 
     return df
 
-def convert_goles_to_int(df):
+def convert_goals_to_int(df):
     """
     Elimina las filas que hacen que goals_home y goals_away no sea integer como debe. Puede ser por NaN o por string "-".
     :param df:
@@ -100,34 +101,17 @@ def convert_capacity_to_int(df):
             print(f"Fallo la conversion de la columna {col} a float")
     return df
 
-def convert_columns_to_int(df, df_etiquetas=None):
+def convert_columns_to_int(df):
     """
     Convierte las variables string a numéricas.
 
-    :param df: DataFrame que contiene las variables a convertir. (DataFrame)
-    :param df_etiquetas: DataFrame adicional con las etiquetas originales y enteros correspondientes. Si se proporciona, se utilizará 
+    # Parameters:
+    df: DataFrame que contiene las variables a convertir. (DataFrame)
+    df_etiquetas: DataFrame adicional con las etiquetas originales y enteros correspondientes. Si se proporciona, se utilizará 
     para la conversión en lugar de ajustar un nuevo LabelEncoder.(DataFrame, opcional)
-    :return: DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
-    """
-    df_encoder = create_encoder(df) if df_etiquetas is None else df_etiquetas
 
-    # Por valor etiquetado
-    for i, row in df_encoder.iterrows():
-
-        # Obtener el nombre de la columna a la que se le realizará el reemplazo
-        nombre_columna = row['variable']
-
-        # Reemplazar valores en la columna específica
-        try:
-            df.loc[:, nombre_columna] = df[nombre_columna].replace(row['str_value'], row['int_value'])
-        except:  # id_coach_home no siempre esta en df_match_next
-            pass
-    
-    return df, df_encoder if df_etiquetas is None else df
-
-def create_encoder(df):
-    """
-    Creacion de df_etiquetas
+    # Returns:
+    DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
     """
     # Definicion de variables
     df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
@@ -135,32 +119,6 @@ def create_encoder(df):
     l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
     print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
 
-    # Columnas a codificar juntas
-    l_variables_a_cod_juntas = [['id_team_home', 'id_team_away'], ['id_coach_home', 'id_coach_away']] # Lista de columnas a codificar juntas
-    for columnas_a_codificar in l_variables_a_cod_juntas:
-        
-        # Obtengo valores a codificar evitando "NaN"
-        df_sin_na = df.dropna(subset=columnas_a_codificar)
-        valores_a_codificar = df_sin_na[columnas_a_codificar].values.flatten()
-
-        # Mapeo valor str con valor int
-        le.fit(valores_a_codificar)
-        d_mapeo = dict(zip(le.classes_, le.transform(le.classes_)))
-
-        for col in columnas_a_codificar:
-
-            # Reemplazo valor str por valor integer en DataFrame
-            df[col] = df[col].map(d_mapeo)
-
-            # Guardo string y su equivalente numerico
-            df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': list(d_mapeo.keys()), 'int_value': list(d_mapeo.values())})
-            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
-            
-            # Ya no codifico esta variable como "sola"
-            l_columnas_a_codificar.remove(col)
-
-    # Columnas a codificar solas
-    print("Columnas a codificar solas: ", l_columnas_a_codificar)
     # Por variable string
     for col in l_columnas_a_codificar:
 
@@ -178,8 +136,46 @@ def create_encoder(df):
         df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': list(d_mapeo.keys()), 'int_value': list(d_mapeo.values())})
         df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
 
-    return df_etiquetas
+    return df, df_etiquetas
+
+# main_next_matches.py
+def convert_columns_to_int_2(df, df_etiquetas):
+    """
+    Etiquetado usando un df_etiquetas ya creado. Es para main_next_matches. Tengo en cuenta posibles nuevas etiquetas y las agrego a df_etiquetas
+    """
+    # Determino columnas a codificar de string a integer
+    l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
+    print("Columnas a codificar: ", l_columnas_a_codificar)
+   
+    # Por columna a codificar
+    for columna in l_columnas_a_codificar:
+        
+        # Obtengo etiquetas de la columna
+        df_etiquetas_columna = df_etiquetas[df_etiquetas['variable']==columna]        
+        d_mapeo = dict(zip(df_etiquetas_columna['str_value'], df_etiquetas_columna['int_value']))
+        print(f"Columna: {columna}, DF etiqeutas shape columna: {df_etiquetas_columna.shape}") 
+
+        # Por partido
+        for i, row in df.iterrows():
             
+            # Si la etiqueta no existe
+            if row[columna] not in d_mapeo.keys():
+                ultimo_registro = df_etiquetas_columna.iloc[-1]
+
+                d = {'variable': columna, 'str_value': row[columna], 'int_value': ultimo_registro['int_value'] + 1}
+                df_etiquetas_new_row = pd.DataFrame(d, index=[0])
+                df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_new_row], axis=0)
+                
+                # Reemplazo valor
+                df.loc[i, columna] = ultimo_registro['int_value'] + 1
+            
+            # Si la etiqueta existe
+            else:
+                # Reemplazo valor
+                df.loc[i, columna] = d_mapeo[row[columna]]
+    
+    return df, df_etiquetas
+
 def revert_columns_from_int(df, df_teams):
     """
     Convierte las variables id a string utilizando el DataFrame df_teams.
@@ -188,25 +184,28 @@ def revert_columns_from_int(df, df_teams):
     :param df_teams: DataFrame que contiene la relacion entre ids y nombres de equipos
     :return: DataFrame con las variables teams como strings.
     """
-    for col in ['id_team_home', 'id_team_away']:
+    # Por partido
+    for id_match, row in df.iterrows():
 
-        # Por fila
-        for i, row in df.iterrows():
+        # Por equipo
+        for col in ['id_team_home', 'id_team_away']:
 
             # Busco equipo en df_teams
-            row_val = df_teams[df_teams.index == row[col]]
+            id_team = row[col] # .values[0] para argentina no se porque...
+            row_team = df_teams[df_teams.index == id_team]
 
             # Si encontró el equipo en df_teams
-            if len(row_val) > 0:
+            if len(row_team) > 0:
                 
                 # Reemplazo id por string
-                str_value = row_val['team_name'].values[0]
-                df.loc[i, col] = str_value
+                str_value = row_team['team_name'].values[0]
+                df.loc[id_match, col] = str_value
             else:
                 print(f"El valor {row[col]} no está en df_teams.")
+   
     return df
 
-
+# Prueba
 def prueba():
     # Levanto datasets
     country = 'argentina'

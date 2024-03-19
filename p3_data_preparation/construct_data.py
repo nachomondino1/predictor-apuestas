@@ -172,7 +172,7 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
 
                     # Guardo h2h
                     if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
-                        df.loc[idx, h2h_col_name] = h2h / len(df_hist_filt)
+                        df.loc[idx, h2h_col_name] = h2h
                         if _print:
                             print(f"Historial a agregar: {h2h/len(df_hist_filt)}")
 
@@ -190,46 +190,77 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
      """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
+    n_days = int(n_days*2) if segun_localia else n_days
 
-    # Por team
-    for team in df['id_team_home'].unique():
-    
-        # Obtengo los matchs que jugó el team
-        df_match_team = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
-        l_dfs = [df_match_team] if not segun_localia else [df_match_team[df_match_team['id_team_home'] == team], df_match_team[df_match_team['id_team_away'] == team]]
-        if _print:
-            print(f"Team: {team}")
-            print(f"Cantidad total de matchs del team: {df_match_team.shape[0]}")
-            print('DF_MATCH_TEAM: \n', df_match_team.loc[:, ['date', 'id_team_home', 'id_team_away', variable]].head(5))
-        
-        for df_match_team_2 in l_dfs:
-            if _print and segun_localia:
-                print(f'\nDF_MATCH_TEAM_LOCALIA: {df_match_team_2.shape} \n', df_match_team_2.loc[:, ['date', 'id_team_home', 'id_team_away', variable]].head(5))
+    # Por partido
+    for id_match, row in df.iterrows():
 
-            # Por match del team
-            for id_match, row in df_match_team_2.iterrows(): # for id_match, row in df_match_team_2.iloc[:3].iterrows():
+        # Selecciono los ultimos partidos
+        limit_date = row['date'] - timedelta(days=n_days)
+        df_last_matches = df.loc[(df['date'] >= limit_date) & (df['date'] < row['date'])]
 
-                home_or_away = 'home' if row['id_team_home'] == team else 'away'
-                limit_date = row['date'] - timedelta(days=n_days)
+        # Por equipo
+        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
 
-                # Selecciono los ultimos matchs del team
-                df_match_team_filt = df_match_team_2.loc[(df_match_team_2['date'] >= limit_date) & (df_match_team_2['date'] < row['date'])]
+        # Por equipo
+        for col_team, home_or_away in d_teams.items():
 
-                # Necesito la posesion segun si fue home o away en cada uno de esos matchs...
-                s_valores_home = df_match_team_filt.loc[df_match_team_filt['id_team_home'] == team, variable]
-                s_valores_away = df_match_team_filt.loc[df_match_team_filt['id_team_away'] == team, variable] * -1  # -1 puesto que valores positivos en dif_variable es para el home y valores negativos es favor del away
-                s_valores = pd.concat([s_valores_home, s_valores_away], ignore_index=True)
+            variable_form = f'{variable}_{home_or_away}'
+            other = 'away' if home_or_away == 'home' else 'home'
+            team = row[col_team]
+
+            # Si es por localia
+            if segun_localia: # --> Verificar que calcula bien... lo hice estando cansado...
+                
+                # Busco promedio en ultimos partidos
+                df_matches_team = df_last_matches[df_last_matches[col_team] == team]
+  
+                # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                values_team = df_matches_team[f'{variable}_{home_or_away}'].values
+                values_against_team = df_matches_team[f'{variable}_{other}'].values
+
+                # Remover los valores NaN
+                values_team_clean = values_team[~np.isnan(values_team)]
+                values_against_team_clean = values_against_team[~np.isnan(values_against_team)]
+
+                # Calcular el número total de partidos
+                total_partidos = len(values_team_clean)
+                suma = np.sum(values_team_clean)
+                suma_against = np.sum(values_against_team_clean)
+            
+            # Si no es por localia
+            else:
+                # Busco promedio en ultimos partidos
+                df_matches_home_team = df_last_matches[df_last_matches['id_team_home'] == team]
+                df_matches_away_team = df_last_matches[df_last_matches['id_team_away'] == team]
                 if _print:
-                    print(f"\nMatch Nº: {id_match}")
-                    print(f"Cantidad de partidos en ultimos {n_days} dias: {df_match_team_filt.shape[0]}")
-                    print(f"Estadistica {variable} en dichos partidos: {s_valores.values}")
+                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_home']].head(5))
+                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_away']].head(5))
 
-                if len(s_valores) > 0:
-                    value = s_valores.mean() if tipo == "mean" else (s_valores.sum() if tipo == "sum" else None)
-                    df.loc[id_match, f'{tipo}_last_match_{variable}_{home_or_away}'] = value
-                    # df.loc[id_match, f'{tipo}_last_match_{variable}_{home_or_away}_pond'] = value / len(s_valores)
-                    if _print:
-                        print(f"Valor a agregar: {value} y {value / len(s_valores)} \n")
+                # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                values_home = df_matches_home_team[f'{variable}_home'].values
+                values_away = df_matches_away_team[f'{variable}_away'].values
+                values_against_home = df_matches_home_team[f'{variable}_away'].values
+                values_against_away = df_matches_away_team[f'{variable}_home'].values
+
+                # Remover los valores NaN
+                values_home_clean = values_home[~np.isnan(values_home)]
+                values_away_clean = values_away[~np.isnan(values_away)]
+                values_against_home_clean = values_against_home[~np.isnan(values_against_home)]
+                values_against_away_clean = values_against_away[~np.isnan(values_against_away)]
+
+                # Calcular el número total de partidos
+                total_partidos = (len(values_home_clean) + len(values_away_clean))
+                suma = np.sum(values_home_clean) + np.sum(values_away_clean)
+                suma_against =  np.sum(values_against_home_clean) + np.sum(values_against_away_clean)
+
+            # Si hay al menos un valor que promediar, guardo promedio
+            if total_partidos > 1:
+                # Calcular el promedio
+                df.loc[id_match, f'mean_last_match_{variable_form}'] = suma / total_partidos
+                df.loc[id_match, f'mean_last_match_{variable_form}_against'] = suma_against / total_partidos
+                if _print:
+                    print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
 
     return df
 
@@ -245,6 +276,43 @@ def suma_rat_player_missing(df: pd.DataFrame):  # Ojo falla en calculo cuando un
   
     df['sum_rat_player_miss_home'] = df_copia['mean_rat_player_miss_home'] * df_copia['n_player_miss_home']  # Lo guardo en la misma porque sino la cago con calculate_dif_col_players()
     df['sum_rat_player_miss_away'] = df_copia['mean_rat_player_miss_away'] * df_copia['n_player_miss_away']
+    return df
+
+def calculate_dif_col_stats(df, l_stats, n_days, segun_localia):
+    """
+    Construye variables diferencia de estadisticas entre local y visitante.
+    
+    # Parameters
+    df:
+    n_days:
+    segun_localia: 
+
+    # Returns
+    ...
+    """
+    # Por estadistica del partido
+    for var in l_stats: # e.g. shots_on_goal
+        print(f"\tEstadistica a promediar: {var}", df[f"{var}_home"].dtype, df[f"{var}_away"].dtype)
+
+        # PROMEDIANDO LA ESTADISTICA Y LUEGO CALCULANDO LA DIFERENCIA       
+        # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
+        df = determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia, tipo='mean')  # mean_last_match_dif_points_home
+        df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+
+        try:
+            # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+            not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
+            df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
+            df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
+
+            # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+            not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
+            df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
+            df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
+       
+        except KeyError:
+            print(f"La variable {var} no pudo ser construida porque no se cuenta con suficientes datos...")
+
     return df
 
 def calculate_dif_col_players(df: pd.DataFrame):
@@ -271,17 +339,48 @@ def calculate_dif_col_players(df: pd.DataFrame):
                 df = df.drop([f'{var_2}_player_{titularidad}_home', f'{var_2}_player_{titularidad}_away'], axis=1)
             
             # Calculo diferencia entre home y away
-            df[f'dif_{var}_player_{titularidad}'] = df[f'{var}_player_{titularidad}_home'] - df[f'{var}_player_{titularidad}_away']
+            # Definir las columnas a restar
+            columna_home = f'{var}_player_{titularidad}_home'
+            columna_away = f'{var}_player_{titularidad}_away'
+
+            not_none_condition = (df[columna_home].notnull()) & (df[columna_away].notnull())
+            df[f'dif_{var}_player_{titularidad}'] = np.where(not_none_condition, df[columna_home] - df[columna_away], np.nan)
 
             # Elimino variables utilizadas para calcular la diferencia
-            df = df.drop([f'{var}_player_{titularidad}_home', f'{var}_player_{titularidad}_away'], axis=1)
+            df = df.drop([columna_home, columna_away], axis=1)
     
     df['dif_n_player_miss'] = df['n_player_miss_home'] - df['n_player_miss_away']
     df = df.drop(["n_player_miss_home", "n_player_miss_away"], axis=1) 
     return df
 
+def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
+    """
+    Elimina las columnas especificadas de un DataFrame.
+
+    Args:
+        df (DataFrame): El DataFrame del que se eliminarán las columnas.
+        columns_to_drop (list): Una lista de listas, donde cada sublista contiene los nombres de las columnas a eliminar.
+
+    Returns:
+        DataFrame: El DataFrame con las columnas especificadas eliminadas.
+    """
+    print("Dimensiones originales del DataFrame:", df.shape)
+    
+    # Determino cuales son las estadisticas a eliminar
+    stats_to_drop = list(set(stats_columns).difference(set(relevant_stats_columns)))
+
+    # Eliminar las columnas especificadas
+    for stat in stats_to_drop:
+
+        l_stat = [f'{stat}_home', f'{stat}_away']
+        columns_to_remove = [col for col in l_stat if col in df.columns]
+        df = df.drop(columns_to_remove, axis=1)
+
+    print("Dimensiones del DataFrame después de eliminar columnas:", df.shape)
+    return df
+
 # Main_next_matches.py
-def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int):
+def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int, segun_localia: bool):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
@@ -292,6 +391,7 @@ def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int
     """
     # Definicion de variables
     n_days = 365 * n_years
+    h2h_col_name = f'h2h_{n_years}_segun_loc' if segun_localia else f'h2h_{n_years}'
 
     # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
     df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
@@ -304,82 +404,107 @@ def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int
         limit_date = row['date'] - timedelta(days=n_days)
         h2h = 0
 
-        # Filtrar df_old con partidos de estos equipos en ultimos n años
-        filter1 = ((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | ((df['id_team_home'] == eq2) & (df['id_team_away'] == eq1))
-        filter2 = (df['date'] >= limit_date) & (df['date'] < row['date'])
-        df_filtered = df[filter1 & filter2]
+        # Determino df_historial para eq1 y eq2
+        df_historial = df[((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | (df['id_team_home'] == eq2) & (df['id_team_away'] == eq1)]
+        l_dfs = [df_historial] if not segun_localia else [df_historial[df_historial['id_team_home'] == eq1], df_historial[df_historial['id_team_home'] == eq2]]
 
-        # Por ultimos matchs
-        for idx, fila in df_filtered.iterrows():
+        for df_hist in l_dfs:
 
-            if fila['result'] == 1:
-                h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
+            # Filtrar df_old con partidos de estos equipos en ultimos n años
+            # filter1 = ((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | ((df['id_team_home'] == eq2) & (df['id_team_away'] == eq1))
+            filter2 = (df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])
+            df_hist_filt = df_hist[filter2]  # df_hist_filt = df[filter1 & filter2]
 
-            elif fila['result'] == 2:
-                h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+            # Por ultimos matchs
+            for idx, fila in df_hist_filt.iterrows():
 
-            else:
-                h2h += 0
+                if fila['result'] == 1:
+                    h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
 
-        # Guardo h2h
-        if len(df_filtered) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
-            df_new.loc[i, 'h2h'] = h2h
+                elif fila['result'] == 2:
+                    h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+
+            # Guardo h2h
+            if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
+                df_new.loc[i, h2h_col_name] = h2h
 
     return df_new
 
-def determine_mean_in_last_matches_next_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_days: int, variable: str, tipo: str = "mean"):
+def determine_mean_in_last_matches_next_matches(df_new: pd.DataFrame, df: pd.DataFrame, variable: str, tipo: str = "mean", _print: bool = False):
     """
-     Obtiene el promedio de las stats en los ultimos matchs
+    Obtiene el promedio de las stats en los ultimos matchs
 
-     :param df: DataFrame.
-     :param n_days: Integer. Numero de dias de los cuales obtener los datos.
-     :param variable: String. Nombre de la variable a promediar.
-     :param tipo: String. Tipo de cálculo a realizar ('mean' para promedio, 'sum' para suma).
-     :return: DataFrame con stats promediadas
+    # Parameters:
+    df_new: Dataframe con proximos partidos. (Dataframe)
+    df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
+    n_days: Numero de dias de los cuales obtener los datos. (Integer)
+    variable: Nombre de la variable a promediar (e.g. 'mean_rat_player_start') (String)
+    tipo: Tipo de cálculo a realizar ('mean' para promedio, 'sum' para suma). (String)
+  
+    # Returns:
+    DataFrame con stats promediadas
      """
     # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=False)  #ignore_index=True
+    df = df.sort_values(by='date', ascending=False)
+    if _print:
+        print("Dataframe con el cual construir las variables de jugadores (ordenado por fecha descendiente): \n", df.head(5))
+
+    # Creo variable en caso que no existe
+    l_columns = [f'{variable}_home', f'{variable}_away']
+    for col in l_columns:
+        if col not in df_new.columns:  # A veces la variable aun ni siquiera existe... puesto que no se tiene la formacion titular para ninguno de los proximos partidos por ejemplo...
+            df_new[col] = np.nan
+            if _print:
+                print(f"Creo columna {col} puesto que no existe en df_new")
+                print(list(df_new.columns))
 
     # Por partido nuevo
-    for idx, row in df_new.iterrows():
-        # print(f"Partido: {idx}")
+    for id_match, row in df_new.iterrows():
+        if _print:
+            print(f"\nPartido: {id_match}")
 
-        # Si no tiene un valor asignado aun (A veces ya calcule la variable correctamente al tener disponible las formaciones del partido)
-        if not pd.notna(row[variable]):
-   
-            # Obtengo id de equipos local y visitante
-            d_teams = {row['id_team_home']: 'home', row['id_team_away']: 'away'}
-            # print(f"Team home: {row['id_team_home']}, Team away: {row['id_team_away']}")
+        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
 
-            # Por equipos
-            for team, home_or_away in d_teams.items():
+        # Por equipo
+        for col_team, home_or_away in d_teams.items():
 
-                limit_date = row['date'] - timedelta(days=n_days)
+            variable_form = f'{variable}_{home_or_away}'
+            team = row[col_team]
+            if _print:
+                print(f"Equipo: {team}")
+                print("Es un valor a rellenar?: ", pd.isna(row[variable_form]))
 
-                # Filtrar df_old: solo partidos del equipo en ultimos dias
-                filter1 = (df['id_team_home'] == team) | (df['id_team_away'] == team)
-                filter2 = (df['date'] >= limit_date) & (df['date'] < row['date'])
-                df_filtered = df[filter1 & filter2]
-                # print(df_filtered)  # Presumo que puede dar siempre 0 el filter...
+            # Si el valor es nan
+            if pd.isna(row[variable_form]):
 
-                # Necesito la posesion segun si fue home o away en cada uno de esos matchs...
-                s_valores_home = df_filtered.loc[df_filtered['id_team_home'] == team, variable]
-                s_valores_away = df_filtered.loc[df_filtered['id_team_away'] == team, variable] * -1  # -1 puesto que valores positivos en dif_variable es para el home y valores negativos es favor del away
-                s_valores = pd.concat([s_valores_home, s_valores_away], ignore_index=True)
-                # print(len(s_valores))
+                # Busco promedio en ultimos partidos
+                df_matches_home_team = df[df['id_team_home'] == team]
+                df_matches_away_team = df[df['id_team_away'] == team]
+                if _print:
+                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_home']].head(5))
+                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_away']].head(5))
 
-                if len(s_valores) > 0:
-                    value = s_valores.mean() if tipo == "mean" else (s_valores.sum() if tipo == "sum" else None)
-                    df_new.loc[idx, f'{tipo}_last_match_{variable}_{home_or_away}'] = value
-            # df_new.to_excel('/Users/nachomondino/Desktop/df_new_with_mean_last_match_columns.xlsx', index=True)
+                # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                values_home = df_matches_home_team[f'{variable}_home'].values
+                values_away = df_matches_away_team[f'{variable}_away'].values
 
-            # Determinar la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-            df_new.loc[idx, variable] = df_new.loc[idx, f'mean_last_match_{variable}_home'] - df_new.loc[idx, f'mean_last_match_{variable}_away'] # (e.g. mean_last_match_dif_mean_player_start_home)
+                # Remover los valores NaN
+                values_home_clean = values_home[~np.isnan(values_home)]
+                values_away_clean = values_away[~np.isnan(values_away)]
 
-    try:
-        df_new = df_new.drop(columns=[f'mean_last_match_{variable}_home', f'mean_last_match_{variable}_away'], axis=1)
-    except:
-        pass
+                # Calcular el número total de partidos
+                total_partidos = (len(values_home_clean) + len(values_away_clean))
+
+                # Si hay al menos un valor que promediar, guardo promedio
+                if total_partidos > 1:
+                    # Calcular el promedio
+                    promedio_variable = (np.sum(values_home_clean) + np.sum(values_away_clean)) / total_partidos
+                
+                    df_new.loc[id_match, variable_form] = promedio_variable
+                    df_new.loc[id_match, 'copiado_formaciones'] = 1
+                    if _print:
+                        print(f"Valor a rellenar: {promedio_variable} en {variable_form}")
+
     return df_new
 
 # Prueba
@@ -393,6 +518,8 @@ def prueba():
 
     # Levanto dataset
     df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
+    df = df.sort_values(by='date', ascending=False)
+    df = df.head(500)
     print(df.head())
 
     start = time.time()
@@ -405,27 +532,20 @@ def prueba():
     # Variables historicas
     # df = h2h_by_date(df, n_years=n_years_h2h, segun_localia=segun_localia, _print=True)
 
-    # Por estadistica del match
-    l_stats = determine_stats_columns(df)
-    print(f"Stats a promediar en ultimos matchs: {l_stats}")
-
-    # Por estadistica del partido
-    for var in l_stats: # e.g. shots_on_goal
-        print(f"\tEstadistica a promediar: {var}", df[f"{var}_home"].dtype, df[f"{var}_away"].dtype)
-        
-        if var in ['shots_on_goal']:
+    # STATS
+    stats_columns = determine_stats_columns(df)
+    relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'expected_goals_(xg)', 'fouls', 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
+    print(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
     
-            # Determine la diferencia de la estadistica entre equipo local y visitante de cada partido
-            df[f'dif_{var}'] = df[f'{var}_home'] - df[f'{var}_away']  # (e.g. dif_goles = goles_home - goles_away)
-            df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+    # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
+    df = delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
 
-            # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-            df = determine_mean_in_last_matches(df, n_days=n_days, variable=f'dif_{var}', segun_localia=segun_localia, tipo='mean', _print=True)  # mean_last_match_dif_points_home
-            df = df.drop([f'dif_{var}'], axis=1)
+    # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
+    df = construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
+    df = construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
 
-            # Determine la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-            df[f'dif_mean_last_match_dif_{var}'] = df[f'mean_last_match_dif_{var}_home'] - df[f'mean_last_match_dif_{var}_away']  # KeyError: 'mean_last_match_dif_points_home'
-            df = df.drop(columns=[f'mean_last_match_dif_{var}_home', f'mean_last_match_dif_{var}_away'], axis=1)
+    # Determino cuales son las variables stats automaticamente
+    df = calculate_dif_col_stats(df, relevant_stats_columns, n_days, segun_localia)
 
     # Construyo variables de diferencias para las variables promedio de los players
     # df = suma_rat_player_missing(df)

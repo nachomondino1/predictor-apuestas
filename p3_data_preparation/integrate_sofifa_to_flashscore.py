@@ -172,8 +172,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                 # Busco el fifa correspondiente segun la fecha del partido
                 year_fifa = search_fecha_fifa(row_match['date'])
                 if _print:
-                    print(f' Partido Nº: {i} '.center(120, '#'))
-                    print(f"Fecha partido: {row['fecha']} --> Fifa a buscar: {year_fifa}")
+                    print(f' Partido Nº: {id_match} '.center(120, '#'))
+                    print(f"Fecha partido: {row_match['date']} --> Fifa a buscar: {year_fifa}")
 
                 # Por columna jugador en df_match_player
                 for col_player in l_col_to_preprocess:
@@ -195,7 +195,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                             id_player_sofifa = row_map['id_player_so'].values[0]
 
                             # Busco el id y la fecha en df_player (Sofifa)
-                            df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'] == id_player_sofifa) & (df_player_fifa_sofifa['fifa_year'] == year_fifa)]
+                            df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'] == id_player_sofifa)]             
+                            df_player_filt = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]              
 
                             # Guardo datos del jugador
                             if len(df_player_filt) > 0:

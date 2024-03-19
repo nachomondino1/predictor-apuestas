@@ -31,11 +31,11 @@ class DataUnderstanding:
 
     def __init__(self, id_country: int, country: str):
         self.id_country = id_country
-        self.country = country
+        self.country = country.lower()
         self.make_directories()
 
     def make_directories(self):
-        ruta_base = f'./p2_data_understanding/data/{self.country.lower()}/data_seg'
+        ruta_base = f'./p2_data_understanding/data/{self.country}/data_seg'
         l_directorios = [f'{ruta_base}/per_season/df_match/',
                          f'{ruta_base}/per_season/df_match_player/',
                          f'{ruta_base}/per_season/df_match_odds/',                    
@@ -92,13 +92,13 @@ class DataUnderstanding:
             print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
             # Extraigo partidos de Flashscore (df_match y df_match_player)
-            df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], n_seasons_max=16, export=export)
+            df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=export)
             
-            print("A", df_teams.shape, df_coaches.shape, df_player.shape)
+            # print("A", df_teams.shape, df_coaches.shape, df_player.shape)
             df_teams = df_teams[~df_teams.index.isin(df_teams_concat.index)]
             df_coaches = df_coaches[~df_coaches.index.isin(df_coaches_concat.index)]
             df_player = df_player[~df_player.index.isin(df_player_concat.index)]
-            print("B" ,df_teams.shape, df_coaches.shape, df_player.shape)
+            # print("B" ,df_teams.shape, df_coaches.shape, df_player.shape)
 
             # Guardo datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
@@ -186,9 +186,8 @@ class DataPreparation:
 
     def make_directories(self):
         l_directorios = [
-            f'./p3_data_preparation/data/{self.country.lower()}',
-            f'./p3_data_preparation/data/{self.country.lower()}/clean_data',
-            f'./p3_data_preparation/data/{self.country.lower()}/integrate_data',
+            f'./p3_data_preparation/data/{self.country}/clean_data',
+            f'./p3_data_preparation/data/{self.country}/integrate_data',
         ]
 
         for directorio in l_directorios:
@@ -214,16 +213,16 @@ class DataPreparation:
         ## Capacity & Attendance
         df_match = format_data.convert_capacity_to_int(df_match)
         ## Ball posession
-        df_match = format_data.convert_posesion_to_int(df_match)
+        df_match = format_data.convert_ball_possession_to_int(df_match)
         ## Goals
-        df_match = format_data.convert_goles_to_int(df_match)
+        df_match = format_data.convert_goals_to_int(df_match)
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
         
         # Dataframe player_fifa_sofifa
         ## Fecha
         df_player_fifa_sofifa['date'] = pd.to_datetime(df_player_fifa_sofifa['date'], format='%b %d, %Y')
         ## Market value
-        df_player_fifa_sofifa = format_data.convert_value_to_int(df_player_fifa_sofifa)
+        df_player_fifa_sofifa = format_data.convert_market_value_to_int(df_player_fifa_sofifa)
 
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
@@ -334,46 +333,31 @@ class DataPreparation:
         # Construyo variables: "result" y points obtenidos
         df = construct_data.determine_result(df, self.var_resp)
         df = construct_data.determine_points(df)
+    
         # Diferencia en cantidad de ultimos partidos
         df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
-        # df['dif_n_matches_last_days'] = df['n_matches_last_days_home'] - df['n_matches_last_days_away']
-        # df = df.drop(['n_matches_last_days_home', 'n_matches_last_days_away'], axis=1)  
+        df['dif_n_matches_last_days'] = df['n_matches_last_days_home'] - df['n_matches_last_days_away']
+        df = df.drop(['n_matches_last_days_home', 'n_matches_last_days_away'], axis=1)  
 
         # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
         # df['perc_attendance'] = df["attendance"] / df["capacity"]
         df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
      
         # STATS
-         # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
-        print(df.shape)
-        df = df.drop(['clearances_completed_home', 'clearances_completed_away', 'red_cards_home', 'red_cards_away', 'yellow_cards_home', 'yellow_cards_away', 'offsides_home', 'offsides_away', 'attacks_home', 'attacks_away', 'dangerous_attacks_home', 'dangerous_attacks_away','corner_kicks_home', 'corner_kicks_away', 'blocked_shots_home', 'blocked_shots_away', 'throw-ins_home', 'throw-ins_away', 'goalkeeper_saves_home', 'goalkeeper_saves_away', 'goal_kicks_home', 'goal_kicks_away', 'pass_success_%_home', 'pass_success_%_away', 'free_kicks_home', 'free_kicks_away', 'crosses_completed_home', 'crosses_completed_away', 'shots_off_goal_home', 'shots_off_goal_away'], axis=1)  # --> para mi meten ruido en el analisis...
-        df = df.drop(['tackles_home', 'tackles_away', 'completed_passes_home', 'completed_passes_away', 'total_passes_home', 'total_passes_away'], axis=1)
-        print(df.shape)
+        stats_columns = construct_data.determine_stats_columns(df)
+        relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
+        print(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
+
+        # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
+        df = construct_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
 
         # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
-        df = construct_data.construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
-        df = construct_data.construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
+        # df = construct_data.construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
+        # df = construct_data.construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
 
         # Determino cuales son las variables stats automaticamente
-        l_stats = construct_data.determine_stats_columns(df)
-        print(f"Stats a promediar en ultimos partidos: {l_stats}")
-
-        # Por estadistica del partido
-        for var in l_stats: # e.g. shots_on_goal
-            print(f"\tEstadistica a promediar: {var}", df[f"{var}_home"].dtype, df[f"{var}_away"].dtype)
-            
-            # Determine la diferencia de la estadistica entre equipo local y visitante de cada partido
-            df[f'dif_{var}'] = df[f'{var}_home'] - df[f'{var}_away']  # (e.g. dif_goles = goles_home - goles_away)
-            df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
-
-            # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-            df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=f'dif_{var}', segun_localia=segun_localia, tipo='mean')  # mean_last_match_dif_points_home
-            df = df.drop([f'dif_{var}'], axis=1)
-
-            # Determine la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-            df[f'dif_mean_last_match_dif_{var}'] = df[f'mean_last_match_dif_{var}_home'] - df[f'mean_last_match_dif_{var}_away']  # KeyError: 'mean_last_match_dif_points_home'
-            df = df.drop(columns=[f'mean_last_match_dif_{var}_home', f'mean_last_match_dif_{var}_away'], axis=1)
-
+        df = construct_data.calculate_dif_col_stats(df, relevant_stats_columns, n_days, segun_localia)
+       
         # PLAYER
         # Construyo variables de diferencias para las variables promedio de los players
         df = clean_data.replace_nan_with_zero(df, 'n_player_miss_home', 'n_player_miss_away')  # Funciona perfecto
@@ -531,14 +515,14 @@ class Modeling:
 
         self.var_resp = var_resp
         self.var_pred = var_pred
-        self.country = country
+        self.country = country.lower()
         self.make_directories()
 
     def make_directories(self):
 
         l_directorios = [
-            f'./p4_modeling/data/{self.country.lower()}',
-            f'./p4_modeling/data/{self.country.lower()}/generate_test_design',
+            f'./p4_modeling/data/{self.country}/generate_test_design',
+            f'./p4_modeling/data/{self.country}/modeling',
         ]
 
         for directorio in l_directorios:
@@ -752,9 +736,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'England'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'Spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, True, True
+    data_unders, data_prep, modeling = True, False, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -795,19 +779,19 @@ def main():
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         n_days, n_years_h2h, segun_localia = 30, 3, False
-        thr_corr, thr_fs = 0.7, 0.1
+        thr_corr, thr_fs = 0.9, 0.1
         fill_na = None
         df_hiper_prep = pd.DataFrame(data={'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na]}, index=[0])
         
-        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_selected.xlsx', index_col=0)
-        # print(df.head(2))
+        df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
+        print(df.head(2))
 
         # Preparo el dataset para el analisis
-        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
-        df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
-        df = dp.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
+        # df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
+        # df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
+        # df = dp.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
-        df = dp.etiquetado(df)
+        df = dp.etiquetado(df, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
         df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         
