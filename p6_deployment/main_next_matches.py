@@ -262,7 +262,7 @@ class DataPreparationNew(DataPreparation):
             df.to_excel(f'./p6_deployment/data/{self.country.lower()}/df_integrated.xlsx')
         return df
 
-    def construct_data_new(self, df_new: pd.DataFrame, df_old_int, n_days: int, n_years_h2h: int, segun_localia, export: bool = True): # actualizar df_old tiene que ser df_updated...
+    def construct_data_new(self, df_new: pd.DataFrame, df_old_int, n_days: int, n_years_h2h: int, segun_localia, export: bool = True, _print: bool = False):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -281,44 +281,25 @@ class DataPreparationNew(DataPreparation):
         # Filtro df para seleccionar ultimos x dias  ## Filtro dataset old por fecha para evitar levantar todos los datos y minimizar tiempo de computo. Solo requiero ultimos 5 part de cada team...
         fecha_limite = datetime.datetime.now() - datetime.timedelta(days=n_days)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
         df_old_int_filt = df_old_int[df_old_int['date'] >= fecha_limite]
-        print(df_old_int_filt.shape)
+        if _print:
+            print("Shape de partidos ya jugados con los cuales construir los proximos partidos: ", df_old_int_filt.shape)
 
-        # JUGADORES --> para que despues calcule bien la dif en construct_data()
-        # 3) Relleno datos no disponibles en partidos nuevos (rating formacion titular, etc) usando los partidos viejos
-        # df_new.to_excel("/Users/nachomondino/Desktop/1_df_new_copy_mean_players.xlsx")
-        df_new = copy_last_matches_mean_value(df_new, df_old_int_filt)
-        df_new.to_excel("/Users/nachomondino/Desktop/2_df_new_copy_mean_players.xlsx")
-        try:
+        # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos 
+        df_new = assign_average_to_player_variables(df_new, df_old_int_filt)
+        if 'copiado_formaciones' in df_new.columns:
             df_copiado_formaciones = df_new.loc[:, 'copiado_formaciones']
             df_copiado_formaciones.to_excel(f"./p6_deployment/data/{self.country}/df_copiado_formaciones.xlsx", index=True)
             df_new = df_new.drop('copiado_formaciones', axis=1)
-        except:
-            pass
-
+        
         # Concateno df_new y df filtrado
         df_concat = pd.concat([df_new, df_old_int_filt], axis=0)
-        # df_concat.to_excel("/Users/nachomondino/Desktop/df_concat.xlsx")  # Por que no genera valores a estadisticas??
 
         # Construyo 
         df_constructed = self.construct_data(df_concat, n_days, n_years_h2h, segun_localia=segun_localia, export=False)
-        # df_constructed.to_excel("/Users/nachomondino/Desktop/df_constructed.xlsx")  # Por que no genera valores a estadisticas??
 
-        # 4) Selecciono solo los partidos nuevos de los datos construidos 
+        # Selecciono solo los partidos nuevos de los datos construidos 
         df_new = df_constructed[df_constructed.index.isin(df_new.index)]
         df_old_filt_cons = df_constructed[~df_constructed.index.isin(df_new.index)]
-        # df_new.to_excel("/Users/nachomondino/Desktop/df_new_constructed.xlsx")
-        # df.to_excel("/Users/nachomondino/Desktop/df_constructed_sin_new_matches.xlsx")
-        
-        # Copio valores en ultimos partidos reemplazando casi todos los valores NaN  --> la sacaria dee aca pero usa df_old_filt_cons......
-        # df_new.to_excel("/Users/nachomondino/Desktop/1_df_new_copy.xlsx")
-        df_new = copy_last_matches_value(df_new, df_old_filt_cons) 
-        # df_new.to_excel("/Users/nachomondino/Desktop/2_df_new_copy.xlsx")
-        try:
-            df_copiado_2 = df_new.loc[:, 'copiado_avoid_nan']
-            df_copiado_2.to_excel(f"./p6_deployment/data/{self.country}/df_copiado_2.xlsx", index=True)
-            df_new = df_new.drop('copiado_avoid_nan', axis=1)
-        except:
-            pass
 
         # Construyo historial entre si --> Se reemplazan en construct_data() --> Como construyo h2h all time???? REemplazo los valores de construct_data creo...
         df_old_int = construct_data.determine_result(df_old_int, self.var_resp) # en el old para poder calcular historial
@@ -327,11 +308,27 @@ class DataPreparationNew(DataPreparation):
         df_new = construct_data.h2h_by_date_new_matches(df_new, df_old_int, n_years=n_years_h2h, segun_localia=True)
         df_new = construct_data.h2h_by_date_new_matches(df_new, df_old_int, n_years=n_years_h2h, segun_localia=False)
 
+        # Copio valores en ultimos partidos reemplazando casi todos los valores NaN (deberia copiar solo arbitro, referee, alguna estadistica en particular tal vez, no se..)
+        # df_new.to_excel("/Users/nachomondino/Desktop/1_df_new_copy.xlsx")
+        df_new = copy_last_matches_value(df_new, df_old_filt_cons) 
+        # df_new.to_excel("/Users/nachomondino/Desktop/2_df_new_copy.xlsx")
+        if 'copiado_avoid_nan' in df_new.columns:
+            df_copiado_2 = df_new.loc[:, 'copiado_avoid_nan']
+            df_copiado_2.to_excel(f"./p6_deployment/data/{self.country}/df_copiado_2.xlsx", index=True)
+            df_new = df_new.drop('copiado_avoid_nan', axis=1)
+
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
 
+        if _print:
+            df_concat.to_excel("/Users/nachomondino/Desktop/df_concat.xlsx")
+            df_constructed.to_excel("/Users/nachomondino/Desktop/df_constructed.xlsx")
+            df_new.to_excel("/Users/nachomondino/Desktop/df_new_constructed.xlsx")
+            self.df_old_filt_cons.to_excel("/Users/nachomondino/Desktop/df_old_filt_cons.xlsx")
+
         if export:
             df_new.to_excel(f'./p6_deployment/data/{self.country}/df_constructed.xlsx', index=True)
+
         return df_new
 
     def etiquetado_new(self, df: pd.DataFrame, export: bool = True):
@@ -405,88 +402,39 @@ class DataPreparationNew(DataPreparation):
         return df
 
 
-# Missing data
-def read_last_version_matches(country, _print: bool = False):
-    # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
-    try:
-        df_match = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_match_with_missing.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_match_player_with_missing.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_match_odds_with_missing.xlsx', index_col=0)
-        # df_player = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_player_miss.xlsx', index_col=0)
-        # df_teams = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_teams_miss.xlsx', index_col=0)
-        # df_coaches = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_coaches_miss.xlsx', index_col=0)
-        if _print:
-            print('1) Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
-            print(df_match.shape, df_match_player.shape, df_match_odds.shape)
-   
-    except:
-        df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
-        # df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index_col=0)
-        # df_teams = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams.xlsx', index_col=0)
-        # df_coaches = pd.read_excel(f'./p2_data_understanding/data/{country}/df_coaches.xlsx', index_col=0)
-
-        if _print:
-            print('2) Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
-            print(df_match.shape, df_match_player.shape, df_match_odds.shape)
-  
-    return df_match, df_match_player, df_match_odds # , df_player, df_teams, df_coaches
-
-def read_last_version_integrated(country, _print: bool = False):
-    """
-    Levanta la ultima version de los datos viejos integrados (puede que ya le haya concatenado algunos partidos missing)
-    Extriago df_integrated_missing si ya existe.
-    """
-    try:
-        df_integrated = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_preparation/df_integrated_with_missing.xlsx', index_col=0)
-        if _print:
-            print('1) Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
-            print(df_integrated.shape)
-    except:
-        df_integrated = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
-        if _print:
-            print('2) Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
-            print(df_integrated.shape)
-    return df_integrated
-            
-def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
-    """
-    Intenta convertir las columnas object a float
-    """
-    # Selecciono las columnas object
-    l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
-    
-    if _print:
-        print("\n df_integrated_missing \n")
-        df.info()
-
-    # Por columna object
-    for col in l_columnas_a_codificar:
-
-        # Intento convertirla a float
-        try:
-            df[col] = df[col].astype(float)
-            if _print:
-                print(f"Se convirtio la columna {col} a float!")
-        except:
-            pass
-    return df
-
 # Construct_data_new
+def assign_average_to_player_variables(df_new: pd.DataFrame, df: pd.DataFrame):
+    """
+    En caso que aun no se cuenta con las formaciones del partido pero se quiere predecir igual, asigno en estas variables de jugadores,
+    el valor promedio en los ultimos partidos.
+    Cuidado algunas variables de jugadores ya tiene calculado el valor y tengo que dejar ese valor. Sobretodo miss players auqnue tambein podrian serr titulares y suplentes si falta poco para el partido.
+
+    # Parameters
+    df: df_old_int los partidos ya jugados e integrado (sin construir). Ya filtrado por fecha
+   
+    # Returns
+    """
+    # Selecciono las variables que corresponden a jugadores
+    l_var_mean_player = [col for col in df.columns if re.search(r'_player_', col) and "_miss" not in col] # Al parecer funcionaria # Puesto que los missing pueden ser nulos efectivamente y estan siempre pre-partido...
+    l_var_mean_player = [re.sub(r'_(home|away)$', '', col) for col in l_var_mean_player]
+    print(f"Lista de columnas prom jug: {l_var_mean_player}")
+
+    # Por variable mean_player
+    for var in l_var_mean_player:
+        print(f"\tVariable a promediar: {var}")  # (e.g. _mean_val_player_sub_home)             
+        df_new = determine_mean_in_last_matches_next_matches(df_new, df, variable=var) # (e.g. mean_last_match_dif_mean_val_player_sub)
+
+    # df_new.to_excel("/Users/nachomondino/Desktop/2_df_new_copy_mean_players.xlsx")
+    return df_new
+
 def copy_last_matches_value(df_new: pd.DataFrame, df: pd.DataFrame):
     """
-    # En los partidos nuevos, rellena los datos no disponibles (necesarios antes de construir datos) con los datos de partidos anteriores.
-    
-    Cosas a agregar:
-    - Si los dts son nan en el partido anterior, entonces buscar en el sigueinte y asi...
+    En los partidos nuevos, rellena los datos no disponibles con los datos de partidos anteriores.
     """  
     print("Rellenando datos no disponibles...")
     # Identificar las columnas con al menos un valor NaN
     l_var_to_copy = df_new.columns[df_new.isna().any()].tolist()
-    # print("Columnas con al menos un NaN:", l_var_to_copy)
-    l_columns_sin_suffix = {re.sub(r'_(home|away)$', '', col) for col in l_var_to_copy}
-    l_var_to_copy_sin_suffix = list(l_columns_sin_suffix)
+    l_var_to_copy_sin_suffix = [re.sub(r'_(home|away)$', '', col) for col in l_var_to_copy]
     print("Columnas con al menos un NaN:", l_var_to_copy_sin_suffix)
 
     for var in l_var_to_copy_sin_suffix:
@@ -524,31 +472,6 @@ def copy_last_matches_value(df_new: pd.DataFrame, df: pd.DataFrame):
 
     return df_new
 
-def copy_last_matches_mean_value(df_new: pd.DataFrame, df: pd.DataFrame):
-    """
-    En caso que aun no se cuenta con las formaciones del partido pero se quiere predecir igual, asigno en estas variables de jugadores,
-    el valor promedio en los ultimos partidos.
-    Cuidado algunas variables de jugadores ya tiene calculado el valor y tengo que dejar ese valor. Sobretodo miss players auqnue tambein podrian serr titulares y suplentes si falta poco para el partido.
-
-    # Parameters
-    df: df_old_int los partidos ya jugados e integrado (sin construir). Ya filtrado por fecha
-   
-    # Returns
-    """
-    # Selecciono las variables que corresponden a jugadores
-    l_var_mean_player = [col for col in df.columns if re.search(r'_player_', col) and "_miss" not in col] # Al parecer funcionaria # Puesto que los missing pueden ser nulos efectivamente y estan siempre pre-partido...
-    l_var_mean_player = [re.sub(r'_(home|away)$', '', col) for col in l_var_mean_player]
-    print(f"Lista de columnas prom jug: {l_var_mean_player}")
-
-    # Por variable mean_player
-    for var in l_var_mean_player:
-
-        print(f"\tVariable a promediar: {var}")  # (e.g. _mean_val_player_sub_home)             
-
-        df_new = determine_mean_in_last_matches_next_matches(df_new, df, variable=var, tipo="mean") # (e.g. mean_last_match_dif_mean_val_player_sub)
-
-    # df_new.to_excel(f'/Users/nachomondino/Desktop/df_copy_last_matchs_mean_value.xlsx', index=False)
-    return df_new
 
 ################################################### MAIN ###################################################
 def main():
@@ -739,7 +662,75 @@ def main():
 
     end = time.time()
     print(f"Main_next_matches en {(end - start)/60:.1f} minutos")
+
+  # Missing data
+def read_last_version_matches(country, _print: bool = False):
+    # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
+    try:
+        df_match = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_match_with_missing.xlsx', index_col=0)
+        df_match_player = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_match_player_with_missing.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_match_odds_with_missing.xlsx', index_col=0)
+        # df_player = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_player_miss.xlsx', index_col=0)
+        # df_teams = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_teams_miss.xlsx', index_col=0)
+        # df_coaches = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_understanding/df_coaches_miss.xlsx', index_col=0)
+        if _print:
+            print('1) Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
+            print(df_match.shape, df_match_player.shape, df_match_odds.shape)
+   
+    except:
+        df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
+        df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
+        # df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index_col=0)
+        # df_teams = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams.xlsx', index_col=0)
+        # df_coaches = pd.read_excel(f'./p2_data_understanding/data/{country}/df_coaches.xlsx', index_col=0)
+
+        if _print:
+            print('2) Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+            print(df_match.shape, df_match_player.shape, df_match_odds.shape)
+  
+    return df_match, df_match_player, df_match_odds # , df_player, df_teams, df_coaches
+
+def read_last_version_integrated(country, _print: bool = False):
+    """
+    Levanta la ultima version de los datos viejos integrados (puede que ya le haya concatenado algunos partidos missing)
+    Extriago df_integrated_missing si ya existe.
+    """
+    try:
+        df_integrated = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_preparation/df_integrated_with_missing.xlsx', index_col=0)
+        if _print:
+            print('1) Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
+            print(df_integrated.shape)
+    except:
+        df_integrated = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
+        if _print:
+            print('2) Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+            print(df_integrated.shape)
+    return df_integrated
+            
+def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
+    """
+    Intenta convertir las columnas object a float
+    """
+    # Selecciono las columnas object
+    l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
     
+    if _print:
+        print("\n df_integrated_missing \n")
+        df.info()
+
+    # Por columna object
+    for col in l_columnas_a_codificar:
+
+        # Intento convertirla a float
+        try:
+            df[col] = df[col].astype(float)
+            if _print:
+                print(f"Se convirtio la columna {col} a float!")
+        except:
+            pass
+    return df
+  
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     main()
