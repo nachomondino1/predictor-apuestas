@@ -156,7 +156,7 @@ def calculate_dif_col_stats(df, l_stats, n_days, segun_localia):
 
         # PROMEDIANDO LA ESTADISTICA Y LUEGO CALCULANDO LA DIFERENCIA       
         # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-        df = determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia, tipo='mean')  # mean_last_match_dif_points_home
+        df = determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
         df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
 
         try:
@@ -175,7 +175,7 @@ def calculate_dif_col_stats(df, l_stats, n_days, segun_localia):
 
     return df
 
-def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, tipo: str = 'mean', _print: bool = False):
+def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, _print: bool = False):
     """
      Obtiene el promedio de las stats en los ultimos matchs
 
@@ -184,7 +184,7 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
      :param variable: String. Nombre de la variable a promediar.
      :param tipo: String. Tipo de cálculo a realizar ('mean' para promedio, 'sum' para suma).
      :return: DataFrame con stats promediadas
-     """
+    """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
     n_days = int(n_days*2) if segun_localia else n_days
@@ -213,7 +213,7 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
                 df_matches_team = df_last_matches[df_last_matches[col_team] == team]
   
                 # Obtener los valores de la variable para los partidos en casa y fuera de casa
-                values_team = df_matches_team[f'{variable}_{home_or_away}'].values
+                values_team = df_matches_team[variable_form].values
                 values_against_team = df_matches_team[f'{variable}_{other}'].values
 
                 # Remover los valores NaN
@@ -222,6 +222,7 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
 
                 # Calcular el número total de partidos
                 total_partidos = len(values_team_clean)
+                total_partidos_against = len(values_against_team_clean)
                 suma = np.sum(values_team_clean)
                 suma_against = np.sum(values_against_team_clean)
             
@@ -248,43 +249,52 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
 
                 # Calcular el número total de partidos
                 total_partidos = (len(values_home_clean) + len(values_away_clean))
+                total_partidos_against = (len(values_against_home_clean) + len(values_against_away_clean))
                 suma = np.sum(values_home_clean) + np.sum(values_away_clean)
                 suma_against =  np.sum(values_against_home_clean) + np.sum(values_against_away_clean)
 
             # Si hay al menos un valor que promediar, guardo promedio
-            if total_partidos > 1:
+            if total_partidos > 0:
                 # Calcular el promedio
                 df.loc[id_match, f'mean_last_match_{variable_form}'] = suma / total_partidos
-                df.loc[id_match, f'mean_last_match_{variable_form}_against'] = suma_against / total_partidos
                 if _print:
                     print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
+            
+            if total_partidos_against > 0:
+                df.loc[id_match, f'mean_last_match_{variable_form}_against'] = suma_against / total_partidos_against
+             
 
     return df
 
 ## Player
-def calculate_dif_col_players(df: pd.DataFrame):  # PROBAR SI FUNCIONA...
+def calculate_dif_col_players(df: pd.DataFrame):
     """
     Calcula la diferencia entre home y away
     :param df: Dataframe. Unidad de analisis: match
     :return:
     """
     # Determinar columnas players (e.g.sum_rat_player_miss)
-    pattern = r'(mean|sum|n)_player_[a-z_\(\)%]+_(home|away)' # Patrón regex para encontrar columnas relevantes
+    pattern = r'_player_[a-z_\(\)%]+_(home|away)' # Patrón regex para encontrar columnas relevantes
     relevant_columns = df.filter(regex=pattern, axis=1).columns
     l_var_sin_suffix = [re.sub(r'_(home|away)$', '', col) for col in relevant_columns]
+    print(f"Variables jugadores a calcular diferencia entre local y visitante: {l_var_sin_suffix}")
 
     for var in l_var_sin_suffix:
+        print(f"Variable: {var}")
         columna_home, columna_away = f'{var}_home', f'{var}_away'
-        if ('sum_' in var or 'n_' in var) and '_miss_' in var:
-            # Creo una copia del df para evitar sum=nan (nan*0=nan) cdo uno de los dos equipos no tiene jugadores ausentes.
-            df = replace_nan_with_zero(df, columna_home, columna_away)  # Reemplazo sum_rat_player_miss=nan por sum_rat_player_miss=0 cdo uno de los dos equipos no tiene jugadores ausentes y el otro si
 
-        # Calculo diferencia entre home y away cuando ambos equipos no tienen NaN
-        not_none_condition = (df[columna_home].notnull()) & (df[columna_away].notnull())
-        df[f'dif_{var}'] = np.where(not_none_condition, df[columna_home] - df[columna_away], np.nan)
+        if (columna_home in df.columns) and (columna_away in df.columns):
+            if (('sum_' in var) or ('n_player' in var)) and ('_miss' in var):
+                # Creo una copia del df para evitar sum=nan (nan*0=nan) cdo uno de los dos equipos no tiene jugadores ausentes.
+                print("\t Reemplazo NaN values por cero.")
+                df = replace_nan_with_zero(df, columna_home, columna_away)  # Reemplazo sum_rat_player_miss=nan por sum_rat_player_miss=0 cdo uno de los dos equipos no tiene jugadores ausentes y el otro si
 
-        # Elimino variables utilizadas para calcular la diferencia
-        df = df.drop([columna_home, columna_away], axis=1)
+            # Calculo diferencia entre home y away cuando ambos equipos no tienen NaN
+            not_none_condition = (df[columna_home].notnull()) & (df[columna_away].notnull())
+            df[f'dif_{var}'] = np.where(not_none_condition, df[columna_home] - df[columna_away], np.nan)
+
+            # Elimino variables utilizadas para calcular la diferencia
+            df = df.drop([columna_home, columna_away], axis=1)
     
     return df
 
@@ -438,10 +448,9 @@ def determine_mean_in_last_matches_next_matches(df_new: pd.DataFrame, df: pd.Dat
 
     # Por partido nuevo
     for id_match, row in df_new.iterrows():
+        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
         if _print:
             print(f"\nPartido: {id_match}")
-
-        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
 
         # Por equipo
         for col_team, home_or_away in d_teams.items():
@@ -472,16 +481,14 @@ def determine_mean_in_last_matches_next_matches(df_new: pd.DataFrame, df: pd.Dat
 
                 # Calcular el número total de partidos
                 total_partidos = (len(values_home_clean) + len(values_away_clean))
+                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
 
                 # Si hay al menos un valor que promediar, guardo promedio
-                if total_partidos > 1:
-                    # Calcular el promedio
-                    promedio_variable = (np.sum(values_home_clean) + np.sum(values_away_clean)) / total_partidos
-                
-                    df_new.loc[id_match, variable_form] = promedio_variable
+                if total_partidos > 0:
+                    df_new.loc[id_match, variable_form] = suma / total_partidos
                     df_new.loc[id_match, 'copiado_formaciones'] = 1
                     if _print:
-                        print(f"Valor a rellenar: {promedio_variable} en {variable_form}")
+                        print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
 
     return df_new
 
@@ -497,37 +504,39 @@ def prueba():
     # Levanto dataset
     df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
     df = df.sort_values(by='date', ascending=False)
-    df = df.head(500)
+    df = df.head(200)
     print(df.head())
 
     start = time.time()
     # df.info()
 
     # Construyo variables: "equipo_gandor", diferencia de goles y points obtenidos
-    # df = determine_result(df, var_resp)
-    # df = determine_points(df)
-
-    # Variables historicas
-    # df = h2h_by_date(df, n_years=n_years_h2h, segun_localia=segun_localia, _print=True)
+    df = determine_result(df, var_resp)
+    df = determine_points(df)
 
     # STATS
     stats_columns = determine_stats_columns(df)
-    relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'expected_goals_(xg)', 'fouls', 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
+    relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls']
     print(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
     
     # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
     df = delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
 
     # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
-    df = construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
-    df = construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
+    # df = construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
+    # df = construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
 
     # Determino cuales son las variables stats automaticamente
     df = calculate_dif_col_stats(df, relevant_stats_columns, n_days, segun_localia)
 
+    # PLAYER 
     # Construyo variables de diferencias para las variables promedio de los players
-    # df = suma_rat_player_missing(df)
-    # df = calculate_dif_col_players(df)
+    df = determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
+    df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
+    df = calculate_dif_col_players(df)
+
+    # TEAM
+    # df = h2h_by_date(df, n_years=n_years_h2h, segun_localia=segun_localia, _print=True)
 
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
