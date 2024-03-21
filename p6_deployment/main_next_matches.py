@@ -647,12 +647,12 @@ def main():
         df_pred_proba = pd.DataFrame({var_pred: y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df.index)
 
         # Concateno conjunto de datos
-        df_match_odds = asses_model.calculate_probas_bookmarker(df_match_odds) # Caculo probabilidades segun casa de apuesta
+        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
         df_predicciones = pd.concat([df_match_next, df_match_odds, df_pred_proba, df_copiado, df_copiado_2, df], axis=1)
         # df_predicciones = pd.concat([df_match_next, df_match_odds, df_pred_proba, df], axis=1)
 
         # Determino estrategia de inversion
-        df_predicciones = asses_model.calculate_dif_probas(df_predicciones)
+        df_predicciones = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.construct_stake_modified(df_predicciones, stake_base=1, type_relation='linear', m=15, b=-2.5)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids

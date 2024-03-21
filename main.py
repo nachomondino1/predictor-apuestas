@@ -452,14 +452,14 @@ class DataPreparation:
         Tratamiento de nan values
 
         # Parameters
-        df: Dataframe a tratar nan values. (DataFrame)
-        fill_na: Tipo de rellenado de NaN values.
-        percentil_nan: Percentil para definir que columnas son consideradas con mucho nan y cuales con poco nan. Solo cuando haces fillna.
-        export: 
-        _print:
+            df: Dataframe a tratar nan values. (DataFrame)
+            fill_na: Tipo de rellenado de NaN values.
+            percentil_nan: Percentil para definir que columnas son consideradas con mucho nan y cuales con poco nan. Solo cuando haces fillna.
+            export: 
+            _print:
 
         # Returns
-        Dataframe sin NaN values
+            Dataframe sin NaN values
         """ 
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
         # Separo en X e y
@@ -637,12 +637,14 @@ class Modeling:
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
-        :param model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
-        :param X_test: Dataframe de prueba con variables predictoras. (DataFrame)
-        :param y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, False
-        de lo contrario. (bool)
-        :return: Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
+        # Parameters:
+            model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
+            X_test: Dataframe de prueba con variables predictoras. (DataFrame)
+            y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
+            export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
+
+        # Returns:
+            Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluating trained model with test sets...")
         # Levanto df_match_odds (solo los partidos en X_test)
@@ -665,8 +667,8 @@ class Modeling:
         df_conf_mat = asses_model.confusion_matrix(y_test, y_pred)
 
         # Agrego predicciones de bookmaker
-        df_match_odds = asses_model.calculate_probas_bookmarker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-        df_match_odds = asses_model.determine_bookmaker_result(df_match_odds, self.var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
+        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
+        df_match_odds = asses_model.determine_result_by_bookmaker(df_match_odds, self.var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
         y_pred_bm = df_match_odds[self.var_pred_bm].values
 
         # Calculo precision de casa de apuesta
@@ -732,7 +734,7 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'England'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'Argentina'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
     data_unders, data_prep, modeling = False, True, False
     export = True
