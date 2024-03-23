@@ -369,7 +369,7 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
     return df
 
 # MAIN_NEXT_MATCHES.PY
-def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int, segun_localia: bool):
+def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int, segun_localia: bool): # Me gustaria juntarla con h2h de main.py
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
@@ -416,79 +416,6 @@ def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int
             # Guardo h2h
             if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
                 df_new.loc[i, h2h_col_name] = h2h
-
-    return df_new
-
-def determine_mean_in_last_matches_next_matches(df_new: pd.DataFrame, df: pd.DataFrame, variable: str, _print: bool = False):
-    """
-    Obtiene el promedio de las stats en los ultimos matchs
-
-    # Parameters:
-    df_new: Dataframe con proximos partidos. (Dataframe)
-    df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame) --> YA TIENE QUE ESTAR FILTRADO POR FECHA PARA NO USAR EL PROMEDIO DE TODOS LOS PARTIDOS SINO SOLO DE LOS ULTIMOS
-    n_days: Numero de dias de los cuales obtener los datos. (Integer)
-    variable: Nombre de la variable a promediar (e.g. 'mean_rat_player_start') (String)
-  
-    # Returns:
-    DataFrame con stats promediadas
-     """
-    # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=False)
-    if _print:
-        print("Dataframe con el cual construir las variables de jugadores (ordenado por fecha descendiente): \n", df.head(5))
-
-    # Creo variable en caso que no existe
-    l_columns = [f'{variable}_home', f'{variable}_away']
-    for col in l_columns:
-        if col not in df_new.columns:  # A veces la variable aun ni siquiera existe... puesto que no se tiene la formacion titular para ninguno de los proximos partidos por ejemplo...
-            df_new[col] = np.nan
-            if _print:
-                print(f"Creo columna {col} puesto que no existe en df_new")
-                print(list(df_new.columns))
-
-    # Por partido nuevo
-    for id_match, row in df_new.iterrows():
-        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
-        if _print:
-            print(f"\nPartido: {id_match}")
-
-        # Por equipo
-        for col_team, home_or_away in d_teams.items():
-
-            variable_form = f'{variable}_{home_or_away}'
-            team = row[col_team]
-            if _print:
-                print(f"Equipo: {team}")
-                print("Es un valor a rellenar?: ", pd.isna(row[variable_form]))
-
-            # Si el valor es nan
-            if pd.isna(row[variable_form]):
-
-                # Busco promedio en ultimos partidos
-                df_matches_home_team = df[df['id_team_home'] == team]
-                df_matches_away_team = df[df['id_team_away'] == team]
-                if _print:
-                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_home']].head(5))
-                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_away']].head(5))
-
-                # Obtener los valores de la variable para los partidos en casa y fuera de casa
-                values_home = df_matches_home_team[f'{variable}_home'].values
-                values_away = df_matches_away_team[f'{variable}_away'].values
-
-                # Remover los valores NaN
-                values_home_clean = values_home[~np.isnan(values_home)]
-                values_away_clean = values_away[~np.isnan(values_away)]
-
-                # Calcular el número total de partidos
-                total_partidos = (len(values_home_clean) + len(values_away_clean))
-                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
-
-                # Si hay al menos un valor que promediar, guardo promedio
-                if total_partidos > 0:
-                    df_new.loc[id_match, variable_form] = suma / total_partidos
-                    df_new.loc[id_match, 'copiado_formaciones'] = 1
-                    if _print:
-                        print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
 
     return df_new
 

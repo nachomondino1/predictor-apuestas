@@ -11,7 +11,6 @@ from main import DataPreparation
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_missing_data
 from p2_data_understanding import describe_data
 ## Data preparation
-from p3_data_preparation.construct_data import determine_mean_in_last_matches_next_matches
 from p3_data_preparation import format_data, select_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
@@ -292,7 +291,7 @@ class DataPreparationNew(DataPreparation):
             print("Shape de partidos ya jugados con los cuales construir los proximos partidos: ", df_old_int_filt.shape)
 
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos 
-        df_new = assign_average_to_player_variables(df_new, df_old_int_filt)
+        df_new = replace_nan_line_ups_with_mean_in_last_matches(df_new, df_old_int_filt)
         if 'copiado_formaciones' in df_new.columns:
             df_copiado_formaciones = df_new.loc[:, 'copiado_formaciones']
             df_copiado_formaciones.to_excel(f"./p6_deployment/data/{self.country}/df_copiado_formaciones.xlsx", index=True)
@@ -421,29 +420,94 @@ class DataPreparationNew(DataPreparation):
 
 
 # Construct_data_new
-def assign_average_to_player_variables(df_new: pd.DataFrame, df: pd.DataFrame):
+def replace_nan_line_ups_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, _print: bool = False): # Podria eficientizarla. Tal hacer el ciclo por partido afuera y adentro las variables...
     """
-    En caso que aun no se cuenta con las formaciones del partido pero se quiere predecir igual, asigno en estas variables de jugadores,
-    el valor promedio en los ultimos partidos.
+    En caso que aun no se cuenta con las formaciones del partido pero se quiere predecir igual, reemplazo NaN por el valor promedio en los ultimos partidos
+    en dichas variables de jugadores.
     Cuidado algunas variables de jugadores ya tiene calculado el valor y tengo que dejar ese valor. Sobretodo miss players auqnue tambein podrian serr titulares y suplentes si falta poco para el partido.
 
     # Parameters
-    df: df_old_int los partidos ya jugados e integrado (sin construir). Ya filtrado por fecha
-   
+        df_new: Dataframe con los proximos partidos. (DataFrame)
+        df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame) --> YA TIENE QUE ESTAR FILTRADO POR FECHA PARA NO USAR EL PROMEDIO DE TODOS LOS PARTIDOS SINO SOLO DE LOS ULTIMOS
+    
     # Returns
+        Dataframe df_new pasado como parametro habiendo reemplazo formaciones NaN por promedio en ultimos partidos.
     """
+    # Ordeno por fecha ascendente
+    df = df.sort_values(by='date', ascending=False)
+   
     # Selecciono las variables que corresponden a jugadores
     l_var_mean_player = [col for col in df.columns if re.search(r'_player_', col) and "_miss" not in col] # Al parecer funcionaria # Puesto que los missing pueden ser nulos efectivamente y estan siempre pre-partido...
     l_var_mean_player = [re.sub(r'_(home|away)$', '', col) for col in l_var_mean_player]
     print(f"Lista de columnas prom jug: {l_var_mean_player}")
 
-    # Por variable mean_player
-    for var in l_var_mean_player:
-        print(f"\tVariable a promediar: {var}")  # (e.g. _mean_val_player_sub_home)             
-        df_new = determine_mean_in_last_matches_next_matches(df_new, df, variable=var) # (e.g. mean_last_match_dif_mean_val_player_sub)
+    # Por variable mean_player 
+    for variable in l_var_mean_player:
+
+        # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondiente
+        df_new = create_columns(df, variable)
+        if _print:
+            print(f"\tVariable a promediar: {variable}")  # (e.g. mean_val_player_sub, mean_rat_player_start)  
+
+        # Por partido nuevo
+        for id_match, row in df_new.iterrows():
+            d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
+            if _print:
+                print(f"\nPartido: {id_match}")
+
+            # Por equipo
+            for col_team, home_or_away in d_teams.items():
+
+                variable_form = f'{variable}_{home_or_away}'
+                team = row[col_team]
+                if _print:
+                    print(f"Equipo: {team}")
+                    print("Es un valor a rellenar?: ", pd.isna(row[variable_form]))
+
+                # Si el valor es nan
+                if pd.isna(row[variable_form]):
+
+                    # Busco promedio en ultimos partidos
+                    df_matches_home_team = df[df['id_team_home'] == team]
+                    df_matches_away_team = df[df['id_team_away'] == team]
+                    if _print:
+                        print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_home']].head(5))
+                        print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_away']].head(5))
+
+                    # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                    values_home = df_matches_home_team[f'{variable}_home'].values
+                    values_away = df_matches_away_team[f'{variable}_away'].values
+
+                    # Remover los valores NaN
+                    values_home_clean = values_home[~np.isnan(values_home)]
+                    values_away_clean = values_away[~np.isnan(values_away)]
+
+                    # Calcular el número total de partidos
+                    total_partidos = (len(values_home_clean) + len(values_away_clean))
+                    suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
+
+                    # Si hay al menos un valor que promediar, guardo promedio
+                    if total_partidos > 0:
+                        df_new.loc[id_match, variable_form] = suma / total_partidos
+                        df_new.loc[id_match, 'copiado_formaciones'] = 1
+                        if _print:
+                            print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
 
     # df_new.to_excel("/Users/nachomondino/Desktop/2_df_new_copy_mean_players.xlsx")
     return df_new
+
+def create_columns(df, variable):
+    """
+    A veces la variable aun ni siquiera existe... puesto que no se tiene la formacion titular para ninguno de los proximos partidos por ejemplo...
+    """
+    # Creo variable en caso que no existe
+    l_columns = [f'{variable}_home', f'{variable}_away']
+    for col in l_columns:
+        if col not in df.columns:  
+            df[col] = np.nan
+            print(f"Creo columna {col} puesto que no existe en df_new")
+            print(list(df.columns))
+    return df
 
 def copy_last_matches_value(df_new: pd.DataFrame, df: pd.DataFrame):
     """
