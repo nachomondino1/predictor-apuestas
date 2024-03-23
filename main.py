@@ -140,10 +140,12 @@ class DataUnderstanding:
             df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
             df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_coaches_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_teams_concat, df_coaches_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat
 
     def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame,  df_player:  pd.DataFrame, df_teams:  pd.DataFrame, df_coaches: pd.DataFrame, df_player_sofifa:  pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame):
-
+        """
+        Descripcion basica de los datos recolectados como shape, datatypes, cantidad de NaN por columna, etcetera.
+        """
         print(" Describing data... ")
 
         print("\n DF_MATCH \n".center(240, "-"))
@@ -379,7 +381,7 @@ class DataPreparation:
 
         return df
 
-    def etiquetado(self, df: pd.DataFrame, export: bool = True):
+    def tag_string_data_to_integer(self, df: pd.DataFrame, export: bool = True):
         """
         """
         # Elimino columna 'season'
@@ -734,9 +736,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'Argentina'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'Colombia'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = True, False, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -789,7 +791,7 @@ def main():
         df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
-        df = dp.etiquetado(df, export=export)
+        df = dp.tag_string_data_to_integer(df, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
         df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         
