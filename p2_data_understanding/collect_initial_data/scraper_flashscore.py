@@ -570,47 +570,55 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
         season_year = crawler.extract_season_year()
         print(f" {season_year} ".center(120, "-"))
 
-        # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la season)
-        crawler.click_show_more_matches()
+        # Si ya extraje la season
+        if not check_if_season_already_extracted(ruta_base, competition_form, season_year):
 
-        # Extraigo partidos (items) y sus ids
-        l_ids = crawler.extract_id_matches()
-        print(f"Partidos recolectados de la season {season_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
-        progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
+            # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la season)
+            crawler.click_show_more_matches()
 
-        # POR MATCH (c/u identificado con un id)
-        for id_match in l_ids:
+            # Extraigo partidos (items) y sus ids
+            l_ids = crawler.extract_id_matches()
+            print(f"Partidos recolectados de la season {season_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
+            progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
 
-            # Ingreso a pagina de informacion del match
-            url_match = f'https://www.flashscore.com/match/{id_match}/#/match-summary'
-            crawler.driver.get(url_match)
+            # POR MATCH (c/u identificado con un id)
+            for id_match in l_ids:
 
-            # Extraigo todos los datos del partido
-            d_row_match, d_row_match_player, d_row_match_odds, d_row_match_teams, d_row_match_coaches, d_row_match_players = crawler.extract_match_data()
-            d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
+                # Ingreso a pagina de informacion del match
+                url_match = f'https://www.flashscore.com/match/{id_match}/#/match-summary'
+                crawler.driver.get(url_match)
 
-            # Guardo datos del partido
-            df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
-            df_match_player = pd.concat([df_match_player, pd.DataFrame(d_row_match_player, index=[id_match])])
-            df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_row_match_odds, index=[id_match])])
+                # Extraigo todos los datos del partido
+                d_row_match, d_row_match_player, d_row_match_odds, d_row_match_teams, d_row_match_coaches, d_row_match_players = crawler.extract_match_data()
+                d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
 
-            # Guardo solo si las filas son nuevas
-            df_teams = check_new_rows(df_teams, d_row_match_teams)
-            df_coaches = check_new_rows(df_coaches, d_row_match_coaches)
-            df_player = check_new_rows(df_player, d_row_match_players)
-            progress_bar.update(1)
+                # Guardo datos del partido
+                df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
+                df_match_player = pd.concat([df_match_player, pd.DataFrame(d_row_match_player, index=[id_match])])
+                df_match_odds = pd.concat([df_match_odds, pd.DataFrame(d_row_match_odds, index=[id_match])])
 
-        progress_bar.close()
+                # Guardo solo si las filas son nuevas
+                df_teams = check_new_rows(df_teams, d_row_match_teams)
+                df_coaches = check_new_rows(df_coaches, d_row_match_coaches)
+                df_player = check_new_rows(df_player, d_row_match_players)
+                progress_bar.update(1)
 
-        if export:
-            # Guardo partidos de la season (por seguridad)
-            df_match.to_excel(f'{ruta_base}/per_season/df_match/{competition_form}_{season_year}.xlsx', index=True)
-            df_match_player.to_excel(f'{ruta_base}/per_season/df_match_player/{competition_form}_{season_year}.xlsx', index=True)
-            df_match_odds.to_excel(f'{ruta_base}/per_season/df_match_odds/{competition_form}_{season_year}.xlsx', index=True)
-            df_teams.to_excel(f'{ruta_base}/per_competition/df_teams/{competition_form}.xlsx', index=True)
-            df_coaches.to_excel(f'{ruta_base}/per_competition/df_coaches/{competition_form}.xlsx', index=True)
-            df_player.to_excel(f'{ruta_base}/per_competition/df_player/{competition_form}.xlsx', index=True)
-    
+            progress_bar.close()
+
+            if export:
+                # Guardo partidos de la season (por seguridad)
+                df_match.to_excel(f'{ruta_base}/per_season/df_match/{competition_form}_{season_year}.xlsx', index=True)
+                df_match_player.to_excel(f'{ruta_base}/per_season/df_match_player/{competition_form}_{season_year}.xlsx', index=True)
+                df_match_odds.to_excel(f'{ruta_base}/per_season/df_match_odds/{competition_form}_{season_year}.xlsx', index=True)
+                df_teams.to_excel(f'{ruta_base}/per_competition/df_teams/{competition_form}.xlsx', index=True)
+                df_coaches.to_excel(f'{ruta_base}/per_competition/df_coaches/{competition_form}.xlsx', index=True)
+                df_player.to_excel(f'{ruta_base}/per_competition/df_player/{competition_form}.xlsx', index=True)
+        
+        else:
+            print(f"La season {season_year} de la competicion {competition_form} ya fue extraida, por lo que, se evita su nueva extraccion.")
+            df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = read_dataframes_already_extracted(ruta_base, competition_form, season_year)
+            print(f"Match: {df_match.shape}, Match_player: {df_match_player.shape}, Odds: {df_match_odds.shape}, Teams:{df_teams.shape}, Coaches: {df_coaches.shape}, Player: {df_player.shape}")
+
     if export:
         # Guardo partidos de la competition
         df_match.to_excel(f'{ruta_base}/per_competition/df_match/{competition_form}.xlsx', index=True)
@@ -623,6 +631,28 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player
+
+def check_if_season_already_extracted(ruta_base, competition_form, season_year):
+    """
+    Verificacion de que aun no extraje la temporada
+    """
+    try:
+        pd.read_excel(f'{ruta_base}/per_season/df_match/{competition_form}_{season_year}.xlsx', index_col=0)
+        pd.read_excel(f'{ruta_base}/per_season/df_match_player/{competition_form}_{season_year}.xlsx', index_col=0)
+        pd.read_excel(f'{ruta_base}/per_season/df_match_odds/{competition_form}_{season_year}.xlsx', index_col=0)
+        return True
+    except:
+        return False
+
+def read_dataframes_already_extracted(ruta_base, competition_form, season_year):
+    df_match = pd.read_excel(f'{ruta_base}/per_season/df_match/{competition_form}_{season_year}.xlsx', index_col=0)
+    df_match_player = pd.read_excel(f'{ruta_base}/per_season/df_match_player/{competition_form}_{season_year}.xlsx', index_col=0)
+    df_match_odds = pd.read_excel(f'{ruta_base}/per_season/df_match_odds/{competition_form}_{season_year}.xlsx', index_col=0)
+    df_teams = pd.read_excel(f'{ruta_base}/per_competition/df_teams/{competition_form}.xlsx', index_col=0)
+    df_coaches = pd.read_excel(f'{ruta_base}/per_competition/df_coaches/{competition_form}.xlsx', index_col=0)
+    df_player =  pd.read_excel(f'{ruta_base}/per_competition/df_player/{competition_form}.xlsx', index_col=0)
+    return df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player
+
 
 def check_new_rows(df: pd.DataFrame, d_row: dict, _print: bool = False):
     """

@@ -22,7 +22,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
     df_iteration = pd.DataFrame()
     best_roi_max = -100
     cont_iter = 0
-    l_modelos = [RandomForestClassifier(), LogisticRegression()] # SVC(), MLPClassifier(), GradientBoostingClassifier()]  # , XGBClassifier(), 
+    l_modelos = [RandomForestClassifier(), LogisticRegression(), SVC(), MLPClassifier(), GradientBoostingClassifier()]  # , XGBClassifier(), 
 
     # Creo directorio automaticamente
     make_directories(country)
@@ -39,12 +39,12 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             'thr_fs': [0.2, 0.1, None], 
         },
         'treat_nan': {
-            'fill_na': [None], # 'ml', 'mode', 
+            'fill_na': [None, 'ml'],
         },
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.125], 
-            'bal_type': ['under', None], # 'over'
+            'bal_type': ['under', None],
             'k': [10]
         }
     }
@@ -75,8 +75,15 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             df_constructed.to_excel(path, index=True)
 
         # Etiqueto df_constructed
-        df_cons_etiquetado = dp.etiquetado(df_constructed, export=False)
-        
+        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_constructed_etiquetado_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        df_cons_etiquetado = dp.tag_string_data_to_integer(df_constructed, export=False)
+        df_cons_etiquetado.to_excel(path, index=True)
+
+        # Clean data 2
+        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_constructed_clean_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        df_cons_clean = dp.clean_data_2(df_cons_etiquetado, export=False)
+        df_cons_clean.to_excel(path, index=True)
+
         # Por combinacion de parametros de select_data
         for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
@@ -90,7 +97,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             try:
                 df_sel = pd.read_excel(path, index_col=0)
             except FileNotFoundError:
-                df_sel = dp.select_data(df_cons_etiquetado, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
                 df_sel.to_excel(path, index=True)
           
             for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
@@ -190,7 +197,7 @@ def make_directories(country):
             os.makedirs(directorio)
 
 def main():
-    country, var_resp, var_pred = "england", 'result', 'predicted_result'
+    country, var_resp, var_pred = "colombia", 'result', 'predicted_result'
     find_best_hiperparameters(var_resp, var_pred, country)
 
 if __name__ == '__main__':

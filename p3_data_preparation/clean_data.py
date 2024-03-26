@@ -74,28 +74,28 @@ class TextPreparation:
         # return df
         pass
 
-def prepare_text_columns(df, l_cols_to_process=[], l_col_to_except=[]):
-    '''
+def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = []):
+    """
     Prepara el texto de las columns que contengan strings.
-    :param df: Dataframe.
-     :param l_cols_to_process: Lista. Columns del tipo object a procesar.
-    :param l_col_to_except: Lista. Columns del tipo object que omitir en el procesamiento.
-    :return: Dataframe con columns que contienen strings ya preparados para ser analizados
-    '''
+
+    # Parameters:
+        df: Dataframe con columnas string (DataFrame)
+        l_cols_to_process: Columns del tipo object a procesar. (list)
+    
+    # Returns:
+        Dataframe pasado como parametro con columns strings ya preparadas para ser analizadas. (DataFrame)
+    """
     # Si l_cols_to_process está vacía, procesar todas las columns de texto
     if not l_cols_to_process:
         l_cols_to_process = df.select_dtypes(include='object').columns.tolist()
-
-    # Filtrar las columns que se procesarán y que no están en la lista de excepciones
-    l_text_columns = [col for col in l_cols_to_process if col not in l_col_to_except]
-    print("\nColumns tipo object a preparar:", l_text_columns)
+    print("\nColumns tipo object a preparar:", l_cols_to_process)
 
     # Creo objeto de la clase
     tp = TextPreparation()
-    df = tp.to_lower(df, columns=l_text_columns)
-    df = tp.delete_accent(df, columns=l_text_columns)
-    df = tp.delete_special_characters(df, columns=l_text_columns)
-    df = tp.delete_punctuation(df, columns=l_text_columns)
+    df = tp.to_lower(df, columns=l_cols_to_process)
+    df = tp.delete_accent(df, columns=l_cols_to_process)
+    df = tp.delete_special_characters(df, columns=l_cols_to_process)
+    df = tp.delete_punctuation(df, columns=l_cols_to_process)
     return df
 
 def clean_teams_names(df):
@@ -111,7 +111,34 @@ def clean_teams_names(df):
     # df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
     return df
 
-# 2) Tratamiento de NaN values
+# 2) Eliminacion de columnas no relevantes
+def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
+    """
+    Elimina las columnas especificadas de un DataFrame.
+
+    Args:
+        df (DataFrame): El DataFrame del que se eliminarán las columnas.
+        columns_to_drop (list): Una lista de listas, donde cada sublista contiene los nombres de las columnas a eliminar.
+
+    Returns:
+        DataFrame: El DataFrame con las columnas especificadas eliminadas.
+    """
+    print("Dimensiones originales del DataFrame:", df.shape)
+    
+    # Determino cuales son las estadisticas a eliminar
+    stats_to_drop = list(set(stats_columns).difference(set(relevant_stats_columns)))
+
+    # Eliminar las columnas especificadas
+    for stat in stats_to_drop:
+
+        l_stat = [f'{stat}_home', f'{stat}_away']
+        columns_to_remove = [col for col in l_stat if col in df.columns]
+        df = df.drop(columns_to_remove, axis=1)
+
+    print("Dimensiones del DataFrame después de eliminar columnas:", df.shape)
+    return df
+
+# 3) Tratamiento de NaN values
 def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False):
     """
     Elimina las rows de un DataFrame que contienen un percentage alto de valores NaN.

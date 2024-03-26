@@ -25,6 +25,7 @@ from sklearn.neural_network import MLPClassifier
 ### Assess model
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
+import joblib
 
 
 class DataUnderstanding:
@@ -63,28 +64,13 @@ class DataUnderstanding:
         Collecting data from Flashscore and Sofifa
         """
         print(" Collecting data... ")
-        # Levanto partidos ya extraidos (para no volver a extraer la/s competicione/s ya extraidas)
-        try:
-            df_match_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match.xlsx', index_col=0)
-            df_match_player_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match_player.xlsx', index_col=0)
-            df_match_odds_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index_col=0)
-            df_player_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_player.xlsx', index_col=0)
-            df_teams_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_teams.xlsx', index_col=0)
-            df_coaches_concat = pd.read_excel(f'p2_data_understanding/data/{self.country}/df_coaches.xlsx', index_col=0)
-            df_player_sofifa_concat, df_player_fifa_sofifa_concat = pd.DataFrame(), pd.DataFrame()
-
-            l_competition_already_extracted = df_match_concat['id_competition'].unique()
-            print(df_match_concat.shape, df_match_player_concat.shape, df_match_odds_concat.shape)
-            print(df_player_concat.shape, df_teams_concat.shape, df_coaches_concat.shape)
-            print(f"Competiciones ya extraidas: {l_competition_already_extracted}")
-        except:
-            df_match_concat, df_match_player_concat,df_match_odds_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-            df_teams_concat, df_coaches_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-            l_competition_already_extracted = []
+        # Defino variables
+        df_match_concat, df_match_player_concat,df_match_odds_concat, df_teams_concat, df_coaches_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
+        df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()  # Sofifa
 
         # Selecciono competencias del country
         df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-        df_comp_country = df_comp[(df_comp['id_country'] == self.id_country) & ~(df_comp['id_competition'].isin(l_competition_already_extracted))]
+        df_comp_country = df_comp[(df_comp['id_country'] == self.id_country)]
         print(f' COUNTRY: {self.country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
         # POR COMPETITION
@@ -94,13 +80,12 @@ class DataUnderstanding:
             # Extraigo partidos de Flashscore (df_match y df_match_player)
             df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=export)
             
-            # print("A", df_teams.shape, df_coaches.shape, df_player.shape)
+            # Elimino registros que ya extraje
             df_teams = df_teams[~df_teams.index.isin(df_teams_concat.index)]
             df_coaches = df_coaches[~df_coaches.index.isin(df_coaches_concat.index)]
             df_player = df_player[~df_player.index.isin(df_player_concat.index)]
-            # print("B" ,df_teams.shape, df_coaches.shape, df_player.shape)
 
-            # Guardo datos de competition
+            # Guardo datos
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
@@ -119,16 +104,21 @@ class DataUnderstanding:
             # Si la competition es una liga
             if row['is_cup'] == 0:
 
-                # Extraigo datos de players de Sofifa (df_player)
-                df_player_sofifa, df_player_fifa_sofifa_sofifa = scraper_sofifa.extract_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
-
-                # Save data
+                # Extraigo datos de players de Sofifa 
+                ## Player
+                df_player_sofifa, df_player_fifa_sofifa = scraper_sofifa.extraxct_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
                 df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
-                df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa_sofifa], axis=0)
+                df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
+
+                ## Teams
+                df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
+                df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
+
                 if export:
                     df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_sofifa.xlsx', index=True)
-                    df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_fifa_sofifa_sofifa.xlsx', index=True)
-
+                    df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_fifa_sofifa.xlsx', index=True)
+                    df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_teams_sofifa.xlsx', index=True)
+       
         # Exporto datasets con competiciones del country
         if export:
             df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
@@ -137,10 +127,11 @@ class DataUnderstanding:
             df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player.xlsx', index=True)
             df_teams_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams.xlsx', index=True)
             df_coaches_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_coaches.xlsx', index=True)
-            df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
+            df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_sofifa.xlsx', index=True)
             df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
+            df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams_sofifa.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_teams_concat, df_coaches_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_teams_concat, df_coaches_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat
 
     def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame,  df_player:  pd.DataFrame, df_teams:  pd.DataFrame, df_coaches: pd.DataFrame, df_player_sofifa:  pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame):
         """
@@ -219,7 +210,7 @@ class DataPreparation:
         ## Goals
         df_match = format_data.convert_goals_to_int(df_match)
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
-        
+            
         # Dataframe player_fifa_sofifa
         ## Fecha
         df_player_fifa_sofifa['date'] = pd.to_datetime(df_player_fifa_sofifa['date'], format='%b %d, %Y')
@@ -245,30 +236,30 @@ class DataPreparation:
         warnings.filterwarnings('ignore')
         scaler = StandardScaler()  # Crea un objeto StandardScaler
 
-        ## Elimino filas con alto porcentaje de NaN values
-        n_filas = len(df_match)
-        df_match_player = df_match_player.dropna(subset=['id_player_start_home_11', 'id_player_start_away_11'], how='any')
-        df_match = df_match[df_match.index.isin(df_match_player.index)]
-        print(f"De las {n_filas} filas, se eliminan {(n_filas - len(df_match))} por no tener formaciones del partido, quedan {len(df_match)} filas.")
+        # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
+        print("\nEliminacion de estadisticas irrelevantes")
+        stats_columns = construct_data.determine_stats_columns(df_match)
+        relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
+        df_match = clean_data.delete_not_relevant_stats(df_match, stats_columns, relevant_stats_columns)
 
-        # Dataframe player
+        # Preparacion de texto
+        print("\nPreparacion de columnas string")
+        ## FLASHSCORE
+        ### Dataframe player (df_player)
         df_player = clean_data.prepare_text_columns(df_player, l_cols_to_process=['player_name'])
-
-        # Dataframe teams
+        ### Dataframe teams (df_teams)
         df_teams = clean_data.prepare_text_columns(df_teams, l_cols_to_process=['team_name'])
         df_teams = clean_data.clean_teams_names(df_teams)  # Eliminar strings adicionales en names de equipos
-
-        # Dataframe player_sofifa:
+        ## SOFIFA
+        ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name'])  # Preaparo texto para integrar
-   
-        # Dataframe player_fifa_sofifa
-        ## Market Value
-        df_player_fifa_sofifa['value'] = scaler.fit_transform(df_player_fifa_sofifa['value'].values.reshape(-1, 1))
-        df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
-    
-        # df_teams_sofifa
+        ## Dataframe teams sofifa (df_teams_sofifa)
         df_teams_sofifa = clean_data.prepare_text_columns(df_teams_sofifa, l_cols_to_process=['team_name'])
 
+        # Correcion de valores
+        print("\nCorrecion de valores")
+        df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
+    
         # Verificar que no haya outliers
         # algo (sacar de mi tesis)
 
@@ -320,7 +311,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, n_days: int, n_years_h2h: int, segun_localia: bool, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_days: int, n_years_h2h: int, segun_localia: bool, without_h2h: bool = False, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -332,42 +323,42 @@ class DataPreparation:
         start = time.time()
         print("\nConstructing data...")
 
-        # Construyo variables: "result" y points obtenidos
+        # Construyo variables: "result" y otras
         df = construct_data.determine_result(df, self.var_resp)
-        df = construct_data.determine_points(df)
         df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
-
         # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
         # df['perc_attendance'] = df["attendance"] / df["capacity"]
         df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
      
+        # Construyo variables rendimiento del equipo
+        ## Puntos
+        df = construct_data.determine_points(df)
+        ## Historial entre si
+        if not without_h2h:
+            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=True) # QUIERO USAR EL MAXIMO HISTORIAL, NO QUIERO TENER QUE DECIRLE...
+            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=False) # QUIERO USAR EL MAXIMO HISTORIAL, NO QUIERO TENER QUE DECIRLE...
+            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
+            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
+
         # STATS
-        stats_columns = construct_data.determine_stats_columns(df)
-        relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
-        print(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
-
-        # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
-        df = construct_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
-
         # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
         # df = construct_data.construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
         # df = construct_data.construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
 
         # Determino cuales son las variables stats automaticamente
-        df = construct_data.calculate_dif_col_stats(df, relevant_stats_columns, n_days, segun_localia)
+        stats_columns = construct_data.determine_stats_columns(df)
+        print(f"Stats a promediar en ultimos partidos: {stats_columns}")
+
+        # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
+        df = construct_data.calculate_dif_col_stats(df, stats_columns, n_days, segun_localia)
        
         # PLAYER
         # Construyo variables de diferencias para las variables promedio de los players
-        df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
+        df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia) # Variable para ponderar estadisticas
         df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
         df = construct_data.calculate_dif_col_players(df)
     
         # TEAM
-        ## Historial entre si
-        df = construct_data.h2h_by_date(df, n_years=16, segun_localia=True)
-        df = construct_data.h2h_by_date(df, n_years=16, segun_localia=False)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
         ## Rival team de Sofifa
         func = lambda row: 1 if (row['id_team_home_rival_team'] == row['id_team_away']) or (row['id_team_away_rival_team'] == row['id_team_home']) else 0
         df['is_rival_match'] = df.apply(func, axis=1)
@@ -395,18 +386,18 @@ class DataPreparation:
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_etiquetado.xlsx', index=True)
         return df
     
-    def select_data(self, df: pd.DataFrame, thr_corr=None, thr_fs= None, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, export: bool = True):
         """
-        Selecciona las variables relevantes del dataframe.
+        Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
-        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
-        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
-        :return: Dataframe con las variables seleccionadas. (DataFrame)
+        # Parameters:
+            df: Dataframe a tratar NaN y escalar.
+
+        # Returns:
+            df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
-        warnings.filterwarnings('ignore')
-        start = time.time()
-        n_reg_min = int(0.2*len(df))
-        print("\nSelecting data...")
+        # Elimino filas con mucho NaN (filas sin estadisticas ni formaciones)
+        df = clean_data.delete_rows_nan(df, 0.5, _print=True)
 
         # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         df = df.drop(['date', 'venue'], axis=1)  
@@ -417,6 +408,7 @@ class DataPreparation:
         print(f"Columnas constantes eliminadas: {constant_cols}")
 
         # Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
+        n_reg_min = int(0.2*len(df))
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp] # Separo en X e y
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
         print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
@@ -424,7 +416,35 @@ class DataPreparation:
             l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
             text = f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}"
             warnings.warn(text)
-        df = pd.concat([X_sin_col_mucho_nan, y], axis=1)
+
+        # Escalado de datos
+        print("\nEscalado de datos")
+        # Paso 1: Ajusta el StandardScaler a tus datos de entrenamiento
+        scaler = StandardScaler()
+        scaler.fit(X_sin_col_mucho_nan)
+        # Paso 2: Transforma tus datos de entrenamiento utilizando el StandardScaler ajustado
+        X_train_scaled = scaler.transform(X_sin_col_mucho_nan)
+
+        # Concateno X e y
+        df_X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
+        df = pd.concat([df_X_train_scaled, y], axis=1)
+
+        if export:        
+            joblib.dump(scaler, f"./p3_data_preparation/data/{self.country}/scaler_model.pkl") # Paso 3: Guarda el StandardScaler ajustado en un archivo
+            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_clean.xlsx', index=True)
+        return df
+    
+    def select_data(self, df: pd.DataFrame, thr_corr=None, thr_fs= None, export: bool = True):
+        """
+        Selecciona las variables relevantes del dataframe.
+
+        :param df: Dataframe de los datos Si no se proporciona, se cargará desde un archivo. (DataFrame)
+        :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
+        :return: Dataframe con las variables seleccionadas. (DataFrame)
+        """
+        warnings.filterwarnings('ignore')
+        start = time.time()
+        print("\nSelecting data...")
 
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
@@ -736,13 +756,13 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'Colombia'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'argentina'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = True, False, False
+    data_unders, data_prep, modeling = False, True, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country]['id_country'].values[0]
+    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
@@ -753,8 +773,7 @@ def main():
     if data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
-        df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches, df_player_sofifa, df_player_fifa_sofifa = du.collect_initial_data(export=export)
-        # df_teams_sofifa = pd.read_excel('./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
+        df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = du.collect_initial_data(export=export)
 
         # Describo datos
         du.describe_data(df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches, df_player_sofifa, df_player_fifa_sofifa)
@@ -783,7 +802,7 @@ def main():
         fill_na = None
         df_hiper_prep = pd.DataFrame(data={'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na]}, index=[0])
         
-        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
+        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed_etiquetado.xlsx', index_col=0)
         # print(df.head(2))
 
         # Preparo el dataset para el analisis
@@ -792,6 +811,7 @@ def main():
         df = dp.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
         df = dp.tag_string_data_to_integer(df, export=export)
+        df = dp.clean_data_2(df, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
         df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         

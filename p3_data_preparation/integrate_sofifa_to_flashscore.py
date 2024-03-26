@@ -147,9 +147,11 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...
     l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se lo proceso con sup.
     l_condicion = ['home', 'away']
+    d_n_reg_min = {'start': 7, 'sub': 4, 'miss': 0}
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
+        n_reg_min = d_n_reg_min[titularidad]
 
         # Por condicion (Local o visitante)
         for condicion in l_condicion:
@@ -209,7 +211,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 l_int_reputation.append(df_player_filt.int_reputation.values[0])
 
                 # Guardo promedios de age, height, overall_rating y market value
-                if len(l_age) > 0:
+                if len(l_age) > n_reg_min:
                     df_match.loc[id_match, f'mean_age_player_{titularidad}_{condicion}'] = sum(l_age) / len(l_age)
                     df_match.loc[id_match, f'mean_hei_player_{titularidad}_{condicion}'] = sum(l_height) / len(l_height)
                     df_match.loc[id_match, f'mean_int_rep_player_{titularidad}_{condicion}'] = sum(l_int_reputation) / len(l_int_reputation)
@@ -217,7 +219,6 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                     # Calculo nro de jugadores lesionados
                     if titularidad == 'miss':
                         df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)
-                        # print("Numero de ausentes: ", len(l_rating))
 
                         df_match.loc[id_match, f'sum_rat_player_{titularidad}_{condicion}'] = sum(l_rating)
                         df_match.loc[id_match, f'sum_val_player_{titularidad}_{condicion}'] = sum(l_market_value)
