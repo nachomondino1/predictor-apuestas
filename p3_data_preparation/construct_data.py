@@ -356,7 +356,11 @@ def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int
     equipos de un match le favorece más el h2h entre ellos.
     """
     # Definicion de variables
-    n_days = 365 * n_years
+     # Definicion de variables
+    if n_years == -1:
+        n_years = (max(df['date']) - min(df['date'])).days / 365
+        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
+    n_days =  365 * n_years
     h2h_col_name = f'h2h_{n_years}_segun_loc' if segun_localia else f'h2h_{n_years}'
 
     # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)

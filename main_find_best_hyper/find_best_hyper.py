@@ -11,6 +11,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 import pickle
+import joblib
 import warnings
 import os
 
@@ -75,15 +76,14 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             df_constructed.to_excel(path, index=True)
 
         # Etiqueto df_constructed
-        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_constructed_etiquetado_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
-        df_cons_etiquetado = dp.tag_string_data_to_integer(df_constructed, export=False)
-        df_cons_etiquetado.to_excel(path, index=True)
+        df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=False)
+        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_etiquetas_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        df_etiquetas.to_excel(path, index=True)
 
         # Clean data 2
-        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_constructed_clean_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
-        df_cons_clean = dp.clean_data_2(df_cons_etiquetado, export=False)
-        df_cons_clean.to_excel(path, index=True)
-
+        df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, export=False)
+        joblib.dump((scaler, columns_used), f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.pkl')
+        
         # Por combinacion de parametros de select_data
         for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
@@ -197,7 +197,7 @@ def make_directories(country):
             os.makedirs(directorio)
 
 def main():
-    country, var_resp, var_pred = "colombia", 'result', 'predicted_result'
+    country, var_resp, var_pred = "argentina", 'result', 'predicted_result'
     find_best_hiperparameters(var_resp, var_pred, country)
 
 if __name__ == '__main__':

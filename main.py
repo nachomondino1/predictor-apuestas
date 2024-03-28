@@ -384,7 +384,7 @@ class DataPreparation:
         if export:
             df_etiquetas.to_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx', index=False)
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_etiquetado.xlsx', index=True)
-        return df
+        return df, df_etiquetas
     
     def clean_data_2(self, df: pd.DataFrame, export: bool = True):
         """
@@ -396,20 +396,22 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
+        # Separo en X e y
+        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
+        
         # Elimino filas con mucho NaN (filas sin estadisticas ni formaciones)
-        df = clean_data.delete_rows_nan(df, 0.5, _print=True)
+        X = clean_data.delete_rows_nan(X, 0.5, _print=True)
 
         # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        df = df.drop(['date', 'venue'], axis=1)  
+        X = X.drop(['date', 'venue'], axis=1)  
 
         # Elimino columnas constantes
-        constant_cols = df.columns[df.nunique() == 1]
-        df.drop(columns=constant_cols, inplace=True)
+        constant_cols = X.columns[X.nunique() == 1]
+        X = X.drop(columns=constant_cols, inplace=True)
         print(f"Columnas constantes eliminadas: {constant_cols}")
 
         # Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(0.2*len(df))
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp] # Separo en X e y
+        n_reg_min = int(0.15*len(df))
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
         print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
         if len(X.columns) != len(X_sin_col_mucho_nan.columns):
@@ -419,22 +421,22 @@ class DataPreparation:
 
         # Escalado de datos
         print("\nEscalado de datos")
-        # Paso 1: Ajusta el StandardScaler a tus datos de entrenamiento
         scaler = StandardScaler()
-        scaler.fit(X_sin_col_mucho_nan)
-        # Paso 2: Transforma tus datos de entrenamiento utilizando el StandardScaler ajustado
-        X_train_scaled = scaler.transform(X_sin_col_mucho_nan)
+        scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
+        X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
+        X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
 
         # Concateno X e y
-        df_X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
-        df = pd.concat([df_X_train_scaled, y], axis=1)
+        y_sin_nan = y[y.index.isin(X.columns)] # Dado que elimine filas de X
+        df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
 
-        if export:        
-            joblib.dump(scaler, f"./p3_data_preparation/data/{self.country}/scaler_model.pkl") # Paso 3: Guarda el StandardScaler ajustado en un archivo
+        if export: 
+            joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./p3_data_preparation/data/{self.country}/scaler_model.pkl")       
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_clean.xlsx', index=True)
-        return df
+      
+        return df, scaler, X_sin_col_mucho_nan.columns
     
-    def select_data(self, df: pd.DataFrame, thr_corr=None, thr_fs= None, export: bool = True):
+    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -469,7 +471,7 @@ class DataPreparation:
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_selected.xlsx', index=True)
         return df
     
-    def treat_nan_values(self, df , fill_na, percentil_nan: int = 75, export: bool = True, _print: bool = True):
+    def treat_nan_values(self, df: pd.DataFrame , fill_na: str = None, percentil_nan: int = 75, export: bool = True, _print: bool = True):
         """
         Tratamiento de nan values
 
@@ -565,47 +567,73 @@ class Modeling:
         warnings.filterwarnings('ignore') # no son mias, son de openpyxl
         print("\nSeparating data in train, val and test...")
 
-        # Separo df_test (si rellené, dejo registros sin rellenar)
+        # Si rellené NaN values
         if 'rellenado' in df.columns:
-            print("\tDejo registros no rellenados en df_test.")
+            print("\tDejo registros no rellenados en df_test y df_val")
 
             # Obtengo indice de filas no rellenadas
             index_no_rellenado = df[~df['rellenado']].index
             df = df.drop('rellenado', axis=1)
+            print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
 
-            # Todos los registros con al menos un NaN value los guardo en el conjunto de entrenamiento
+            # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
             n_reg_test = int(len(df) * test_size)
             n_reg_test_max = len(index_no_rellenado)
+            print(f"Numero de registros para df_test: {n_reg_test}")
             if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
                 # Ajusta n para tomar todas las filas no rellenadas disponibles
                 print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
                 n_reg_test = n_reg_test_max
 
-            # Construyo el dataset de prueba a partir de registros que no han sido rellenados
+            # Construyo el dataset de testeo a partir de registros que no han sido rellenados
             df_test = df.loc[index_no_rellenado].sample(n_reg_test, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
             X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
+            print(f"Shape df_test: {df_test.shape}")
+
+            # Eliminar los índices de df_test de index_no_rellenado
+            indices_a_eliminar = df_test.index
+            index_no_rellenado_sin_test = index_no_rellenado.drop(indices_a_eliminar)
+            print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
+
+            # Determino si hay suficientes registros no rellenados para poner en el dataframe de validacion
+            n_reg_val = int(len(df) * val_size)
+            n_reg_val_max = len(index_no_rellenado_sin_test)
+            print(f"Numero de registros para df_val: {n_reg_val}")
+            if n_reg_val > n_reg_val_max: # Si no hay suficientes filas no rellenadas disponibles
+                # Ajusta n para tomar todas las filas no rellenadas disponibles
+                print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
+                n_reg_val = n_reg_val_max
 
             # Construyo train y val a partir de las filas que quedan
             df_train_val = df[~df.index.isin(df_test.index)]
-            X_train_val, y_train_val = df_train_val.drop(self.var_resp, axis=1), df_train_val[self.var_resp]
+            df_val = df_train_val.loc[index_no_rellenado_sin_test].sample(n_reg_val, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
+            X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]
+            print(f"Shape df_train_val: {df_train_val.shape}")
+            print(f"Shape df_val: {df_val.shape}")
 
+            # Construyo train con los registros que quedan
+            df_train = df_train_val[~df_train_val.index.isin(df_val.index)]
+            X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
+            print(f"Shape df_train: {df_train.shape}")
+
+        # Si no rellene nan values
         else:
+            # Separo test y train_val
             X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
             X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
 
-        # Calcula el tamaño relativo del conjunto de prueba
-        test_size_ratio = len(X_test) / len(df)
-        # Calcula el tamaño relativo del conjunto de validación
-        val_size_ratio = val_size / (1 - test_size_ratio)
+            # Calcula el tamaño relativo del conjunto de validación
+            test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
+            val_size_ratio = val_size / (1 - test_size_ratio) 
 
-        # Balanceo el dataset de entrenamiento y validacion
+            # Separo en train y validation
+            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
+
+        # Balanceo el dataset de entrenamiento
         if bal_type is not None:
-            X_train_val, y_train_val = generate_test_design.balance_dataset(X_train_val, y_train_val, bal_type=bal_type)
+            X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, bal_type=bal_type)
 
-        # Separo train y validation
-        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
         print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
-
         if export:
             X_train.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/X_train.xlsx', index=True)
             X_val.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/X_val.xlsx', index=True)
@@ -756,9 +784,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'argentina'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = True, False, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -799,7 +827,7 @@ def main():
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         n_days, n_years_h2h, segun_localia = 30, 3, False
         thr_corr, thr_fs = 0.9, 0.1
-        fill_na = None
+        fill_na = 'ml'
         df_hiper_prep = pd.DataFrame(data={'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na]}, index=[0])
         
         # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed_etiquetado.xlsx', index_col=0)
@@ -810,8 +838,8 @@ def main():
         df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
-        df = dp.tag_string_data_to_integer(df, export=export)
-        df = dp.clean_data_2(df, export=export)
+        df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
+        df, scaler, columns_used = dp.clean_data_2(df, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
         df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         
