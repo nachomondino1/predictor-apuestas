@@ -6,6 +6,8 @@ from django.db.models import (
     F,
     ExpressionWrapper
 )  # Q objects to create an 'OR' statament, F objects to create col1==col2
+from django_filters.rest_framework import DjangoFilterBackend
+from home.pagination import DefaultPagination # for generic filtering
 from home.models import Prediction
 from rest_framework.mixins import ListModelMixin, CreateModelMixin
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
@@ -14,6 +16,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.filters import SearchFilter, OrderingFilter
+#  from rest_framework.pagination import PageNumberPagination
 from .serializers import PredictionSerializer
 
 # A view function is a function that takes a request and returns a response.
@@ -136,6 +140,12 @@ We can change to:If you need some logic!
 class PredictionViewSet(ModelViewSet):
     queryset = Prediction.objects.all()
     serializer_class = PredictionSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter] # SearchFilter: to search string columns
+    filterset_fields = ['id_match', 'date'] # http://127.0.0.1:8000/home/predictions/?id_match=MNMbQMK1
+    # http://127.0.0.1:8000/home/predictions/?date=2024-02-24%2014:30:00.000000
+    pagination_class = DefaultPagination
+    search_fields = ['predicted_result'] # http://127.0.0.1:8000/home/predictions/?search=1
+    ordering_filter = ['prob_class_1']
 
     def get_serializer_context(self):
         return {'request': self.request}
