@@ -1,4 +1,5 @@
 from django.db import models
+from uuid import uuid4
 
 # To generate a new migration: python manage.py makemigrations
 # To execute the migrations: python manage.py migrate
@@ -22,6 +23,7 @@ class TeamFlashscore(models.Model):
 
 class Prediction(models.Model):
    id_match = models.CharField(primary_key=True, max_length=100)
+   id = models.UUIDField(primary_key=True, default=uuid4)
    date = models.DateTimeField()
    id_team_home = models.CharField(max_length=100) # models.ForeignKey(TeamsFlashscore, related_name='id_team_home', on_delete=models.PROTECT)
    id_team_away = models.CharField(max_length=100) # models.ForeignKey(TeamsFlashscore, related_name='id_team_away', on_delete=models.PROTECT)
