@@ -5,6 +5,8 @@ from home.models import Prediction
 class PredictionSerializer(serializers.ModelSerializer):
     """ This values are the one we are going to send when we have an API request!
 
+    This fileds are the onw the poeple can see
+
     Args:
         serializers (_type_): _description_
     """
@@ -12,6 +14,7 @@ class PredictionSerializer(serializers.ModelSerializer):
         model = Prediction
         fields = ['id_match', 'date', 'id_team_home', 'id_team_away','prob_home_bm','prob_draw_bm','prob_away_bm', 'predicted_result','winner_team']
     """
+    Other option: 
     id_match = serializers.CharField()
     date = serializers.DateTimeField()
     id_team_home = serializers.CharField(max_length=100) # models.ForeignKey(TeamsFlashscore, related_name='id_team_home', on_delete=models.PROTECT)
