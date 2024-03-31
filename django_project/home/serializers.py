@@ -5,14 +5,24 @@ from home.models import Prediction
 class PredictionSerializer(serializers.ModelSerializer):
     """ This values are the one we are going to send when we have an API request!
 
-    This fileds are the onw the poeple can see
+    This fields are the ones the poeple can see
 
     Args:
         serializers (_type_): _description_
     """
-    class Meta:
+    winner_team_name = serializers.SerializerMethodField()
+
+    def get_winner_team_name(self,Prediction): # calculated field
+        if Prediction.prob_home_bm > Prediction.prob_away_bm:
+            return Prediction.id_team_home
+        elif Prediction.prob_home_bm < Prediction.prob_away_bm:
+            return Prediction.id_team_away
+        else:
+            return 'draw'
+
+    class Meta: # http://127.0.0.1:8000/home/predictions/?date=2024-02-24&id_match=&ordering=time
         model = Prediction
-        fields = ['id_match', 'date', 'id_team_home', 'id_team_away','prob_home_bm','prob_draw_bm','prob_away_bm', 'predicted_result','winner_team']
+        fields = ['id_match', 'date', 'time', 'id_team_home', 'id_team_away','prob_home_bm','prob_draw_bm','prob_away_bm', 'predicted_result','winner_team', 'winner_team_name']
     """
     Other option: 
     id_match = serializers.CharField()

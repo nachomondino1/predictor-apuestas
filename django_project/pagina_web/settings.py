@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django_filters', # to filter
     'rest_framework', # api calls
     'home',
+    'core',
     'debug_toolbar' # debug in page
 ]
 
@@ -139,3 +140,5 @@ REST_FRAMEWORK = {
     #'DEFAULT_PAGINATION_CLASS':'rest_framework.pagination.PageNumberPagination',
     #'PAGE_SIZE':10 
     }
+
+AUTH_USER_MODEL = 'core.User'
