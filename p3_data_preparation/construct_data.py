@@ -152,8 +152,12 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
 def determine_stats_columns(df: pd.DataFrame):
     """
     Determina automáticamente las variables que deben ser promediadas en los últimos partidos.
-    :param df: DataFrame.
-    :return: Lista de variables a ser promediadas.
+    
+    # Parameters:
+        df: DataFrame.
+
+    # Returns:
+        Lista de variables a ser promediadas.
     """
     # Definicion variables
     keywords_prohibidas = ['_player_', 'team_', 'odds_', 'coach_']  # Definir palabras clave prohibidas
@@ -190,21 +194,18 @@ def calculate_dif_col_stats(df, l_stats, n_days, segun_localia): # ver que estan
     Construye variables diferencia de estadisticas entre local y visitante.
     
     # Parameters
-        df:
-        n_days:
+        df: Dataframe. (DataFrame)
+        l_stats: Estadisticas a promediar y calcular diferencia (e.g. 'ball_possession'). (list) # Me gustaria pasarle 'ball_possession_home' y ball_possession_away' 
+        n_days: Numero de dias para los cuales promediar la estadistica
         segun_localia: 
 
     # Returns
-        ...
+        Dataframe pasado como parametro con ...
     """
     # Por estadistica del partido
     for var in l_stats: # e.g. shots_on_goal
         print(f"Estadistica a promediar: {var}")
-        column_home, column_away = f'{var}_home', f'{var}_away'
-
-        # Si la estadistica fue recolectada para estos partidos
-        if (column_home in df.columns) and (column_away in df.columns):
-
+        try:
             # PROMEDIANDO LA ESTADISTICA Y LUEGO CALCULANDO LA DIFERENCIA       
             # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
             df = determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
@@ -219,7 +220,8 @@ def calculate_dif_col_stats(df, l_stats, n_days, segun_localia): # ver que estan
             not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
             df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
             df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
-    
+        except:
+            pass
     return df
 
 def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, _print: bool = False):
@@ -314,27 +316,35 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
     return df
 
 ## Player
-def calculate_dif_col_players(df: pd.DataFrame):
+def calculate_dif_col_players(df: pd.DataFrame, _print: bool = False):
     """
     Calcula la diferencia entre home y away
-    :param df: Dataframe. Unidad de analisis: match
-    :return:
+
+    # Parameters:
+        df: Dataframe con columnas de jugadores
+
+    # Returns
+        Dataframe pasado como parametro habiendo construido columnas "diferencias" entre local y visitante.
     """
     # Determinar columnas players (e.g.sum_rat_player_miss)
     pattern = r'_player_[a-z_\(\)%]+_(home|away)' # Patrón regex para encontrar columnas relevantes
     relevant_columns = df.filter(regex=pattern, axis=1).columns
-    l_var_sin_suffix = [re.sub(r'_(home|away)$', '', col) for col in relevant_columns]
-    print(f"Variables jugadores a calcular diferencia entre local y visitante: {l_var_sin_suffix}")
-
+    l_var_sin_suffix = list({re.sub(r'_(home|away)$', '', col) for col in relevant_columns})
+    if _print:
+        print(f"Variables jugadores a calcular diferencia entre local y visitante: {l_var_sin_suffix}")
+    
     for var in l_var_sin_suffix:
-        print(f"Variable: {var}")
         columna_home, columna_away = f'{var}_home', f'{var}_away'
 
-        if (columna_home in df.columns) and (columna_away in df.columns):
-            if (('sum_' in var) or ('n_player' in var)) and ('_miss' in var):
-                # Creo una copia del df para evitar sum=nan (nan*0=nan) cdo uno de los dos equipos no tiene jugadores ausentes.
-                print("\t Reemplazo NaN values por cero.")
+        if  "_against" not in var:  # Temporalmente. Porque falla sin con la columna player que es against.
+            if _print:
+                print(f"\nVariable: {var}")
+                print(f"Columna home: {columna_home} ; Columna away: {columna_away}")
+            
+            if (('sum_' in var) or ('n_player' in var)) and ('_miss' in var):  # Si quiero reemplazar tambien las 'mean' --> if ('_miss' in var):
                 df = replace_nan_with_zero(df, columna_home, columna_away)  # Reemplazo sum_rat_player_miss=nan por sum_rat_player_miss=0 cdo uno de los dos equipos no tiene jugadores ausentes y el otro si
+                if _print:
+                    print("\t Reemplazo NaN values por cero.")
 
             # Calculo diferencia entre home y away cuando ambos equipos no tienen NaN
             not_none_condition = (df[columna_home].notnull()) & (df[columna_away].notnull())
@@ -342,7 +352,6 @@ def calculate_dif_col_players(df: pd.DataFrame):
 
             # Elimino variables utilizadas para calcular la diferencia
             df = df.drop([columna_home, columna_away], axis=1)
-    
     return df
 
 # MAIN_NEXT_MATCHES.PY

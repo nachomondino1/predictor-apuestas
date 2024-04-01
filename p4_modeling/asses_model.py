@@ -59,9 +59,9 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     for idx, row in df_match_odds.iterrows():
 
         # Calcular probabilidades a partir de invertir las cuotas
-        prob_home_with_over = 1 / row['odds_home']
-        prob_draw_with_over = 1 / row['odds_draw']
-        prob_away_with_over = 1 / row['odds_away']
+        prob_home_with_over = 1 / float(row['odds_home'])
+        prob_draw_with_over = 1 / float(row['odds_draw'])
+        prob_away_with_over = 1 / float(row['odds_away'])
 
         # Sumo las probabilidades (deberia ser >1 por el margen de ganancia de la casa de apuesta)
         sum_prob_with_over = prob_home_with_over + prob_draw_with_over + prob_away_with_over # Si no habria overround seria 100%
@@ -218,20 +218,22 @@ def calculate_odd_double_chance(row, result_to_bet):
     # Returns:
         Cuota a apostar cuando se hace doble oportunidad. (float)
     """
+    odds_home, odds_draw, odds_away = float(row['odds_home']), float(row['odds_draw']), float(row['odds_away'])
+  
     # Si el resultado a apostar es doble oportunidad sin Home
     if result_to_bet == -1:
-        proporcion = row['odds_draw'] / (row['odds_draw'] + row['odds_away'])  # 6,5 / (6,5 + 12) = 0,35
-        odd_to_bet = row['odds_away'] * proporcion
+        proporcion = odds_draw / (odds_draw + odds_away)  # 6,5 / (6,5 + 12) = 0,35
+        odd_to_bet = odds_away * proporcion
 
     # Si el resultado a apostar es doble oportunidad sin Away
     elif result_to_bet == -2:
-        proporcion = row['odds_draw'] / (row['odds_draw'] + row['odds_home'])
-        odd_to_bet = row['odds_home'] * proporcion
+        proporcion = odds_draw / (odds_draw + odds_home)
+        odd_to_bet = odds_home * proporcion
 
     # Si el resultado a apostar es doble oportunidad sin Draw
     elif result_to_bet == -100:
-        proporcion = row['odds_away'] / (row['odds_away'] + row['odds_home'])
-        odd_to_bet = row['odds_home'] * proporcion
+        proporcion = odds_away / (odds_away + odds_home)
+        odd_to_bet = odds_home * proporcion
 
     return odd_to_bet
 

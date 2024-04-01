@@ -176,35 +176,6 @@ def convert_columns_to_int_2(df, df_etiquetas):
     
     return df, df_etiquetas
 
-def revert_columns_from_int(df, df_teams):
-    """
-    Convierte las variables id a string utilizando el DataFrame df_teams.
-
-    :param df: DataFrame que contiene las variables teams como ids. (DataFrame)
-    :param df_teams: DataFrame que contiene la relacion entre ids y nombres de equipos
-    :return: DataFrame con las variables teams como strings.
-    """
-    # Por partido
-    for id_match, row in df.iterrows():
-
-        # Por equipo
-        for col in ['id_team_home', 'id_team_away']:
-
-            # Busco equipo en df_teams
-            id_team = row[col] # .values[0] para argentina no se porque...
-            row_team = df_teams[df_teams.index == id_team]
-
-            # Si encontró el equipo en df_teams
-            if len(row_team) > 0:
-                
-                # Reemplazo id por string
-                str_value = row_team['team_name'].values[0]
-                df.loc[id_match, col] = str_value
-            else:
-                print(f"El valor {row[col]} no está en df_teams.")
-   
-    return df
-
 # Prueba
 def prueba():
     # Levanto datasets

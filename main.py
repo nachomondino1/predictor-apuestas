@@ -106,7 +106,7 @@ class DataUnderstanding:
 
                 # Extraigo datos de players de Sofifa 
                 ## Player
-                df_player_sofifa, df_player_fifa_sofifa = scraper_sofifa.extraxct_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
+                df_player_sofifa, df_player_fifa_sofifa = scraper_sofifa.extract_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
                 df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
                 df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
 
@@ -341,10 +341,6 @@ class DataPreparation:
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
 
         # STATS
-        # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
-        # df = construct_data.construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
-        # df = construct_data.construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
-
         # Determino cuales son las variables stats automaticamente
         stats_columns = construct_data.determine_stats_columns(df)
         print(f"Stats a promediar en ultimos partidos: {stats_columns}")
@@ -407,11 +403,11 @@ class DataPreparation:
 
         # Elimino columnas constantes
         constant_cols = X.columns[X.nunique() == 1]
-        X = X.drop(columns=constant_cols, inplace=True)
+        X.drop(columns=constant_cols, inplace=True)
         print(f"Columnas constantes eliminadas: {constant_cols}")
 
         # Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(0.15*len(df))
+        n_reg_min = int(0.15*len(X))
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
         print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
         if len(X.columns) != len(X_sin_col_mucho_nan.columns):
@@ -427,7 +423,7 @@ class DataPreparation:
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
 
         # Concateno X e y
-        y_sin_nan = y[y.index.isin(X.columns)] # Dado que elimine filas de X
+        y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
         df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
 
         if export: 
@@ -666,8 +662,8 @@ class Modeling:
             model_best_params = model.set_params(**params)
             # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
 
-        d_best_hiper = model_best_params.get_params()
-        print("Hiperparametros:", d_best_hiper)
+        d_hiper_model = model_best_params.get_params()
+        print("Hiperparametros:", d_hiper_model)
 
         # Fit model
         model_best_params.fit(X_train, y_train)
@@ -678,10 +674,10 @@ class Modeling:
 
         if export:
             pickle.dump(model_best_params, open(f"./p4_modeling/data/{self.country}/modelo.pkl", "wb"))
-            df_hiperparametros = pd.DataFrame.from_dict(d_best_hiper, orient='index', columns=['Valor'])
+            df_hiperparametros = pd.DataFrame.from_dict(d_hiper_model, orient='index', columns=['Valor'])
             df_hiperparametros.to_csv(f"./p4_modeling/data/{self.country}/modeling/hiperparametros.csv")
 
-        return d_best_hiper, model_best_params, cv_accuracy
+        return model_best_params, d_hiper_model, cv_accuracy
 
     def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, _print: bool = True):
         """
@@ -760,23 +756,23 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento     
             try:
-                d_best_hiper, model_best_params, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
-                d_metrics = self.assess_model(model_best_params, X_test, y_test)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Si la precision_test_es mayor, guardar datos...
                 if d_metrics['best_roi'] > best_roi_max:
                     best_roi_max = d_metrics['best_roi']
                  
                     # Guardo datos del mejor modelo
-                    best_hiper = d_best_hiper
-                    best_model = model_best_params
-                    d = {'model_name': model_name, 'model_trained': model_best_params, 'train_cv_accuracy': cv_accuracy}
-                    d.update(d_metrics)
+                    d_hiper_best_model = d_hiper_model
+                    best_model = model
+                    d_metrics_best_model = {'model_name': model_name, 'model_trained': d_hiper_model, 'train_cv_accuracy': cv_accuracy}
+                    d_metrics_best_model.update(d_metrics)
 
             except KeyboardInterrupt:
                 print("Se evitó entrenar este modelo")
         
-        return best_hiper, best_model, d
+        return best_model, d_hiper_best_model, d_metrics_best_model
 
 ##################################################### MAIN #####################################################
 def main():
@@ -784,9 +780,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = True, False, False
+    data_unders, data_prep, modeling = False, True, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -894,15 +890,15 @@ def main():
         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, val_size, test_size, export=export)
 
         # Analizo datos con un modelo
-        d_best_hiper, model_best_params, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
-        d_metrics = mo.assess_model(model_best_params, X_test, y_test, export=export)
+        model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
+        d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
         # Analizo mas de un modelo
         # d_best_hiper, model_best_params, d_best_model = mo.select_best_model(l_modelos, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, k=k, export=False)
 
         if export:
             df_hiper_mod.to_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx', index=True)
-            pickle.dump(model_best_params, open(f"./p4_modeling/data/{country}/modeling/modelo.pkl", "wb"))
+            pickle.dump(model, open(f"./p4_modeling/data/{country}/modeling/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
     df_iteration = pd.DataFrame()
     best_roi_max = -100
     cont_iter = 0
-    l_modelos = [RandomForestClassifier(), LogisticRegression(), SVC(), MLPClassifier(), GradientBoostingClassifier()]  # , XGBClassifier(), 
+    l_modelos = [LogisticRegression(), SVC()]  # RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()
 
     # Creo directorio automaticamente
     make_directories(country)
@@ -45,7 +45,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.125], 
-            'bal_type': ['under', None],
+            'bal_type': [None], # ['under', None],
             'k': [10]
         }
     }
@@ -125,7 +125,7 @@ def find_best_hiperparameters(var_resp, var_pred, country):
                     if len(X_test) >= 100:
                         
                         # Select best model
-                        d_best_hiper, train_model, d_best_model = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
+                        best_model, d_hiper_best_model, d_metrics_best_model = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
 
                         # Guardo datos en dataframe
                         row_data = {'n_iteration': cont_iter, 
@@ -135,26 +135,26 @@ def find_best_hiperparameters(var_resp, var_pred, country):
                                     'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
                                     'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
                                     'k': k}
-                        row_data.update(d_best_model)
+                        row_data.update(d_metrics_best_model)
                         df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
                         df_iteration.to_excel(f'./main_find_best_hyper/data/{country}/df_iteration.xlsx', index=False)
                     
                         # Guardo datos del modelo
-                        pickle.dump(train_model, open(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model.pkl", "wb"))
+                        pickle.dump(best_model, open(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model.pkl", "wb"))
                         try:
-                            df_best_model_hiper = pd.DataFrame.from_dict(d_best_hiper, orient='index', columns=['Valor'])
-                            df_best_model_hiper.to_csv(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model_hiper.csv")
+                            df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
+                            df_hiper_best_model.to_csv(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model_hiper.csv")
                         except:
                             pass
 
                         # Verificar si la precisión actual es la mejor hasta ahora
-                        if d_best_model['best_roi'] > best_roi_max:
-                            best_roi_max = d_best_model['best_roi']
+                        if d_metrics_best_model['best_roi'] > best_roi_max:
+                            best_roi_max = d_metrics_best_model['best_roi']
                             best_hyperparameters = row_data
-                            best_model, hiper_best_model = train_model, train_model.get_params()
-                            print(f"EL MEJOR MODELO HASTA AHORA! ROI: {d_best_model['best_roi']:.2f}%. Precision de test de {d_best_model['test_accuracy']:.2f}%")
+                            best_model, hiper_best_model = best_model, d_hiper_best_model
+                            print(f"EL MEJOR MODELO HASTA AHORA! ROI: {d_metrics_best_model['best_roi']:.2f}%. Precision de test de {d_metrics_best_model['test_accuracy']:.2f}%")
                         else:
-                            print(f"El ROI de {d_best_model['best_roi']:.2f}% es menor a {best_roi_max:.2f}%")
+                            print(f"El ROI de {d_metrics_best_model['best_roi']:.2f}% es menor a {best_roi_max:.2f}%")
                     else:
                         texto = f"Se evitó el entrenamiento con tan pocos datos disponibles (X_test = {X_test.shape[0]} filas)."
                         warnings.warn(texto)
@@ -197,7 +197,7 @@ def make_directories(country):
             os.makedirs(directorio)
 
 def main():
-    country, var_resp, var_pred = "argentina", 'result', 'predicted_result'
+    country, var_resp, var_pred = "spain", 'result', 'predicted_result'
     find_best_hiperparameters(var_resp, var_pred, country)
 
 if __name__ == '__main__':
