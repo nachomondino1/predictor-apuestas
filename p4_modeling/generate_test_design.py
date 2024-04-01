@@ -5,15 +5,24 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
 from random import randint
 
-def balance_dataset(X, y, bal_type):  # Borra indice original de X e y
-    
+def balance_dataset(X, y, bal_type: str):
+    """
+    Balanceo de datos
+    # Parameters
+        X: Dataframe solo con variables predictoras.
+        y: Dataframe solo con variable respuesta.
+        bal_type: Tipo de balanceo a aplicar. Puede ser 'over' o 'under'. (str)
+
+    # Returns
+        X e y pasados como parametros balanceados segun bal_type indicado.
+    """
     # Balanceamos segun variable respuesta
-    if bal_type == 'over':  # Genera overfitting
+    if bal_type == 'over':
         oversampler = RandomOverSampler()  #
         X_bal, y_bal = oversampler.fit_resample(X, y)
 
-    elif bal_type == 'under':  # Genera underfitting si no hago shuffle despues
-        undersampler = RandomUnderSampler()  # Funciona igual que mi funcion pero no cambia dtypes, por lo que, no arroja errores
+    elif bal_type == 'under':
+        undersampler = RandomUnderSampler()
         X_bal, y_bal = undersampler.fit_resample(X, y)
 
     else:
