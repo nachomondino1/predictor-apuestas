@@ -300,7 +300,7 @@ def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"
     print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
     return X
 
-def replace_nan_with_zero(df, col1, col2):  # Esto solo para las columnas n_player_miss_home y n_player_miss_away. Si un equipo no tiene jug asusentes pero el otro si, entonces que reemplece nan por 0 (asi puedo restar home y away evitando el nan puesto que 7 - nan = nan)
+def replace_nan_with_zero(df, col1, col2):  # Si un equipo no tiene jug asusentes pero el otro si, entonces que reemplece nan por 0 (asi puedo restar home y away evitando el nan puesto que 7 - nan = nan)
     """
     Replace NaN values with 0 if one of the variables has an integer value and the other is NaN.
     If both variables are NaN, do not replace any values.

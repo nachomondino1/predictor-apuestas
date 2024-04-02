@@ -36,6 +36,8 @@ def find_best_hiperparameters(var_resp, var_pred, country):
             'segun_localia': [False],
         },
         'select': {
+            # 'n_years_of_data': [15, 20, 50], # Filtro cantidad de años de datos?
+            # algun hiper para seleccionar algunas competencias y otras no...
             'thr_corr': [0.7, 0.8, 0.9, None],
             'thr_fs': [0.2, 0.1, None], 
         },

@@ -105,7 +105,7 @@ def prueba():
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes =  ['df_player_sofifa', 'df_player_fifa_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches']  # ['df_player', 'df_player_temp']  # 
+        l_dataframes = ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
         concat_dfs_per_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country
