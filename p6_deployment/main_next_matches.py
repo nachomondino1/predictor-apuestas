@@ -8,7 +8,7 @@ import re
 import os
 from main import DataPreparation
 ## Data understanding
-from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_missing_data
+from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
 from p3_data_preparation import format_data, select_data, clean_data, construct_data
@@ -104,7 +104,6 @@ class DataUnderstandingNew():
         print(" Collecting data... ")
         # Definicion de variables
         df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        df_teams_concat, df_coaches_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
         df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
         if _print:
@@ -125,7 +124,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss, df_match_odds_miss, df_teams_miss, df_coaches_miss, df_player_miss = extract_missing_data(self.id_country, self.country, id_competition, competition, is_cup, list(df_match.index), _print=True)
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), _print=True, export=False)
             if _print:
                print(f"Cantidad de partidos faltantes en df_match: {df_match_miss.shape[0]}")
 
@@ -133,20 +132,14 @@ class DataUnderstandingNew():
             df_match_concat = pd.concat([df_match_concat, df_match_miss], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_miss], axis=0)
             df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds_miss], axis=0)
-            df_teams_concat = pd.concat([df_teams_concat, df_teams_miss], axis=0)
-            df_coaches_concat = pd.concat([df_coaches_concat, df_coaches_miss], axis=0)
-            df_player_concat = pd.concat([df_player_concat, df_player_miss], axis=0)
             
         # Exporto datasets
         if self.export and len(df_match_miss) > 0:
             df_match_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_miss.xlsx', index=True)
             df_match_player_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_player_miss.xlsx', index=True)
             df_match_odds_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_odds_miss.xlsx', index=True)
-            df_player_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_player_miss.xlsx', index=True)
-            df_teams_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_teams_miss.xlsx', index=True)
-            df_coaches_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_coaches_miss.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_teams_concat, df_coaches_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat
 
     def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame,  df_player:  pd.DataFrame, df_teams:  pd.DataFrame, df_coaches: pd.DataFrame):
 
@@ -735,7 +728,7 @@ def main():
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_miss, df_teams_miss, df_coaches_miss = du.collect_missing_data(df_match)
+        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match)
         print(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
         # Si hay partidos missing que no extraje aun
@@ -770,7 +763,6 @@ def main():
             df_int_with_missing = pd.read_excel(f'./p6_deployment/data/{country}/missing/df_integrated_with_missing.xlsx', index_col=0)
         
     else:
-    
         try:
             df_int_with_missing = pd.read_excel(f'./p6_deployment/data/{country}/missing/df_integrated_with_missing.xlsx', index_col=0)
         except FileNotFoundError:

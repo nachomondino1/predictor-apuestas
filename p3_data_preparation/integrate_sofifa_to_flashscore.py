@@ -5,6 +5,24 @@ import time
 from tqdm import tqdm
 
 
+def unique_values(df: pd.DataFrame, l_cols: list, l_other_cols, col_name):
+    """
+    Obtiene los valores unicos en las columnas especificadas
+    """
+    # Definicion de variables
+    set_unique_values = set()
+
+    # Por columna (e.g. player_start_home_7)
+    for col in l_cols:
+        # Obtengo jugadores unicos y agrego al set
+        l_unique_values = df[col].unique()
+        set_unique_values.update(l_unique_values)  #  Uso set puesto que un jugador puede estar en mas de una columna
+   
+    # Creo dataframe con listado de jugadores unicos
+    df = pd.DataFrame(list(set_unique_values), columns=[col_name])
+    # df = df.dropna() # No se porque le queda un na
+    return df
+
 def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integrate, thr_coincidence_min: int, _print: bool = False):
     """
     Vinculo datasets mediante columna string. Df1 y df2 tienen que tener una columna llamada <column_to_relation>

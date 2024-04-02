@@ -65,7 +65,7 @@ class DataUnderstanding:
         """
         print(" Collecting data... ")
         # Defino variables
-        df_match_concat, df_match_player_concat,df_match_odds_concat, df_teams_concat, df_coaches_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
+        df_match_concat, df_match_player_concat,df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
         df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()  # Sofifa
 
         # Selecciono competencias del country
@@ -78,29 +78,17 @@ class DataUnderstanding:
             print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
             # Extraigo partidos de Flashscore (df_match y df_match_player)
-            df_match, df_match_player, df_match_odds, df_teams, df_coaches, df_player = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=export)
+            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=export)
             
-            # Elimino registros que ya extraje
-            df_teams = df_teams[~df_teams.index.isin(df_teams_concat.index)]
-            df_coaches = df_coaches[~df_coaches.index.isin(df_coaches_concat.index)]
-            df_player = df_player[~df_player.index.isin(df_player_concat.index)]
-
             # Guardo datos
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
-            df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
-            df_coaches_concat = pd.concat([df_coaches_concat, df_coaches], axis=0)
-            df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
-            # Exporto por seguridad
             if export:
                 df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match.xlsx', index=True)
                 df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_player.xlsx', index=True)
                 df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_odds.xlsx', index=True)
-                df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player.xlsx', index=True)
-                df_teams_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_teams.xlsx', index=True)
-                df_coaches_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_coaches.xlsx', index=True)
-
+                
             # Si la competition es una liga
             if row['is_cup'] == 0:
 
@@ -109,14 +97,14 @@ class DataUnderstanding:
                 df_player_sofifa, df_player_fifa_sofifa = scraper_sofifa.extract_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
                 df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
                 df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
-
-                ## Teams
-                df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
-                df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
-
                 if export:
                     df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_sofifa.xlsx', index=True)
                     df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_fifa_sofifa.xlsx', index=True)
+               
+                ## Teams
+                df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
+                df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
+                if export:
                     df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_teams_sofifa.xlsx', index=True)
        
         # Exporto datasets con competiciones del country
@@ -124,16 +112,13 @@ class DataUnderstanding:
             df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
             df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_player.xlsx', index=True)
             df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
-            df_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player.xlsx', index=True)
-            df_teams_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams.xlsx', index=True)
-            df_coaches_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_coaches.xlsx', index=True)
             df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_sofifa.xlsx', index=True)
             df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
             df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams_sofifa.xlsx', index=True)
 
-        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_teams_concat, df_coaches_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat
 
-    def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame,  df_player:  pd.DataFrame, df_teams:  pd.DataFrame, df_coaches: pd.DataFrame, df_player_sofifa:  pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame):
+    def describe_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_sofifa:  pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame):
         """
         Descripcion basica de los datos recolectados como shape, datatypes, cantidad de NaN por columna, etcetera.
         """
@@ -148,18 +133,6 @@ class DataUnderstanding:
 
         print("\n DF_MATCH_ODDS \n".center(240, "-"))
         describe_data.getting_to_know_data(df_match_odds)
-
-        print("\n DF_PLAYER \n".center(240, "-"))
-        describe_data.getting_to_know_data(df_player)
-        describe_data.verificar_unicidad_registros(df_player) # Verifico unicidad de registros segun campos id
-
-        print("\n DF_COACHES \n".center(240, "-"))
-        describe_data.getting_to_know_data(df_coaches)
-        describe_data.verificar_unicidad_registros(df_coaches) # Verifico unicidad de registros segun campos id
-
-        print("\n DF_TEAMS \n".center(240, "-"))
-        describe_data.getting_to_know_data(df_teams)
-        describe_data.verificar_unicidad_registros(df_teams) # Verifico unicidad de registros segun campos id
 
         print("\n DF_PLAYER_SOFIFA \n".center(240, "-"))
         describe_data.getting_to_know_data(df_player_sofifa)
@@ -277,7 +250,7 @@ class DataPreparation:
 
         return df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
 
-    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame, df_teams: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
+    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
         """
         Integra los datos de partidos y players en un solo dataframe.
 
@@ -290,6 +263,15 @@ class DataPreparation:
         """
         start = time.time()
         print("\nIntegrating data...")
+
+        # Creo los dataframes df_teams, df_player, df_coaches de Flashscore.
+        df_teams = unique_values(df, l_cols=['id_team_home', 'id_team_away'])
+        # df_player = 
+        # df_coaches = 
+        # ...
+
+        # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
+
 
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
@@ -780,9 +762,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = True, False, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -797,10 +779,10 @@ def main():
     if data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
-        df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = du.collect_initial_data(export=export)
+        df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = du.collect_initial_data(export=export)
 
         # Describo datos
-        du.describe_data(df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches, df_player_sofifa, df_player_fifa_sofifa)
+        du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
     elif data_prep:
         # Levanto datos ya extraidos
