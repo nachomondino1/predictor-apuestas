@@ -4,24 +4,59 @@ import warnings
 import time
 from tqdm import tqdm
 
-
-def unique_values(df: pd.DataFrame, l_cols: list, l_other_cols, col_name):
+def create_df_teams(df: pd.DataFrame):
     """
     Obtiene los valores unicos en las columnas especificadas
     """
-    # Definicion de variables
-    set_unique_values = set()
-
-    # Por columna (e.g. player_start_home_7)
-    for col in l_cols:
-        # Obtengo jugadores unicos y agrego al set
-        l_unique_values = df[col].unique()
-        set_unique_values.update(l_unique_values)  #  Uso set puesto que un jugador puede estar en mas de una columna
+    l_ids = pd.concat([df['id_team_home'], df['id_team_away']]).unique()
    
-    # Creo dataframe con listado de jugadores unicos
-    df = pd.DataFrame(list(set_unique_values), columns=[col_name])
-    # df = df.dropna() # No se porque le queda un na
-    return df
+    # Crear un DataFrame con los IDs únicos
+    df_teams = pd.DataFrame({'id_team': l_ids})
+
+    # Inicializar una lista para almacenar los nombres de los equipos correspondientes a cada ID
+    l_team_names = []
+
+    # Iterar sobre los IDs únicos y obtener el nombre del equipo correspondiente
+    for id_team in l_ids:
+        # Obtener el nombre del equipo home correspondiente al ID
+        try:
+            team = df[df['id_team_home'] == id_team]['team_home'].iloc[0]
+        except:
+            team = df[df['id_team_away'] == id_team]['team_away'].iloc[0]
+
+        # Concatenar los nombres de los equipos
+        l_team_names.append(team)
+
+    # Agregar la columna de nombres de equipos al nuevo DataFrame
+    df_teams['team_name'] = l_team_names
+    return df_teams
+
+def create_df_player(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas especificadas
+    """
+    l_ids = pd.concat([df['id_team_home'], df['id_team_away']]).unique()
+   
+    # Crear un DataFrame con los IDs únicos
+    df_teams = pd.DataFrame({'id_team': l_ids})
+
+    # Inicializar una lista para almacenar los nombres de los equipos correspondientes a cada ID
+    l_team_names = []
+
+    # Iterar sobre los IDs únicos y obtener el nombre del equipo correspondiente
+    for id_team in l_ids:
+        # Obtener el nombre del equipo home correspondiente al ID
+        try:
+            team = df[df['id_team_home'] == id_team]['team_home'].iloc[0]
+        except:
+            team = df[df['id_team_away'] == id_team]['team_away'].iloc[0]
+            
+        # Concatenar los nombres de los equipos
+        l_team_names.append(team)
+
+    # Agregar la columna de nombres de equipos al nuevo DataFrame
+    df_teams['team_name'] = l_team_names
+    return df_teams
 
 def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integrate, thr_coincidence_min: int, _print: bool = False):
     """

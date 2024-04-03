@@ -40,16 +40,11 @@ class DataUnderstanding:
         l_directorios = [f'{ruta_base}/per_season/df_match/',
                          f'{ruta_base}/per_season/df_match_player/',
                          f'{ruta_base}/per_season/df_match_odds/',                    
-                         f'{ruta_base}/per_season/df_player/',
                         f'{ruta_base}/per_season/df_player_sofifa/',
                          f'{ruta_base}/per_season/df_player_fifa_sofifa/',
-
                          f'{ruta_base}/per_competition/df_match/',
                          f'{ruta_base}/per_competition/df_match_player/',
                         f'{ruta_base}/per_competition/df_match_odds/',
-                         f'{ruta_base}/per_competition/df_player/',
-                        f'{ruta_base}/per_competition/df_teams/',
-                        f'{ruta_base}/per_competition/df_coaches/',
                         f'{ruta_base}/per_competition/df_player_sofifa/',
                         f'{ruta_base}/per_competition/df_player_fifa_sofifa/'
                          ]
@@ -200,14 +195,13 @@ class DataPreparation:
 
         return df_match, df_match_player, df_player_fifa_sofifa
 
-    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player: pd.DataFrame, df_teams: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
+    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
         """
         Limpieza inicial de los dataframes
         """
         start = time.time()
         print("\nCleanning data...")
-        warnings.filterwarnings('ignore')
-        scaler = StandardScaler()  # Crea un objeto StandardScaler
+        # warnings.filterwarnings('ignore')
 
         # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
         print("\nEliminacion de estadisticas irrelevantes")
@@ -218,11 +212,9 @@ class DataPreparation:
         # Preparacion de texto
         print("\nPreparacion de columnas string")
         ## FLASHSCORE
-        ### Dataframe player (df_player)
-        df_player = clean_data.prepare_text_columns(df_player, l_cols_to_process=['player_name'])
-        ### Dataframe teams (df_teams)
-        df_teams = clean_data.prepare_text_columns(df_teams, l_cols_to_process=['team_name'])
-        df_teams = clean_data.clean_teams_names(df_teams)  # Eliminar strings adicionales en names de equipos
+        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=df_match.filter(lambda col: 'id_' not in col, axis=1)) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
+        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=df_match_player.filter(like='player_name'))
+     
         ## SOFIFA
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name'])  # Preaparo texto para integrar
@@ -240,38 +232,39 @@ class DataPreparation:
         print(f"Clean data in {(end - start) / 60:.1f} minutes")
 
         if export:
-            # df_etiquetas.to_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx', index=False)
             df_match.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_match_cleaned.xlsx', index=True)
             df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_match_player_cleaned.xlsx', index=True)
-            df_player.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_cleaned.xlsx', index=True)
-            df_player_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_sofifa_cleaned.xlsx', index=True)
             df_player_fifa_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
             df_teams_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_teams_sofifa_cleaned.xlsx', index=True)
-
-        return df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
+    
+        return df_match, df_match_player, df_player_fifa_sofifa, df_teams_sofifa
 
     def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
         """
         Integra los datos de partidos y players en un solo dataframe.
 
-        :param df_match: Dataframe de los datos de los partidos.
-        :param df_match_player: Dataframe de los datos de los players en cada partido.
-        :param df_player: Dataframe de los datos de los players.
-        :param export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar, False de
-        lo contrario. (bool)
-        :return: Dataframe integrado. (DataFrame)
+        # Parameters:
+            df_match: Dataframe de los datos de los partidos.
+            df_match_player: Dataframe de los datos de los players en cada partido.
+            export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar y False para no exportar. (bool)
+        
+        # Returns:
+            Dataframe integrado. (DataFrame)
         """
         start = time.time()
         print("\nIntegrating data...")
 
         # Creo los dataframes df_teams, df_player, df_coaches de Flashscore.
-        df_teams = unique_values(df, l_cols=['id_team_home', 'id_team_away'])
-        # df_player = 
+        df_teams = create_df_teams(df_match)
         # df_coaches = 
-        # ...
+        # df_stadiums
+        df_player = create_df_player(df_match_player)
+        # df_referees = 
+
+        # Preparo datos para integrar
+        # clean_to_integrate()... 
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
-
 
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
@@ -789,15 +782,11 @@ def main():
         df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
-        df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index_col=0)
-        df_teams = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams.xlsx', index_col=0)
-        df_coaches = pd.read_excel(f'./p2_data_understanding/data/{country}/df_coaches.xlsx', index_col=0)
-
         df_player_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx')
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
 
-        # du.describe_data(df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches, df_player_sofifa, df_player_fifa_sofifa)
+        du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
     #------------------------------------------- DATA PREPARATION -------------------------------------------#
     if data_prep:
@@ -813,8 +802,8 @@ def main():
 
         # Preparo el dataset para el analisis
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
-        df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
-        df = dp.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
+        df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
+        df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
         df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
         df, scaler, columns_used = dp.clean_data_2(df, export=export)

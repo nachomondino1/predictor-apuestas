@@ -60,7 +60,6 @@ class DataUnderstandingNew():
 
         # Definicion de variables
         df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        df_teams_concat, df_coaches_concat, df_player_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         l_competencies = df_match['id_competition'].unique()
         if _print:
             print(f"Competiciones a extraer del pais {self.country}: {l_competencies}")
@@ -74,16 +73,12 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Extraigo proximos partidos
-            df_match_next, df_match_player_next, df_match_odds, df_teams, df_coaches, df_player = extract_next_matches(self.id_country, self.country, id_competition, competition, is_cup, n_days=n_days)
+            df_match_next, df_match_player_next, df_match_odds = extract_next_matches(self.id_country, self.country, id_competition, competition, is_cup, n_days=n_days)
 
             # Guarda datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match_next], axis=0)
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_next], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
-
-            df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
-            df_coaches_concat = pd.concat([df_coaches_concat, df_coaches], axis=0)
-            df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
 
         # Exporto datasets
         if self.export:
@@ -91,11 +86,7 @@ class DataUnderstandingNew():
             df_match_player_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_match_player_next.xlsx', index=True)
             df_match_odds_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_match_next_odds.xlsx', index=True)
 
-            df_player_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_player.xlsx', index=True)
-            df_teams_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_teams.xlsx', index=True)
-            df_coaches_concat.to_excel(f'./p6_deployment/data/{self.country}/data_understanding/df_coaches.xlsx', index=True)
-
-        return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_concat, df_teams_concat, df_coaches_concat
+        return df_match_concat, df_match_player_concat, df_match_odds_concat
 
     def collect_missing_data(self, df_match: pd.DataFrame, _print: bool = False):
         """
@@ -141,7 +132,7 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame,  df_player:  pd.DataFrame, df_teams:  pd.DataFrame, df_coaches: pd.DataFrame):
+    def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame):
 
         print("\nDescribing data... ")
         print("\n DF_MATCH \n".center(240, "-"))
@@ -153,18 +144,6 @@ class DataUnderstandingNew():
 
         print("\n DF_MATCH_ODDS \n".center(240, "-"))
         describe_data.getting_to_know_data(df_match_odds)
-
-        print("\n DF_PLAYER \n".center(240, "-"))
-        describe_data.getting_to_know_data(df_player)
-        describe_data.verificar_unicidad_registros(df_player) # Verifico unicidad de registros segun campos id
-
-        print("\n DF_COACHES \n".center(240, "-"))
-        describe_data.getting_to_know_data(df_coaches)
-        describe_data.verificar_unicidad_registros(df_coaches) # Verifico unicidad de registros segun campos id
-
-        print("\n DF_TEAMS \n".center(240, "-"))
-        describe_data.getting_to_know_data(df_teams)
-        describe_data.verificar_unicidad_registros(df_teams) # Verifico unicidad de registros segun campos id
 
 class DataPreparationNew(DataPreparation):
 
@@ -213,14 +192,13 @@ class DataPreparationNew(DataPreparation):
             df_match.to_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_match_form.xlsx')
         return df_match
 
-    def clean_data_new(self, df_match, df_player: pd.DataFrame, df_teams: pd.DataFrame):
+    def clean_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame):
         """
         Limpieza inicial de los dataframes
 
         # Parameters:
             df_match:
             df_match_player:
-            df_player:
         
         # Returns:
             Dataframe
@@ -231,23 +209,20 @@ class DataPreparationNew(DataPreparation):
         # Dataframe match
         df_match = df_match.drop(['attendance'], axis=1)
 
-        # Dataframe player
-        df_player = clean_data.prepare_text_columns(df_player, l_cols_to_process=['player_name'])
-
-        # Dataframe teams
-        df_teams = clean_data.prepare_text_columns(df_teams, l_cols_to_process=['team_name'])
-        df_teams = clean_data.clean_teams_names(df_teams)  # Eliminar strings adicionales en names de equipos
-
+        # Preparo columnas texto
+        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=df_match.filter(lambda col: 'id_' not in col, axis=1)) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
+        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=df_match_player.filter(like='player_name'))
+     
         end = time.time()
         print(f"Limpieza inicial de datos en {(end - start) / 60:.1f} minutos")
 
         if self.export:
-            df_player.to_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_player_cleaned.xlsx')
-            df_teams.to_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_teams_cleaned.xlsx')
+            df_match.to_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_match_cleaned.xlsx')
+            df_match_player.to_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_match_player_cleaned.xlsx')
 
-        return df_match, df_player, df_teams
+        return df_match, df_match_player
 
-    def integrate_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa):
+    def integrate_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -262,7 +237,7 @@ class DataPreparationNew(DataPreparation):
         Podria guardar el nuevo mapeo para jugadores nuevo o no hace falta? No hace falta creo.
         """
         # Uso integracion de main.py
-        df = self.integrate_data(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
+        df = self.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
 
         if self.export:
             df.to_excel(f'./p6_deployment/data/{self.country}/df_integrated.xlsx')
@@ -736,7 +711,7 @@ def main():
 
             # Guardo df_match y df_match_player concatenados con missing
             if export:
-                df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo odds a float (no se por que son object)
+                # df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo odds a float (no se por que son object)
                 df_concat_match = pd.concat([df_match, df_match_miss], axis=0)
                 df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
                 df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
@@ -747,9 +722,9 @@ def main():
 
             # Preparo datos
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
-            df_match_miss, df_match_player_miss, df_player_miss, df_teams_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_miss, df_teams_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
-            df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_miss, df_teams_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
-            df_integrated_missing = convert_columns_to_float(df_integrated_missing)  # Formateo estadisticas a float (no se por que son object)
+            df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
+            df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
+            # df_integrated_missing = convert_columns_to_float(df_integrated_missing)  # Formateo estadisticas a float (no se por que son object)
       
             # Concateno missing y old
             df_int_with_missing = pd.concat([df_integrated, df_integrated_missing], axis=0)
@@ -775,11 +750,11 @@ def main():
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if data_unders:
         # Extriago datos de los partidos en los proximos dias
-        df_match, df_match_player, df_match_odds, df_player, df_teams, df_coaches = du.collect_initial_data_new(n_days=n_days_max_next_matches)
+        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(n_days=n_days_max_next_matches)
 
         if len(df_match) > 0:
             # Describo datos
-            du.describe_data_new(df_match, df_match_player, df_match_odds,  df_player, df_teams, df_coaches)
+            du.describe_data_new(df_match, df_match_player, df_match_odds)
         else:
             data_prep, modeling, export = False, False, False
             print("No hay proximos partidos para los cuales predecir su resultado.")
@@ -794,9 +769,6 @@ def main():
         df_match = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_match_next.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_match_player_next.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_match_next_odds.xlsx', index_col=0)
-        df_teams = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_teams.xlsx', index_col=0)
-        df_player = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_player.xlsx', index_col=0)
-        df_coaches = pd.read_excel(f'./p6_deployment/data/{country}/data_understanding/df_coaches.xlsx', index_col=0)
         print("\n DF MATCH \n", df_match.head(2))
         print("\n DF MATCH PLAYER \n", df_match_player.head(2))
 
@@ -807,7 +779,7 @@ def main():
         print("\n df_player_sofifa \n", df_player_sofifa.head(2))
         print("\n df_player_fifa_sofifa \n", df_player_fifa_sofifa.head(2))
 
-        # du.describe_data(df_match, df_match_player, df_match_odds, df_player)
+        du.describe_data(df_match, df_match_player, df_match_odds)
 
     #______________________________________________ DATA PREPARATION ______________________________________________#
     print("\n DATA PREPARATION \n".center(240, "#"))
@@ -825,13 +797,13 @@ def main():
 
         # Filtro df para seleccionar ultimos x dias  ## Filtro dataset old por fecha para evitar levantar todos los datos y minimizar tiempo de computo. Solo requiero ultimos 5 part de cada team...
         df_old_int = df_int_with_missing.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
-        df_old_int_filt = df_old_int[df_old_int['date'] >= fecha_limite]  
+        df_old_int_filt = df_old_int[df_old_int['date'] >= fecha_limite]  # Funciona ok, tiene los partidos missing.
         print("Shape de partidos ya jugados con los cuales construir los proximos partidos: ", df_old_int_filt.shape)
         
         # Preparo el dataset para el analisis
         df_match = dp.format_data_new(df_match)
-        df_match, df_player, df_teams = dp.clean_data_new(df_match, df_player, df_teams)
-        df = dp.integrate_data_new(df_match, df_match_player, df_player, df_teams, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
+        df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
+        df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_old_int_filt)
         df = dp.construct_data_new(df, df_old_int, df_old_int_filt, n_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia)
         df = dp.tag_string_data_to_integer_new(df, tager_loaded)
