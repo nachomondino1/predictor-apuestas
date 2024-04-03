@@ -74,7 +74,7 @@ class TextPreparation:
         # return df
         pass
 
-def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = []):
+def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None):
     """
     Prepara el texto de las columns que contengan strings.
 
@@ -86,7 +86,7 @@ def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = []):
         Dataframe pasado como parametro con columns strings ya preparadas para ser analizadas. (DataFrame)
     """
     # Si l_cols_to_process está vacía, procesar todas las columns de texto
-    if not l_cols_to_process:
+    if l_cols_to_process is None:
         l_cols_to_process = df.select_dtypes(include='object').columns.tolist()
     print("\nColumns tipo object a preparar:", l_cols_to_process)
 

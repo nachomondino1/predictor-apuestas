@@ -8,55 +8,83 @@ def create_df_teams(df: pd.DataFrame):
     """
     Obtiene los valores unicos en las columnas especificadas
     """
-    l_ids = pd.concat([df['id_team_home'], df['id_team_away']]).unique()
-   
-    # Crear un DataFrame con los IDs únicos
-    df_teams = pd.DataFrame({'id_team': l_ids})
+    # Combinar las columnas id_team_home y team_home
+    df_home = df[['id_team_home', 'team_home']]
+    df_home.columns = ['id_team', 'team_name']
 
-    # Inicializar una lista para almacenar los nombres de los equipos correspondientes a cada ID
-    l_team_names = []
+    # Combinar las columnas id_team_away y team_away
+    df_away = df[['id_team_away', 'team_away']]
+    df_away.columns = ['id_team', 'team_name']
 
-    # Iterar sobre los IDs únicos y obtener el nombre del equipo correspondiente
-    for id_team in l_ids:
-        # Obtener el nombre del equipo home correspondiente al ID
-        try:
-            team = df[df['id_team_home'] == id_team]['team_home'].iloc[0]
-        except:
-            team = df[df['id_team_away'] == id_team]['team_away'].iloc[0]
-
-        # Concatenar los nombres de los equipos
-        l_team_names.append(team)
-
-    # Agregar la columna de nombres de equipos al nuevo DataFrame
-    df_teams['team_name'] = l_team_names
+    # Concatenar ambos DataFrames y eliminar duplicados
+    df_teams = pd.concat([df_home, df_away]).drop_duplicates()
+  
+    # Establecer los valores únicos como índice
+    df_teams.set_index('id_team', inplace=True)
     return df_teams
+
+def create_df_coaches(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas especificadas
+    """
+    # Combinar las columnas id_team_home y team_home
+    df_home = df[['id_coach_home', 'coach_home']]
+    df_home.columns = ['id_coach', 'coach_name']
+
+    # Combinar las columnas id_team_away y team_away
+    df_away = df[['id_coach_away', 'coach_away']]
+    df_away.columns = ['id_coach', 'coach_name']
+
+    # Concatenar ambos DataFrames y eliminar duplicados
+    df_coaches = pd.concat([df_home, df_away]).drop_duplicates()
+  
+    # Establecer los valores únicos como índice
+    df_coaches.set_index('id_coach', inplace=True)
+    return df_coaches
+
+def create_df_stadiums(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas 
+    # Cuidado. Tendria que ver obtener el estadio del team home de acuerdo al estadio que jugo como local la mayoria de veces (y no por un solo partido)
+    """
+    # Combinar las columnas id_team_home y team_home
+    df = df[df['is_cup'] == 0]
+    df_home = df[['venue', 'id_team_home']].reset_index()
+    df_home = df_home.drop_duplicates(subset='id_team_home')
+    return df_home
 
 def create_df_player(df: pd.DataFrame):
     """
     Obtiene los valores unicos en las columnas especificadas
     """
-    l_ids = pd.concat([df['id_team_home'], df['id_team_away']]).unique()
+    # Identificar las columnas que contienen "id_player"
+    id_player_cols = [col for col in df.columns if 'id_player' in col]
+    print(f"Columnas id: {id_player_cols}")
+
+    # Extraer los valores únicos de esas columnas
+    unique_values = pd.concat([df[col] for col in id_player_cols]).unique()
+    print(f"Cantidad de jugadores: {len(unique_values)}")
+
+    # Convertir a un DataFrame para visualización
+    df_unique_values = pd.DataFrame(unique_values, columns=['id_player'])
    
-    # Crear un DataFrame con los IDs únicos
-    df_teams = pd.DataFrame({'id_team': l_ids})
+    # Establecer los valores únicos como índice
+    df_unique_values.set_index('id_player', inplace=True)
 
-    # Inicializar una lista para almacenar los nombres de los equipos correspondientes a cada ID
-    l_team_names = []
+    # Por jugador
+    for id_player, row in df_unique_values.iterrows():
+        
+        # obtengo su nombre
+        for id_match, row_match in df.iterrows():
 
-    # Iterar sobre los IDs únicos y obtener el nombre del equipo correspondiente
-    for id_team in l_ids:
-        # Obtener el nombre del equipo home correspondiente al ID
-        try:
-            team = df[df['id_team_home'] == id_team]['team_home'].iloc[0]
-        except:
-            team = df[df['id_team_away'] == id_team]['team_away'].iloc[0]
-            
-        # Concatenar los nombres de los equipos
-        l_team_names.append(team)
+            for col in id_player_cols:
 
-    # Agregar la columna de nombres de equipos al nuevo DataFrame
-    df_teams['team_name'] = l_team_names
-    return df_teams
+                if row_match[col] == id_player:
+                    col_to_fetch = col.replace("id_player", "player_name")
+                    player_name = row_match[col_to_fetch]
+                    df_unique_values.loc[id_player, 'player_name'] = player_name
+
+    return df_unique_values
 
 def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integrate, thr_coincidence_min: int, _print: bool = False):
     """

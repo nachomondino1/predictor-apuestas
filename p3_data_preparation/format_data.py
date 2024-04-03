@@ -144,7 +144,7 @@ def convert_columns_to_int_2(df, df_etiquetas):
     Etiquetado usando un df_etiquetas ya creado. Es para main_next_matches. Tengo en cuenta posibles nuevas etiquetas y las agrego a df_etiquetas
     """
     # Determino columnas a codificar de string a integer
-    l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
+    l_columnas_a_codificar = df_etiquetas['variable'].unique()
     print("Columnas a codificar: ", l_columnas_a_codificar)
    
     # Por columna a codificar

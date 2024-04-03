@@ -115,7 +115,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), _print=True, export=False)
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
             if _print:
                print(f"Cantidad de partidos faltantes en df_match: {df_match_miss.shape[0]}")
 
@@ -210,8 +210,10 @@ class DataPreparationNew(DataPreparation):
         df_match = df_match.drop(['attendance'], axis=1)
 
         # Preparo columnas texto
-        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=df_match.filter(lambda col: 'id_' not in col, axis=1)) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
-        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=df_match_player.filter(like='player_name'))
+        columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
+        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
+        columns_player_names = list(df_match_player.filter(like='player_name').columns)
+        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=columns_player_names)
      
         end = time.time()
         print(f"Limpieza inicial de datos en {(end - start) / 60:.1f} minutos")
@@ -262,7 +264,7 @@ class DataPreparationNew(DataPreparation):
         df_new, df_copiado_formaciones = fillna_with_mean_in_last_matches(df_new, df_old_int, cols_to_fill=l_player_cols)            
             
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
-        l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away']      
+        l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away']  # coach_home y coach_away no harian falta pues se usa solo para integrar.  
         df_new, df_copiado = fillna_with_last_match_value(df_new, df_old_int, cols_to_fill=l_var_to_copy) 
 
         if self.export:
@@ -680,9 +682,9 @@ def main():
     var_resp, var_pred = 'result', 'predicted_result'
     run_missing, data_unders, data_prep, modeling = False, False, True, True
     export = True
-    country = "argentina"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = "england"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     numero_mejor_modelo = 10 # ING: 10 ARG: 10 (LOG) (podria ser o 46 (SVM) o 90 (GB) pero me gusta mas LOG pq su prec es mas alta sinceramente ademas de un ROI mayor)
-    n_days_max_next_matches = 1  # Numero de dias maximo desde hoy para extraer partidos
+    n_days_max_next_matches = 2  # Numero de dias maximo desde hoy para extraer partidos
 
     # Determino id_country
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -779,7 +781,7 @@ def main():
         print("\n df_player_sofifa \n", df_player_sofifa.head(2))
         print("\n df_player_fifa_sofifa \n", df_player_fifa_sofifa.head(2))
 
-        du.describe_data(df_match, df_match_player, df_match_odds)
+        du.describe_data_new(df_match, df_match_player, df_match_odds)
 
     #______________________________________________ DATA PREPARATION ______________________________________________#
     print("\n DATA PREPARATION \n".center(240, "#"))
@@ -827,7 +829,7 @@ def main():
     if modeling:
 
         # Levanto datasets
-        df_teams = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams.xlsx', index_col=0)
+        df_teams = pd.read_excel(f'p3_data_preparation/data/{country}/integrate_data/df_teams.xlsx', index_col=0)
         df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']]
 
         # Levanto modelo ya entrenado
@@ -845,6 +847,7 @@ def main():
         # Determino estrategia de apuuesta
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df)
+        # df = asses_model.determine_stake_to_bet(df, type_relation='linear', m=20, b=0)
         df = asses_model.calculate_multiplier(df, type_relation='linear', m=20, b=0)
         # stake_a_apostar = 1 * (1 + row['multiplier'])
 

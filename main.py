@@ -212,8 +212,11 @@ class DataPreparation:
         # Preparacion de texto
         print("\nPreparacion de columnas string")
         ## FLASHSCORE
-        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=df_match.filter(lambda col: 'id_' not in col, axis=1)) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
-        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=df_match_player.filter(like='player_name'))
+        columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
+        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
+        columns_player_names = list(df_match_player.filter(like='player_name').columns)
+        print(f"columns_player_names: {columns_player_names}")
+        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=columns_player_names)
      
         ## SOFIFA
         ### Dataframe player sofifa (df)
@@ -234,10 +237,11 @@ class DataPreparation:
         if export:
             df_match.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_match_cleaned.xlsx', index=True)
             df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_match_player_cleaned.xlsx', index=True)
+            df_player_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_sofifa_cleaned.xlsx', index=True)
             df_player_fifa_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
             df_teams_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_teams_sofifa_cleaned.xlsx', index=True)
     
-        return df_match, df_match_player, df_player_fifa_sofifa, df_teams_sofifa
+        return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
 
     def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
         """
@@ -256,15 +260,16 @@ class DataPreparation:
 
         # Creo los dataframes df_teams, df_player, df_coaches de Flashscore.
         df_teams = create_df_teams(df_match)
-        # df_coaches = 
-        # df_stadiums
+        # df_coaches = create_df_coaches(df_match)
         df_player = create_df_player(df_match_player)
-        # df_referees = 
-
-        # Preparo datos para integrar
-        # clean_to_integrate()... 
+        # Agregar si quiero crear otro df como df_stadiums o df_referees
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
+        cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away'] # main_next a veces no tiene coaches.. deeberia copiar antes...
+        cols_to_drop_filt = [col for col in cols_to_drop if col in df_match.columns]
+        df_match = df_match.drop(cols_to_drop_filt, axis=1)
+        # player_name_cols = [col for col in df.columns if 'player_name' in col] # no hace falta pues cuando integro solo uso las columnas id...
+        # df_match_player = df_match.drop(player_name_cols, axis=1)
 
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
@@ -280,6 +285,9 @@ class DataPreparation:
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         
         if export:
+            df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
+            df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
+            # df_coaches.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_coaches.xlsx", index=True)
             df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
             df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_integrated.xlsx', index=True)
@@ -757,7 +765,7 @@ def main():
     # Definicion de variables
     country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = True, False, False
+    data_unders, data_prep, modeling = False, True, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
