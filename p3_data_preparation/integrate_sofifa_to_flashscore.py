@@ -57,32 +57,20 @@ def create_df_player(df: pd.DataFrame):
     """
     Obtiene los valores unicos en las columnas especificadas
     """
-    # Identificar las columnas que contienen "id_player"
+    # Identificar las columnas que contienen "id_player" y "player_name"
     id_player_cols = [col for col in df.columns if 'id_player' in col]
-    print(f"Columnas id: {id_player_cols}")
+    player_name_cols = [col.replace("id_player", "player_name") for col in id_player_cols]
 
-    # Extraer los valores únicos de esas columnas
-    unique_values = pd.concat([df[col] for col in id_player_cols]).unique()
-    print(f"Cantidad de jugadores: {len(unique_values)}")
+    # Extraer los valores únicos de "id_player" y sus correspondientes "player_name"
+    unique_values = set()
+    for id_col, name_col in zip(id_player_cols, player_name_cols):
+        unique_values.update(zip(df[id_col], df[name_col]))
 
-    # Convertir a un DataFrame para visualización
-    df_unique_values = pd.DataFrame(unique_values, columns=['id_player'])
-   
-    # Establecer los valores únicos como índice
+    # Crear DataFrame con los valores únicos
+    df_unique_values = pd.DataFrame(list(unique_values), columns=['id_player', 'player_name'])
+
+    # Establecer 'id_player' como índice
     df_unique_values.set_index('id_player', inplace=True)
-
-    # Por jugador
-    for id_player, row in df_unique_values.iterrows():
-        
-        # obtengo su nombre
-        for id_match, row_match in df.iterrows():
-
-            for col in id_player_cols:
-
-                if row_match[col] == id_player:
-                    col_to_fetch = col.replace("id_player", "player_name")
-                    player_name = row_match[col_to_fetch]
-                    df_unique_values.loc[id_player, 'player_name'] = player_name
 
     return df_unique_values
 
