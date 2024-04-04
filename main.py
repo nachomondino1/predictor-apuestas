@@ -208,6 +208,11 @@ class DataPreparation:
         stats_columns = construct_data.determine_stats_columns(df_match)
         relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
         df_match = clean_data.delete_not_relevant_stats(df_match, stats_columns, relevant_stats_columns)
+       
+        # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
+        non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
+        df_match_player.drop(columns=non_object_columns, inplace=True)
+        print("Shape df_match_player: ", df_match_player.shape)
 
         # Preparacion de texto
         print("\nPreparacion de columnas string")
@@ -318,8 +323,8 @@ class DataPreparation:
         df = construct_data.determine_points(df)
         ## Historial entre si
         if not without_h2h:
-            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=True) # QUIERO USAR EL MAXIMO HISTORIAL, NO QUIERO TENER QUE DECIRLE...
-            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=False) # QUIERO USAR EL MAXIMO HISTORIAL, NO QUIERO TENER QUE DECIRLE...
+            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=True)
+            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=False)
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
 
@@ -763,7 +768,7 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'argentina'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
     data_unders, data_prep, modeling = False, True, False
     export = True

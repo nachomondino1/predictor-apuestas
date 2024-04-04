@@ -87,12 +87,18 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
     """
     print("\n Constructing Head to Head...")
     # Definicion de variables
+    start = time.time()
+
     if n_years == -1:
         n_years = (max(df['date']) - min(df['date'])).days / 365
         n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
     n_days =  365 * n_years
-    l_equipos = df['id_team_home'].unique()
     h2h_col_name = f'h2h_{n_years}_segun_loc' if segun_localia else f'h2h_{n_years}'
+
+    # Determino equipos a calcular el historial
+    frecuencias = df['id_team_home'].value_counts()
+    l_equipos = frecuencias[frecuencias > int(0.001*len(df))].index.tolist()  # l_equipos = df['id_team_home'].unique()
+    print(f"Integer {int(0.001*len(df))} ; Cantidad de equipos: {len(l_equipos)}")
 
     # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
     df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
@@ -119,10 +125,8 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
                 # Por partido entre equipos
                 for idx, row in df_hist.iterrows():
 
-                    h2h = 0
-                    limit_date = row['date'] - timedelta(days=n_days)
-
                     # Selecciono los ultimos matchs
+                    limit_date = row['date'] - timedelta(days=n_days)
                     df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
                     if _print:
                         print(f"\nPartido al cual construir historial: 'id_match': {idx} 'Date': {row['date']} 'team_home': {row['id_team_home']} 'team_away': {row['id_team_away']} ")
@@ -130,11 +134,10 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
                         print(df_hist_filt.loc[:, ['date', 'id_team_home', 'id_team_away', 'result']])
 
                     # Por ultimos matchs
+                    h2h = 0
                     for _, fila in df_hist_filt.iterrows():
-
                         if fila['result'] == 1:
                             h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
-
                         elif fila['result'] == 2:
                             h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
                         if _print:
@@ -146,6 +149,8 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
                         if _print:
                             print(f"Historial a agregar: {h2h/len(df_hist_filt)}")
 
+    end = time.time()
+    print(f"Construccion de historiales in {(end - start) / 60:.1f} minutes")
     return df
 
 ## Stats
@@ -412,16 +417,16 @@ def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int
 # PRUEBA
 def prueba():
     # Definicion de variables
-    country = 'Argentina'
+    country = 'england'
     var_resp = 'result'
     n_days = 30  # 30 es como N_LAST_MATCH igual a 5...
-    n_years_h2h = 2
+    n_years_h2h = 10
     segun_localia = True
 
     # Levanto dataset
     df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
     df = df.sort_values(by='date', ascending=False)
-    df = df.head(200)
+    # df = df.head(5000)
     print(df.head())
 
     start = time.time()
@@ -435,24 +440,24 @@ def prueba():
     df = h2h_by_date(df, n_years=-1, segun_localia=True) # QUIERO USAR EL MAXIMO HISTORIAL, NO QUIERO TENER QUE DECIRLE...
     df = h2h_by_date(df, n_years=-1, segun_localia=False) # QUIERO USAR EL MAXIMO HISTORIAL, NO QUIERO TENER QUE DECIRLE...
     df = h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
-    df = h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
+    df = h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
 
     # STATS
-    stats_columns = determine_stats_columns(df)
-    print(f"Stats a promediar en ultimos partidos: {stats_columns}")
+    # stats_columns = determine_stats_columns(df)
+    # print(f"Stats a promediar en ultimos partidos: {stats_columns}")
     
     # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
     # df = construct_percentaje_column(df, col_num="shots_on_goal", col_den="goal_attempts")
     # df = construct_percentaje_column(df, col_num="goals", col_den="goal_attempts")
 
     # Determino cuales son las variables stats automaticamente
-    df = calculate_dif_col_stats(df, stats_columns, n_days, segun_localia)
+    # df = calculate_dif_col_stats(df, stats_columns, n_days, segun_localia)
 
     # PLAYER 
     # Construyo variables de diferencias para las variables promedio de los players
-    df = determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
-    df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
-    df = calculate_dif_col_players(df)
+    # df = determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
+    # df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
+    # df = calculate_dif_col_players(df)
 
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")

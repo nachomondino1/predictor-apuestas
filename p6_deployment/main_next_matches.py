@@ -396,13 +396,12 @@ class DataPreparationNew(DataPreparation):
         # Returns:
             df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
         """
-        # Reemplazo historiales nan por 0
-        columnas_h2h = [col for col in df.columns if 'h2h_' in col]
-        df[columnas_h2h] = df[columnas_h2h].fillna(0)
-
-        # A veces, las columnas dif de jugadores ausentes es NaN dado que uno delos equipos no tiene jug ausentes. Podria evitarlo.
-        l_columns = ['dif_mean_last_match_n_matches_last_days', 'dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss', 'dif_sum_rat_player_miss', 'dif_sum_val_player_miss']
-        df[l_columns] = df[l_columns].fillna(0)
+        # Rellenar NaN en algunas columnas espeecificas
+        columnas_h2h = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
+        columnas_player_miss = ['dif_mean_last_match_n_matches_last_days', 'dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss', 'dif_sum_rat_player_miss', 'dif_sum_val_player_miss']         # A veces, las columnas dif de jugadores ausentes es NaN dado que uno delos equipos no tiene jug ausentes. Podria evitarlo.
+        columns_to_fill = [col for col in (columnas_player_miss + columnas_h2h) if col in df.columns]
+        if columns_to_fill:
+            df[columns_to_fill] = df[columns_to_fill].fillna(0)
 
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
@@ -430,7 +429,6 @@ def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, col
         Dataframe df_new pasado como parametro habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
     """
     print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
-    # Definicion de variables
     df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_new.index)
     
     # Por variable mean_player 
@@ -478,8 +476,6 @@ def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, col
                     if _print:
                         print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
 
-    # Relleno valores nan con valor 0 indicando que no copie formaciones
-    df_copiado_form.fillna(0, inplace=True)
     return df_new, df_copiado_form
 
 def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list, _print: bool = False):
@@ -520,8 +516,6 @@ def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to
                         df_copiado.loc[id_match, var] = row_prev_match[variable_prev_match]
                         break
 
-    # Relleno valores nan con valor 0 indicando que no copie
-    df_copiado.fillna(0, inplace=True)
     return df_new, df_copiado
 
 # Missing data
@@ -683,7 +677,7 @@ def main():
     run_missing, data_unders, data_prep, modeling = False, False, True, True
     export = True
     country = "england"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
-    numero_mejor_modelo = 10 # ING: 10 ARG: 10 (LOG) (podria ser o 46 (SVM) o 90 (GB) pero me gusta mas LOG pq su prec es mas alta sinceramente ademas de un ROI mayor)
+    numero_mejor_modelo = 1 # ING: 10 ARG: 10 (LOG) (podria ser o 46 (SVM) o 90 (GB) pero me gusta mas LOG pq su prec es mas alta sinceramente ademas de un ROI mayor)
     n_days_max_next_matches = 2  # Numero de dias maximo desde hoy para extraer partidos
 
     # Determino id_country
@@ -847,9 +841,7 @@ def main():
         # Determino estrategia de apuuesta
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df)
-        # df = asses_model.determine_stake_to_bet(df, type_relation='linear', m=20, b=0)
-        df = asses_model.calculate_multiplier(df, type_relation='linear', m=20, b=0)
-        # stake_a_apostar = 1 * (1 + row['multiplier'])
+        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=20, b=0)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
