@@ -373,7 +373,7 @@ def prueba():
     Funcion para poder correr una prueba especifica del actual archivo independientemente de main.py.
     """
     # Seleccionar pais  
-    country = "argentina"
+    country = "spain"
 
     # Levanto paises y busco id_country
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -383,6 +383,8 @@ def prueba():
     df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
     df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
 
+    df_teams_concat = pd.DataFrame()
+
     # POR COMPETITION
     for i, row in df_comp_country.iterrows():
         print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
@@ -390,13 +392,17 @@ def prueba():
         if row['is_cup'] == 0:
 
             # Player
-            df_player, df_player_fifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
-            df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
-            df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
+            # df_player, df_player_fifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
+            # df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
+            # df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
             
             # Teams
             df_teams = extract_teams(id_country, country, row['competition_sofifa'])
-            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=False)
+            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
+
+            df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
+    
+    df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

@@ -74,7 +74,7 @@ class TextPreparation:
         # return df
         pass
 
-def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = []):
+def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None):
     """
     Prepara el texto de las columns que contengan strings.
 
@@ -86,7 +86,7 @@ def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = []):
         Dataframe pasado como parametro con columns strings ya preparadas para ser analizadas. (DataFrame)
     """
     # Si l_cols_to_process está vacía, procesar todas las columns de texto
-    if not l_cols_to_process:
+    if l_cols_to_process is None:
         l_cols_to_process = df.select_dtypes(include='object').columns.tolist()
     print("\nColumns tipo object a preparar:", l_cols_to_process)
 
@@ -300,7 +300,7 @@ def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"
     print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
     return X
 
-def replace_nan_with_zero(df, col1, col2):  # Esto solo para las columnas n_player_miss_home y n_player_miss_away. Si un equipo no tiene jug asusentes pero el otro si, entonces que reemplece nan por 0 (asi puedo restar home y away evitando el nan puesto que 7 - nan = nan)
+def replace_nan_with_zero(df, col1, col2):  # Si un equipo no tiene jug asusentes pero el otro si, entonces que reemplece nan por 0 (asi puedo restar home y away evitando el nan puesto que 7 - nan = nan)
     """
     Replace NaN values with 0 if one of the variables has an integer value and the other is NaN.
     If both variables are NaN, do not replace any values.

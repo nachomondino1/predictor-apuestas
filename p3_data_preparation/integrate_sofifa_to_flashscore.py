@@ -4,6 +4,75 @@ import warnings
 import time
 from tqdm import tqdm
 
+def create_df_teams(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas especificadas
+    """
+    # Combinar las columnas id_team_home y team_home
+    df_home = df[['id_team_home', 'team_home']]
+    df_home.columns = ['id_team', 'team_name']
+
+    # Combinar las columnas id_team_away y team_away
+    df_away = df[['id_team_away', 'team_away']]
+    df_away.columns = ['id_team', 'team_name']
+
+    # Concatenar ambos DataFrames y eliminar duplicados
+    df_teams = pd.concat([df_home, df_away]).drop_duplicates()
+  
+    # Establecer los valores únicos como índice
+    df_teams.set_index('id_team', inplace=True)
+    return df_teams
+
+def create_df_coaches(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas especificadas
+    """
+    # Combinar las columnas id_team_home y team_home
+    df_home = df[['id_coach_home', 'coach_home']]
+    df_home.columns = ['id_coach', 'coach_name']
+
+    # Combinar las columnas id_team_away y team_away
+    df_away = df[['id_coach_away', 'coach_away']]
+    df_away.columns = ['id_coach', 'coach_name']
+
+    # Concatenar ambos DataFrames y eliminar duplicados
+    df_coaches = pd.concat([df_home, df_away]).drop_duplicates()
+  
+    # Establecer los valores únicos como índice
+    df_coaches.set_index('id_coach', inplace=True)
+    return df_coaches
+
+def create_df_stadiums(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas 
+    # Cuidado. Tendria que ver obtener el estadio del team home de acuerdo al estadio que jugo como local la mayoria de veces (y no por un solo partido)
+    """
+    # Combinar las columnas id_team_home y team_home
+    df = df[df['is_cup'] == 0]
+    df_home = df[['venue', 'id_team_home']].reset_index()
+    df_home = df_home.drop_duplicates(subset='id_team_home')
+    return df_home
+
+def create_df_player(df: pd.DataFrame):
+    """
+    Obtiene los valores unicos en las columnas especificadas
+    """
+    # Identificar las columnas que contienen "id_player" y "player_name"
+    id_player_cols = [col for col in df.columns if 'id_player' in col]
+    player_name_cols = [col.replace("id_player", "player_name") for col in id_player_cols]
+
+    # Extraer los valores únicos de "id_player" y sus correspondientes "player_name"
+    unique_values = set()
+    for id_col, name_col in zip(id_player_cols, player_name_cols):
+        unique_values.update(zip(df[id_col], df[name_col]))
+
+    # Crear DataFrame con los valores únicos
+    df_unique_values = pd.DataFrame(list(unique_values), columns=['id_player', 'player_name'])
+
+    # Establecer 'id_player' como índice
+    df_unique_values.set_index('id_player', inplace=True)
+
+    return df_unique_values
 
 def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integrate, thr_coincidence_min: int, _print: bool = False):
     """
