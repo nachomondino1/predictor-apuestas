@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import os
+import datetime
 ## Data understanding
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
@@ -370,7 +371,7 @@ class DataPreparation:
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select, competencies_to_select, _print: bool = True, export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -380,35 +381,52 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
-        # Separo en X e y
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
+        df = df.sort_values(by='date', ascending=False)
+        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
         
-        # Elimino filas con mucho NaN (filas sin estadisticas ni formaciones)
+        # Eliminacion de filas 
+        ## Para evitar partidos muy viejos
+        print("Eliminacion de filas...")
+        n_reg_inic = len(X)
+        fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+        X = X[X['date'] >= fecha_limite] 
+        print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+        ## Para evitar ciertas competencias
+        n_reg_inic_2 = len(X)
+        X = X[X['id_competition'].isin(competencies_to_select)]
+        print(f"Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
+        ## con mucho NaN (filas sin estadisticas ni formaciones)
+        n_reg_inic_3 = len(X)
         X = clean_data.delete_rows_nan(X, 0.5, _print=True)
+        print(f"Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+        # if _print:
+        #     print("Eliminacion de filas...")
+        #     print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
-        # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        X = X.drop(['date', 'venue'], axis=1)  
-
-        # Elimino columnas constantes
-        constant_cols = X.columns[X.nunique() == 1]
-        X.drop(columns=constant_cols, inplace=True)
-        print(f"Columnas constantes eliminadas: {constant_cols}")
-
-        # Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
+        # Eliminacion de columnas 
+        # usadas solo para construir y constantes
+        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
+        X.drop(columns=cols_for_construct+cols_constants, inplace=True)
+        ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
         n_reg_min = int(0.15*len(X))
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
-        print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
-        if len(X.columns) != len(X_sin_col_mucho_nan.columns):
-            l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
-            text = f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}"
-            warnings.warn(text)
+        if _print:
+            print("Eliminación de columnas...")
+            print(f"Columnas constantes eliminadas: {cols_constants}")
+            if len(X.columns) != len(X_sin_col_mucho_nan.columns):
+                l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
+                text = f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}"
+                warnings.warn(text)
+            print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
 
         # Escalado de datos
-        print("\nEscalado de datos")
         scaler = StandardScaler()
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
+        if _print:
+            print("\nEscalado de datos...")
 
         # Concateno X e y
         y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
@@ -768,9 +786,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'argentina'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'italy'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, True, False
+    data_unders, data_prep, modeling = True, False, False
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')

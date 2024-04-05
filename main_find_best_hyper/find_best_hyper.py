@@ -15,15 +15,28 @@ import joblib
 import warnings
 import os
 
-def find_best_hiperparameters(var_resp, var_pred, country):
-
+def find_best_hiperparameters(id_country, country):
+    """
+    Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
+    """
     # Definicion de variables
-    dp = DataPreparation(country)
-    mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
     df_iteration = pd.DataFrame()
     best_roi_max = -100
     cont_iter = 0
     l_modelos = [LogisticRegression(), SVC()]  # RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()
+    var_resp, var_pred = 'result', 'predicted_result'
+    dp = DataPreparation(country)
+    mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
+
+    # Determino competencias
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+    df_comp_country_sin_sec_div = df_comp_country[(df_comp['is_second_division'] == 0)]
+    df_comp_country_sin_cups = df_comp_country[(df_comp['is_cup'] == 0)]
+    all_comp = df_comp_country['id_competition'].values
+    comp_sin_b = df_comp_country_sin_sec_div['id_competition'].values
+    comp_sin_cups = df_comp_country_sin_cups['id_competition'].values
+    print(all_comp, comp_sin_b, comp_sin_cups)
 
     # Creo directorio automaticamente
     make_directories(country)
@@ -31,13 +44,15 @@ def find_best_hiperparameters(var_resp, var_pred, country):
     # Definicion de hiperparametros
     d_params = {
         'construct': {
-            'n_dias_ult_part': [30, 45],
+            'n_dias_ult_part': [30],
             'n_years_h2h': [3],
-            'segun_localia': [False],
+            'segun_localia': [False]
+        },
+        'clean_data_2': {
+            'n_years_to_select': [20], # Filtro cantidad de años de datos?
+            'competencies_to_select': [all_comp] # [comp_sin_b, comp_sin_cups, all_comp] # algun hiper para seleccionar algunas competencias y otras no...
         },
         'select': {
-            # 'n_years_of_data': [15, 20, 50], # Filtro cantidad de años de datos?
-            # algun hiper para seleccionar algunas competencias y otras no...
             'thr_corr': [0.7, 0.8, 0.9, None],
             'thr_fs': [0.2, 0.1, None], 
         },
@@ -83,83 +98,90 @@ def find_best_hiperparameters(var_resp, var_pred, country):
         df_etiquetas.to_excel(path, index=True)
 
         # Clean data 2
-        df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, export=False)
-        joblib.dump((scaler, columns_used), f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.pkl')
+        for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
+
+            n_years_to_select, comp_to_select = param_values_00[0], param_values_00[1]
+            print(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
+            print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
+
+            df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, n_years_to_select, comp_to_select, export=False)
+            joblib.dump((scaler, columns_used), f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}.pkl')
         
-        # Por combinacion de parametros de select_data
-        for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
+            # Por combinacion de parametros de select_data
+            for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
-            # Asigno valor a cada hiperpametro
-            thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-            print(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
-            print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
+                # Asigno valor a cada hiperpametro
+                thr_corr, thr_fs = param_values_4[0], param_values_4[1]
+                print(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
+                print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
-            # Selecciono datos
-            path = f'./main_find_best_hyper/data/{country}/data_preparation/df_selected_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{thr_corr}_{thr_fs}.xlsx'
-            try:
-                df_sel = pd.read_excel(path, index_col=0)
-            except FileNotFoundError:
-                df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
-                df_sel.to_excel(path, index=True)
-          
-            for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
+                # Selecciono datos
+                path = f'./main_find_best_hyper/data/{country}/data_preparation/df_selected_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{thr_corr}_{thr_fs}.xlsx'
+                try:
+                    df_sel = pd.read_excel(path, index_col=0)
+                except FileNotFoundError:
+                    df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                    df_sel.to_excel(path, index=True)
+            
+                for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
 
-                fill_na = param_values_3[0]
-                print(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
-                print(f"Hiper treat --> fill_na: {fill_na}")
+                    fill_na = param_values_3[0]
+                    print(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
+                    print(f"Hiper treat --> fill_na: {fill_na}")
 
-                df_sel_treated = dp.treat_nan_values(df_sel, fill_na=fill_na, export=False)
+                    df_sel_treated = dp.treat_nan_values(df_sel, fill_na=fill_na, export=False)
 
-                # Por combinacion de parametros de modeling
-                for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-                    cont_iter += 1
+                    # Por combinacion de parametros de modeling
+                    for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
+                        cont_iter += 1
 
-                    # Asigno valor a cada hiperparametro
-                    val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
-                    print(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
-                    print(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
-                    print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                        # Asigno valor a cada hiperparametro
+                        val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                        print(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
+                        print(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
+                        print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
 
-                    # Generar el diseño de la prueba
-                    X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
+                        # Generar el diseño de la prueba
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
 
-                    # Si hay suficientes datos
-                    if len(X_test) >= 100:
+                        # Si hay suficientes datos
+                        if len(X_test) >= 100:
+                            
+                            # Select best model
+                            best_model, d_hiper_best_model, d_metrics_best_model = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
+
+                            # Guardo datos en dataframe
+                            row_data = {'n_iteration': cont_iter, 
+                                        'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia,
+                                        'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                                        'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
+                                        'fill_na': fill_na, 'bal_type': bal_type,
+                                        'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                        'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                                        'k': k}
+                            row_data.update(d_metrics_best_model)
+                            df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
+                            df_iteration.to_excel(f'./main_find_best_hyper/data/{country}/df_iteration.xlsx', index=False)
                         
-                        # Select best model
-                        best_model, d_hiper_best_model, d_metrics_best_model = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
+                            # Guardo datos del modelo
+                            pickle.dump(best_model, open(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model.pkl", "wb"))
+                            try:
+                                df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
+                                df_hiper_best_model.to_csv(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model_hiper.csv")
+                            except:
+                                pass
 
-                        # Guardo datos en dataframe
-                        row_data = {'n_iteration': cont_iter, 
-                                    'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia,
-                                    'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                    'fill_na': fill_na, 'bal_type': bal_type,
-                                    'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
-                                    'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
-                                    'k': k}
-                        row_data.update(d_metrics_best_model)
-                        df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                        df_iteration.to_excel(f'./main_find_best_hyper/data/{country}/df_iteration.xlsx', index=False)
-                    
-                        # Guardo datos del modelo
-                        pickle.dump(best_model, open(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model.pkl", "wb"))
-                        try:
-                            df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
-                            df_hiper_best_model.to_csv(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model_hiper.csv")
-                        except:
-                            pass
-
-                        # Verificar si la precisión actual es la mejor hasta ahora
-                        if d_metrics_best_model['best_roi'] > best_roi_max:
-                            best_roi_max = d_metrics_best_model['best_roi']
-                            best_hyperparameters = row_data
-                            best_model, hiper_best_model = best_model, d_hiper_best_model
-                            print(f"EL MEJOR MODELO HASTA AHORA! ROI: {d_metrics_best_model['best_roi']:.2f}%. Precision de test de {d_metrics_best_model['test_accuracy']:.2f}%")
+                            # Verificar si la precisión actual es la mejor hasta ahora
+                            if d_metrics_best_model['best_roi'] > best_roi_max:
+                                best_roi_max = d_metrics_best_model['best_roi']
+                                best_hyperparameters = row_data
+                                best_model, hiper_best_model = best_model, d_hiper_best_model
+                                print(f"EL MEJOR MODELO HASTA AHORA! ROI: {d_metrics_best_model['best_roi']:.2f}%. Precision de test de {d_metrics_best_model['test_accuracy']:.2f}%")
+                            else:
+                                print(f"El ROI de {d_metrics_best_model['best_roi']:.2f}% es menor a {best_roi_max:.2f}%")
                         else:
-                            print(f"El ROI de {d_metrics_best_model['best_roi']:.2f}% es menor a {best_roi_max:.2f}%")
-                    else:
-                        texto = f"Se evitó el entrenamiento con tan pocos datos disponibles (X_test = {X_test.shape[0]} filas)."
-                        warnings.warn(texto)
+                            texto = f"Se evitó el entrenamiento con tan pocos datos disponibles (X_test = {X_test.shape[0]} filas)."
+                            warnings.warn(texto)
 
     # Guardo datos de todas las iteraciones
     df_iteration.to_excel(f'./main_find_best_hyper/data/{country}/df_iteration.xlsx', index=False)
@@ -199,8 +221,12 @@ def make_directories(country):
             os.makedirs(directorio)
 
 def main():
-    country, var_resp, var_pred = "spain", 'result', 'predicted_result'
-    find_best_hiperparameters(var_resp, var_pred, country)
+    country = 'argentina'
+
+    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+
+    find_best_hiperparameters(id_country, country)
 
 if __name__ == '__main__':
     main()
