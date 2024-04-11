@@ -14,8 +14,9 @@ import pickle
 import joblib
 import warnings
 import os
+import datetime
 
-def find_best_hiperparameters(id_country, country):
+def find_best_hiperparameters(id_country, country, date):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
@@ -23,23 +24,25 @@ def find_best_hiperparameters(id_country, country):
     df_iteration = pd.DataFrame()
     best_roi_max = -100
     cont_iter = 0
-    l_modelos = [LogisticRegression(), SVC()]  # RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()
+    l_modelos = [LogisticRegression()]  #SVC(), RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     var_resp, var_pred = 'result', 'predicted_result'
     dp = DataPreparation(country)
     mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
+    ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
 
     # Determino competencias
     df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
     df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
-    df_comp_country_sin_sec_div = df_comp_country[(df_comp['is_second_division'] == 0)]
-    df_comp_country_sin_cups = df_comp_country[(df_comp['is_cup'] == 0)]
+    df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]
+    df_comp_country_sin_cups = df_comp_country[(df_comp_country['is_cup'] == 0)]
     all_comp = df_comp_country['id_competition'].values
     comp_sin_b = df_comp_country_sin_sec_div['id_competition'].values
     comp_sin_cups = df_comp_country_sin_cups['id_competition'].values
-    print(all_comp, comp_sin_b, comp_sin_cups)
+    comp_solo_liga = df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values
+    print(all_comp, comp_sin_b, comp_sin_cups, comp_solo_liga)
 
     # Creo directorio automaticamente
-    make_directories(country)
+    make_directories(ruta_base)
 
     # Definicion de hiperparametros
     d_params = {
@@ -49,8 +52,8 @@ def find_best_hiperparameters(id_country, country):
             'segun_localia': [False]
         },
         'clean_data_2': {
-            'n_years_to_select': [20], # Filtro cantidad de años de datos?
-            'competencies_to_select': [all_comp] # [comp_sin_b, comp_sin_cups, all_comp] # algun hiper para seleccionar algunas competencias y otras no...
+            'n_years_to_select': [10, None], # Filtro cantidad de años de datos?
+            'competencies_to_select': [comp_sin_b, all_comp] # algun hiper para seleccionar algunas competencias y otras no... # 
         },
         'select': {
             'thr_corr': [0.7, 0.8, 0.9, None],
@@ -62,7 +65,7 @@ def find_best_hiperparameters(id_country, country):
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.125], 
-            'bal_type': [None], # ['under', None],
+            'bal_type': [None, 'under'], 
             'k': [10]
         }
     }
@@ -80,7 +83,7 @@ def find_best_hiperparameters(id_country, country):
         print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia}')
 
         # Construyo datos
-        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_constructed_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        path = f'{ruta_base}/data_preparation/df_constructed_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
         try:
             df_constructed = pd.read_excel(path, index_col=0)
             print("\n DF_CONSTRUCTED \n", df_constructed.head(2))
@@ -94,7 +97,7 @@ def find_best_hiperparameters(id_country, country):
 
         # Etiqueto df_constructed
         df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=False)
-        path = f'./main_find_best_hyper/data/{country}/data_preparation/df_etiquetas_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        path = f'{ruta_base}/data_preparation/df_etiquetas_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
         df_etiquetas.to_excel(path, index=True)
 
         # Clean data 2
@@ -105,7 +108,7 @@ def find_best_hiperparameters(id_country, country):
             print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
 
             df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, n_years_to_select, comp_to_select, export=False)
-            joblib.dump((scaler, columns_used), f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}.pkl')
+            joblib.dump((scaler, columns_used), f'{ruta_base}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}.pkl')
         
             # Por combinacion de parametros de select_data
             for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
@@ -116,7 +119,7 @@ def find_best_hiperparameters(id_country, country):
                 print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
                 # Selecciono datos
-                path = f'./main_find_best_hyper/data/{country}/data_preparation/df_selected_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{thr_corr}_{thr_fs}.xlsx'
+                path = f'{ruta_base}/data_preparation/df_selected_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}_{thr_corr}_{thr_fs}.xlsx'
                 try:
                     df_sel = pd.read_excel(path, index_col=0)
                 except FileNotFoundError:
@@ -148,7 +151,7 @@ def find_best_hiperparameters(id_country, country):
                         if len(X_test) >= 100:
                             
                             # Select best model
-                            best_model, d_hiper_best_model, d_metrics_best_model = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
+                            best_model, d_hiper_best_model, d_metrics_best_model, df_pred = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
 
                             # Guardo datos en dataframe
                             row_data = {'n_iteration': cont_iter, 
@@ -161,33 +164,34 @@ def find_best_hiperparameters(id_country, country):
                                         'k': k}
                             row_data.update(d_metrics_best_model)
                             df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                            df_iteration.to_excel(f'./main_find_best_hyper/data/{country}/df_iteration.xlsx', index=False)
+                            df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
                         
                             # Guardo datos del modelo
-                            pickle.dump(best_model, open(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model.pkl", "wb"))
+                            pickle.dump(best_model, open(f"{ruta_base}/modeling/{cont_iter}_model.pkl", "wb"))
+                            df_pred.to_excel(f'{ruta_base}/modeling/{cont_iter}_df_predicciones.xlsx', index=True)
                             try:
                                 df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
-                                df_hiper_best_model.to_csv(f"./main_find_best_hyper/data/{country}/modeling/{cont_iter}_model_hiper.csv")
+                                df_hiper_best_model.to_csv(f"{ruta_base}/modeling/{cont_iter}_model_hiper.csv")
                             except:
                                 pass
 
                             # Verificar si la precisión actual es la mejor hasta ahora
-                            if d_metrics_best_model['best_roi'] > best_roi_max:
-                                best_roi_max = d_metrics_best_model['best_roi']
+                            if d_metrics_best_model['roi_por_partido'] > best_roi_max:
+                                best_roi_max = d_metrics_best_model['roi_por_partido']
                                 best_hyperparameters = row_data
                                 best_model, hiper_best_model = best_model, d_hiper_best_model
-                                print(f"EL MEJOR MODELO HASTA AHORA! ROI: {d_metrics_best_model['best_roi']:.2f}%. Precision de test de {d_metrics_best_model['test_accuracy']:.2f}%")
+                                print(f"EL MEJOR MODELO HASTA AHORA! ROI: {d_metrics_best_model['roi_por_partido']:.2f}%. Precision de test de {d_metrics_best_model['test_accuracy']:.2f}%")
                             else:
-                                print(f"El ROI de {d_metrics_best_model['best_roi']:.2f}% es menor a {best_roi_max:.2f}%")
+                                print(f"El ROI de {d_metrics_best_model['roi_por_partido']:.2f}% es menor a {best_roi_max:.2f}%")
                         else:
                             texto = f"Se evitó el entrenamiento con tan pocos datos disponibles (X_test = {X_test.shape[0]} filas)."
                             warnings.warn(texto)
 
     # Guardo datos de todas las iteraciones
-    df_iteration.to_excel(f'./main_find_best_hyper/data/{country}/df_iteration.xlsx', index=False)
-    pickle.dump(best_model, open(f"./main_find_best_hyper/data/{country}/best_model.pkl", "wb"))
+    df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
+    pickle.dump(best_model, open(f"{ruta_base}/best_model.pkl", "wb"))
     df_best_model_hiper = pd.DataFrame.from_dict(hiper_best_model, orient='index', columns=['Valor'])
-    df_best_model_hiper.to_csv(f"./main_find_best_hyper/data/{country}/df_best_model_hiper.csv")
+    df_best_model_hiper.to_csv(f"{ruta_base}/df_best_model_hiper.csv")
     
     # Imprimir los hiperparámetros óptimos y la precisión correspondiente
     print("Mejores hiperparámetros:", best_hyperparameters)
@@ -208,11 +212,11 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def make_directories(country):
-    country = country.lower()
+def make_directories(ruta_base):
+    
     l_directorios = [
-        f'./main_find_best_hyper/data/{country}/data_preparation',
-        f'./main_find_best_hyper/data/{country}/modeling',
+        f'{ruta_base}/data_preparation',
+        f'{ruta_base}/modeling',
     ]
     
     for directorio in l_directorios:
@@ -222,11 +226,13 @@ def make_directories(country):
 
 def main():
     country = 'argentina'
+    date_con_hora = datetime.datetime.now()
+    date = date_con_hora.date()
 
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
-    find_best_hiperparameters(id_country, country)
+    find_best_hiperparameters(id_country, country, date)
 
 if __name__ == '__main__':
     main()

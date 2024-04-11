@@ -39,7 +39,7 @@ class DataUnderstandingNew():
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
 
-    def collect_initial_data_new(self, n_days: int = 7, _print: bool = False):
+    def collect_initial_data_new(self, l_competencies, n_days: int = 7, _print: bool = True):
         """
         Extraccion de datos de los partidos en los proximos dias en todas las competiciones del pais.
 
@@ -52,25 +52,21 @@ class DataUnderstandingNew():
         dfs...
         """
         print(" Collecting data... ")
-        if _print:
-            print(f' COUNTRY: {self.country} '.center(120, '#'))
-        # Levanto datasets
-        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-        df_match = pd.read_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index_col=0)
-
         # Definicion de variables
         df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        l_competencies = df_match['id_competition'].unique()
+        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+        df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
         if _print:
+            print(f' COUNTRY: {self.country} '.center(120, '#'))
             print(f"Competiciones a extraer del pais {self.country}: {l_competencies}")
 
         # POR COMPETITION
         for id_competition in l_competencies:
             
-            df_comp_filt = df_comp[(df_comp['id_country'] == self.id_country) & (df_comp['id_competition'] == id_competition)]  # Para extrar varios countryes?: df = df_comp[df_comp['country'].isin(l_countryes)]
+            df_comp_filt = df_comp_country[df_comp_country['id_competition'].astype(int) == int(id_competition)]
             competition, is_cup = df_comp_filt['competition_flashscore'].values[0], df_comp_filt['is_cup'].values[0]
             if _print:
-                print(f" Competition: {competition} ".center(120, '+'))
+                print(f" Competition: {competition} id_comp: {id_competition}".center(120, '+'))
 
             # Extraigo proximos partidos
             df_match_next, df_match_player_next, df_match_odds = extract_next_matches(self.id_country, self.country, id_competition, competition, is_cup, n_days=n_days)
@@ -398,7 +394,7 @@ class DataPreparationNew(DataPreparation):
         """
         # Rellenar NaN en algunas columnas espeecificas
         columnas_h2h = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        columnas_player_miss = ['dif_mean_last_match_n_matches_last_days', 'dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss', 'dif_sum_rat_player_miss', 'dif_sum_val_player_miss']         # A veces, las columnas dif de jugadores ausentes es NaN dado que uno delos equipos no tiene jug ausentes. Podria evitarlo.
+        columnas_player_miss = ['dif_mean_val_player_sub' ,'dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss', 'dif_sum_rat_player_miss', 'dif_sum_val_player_miss']         # A veces, las columnas dif de jugadores ausentes es NaN dado que uno delos equipos no tiene jug ausentes. Podria evitarlo.
         columns_to_fill = [col for col in (columnas_player_miss + columnas_h2h) if col in df.columns]
         if columns_to_fill:
             df[columns_to_fill] = df[columns_to_fill].fillna(0)
@@ -565,9 +561,9 @@ def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
     return df
   
 # Data preparation
-def get_construct_hyper(country, n_mejor_modelo = None):
+def get_hyperparameters(country, n_mejor_modelo = None):
     """
-    Levanto los mismos hiperparametros con los que construi los datos con los que entrene el modelo.
+    Levanto los  hiperparametros utilizados para entrenar un modelo.
 
     # Parameters:
         country: Nombre del pais al cual extraer proximos partidos. (str)
@@ -582,7 +578,9 @@ def get_construct_hyper(country, n_mejor_modelo = None):
         n_dias_ult_part = int(df_hiper_prep['n_days'].values[0])
         n_years_h2h = int(df_hiper_prep['n_years_h2h'].values[0])
         segun_localia = df_hiper_prep['segun_localia'].values[0]
-        
+        n_years_to_select, comp_to_select =  df_hiper_prep['n_years_to_select'].values[0], df_hiper_prep['comp_to_select'].values[0]
+        # thr_prob_min, thr_prob_win, curva, param1, param2 = ?
+
     # 2) Si entrene el modelo en find_best_hyper.py
     else:
         ## Levanto iteraciones en find_best_hyper.py
@@ -591,19 +589,27 @@ def get_construct_hyper(country, n_mejor_modelo = None):
 
         ## Obtengo los hiperparametros utilizados para construir datos cuando entrené el modelo
         n_dias_ult_part, n_years_h2h, segun_localia = int(row_ite['n_dias_ult_part'].values[0]), int(row_ite['n_anios_hist'].values[0]), row_ite['segun_localia'].values[0]
-        print(f"Numero de dias ult part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia}")
+        n_years_to_select, comp_to_select = row_ite['n_years_to_select'].values[0], row_ite['comp_to_select'].values[0]
+        thr_prob_min, thr_prob_win =  row_ite['thr_prob_min_best'].values[0], row_ite['thr_prob_win_best'].values[0]
+        curva, param1, param2 = row_ite['curva'].values[0], row_ite['param1'].values[0], row_ite['param2'].values[0]
+        print(f"Numero de dias ult part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} ; n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")
+        print(f"thr_prob_min: {thr_prob_min} ; thr_prob_win: {thr_prob_win} ; curva: {curva} ; param1: {param1} ; param2: {param2}")
 
-    return n_dias_ult_part, n_years_h2h, segun_localia
+        # Si n_years_to_select es NaN, lo paso de np.nan a None
+        if pd.isna(n_years_to_select):
+            n_years_to_select = None
+        else:
+            n_years_to_select = int(n_years_to_select)
 
-def load_scaler(country, n_model, n_dias_ult_part, n_years_h2h, segun_localia):
+    return n_dias_ult_part, n_years_h2h, segun_localia, n_years_to_select, comp_to_select, thr_prob_min, thr_prob_win, curva, param1, param2
+
+def load_scaler(country, n_model, n_dias_ult_part, n_years_h2h, segun_localia, n_years_to_select, comp_to_select):
 
     # 1) Si entrene el modelo en main.py
     if n_model is None:
         scaler, columns_used = joblib.load(f"./p3_data_preparation/data/{country}/scaler_model.pkl")
-        # scaler_loaded = joblib.load(f"./p3_data_preparation/data/{country}/scaler_model.pkl")
     else:
-        scaler, columns_used = joblib.load(f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.pkl')
-        # scaler_loaded = joblib.load(f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.pkl')
+        scaler, columns_used = joblib.load(f'./main_find_best_hyper/data/{country}/data_preparation/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}.pkl')
 
     return scaler, columns_used
 
@@ -672,21 +678,29 @@ def main():
     """
     start = time.time()
 
-    # Definicion de variables
-    var_resp, var_pred = 'result', 'predicted_result'
+    # Defino condiciones del analisis
+    n_days_max_next_matches = 1  # Numero de dias maximo desde hoy para extraer partidos
     run_missing, data_unders, data_prep, modeling = False, False, True, True
     export = True
-    country = "england"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
-    numero_mejor_modelo = 1 # ING: 10 ARG: 10 (LOG) (podria ser o 46 (SVM) o 90 (GB) pero me gusta mas LOG pq su prec es mas alta sinceramente ademas de un ROI mayor)
-    n_days_max_next_matches = 2  # Numero de dias maximo desde hoy para extraer partidos
-
-    # Determino id_country
+    country = "argentina"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    d_modelos = {'italy': 23, 'england': 235, 'argentina': 86}  # Para inglaterra: Premier League=235 Championship=161
+   
+    # Definicion de variables
+    numero_mejor_modelo = d_modelos[country]
+    var_resp, var_pred = 'result', 'predicted_result'
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
-
-    # Creo instancias de clases
-    du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataPreparation
+    du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
     dp = DataPreparationNew(id_country, country, export) # Creo objeto de clase DataPreparation
+
+    # Obtengo los hiperparametros utilizados para entrenar el modelo <numero_mejor_modelo>
+    n_dias_ult_part, n_years_h2h, segun_localia, n_years_to_select, comp_to_select, thr_prob_min, thr_prob_win, curva, param1, param2 = get_hyperparameters(country=country, n_mejor_modelo=numero_mejor_modelo)
+    # comp_to_select_filt = eval(comp_to_select) # comp_to_select_filt = eval(comp_to_select.replace(" ",", "))
+    comp_to_select_filt = eval(comp_to_select.replace(" ",", "))
+    m = param1 if curva == 'linear' else None
+    b = param2 if curva == 'linear' else None
+    p1 = param1 if curva != 'linear' else None
+    p2 = param2 if curva != 'linear' else None
 
     #______________________________________________ MISSING DATA ______________________________________________#
     print("\n", "#"*120, "\n", "MISSING DATA".center(120), "\n", "#"*120, "\n")
@@ -746,7 +760,7 @@ def main():
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if data_unders:
         # Extriago datos de los partidos en los proximos dias
-        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(n_days=n_days_max_next_matches)
+        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select_filt, n_days=n_days_max_next_matches)
 
         if len(df_match) > 0:
             # Describo datos
@@ -782,16 +796,15 @@ def main():
     if data_prep:
 
         # Levanto hiperparametros de construct y columnas con las que se entrenó el modelo
-        n_dias_ult_part, n_years_h2h, segun_localia = get_construct_hyper(country=country, n_mejor_modelo=numero_mejor_modelo)
         tager_loaded = load_tager(country, numero_mejor_modelo, n_dias_ult_part, n_years_h2h, segun_localia)
-        scaler_loaded, columns_used = load_scaler(country, numero_mejor_modelo, n_dias_ult_part, n_years_h2h, segun_localia)
+        scaler_loaded, columns_used = load_scaler(country, numero_mejor_modelo, n_dias_ult_part, n_years_h2h, segun_localia, n_years_to_select, comp_to_select)
         l_columns = get_columns_of_trained_model(country=country, n_mejor_modelo=numero_mejor_modelo)
-        fecha_limite = datetime.datetime.now() - datetime.timedelta(days=n_dias_ult_part)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
 
         # df = pd.read_excel(f'./p6_deployment/data/{country}/df_integrated.xlsx', index_col=0)
         # print(df.head(2))
 
         # Filtro df para seleccionar ultimos x dias  ## Filtro dataset old por fecha para evitar levantar todos los datos y minimizar tiempo de computo. Solo requiero ultimos 5 part de cada team...
+        fecha_limite = datetime.datetime.now() - datetime.timedelta(days=n_dias_ult_part)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
         df_old_int = df_int_with_missing.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
         df_old_int_filt = df_old_int[df_old_int['date'] >= fecha_limite]  # Funciona ok, tiene los partidos missing.
         print("Shape de partidos ya jugados con los cuales construir los proximos partidos: ", df_old_int_filt.shape)
@@ -840,14 +853,16 @@ def main():
 
         # Determino estrategia de apuuesta
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
-        df = asses_model.determine_result_to_bet(df)
-        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=20, b=0)
+        df = asses_model.determine_result_to_bet(df, thr_prob_min=thr_prob_min, thr_prob_win=thr_prob_win) # LEVANTAR HIPER SEGUN EL NUM_MODELO
+        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=curva, m=m, b=b, p1=p1, p2=p2) # LEVANTAR HIPER SEGUN EL NUM_MODELO
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
         df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
         df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
-        df.to_excel(f'./p6_deployment/data/{country}/predicciones.xlsx')
+
+        if export:
+            df.to_excel(f'./p6_deployment/data/{country}/predicciones.xlsx', index=True)
 
     end = time.time()
     print(f"Main_next_matches en {(end - start)/60:.1f} minutos")

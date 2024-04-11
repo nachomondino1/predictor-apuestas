@@ -100,38 +100,39 @@ def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integ
             print("Shape df2_filt: ", df2_filt.shape)
 
         # Calculo el porcentaje de coincidencia con cada posible string en df2
-        func = lambda row_df2: calculate_coincidence(row[column_to_relation], row_df2[column_to_relation])
+        func = lambda row_df2: calculate_coincidence(row[column_to_relation], row_df2[column_to_relation])        
         df2_filt['porcentaje_coincidencia'] = df2_filt.apply(func, axis=1)
-        
-        # Selecciono la opcion con mayor coincidencia
         df2_filt = df2_filt.sort_values(by='porcentaje_coincidencia', ascending=False) 
-        row_best_coincidende = df2_filt.iloc[0] # Selecciono la primera fila
-        if _print:
-            pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
-            print("Mejores coincidencias: \n", df2_filt.head(5))
-            print("Mejor coincidencia: ", row_best_coincidende.values)
 
-        # Si la mejor opcion tiene mayor coincidencia que la minima deseada (mayor a thr_coincidence_min)
-        if row_best_coincidende['porcentaje_coincidencia'] >= thr_coincidence_min:
-
-            # Hago match
-            # Agrego column_to_integrate a df_map
-            d_data = {f'{column_to_integrate}_fs': id_df1, f'{column_to_relation}_fs': row[column_to_relation], f'{column_to_integrate}_so': row_best_coincidende.name, f'{column_to_relation}_so': row_best_coincidende[column_to_relation], 'porcentaje_coincidencia': row_best_coincidende['porcentaje_coincidencia']}
-            df_map = pd.concat([df_map, pd.DataFrame(d_data, index=[len(df_map)])]) # df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
-
-            # Elimino string que ya hizo match en df2 para agilizar la busqueda y evitar Falsos positivos
-            df2 = df2.drop(row_best_coincidende.name)
-            n_matchs += 1
+        if len(df2_filt) > 0:
+            # Selecciono la opcion con mayor coincidencia
+            row_best_coincidende = df2_filt.iloc[0] # Selecciono la primera fila
             if _print:
-                print(df_map.loc[id_df1].values)
-                print(df2.shape)
-                print(f"MATCH: '{row[column_to_relation]}' <--> '{row_best_coincidende['team_name']}'. Coincidencia: {row_best_coincidende['porcentaje_coincidencia']}")
-        else:
-            d_data = {f'{column_to_integrate}_fs': id_df1, f'{column_to_relation}_fs': row[column_to_relation], f'{column_to_integrate}_so': None, f'{column_to_relation}_so': None, 'porcentaje_coincidencia': None}
-            df_map = pd.concat([df_map, pd.DataFrame(d_data, index=[len(df_map)])]) 
+                pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
+                print("Mejores coincidencias: \n", df2_filt.head(5))
+                print("Mejor coincidencia: ", row_best_coincidende.values)
 
-            if _print:
-                print(f'No hizo match puesto que la opcion con mas coincidencia fue {row_best_coincidende['porcentaje_coincidencia']} (menor a {thr_coincidence_min}). La mejor coincidencia para "{row[column_to_relation]}" fue "{row_best_coincidende['team_name']}".')
+            # Si la mejor opcion tiene mayor coincidencia que la minima deseada (mayor a thr_coincidence_min)
+            if row_best_coincidende['porcentaje_coincidencia'] >= thr_coincidence_min:
+
+                # Hago match
+                # Agrego column_to_integrate a df_map
+                d_data = {f'{column_to_integrate}_fs': id_df1, f'{column_to_relation}_fs': row[column_to_relation], f'{column_to_integrate}_so': row_best_coincidende.name, f'{column_to_relation}_so': row_best_coincidende[column_to_relation], 'porcentaje_coincidencia': row_best_coincidende['porcentaje_coincidencia']}
+                df_map = pd.concat([df_map, pd.DataFrame(d_data, index=[len(df_map)])]) # df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
+
+                # Elimino string que ya hizo match en df2 para agilizar la busqueda y evitar Falsos positivos
+                df2 = df2.drop(row_best_coincidende.name)
+                n_matchs += 1
+                if _print:
+                    print(df_map.loc[id_df1].values)
+                    print(df2.shape)
+                    print(f"MATCH: '{row[column_to_relation]}' <--> '{row_best_coincidende['team_name']}'. Coincidencia: {row_best_coincidende['porcentaje_coincidencia']}")
+            else:
+                d_data = {f'{column_to_integrate}_fs': id_df1, f'{column_to_relation}_fs': row[column_to_relation], f'{column_to_integrate}_so': None, f'{column_to_relation}_so': None, 'porcentaje_coincidencia': None}
+                df_map = pd.concat([df_map, pd.DataFrame(d_data, index=[len(df_map)])]) 
+
+                if _print:
+                    print(f'No hizo match puesto que la opcion con mas coincidencia fue {row_best_coincidende['porcentaje_coincidencia']} (menor a {thr_coincidence_min}). La mejor coincidencia para "{row[column_to_relation]}" fue "{row_best_coincidende['team_name']}".')
     
         progress_bar.update(1)
     progress_bar.close()

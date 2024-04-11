@@ -319,6 +319,10 @@ class DataPreparation:
         # df['perc_attendance'] = df["attendance"] / df["capacity"]
         df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
      
+        # Construyo date numerica
+        fecha_referencia = pd.to_datetime('2000-01-01') # Definir la fecha de referencia
+        df['dias_desde_referencia'] = (df['date'] - fecha_referencia).dt.days  # Calcular los días transcurridos desde la fecha de referencia
+
         # Construyo variables rendimiento del equipo
         ## Puntos
         df = construct_data.determine_points(df)
@@ -371,7 +375,7 @@ class DataPreparation:
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select, competencies_to_select, _print: bool = True, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, _print: bool = True, export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -388,22 +392,26 @@ class DataPreparation:
         ## Para evitar partidos muy viejos
         print("Eliminacion de filas...")
         n_reg_inic = len(X)
-        fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
-        X = X[X['date'] >= fecha_limite] 
-        print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+        if n_years_to_select is not None:
+            fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+            X = X[X['date'] >= fecha_limite] 
+            print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+   
         ## Para evitar ciertas competencias
-        n_reg_inic_2 = len(X)
-        X = X[X['id_competition'].isin(competencies_to_select)]
-        print(f"Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
+        if competencies_to_select is not None:
+            n_reg_inic_2 = len(X)
+            X = X[X['id_competition'].isin(competencies_to_select)]
+            print(f"Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
+       
         ## con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic_3 = len(X)
         X = clean_data.delete_rows_nan(X, 0.5, _print=True)
         print(f"Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
-        # if _print:
-        #     print("Eliminacion de filas...")
-        #     print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+        if _print:
+            print("Eliminacion de filas...")
+            print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
-        # Eliminacion de columnas 
+        # Eliminacion de columnas         
         # usadas solo para construir y constantes
         cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
@@ -732,9 +740,8 @@ class Modeling:
         df_predicciones = pd.concat([df_pred_proba, df_match_odds], axis=1)
         
         # Calculo ROI
-        d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
+        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)
-     
         if _print:
             print(f"\n\nMatriz de confusion:\n {df_conf_mat}")
             print(d_metrics)
@@ -743,7 +750,7 @@ class Modeling:
             df_conf_mat.to_excel(f'./p4_modeling/data/{self.country}/modeling/df_conf_matrix.xlsx')
             df_predicciones.to_excel(f'./p4_modeling/data/{self.country}/modeling/df_predicciones.xlsx')
 
-        return d_metrics
+        return df_predicciones, d_metrics
     
     def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=True):
         """
@@ -751,7 +758,6 @@ class Modeling:
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
         """
         # Definicion de variables
-        d = {}
         best_roi_max = -100000
         
         # Por modelo
@@ -763,22 +769,22 @@ class Modeling:
             # Entreno modelo y evaluo su rendimiento     
             try:
                 model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
-                d_metrics = self.assess_model(model, X_test, y_test)
+                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Si la precision_test_es mayor, guardar datos...
-                if d_metrics['best_roi'] > best_roi_max:
-                    best_roi_max = d_metrics['best_roi']
+                if d_metrics['roi_por_partido'] > best_roi_max:
+                    best_roi_max = d_metrics['roi_por_partido']
                  
                     # Guardo datos del mejor modelo
-                    d_hiper_best_model = d_hiper_model
-                    best_model = model
-                    d_metrics_best_model = {'model_name': model_name, 'model_trained': d_hiper_model, 'train_cv_accuracy': cv_accuracy}
-                    d_metrics_best_model.update(d_metrics)
+                    best_model, d_hiper_best_model, cv_acc = model, d_hiper_model, cv_accuracy
+                    df_pred, d_metrics_best_model = df_predicciones, d_metrics
+                    model_name_best_mod = model_name
 
             except KeyboardInterrupt:
                 print("Se evitó entrenar este modelo")
         
-        return best_model, d_hiper_best_model, d_metrics_best_model
+        d_metrics_best_model.update({'model_name': model_name_best_mod, 'model_trained': d_hiper_best_model, 'train_cv_accuracy': cv_acc})
+        return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
 
 ##################################################### MAIN #####################################################
 def main():
@@ -786,9 +792,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'italy'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = True, False, False
+    data_unders, data_prep, modeling = False, True, True
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -824,11 +830,12 @@ def main():
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         n_days, n_years_h2h, segun_localia = 30, 3, False
-        thr_corr, thr_fs = 0.9, 0.1
-        fill_na = 'ml'
+        thr_corr, thr_fs = 0.7, 0.1
+        n_years_to_select, comp_to_select = 10, [481, 485]
+        fill_na = None
         df_hiper_prep = pd.DataFrame(data={'n_days': [n_days], 'n_years_h2h': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na]}, index=[0])
         
-        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed_etiquetado.xlsx', index_col=0)
+        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx', index_col=0)
         # print(df.head(2))
 
         # Preparo el dataset para el analisis
@@ -837,7 +844,7 @@ def main():
         df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
         df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
-        df, scaler, columns_used = dp.clean_data_2(df, export=export)
+        df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
         df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         
@@ -859,7 +866,7 @@ def main():
         df_hiper_mod = pd.DataFrame(data={'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}, index=[0])        
 
         l_modelos = [LogisticRegression(), RandomForestClassifier()]
-        modelo = RandomForestClassifier()  # LogisticRegression(), RandomForestClassifier()
+        modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
         model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
 
         build_specific_model = False
@@ -893,7 +900,7 @@ def main():
 
         # Analizo datos con un modelo
         model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
-        d_metrics = mo.assess_model(model, X_test, y_test, export=export)
+        df_pred, d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
         # Analizo mas de un modelo
         # d_best_hiper, model_best_params, d_best_model = mo.select_best_model(l_modelos, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, k=k, export=False)
