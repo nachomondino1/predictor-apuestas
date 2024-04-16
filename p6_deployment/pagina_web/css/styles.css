@@ -1,0 +1,126 @@
+/* Generales */
+body {
+    font-family: sans-serif;
+    /*
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    */
+}
+
+div, body {
+    box-sizing: border-box;
+}
+
+/*
+.main-wrapper, header, footer {
+    width: 100%;
+}
+*/
+
+a {
+    text-decoration: none;
+    color:black
+}
+
+img {
+    object-fit: contain;
+    height: 50px;
+    margin: 10px;
+}
+
+
+
+
+
+/*    HEADER     */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    min-height: 70px;
+    color: white;
+    background-color: #2874A6;
+}
+
+/* ## Logo y nombre de la empresa */
+.header-div a {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+}
+
+/* ## Barra de navegacion */
+.main-navbar {
+    height: 100%;
+    width: 100%;
+}
+
+.main-navbar ul {
+    display: flex;
+    list-style: none;
+    padding: 0;
+}
+
+.main-navbar li {
+    font-weight: 600;
+    margin: 10px;
+}
+
+.main-navbar li:hover {
+    background-color: #4c9cd2;
+}
+
+.main-navbar a {
+    color: white;
+    display: inline-block;
+    padding: 9px;
+}
+
+/* Responsive Design
+@media only screen and (min-width: 400px) {
+
+    .nav-div {
+        position: relative;
+        top: -1000px;
+    }
+
+    .responsive{
+        position: absolute;
+        top: -0px;
+        height: 100%;
+        width: 100%;
+    }   
+
+    
+}
+ */
+
+
+
+/*    MAIN SECTION     */
+.main-wrapper {
+    display: flex;
+    color: black;
+    background-color: #F4F6F6;
+}
+
+.main-wrapper aside {
+    background-color: bisque;
+    flex-grow: 1;
+}
+
+
+/* TEMPORAL PARA ENTENDER LO QUE PASA*/
+aside, main {
+    border: 1px solid #f00;
+}
+
+
+/*      FOOTER     */
+footer {
+    background-color: lightcoral;
+}
+
