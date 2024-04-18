@@ -5,27 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title> Predicciones | Apuestas deportivas </title>
+    <link rel="stylesheet" href="css/normalize.css">
     <link rel="stylesheet" href="css/styles.css">
-
-    <header></header>
-
-    <!-- Seccion de Navegación -->
-    <nav>
-        <ul>
-            <li><a href="index.html" target="_self">Inicio</a></li>
-            <li><a href="pagina_1.html" target="_self">Quienes Somos </a></li>
-            <li><a href="pagina_2.html" target="_self">Contacto</a></li>
-        </ul>
-    </nav>
 </head>
 <body>
-    
+    <!-- Encabezado -->
+    <header class="header">
+
+        <!-- Boton para abrir menú -->
+        <input type="checkbox" id="menu-toggle">
+        <label for="menu-toggle" class="header-open-nav-button" role="button"><img src="images/menu.png"></label>
+                
+        <!-- Logo y nombre de la empresa -->
+        <div class="header__logo-container">
+            <a href="index.html">
+                <img class="header__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+                <h2 class="header__logo-title">GoalProphet</h2>
+            </a>
+        </div> 
+
+        <!-- Barra de Navegación -->
+        <nav class="header__navbar">
+
+            <!--
+            <button class="header__open-nav-button" >
+                = <img src="images/menu.png">
+            </button> -->
+
+            <!-- Secciones de pagina -->
+            <ul class="header__nav-list">
+                <li class="header__nav-item"><a href="index.html" target="_self">Inicio</a></li>
+                <li class="header__nav-item"><a href="pagina_1.html" target="_self">Sobre Nosotros </a></li>
+                <li class="header__nav-item"><a href="pagina_2.html" target="_self">Contacto</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <footer></footer>
 </body>
-<aside>
-
-</aside>
-
-<footer>
-
-</footer>
 </html>
