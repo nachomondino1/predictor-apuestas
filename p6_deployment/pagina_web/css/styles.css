@@ -14,6 +14,8 @@
     --font-family: Montserrat, sans-serif;
     --font-size: 1em;
     --color: black;
+
+    --margin: 10%
 }
 
 /* TEMPORAL PARA ENTENDER LO QUE PASA*/
@@ -29,6 +31,12 @@ body {
     box-sizing: border-box;
     text-align: center;
     background: var(--color-de-fondo);
+
+    display: grid;
+    grid-template-rows: var(--header-height) auto min-content; /* 1 fila para el encabezado, 1 fila para el cuerpo, 1 fila para el pie de página */
+    grid-template-columns: 1fr; /*  2 de margenes y una central */ 
+    min-height: 100vh; /* Para garantizar que la pagina ocupe siempre al menos el 100% del viewport height */
+    width: 100vw;
 }
 
 a {
@@ -36,26 +44,26 @@ a {
     color:black;
 }
 
-
 /* ---------------------- HEADER SECTION ---------------------- */
 .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     height: var(--header-height);
-    width: 100vw;
     background-color: var(--color-primario);
 
     position: sticky; /* a diferencia de fixed, mantiene la posicion en el dom */
     top: 0;
     z-index: 10; /* para que quede la barra no quede oculta atras del body */
+
+    padding: 0% var(--margin);
 }
 
 /* Boton para abrir menu */
 .header__open-nav-button {
     font-size: 2rem;
     position: absolute; /* para que no modifique el espacio en el header */
-    right: 1rem;
+    right: 100px;
     color: #fff;
 }
 
@@ -99,7 +107,6 @@ a {
     justify-content: start; 
     text-align: left;
     list-style: none;
-    width: 100%;
     padding: 0;
 }
 
@@ -132,30 +139,26 @@ a {
         display: block;
         position: static; /* para que si ocupe el espacio en el header*/
         height: var(--header-height);
-        justify-content: space-between;
         align-content: center; /* centra verticalmente el ul en el nav */
-    }
-
-    .header__nav-item {
-        margin: 0; /* porque aplico margin en navbar de mobile y queda mal la Desktop... */
-        align-self: center;
     }
     
     .header__nav-list {
         flex-direction: row;
-        justify-content: center;
-        gap: 2rem;
+        justify-content: right;
         margin: 0; /* porque aplico margin en navbar de mobile y queda mal la Desktop... */
+    }
+
+    .header {
+        justify-content: center; /* como el espacio entre el logo y la barra de nav */
     }
 
 }
 
 /* ---------------------- MAIN SECTION ---------------------- */
-body {
-    display: grid;
-    grid-template-rows: auto auto auto; /* 1 fila para el encabezado, 1 fila para el cuerpo, 1 fila para el pie de página */
-    grid-template-columns: 1fr;
-    min-height: 100vh; /* Para garantizar que la pagina ocupe siempre al menos el 100% del viewport height */
+.main-wrapper {
+    display: flex;
+    flex-direction: column;
+    padding: 0% var(--margin);
 }
 
 /* Primer aside */
@@ -181,12 +184,6 @@ body {
     text-align: left;
 }
 
-/* Main */
-.main-wrapper {
-    display: flex;
-    flex-direction: column;
-}
-
 .filters, .main, .leagues {
     border: 0.1rem solid black;
     /* box-shadow: 0.2rem 0.2rem rgb(159, 156, 156); */
@@ -205,6 +202,7 @@ footer {
     grid-template-columns: repeat(2, 1fr);
     background-color: var(--color-neutro);
     color: white;
+    padding: 0% var(--margin);
 }
 
 .footer__logo-container, .footer__copyright {
@@ -304,16 +302,16 @@ footer a {
     justify-content: space-evenly;
     flex-wrap: wrap;
 
-    margin: 3rem;
+    margin: 2rem var(--margin);
 }
 
 .form-contacto {
-    min-width: 20rem;
+    width: 60%;
     text-align: center;
 }
 
 .form__input {
-    width: 100%;
+    width: 90%;
     margin-bottom: 1rem;
     border: none;
     border-bottom: 3px solid var(--color-primario);
@@ -342,6 +340,4 @@ footer a {
 
 .form-contacto-imagen img {
     width: 70%;
-    max-width: 25rem;
-
 }
