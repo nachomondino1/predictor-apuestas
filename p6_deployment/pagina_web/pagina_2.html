@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title> Predicciones | Apuestas deportivas </title>
+    <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
     <link rel="stylesheet" href="css/normalize.css">
     <link rel="stylesheet" href="css/styles.css">
 <body>
     <!-- Encabezado -->
     <header class="header">
+
+        <!-- Boton para abrir menú -->
+        <input type="checkbox" class="header__checkbox" id="menu-toggle">
+        <label for="menu-toggle" class="header__open-nav-button" role="button">=</label>
+        
+                
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
             <a href="index.html">
@@ -20,13 +27,6 @@
 
         <!-- Barra de Navegación -->
         <nav class="header__navbar">
-
-            <!-- Boton para abrir menú -->
-            <button class="header__open-nav-button" >
-                =<!--<img src="images/menu.png"> -->
-            </button>
-
-            <!-- Secciones de pagina -->
             <ul class="header__nav-list">
                 <li class="header__nav-item"><a href="index.html" target="_self">Inicio</a></li>
                 <li class="header__nav-item"><a href="pagina_1.html" target="_self">Sobre Nosotros </a></li>
@@ -34,7 +34,61 @@
             </ul>
         </nav>
     </header>  
+    <div class="form-container">
+        <div class="form-contacto-imagen">
+            <img src="images/gmail.png">
+        </div>
+        
+        <form class="form-contacto">
+            <div class="form__section">
+                <input class="form__input" type="email" required="" placeholder="Escriba su email">
+            </div>
+            <div class="form__section">
+                <input class="form__input" type="text" required="" placeholder="Escriba el asunto">
+            </div>
+            <div class="form__section">
+                <textarea class="form__input input--mensaje" placeholder="Escriba su mensaje"></textarea>
+            </div>
+            <div class="form__section">
+                <input class="form__input input--boton" type="submit">
+            </div>
+        </form>
 
-    <footer></footer>
+    </div>
+
+    <!-- Pie de pagina -->
+    <footer>
+        <!-- Logo y nombre de la empresa -->
+        <div class="footer__logo-container">
+            <a class="footer__logo-link" href="index.html">
+                <img class="footer__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+                <h2 class="footer__logo-title">GoalProphet</h2>
+            </a>
+        </div> 
+
+        <!-- Enlaces a paginas -->
+        <div class="footer-navbar">
+            <ul class="footer-navbar-list">
+                <li class="footer-navbar__item"><a href="pagina_1.html">Sobre nosotros</a></li>
+                <li class="footer-navbar__item"><a href="pagina_2.html">Contacto</a></li>
+                <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
+                <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
+            </ul>
+        </div>
+
+        <!-- Social media -->
+        <div class="footer__social-media">
+            <ul class="footer-social-media-list">
+                <li class="footer-social-media__item"><a href="#"><img src="images/facebook.png" alt="Facebook"> Facebook</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="images/gorjeo.png" alt="Twitter"> Twitter</a></li>
+            </ul>
+        </div>
+
+        <!-- Copyright -->
+        <div class="footer__copyright">
+            <p>&copy; 2024 Football Predictions. Todos los derechos reservados.</p>
+        </div>
+
+    </footer>
 </body>
 </html>
