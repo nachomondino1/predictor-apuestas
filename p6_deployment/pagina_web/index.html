@@ -12,6 +12,10 @@
     <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
     <link rel="stylesheet" href="css/normalize.css">
     <link rel="stylesheet" href="css/styles.css">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
 </head>
 
 <!-- Contenido de la pagina -->
@@ -42,18 +46,36 @@
         </nav>
     </header>  
 
-    <h1> Predicciones del día </h1>
+    <div class="title">
+        <h1> Predicciones del día </h1>
+    </div>
 
     <div class="main-wrapper">
         <!-- Barra lateral de navegacion: Calendario-->
-        <aside class="calendar">
-            <h2>Partidos</h2>
-            <div class="day-list-container">
-                <ul class="day-list">
-                    <li class="day-list__item">Ayer</li>
-                    <li class="day-list__item">Hoy</li>
-                    <li class="day-list__item">Mañana</li>
-                </ul>
+        <aside class="filters">
+            <h2>Filtros</h2>
+    
+            <div class="calendar-container">
+
+                <h3> Fecha </h3>
+                <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha">
+                <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+                <script>
+                    flatpickr("#fechaSeleccionada", {
+                        dateFormat: "d-m-Y", // Formato de fecha
+                        minDate: "01-01-2024", // Fecha mínima permitida (opcional)
+                        maxDate: new Date().fp_incr(3), // Fecha máxima permitida (opcional)
+                        onChange: function(selectedDates, dateStr, instance) {
+                            // Aquí puedes realizar acciones cuando se selecciona una fecha
+                            console.log("Fecha seleccionada:", dateStr);
+                            // Puedes agregar aquí la lógica para cargar los datos según la fecha seleccionada
+                        }
+                    });
+                </script>                
+            </div>
+
+            <div class="leagues-container">
+                <h3> Leagues </h3>
             </div>
         </aside>
 
