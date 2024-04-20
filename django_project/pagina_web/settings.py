@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'home',
     'debug_toolbar'
 ]
@@ -78,8 +79,11 @@ WSGI_APPLICATION = 'pagina_web.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+       'ENGINE': 'django.db.backends.mysql',
+       'NAME': 'predictor_apuestas', # name of the db we created in Workbench
+       'HOST': 'localhost',
+       'USER': 'root',
+       'PASSWORD': 'MiComidaFavoritaMilanesa_2024' # This is only for development
     }
 }
 
@@ -128,3 +132,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+REST_FRAMEWORK = {'COERCE_DECIMAL_TO_STRING': False}

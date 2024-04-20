@@ -70,7 +70,7 @@ def preparate_to_integrate(df_match_flash):
 
     # Format data: fecha y posesion
     df_match_flash['fecha'] = pd.to_datetime(df_match_flash['fecha'], format='%d.%m.%Y %H:%M')  # ya lo voy a extraer datetime... # Fundamental para poder ordenar el df por 'fecha'
-    df_match_flash = convert_posesion_to_int(df_match_flash)
+    df_match_flash = convert_ball_possession_to_int(df_match_flash)
 
     # Clean data
     # Hago limpieza de variables object antes de integrar para facilitar la integracion de datos
@@ -81,7 +81,7 @@ def preparate_to_integrate(df_match_flash):
 
     return df_match_flash
 
-def convert_posesion_to_int(df):
+def convert_ball_possession_to_int(df):
     """
      Transforma la posesión de string a float.
 

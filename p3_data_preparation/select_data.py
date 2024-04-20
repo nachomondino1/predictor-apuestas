@@ -17,13 +17,17 @@ import plotly.graph_objects as go
 import numpy as np
 
 
-def delete_correlated_columns(df, var_resp, umbral):
+def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float = 0.7, _print: bool = False) -> list:
     """
-    Identificacion de las columnas con un correlacion alta (mayor al umbral)
-    :param df:
-    :param var_resp:
-    :param umbral:
-    :return: List. Columnas a eliminar por correlacion alta.
+    Identificación de las columnas con una alta correlacion.
+   
+    # Parameters
+    df: Dataframe con columnas numericas no? .(DataFrame)
+    var_resp: Nombre de la variable respuesta (String)
+    thr_corr: Correlacion umbral encima de la cual se considera que hay correlacion entre dos variables. (Float)
+   
+    # Returns
+    Columnas a eliminar por alta correlacion. (List)
     """
     print('\nEliminacion de columnas correlacionadas:')
     # Definicion de variables
@@ -31,43 +35,74 @@ def delete_correlated_columns(df, var_resp, umbral):
 
     # Calculo matriz de correlacion
     df_correlacion = df.corr().abs()
-    # df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
 
     # Separo matriz de correlacion de las variables predictoras y de ellas con la variable objetivo
-    df_corr = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0)
+    df_corr_X = df_correlacion.drop(var_resp, axis=1).drop(var_resp, axis=0) # la borro del eje x e y
     df_corr_y = df_correlacion[var_resp].drop(var_resp, axis=0)
 
     # Obtener matriz triangular superior de correlacion (pues la matriz de correlacion es una matriz simetrica respecto de la diagonal)
-    df_corr_tri = df_corr.where(np.triu(np.ones(df_corr.shape), k=1).astype(bool))
+    df_corr_tri_X = df_corr_X.where(np.triu(np.ones(df_corr_X.shape), k=1).astype(bool))
+    if _print:
+        df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
+        df_corr_X.to_excel('/Users/nachomondino/Desktop/df_corr_X.xlsx')
+        df_corr_y.to_excel('/Users/nachomondino/Desktop/df_corr_y.xlsx')
+        df_corr_tri_X.to_excel('/Users/nachomondino/Desktop/df_corr_tri_X.xlsx')
 
-    # Buscar columnas con alta correlacion
-    columnas_correlacionadas = np.where(df_corr_tri > umbral)
-    for i, j in zip(*columnas_correlacionadas):
-        col1, col2 = df_corr.columns[i], df_corr.columns[j]
-        # print(f"\nColumna 1: {col1} ; Columna 2: {col2} --> Correlacion: {df_corr.loc[col1, col2]*100:.0f}%")
+    # EL OBJETIVO ES NO ELIMINAR COLUMNAS POR CORRELACION CON UNA COLUMNA QUE YA DECIDI ELIMINAR...\
+    l_cols = list(df_corr_tri_X.columns)
 
-        # Buscar correlacion de cada columna con variable objetivo
-        corr_col1, corr_col2 = df_corr_y.loc[col1], df_corr_y.loc[col2]
-        # print(f"Corr col 1: {corr_col1} ; Corr col 2: {corr_col2}")
+    # Por fila 
+    for col1, row in df_corr_tri_X.iterrows():
+        l_cols.remove(col1)  # Elimino columna 1 de l_cols para agilizar el procesamiento 
 
-        # Eliminar aquella columna con menor correlacion con la variable objetivo
-        if corr_col2 > corr_col1:
-            columnas_eliminar.add(col1)
-        else:
-            columnas_eliminar.add(col2)
+        # Si la columna 1 aun no fue eliminada por alta correlacion
+        if col1 not in columnas_eliminar:
+
+            # Por columna 
+            for col2 in l_cols:
+                
+                # Si la columna 2 aun no fue eliminada por alta correlacion
+                if col2 not in columnas_eliminar:
+
+                    corr = row[col2]
+
+                    # Si hay correlacion mayor a la umbral
+                    if corr > thr_corr:
+
+                        # Buscar correlacion de cada columna con variable objetivo
+                        corr_col1_y, corr_col2_y = df_corr_y.loc[col1], df_corr_y.loc[col2]
+            
+                        # Eliminar aquella columna con menor correlacion con la variable objetivo
+                        col_to_eliminate = col1 if corr_col2_y > corr_col1_y else col2
+                        columnas_eliminar.add(col_to_eliminate)
+                        if _print:
+                            print(f"\n Columna 1: {col1} y Columna 2: {col2} Correlacion: {corr*100:.0f}%")
+                            print(f"Busco la mayor correlacion con y: Corr col 1 e y: {corr_col1_y*100:.0f}% ; Corr col 2 e y: {corr_col2_y*100:.0f}%")
+                            print(f"Columna eliminada: {col_to_eliminate}")
+                        
+                        # Si eliminé la columna 1
+                        if col_to_eliminate == col1:
+                            # print(f"Dejo de probar si {col1} tiene correlacion con otras columnas puesto que ya fue eliminada por alta correlacion con {col2}")
+                            break
 
     return list(columnas_eliminar)
 
 class FeatureSelection():
 
-    def modelos_estadisticos(self, X, y, graf=False):
+    def __init__(self, graficar_cada_metodo: bool = False) -> None:
+        self.graficar_cada_metodo = graficar_cada_metodo
+
+    def modelos_estadisticos(self, X, y):
         """
         Calculo de importancia de cada variable segun los modelos estadisticos.
 
-        :param X: Dataframe con variables predictoras. (DataFrame)
-        :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
-        :return: Dataframe. Importancia por variable. (Dataframe)
+        # Parameters
+        X: Dataframe con variables predictoras. (DataFrame)
+        y: Dataframe solo con variable respuesta. (DataFrame)
+        graf: Boolean. True para graficar importancia por variable. (bool)
+
+        # Returns
+        Dataframe. Importancia por variable. (Dataframe)
         """
         # Definicion de variables
         l_features, l_scores = [], []
@@ -103,19 +138,22 @@ class FeatureSelection():
         # print("Resultados estadisticos: \n", df_importance)
 
         # Grafico variables y su importancia
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['mod_estadisticos'], y=df_importance.index)
 
         return df_importance
 
-    def random_forest(self, X, y, k: int = 5, graf=False):
+    def random_forest(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
-        :param X: Dataframe con variables predictoras. (DataFrame)
-        :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
-        :return: Dataframe. Importancia por variable. (Dataframe)
+        # Parameters
+        X: Dataframe con variables predictoras. (DataFrame)
+        y: Dataframe solo con variable respuesta. (DataFrame)
+        graf: Boolean. True para graficar importancia por variable. (bool)
+        
+        # Returns
+        Dataframe. Importancia por variable. (Dataframe)
         """
         # Separo en train y val (para que select_best_hiperparameters() no tarde tanto)
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
@@ -130,19 +168,22 @@ class FeatureSelection():
         df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)
 
         # Grafico variables y su importancia
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['random_forest'], y=df_importance.index)
 
         return df_importance
 
-    def via(self, X, y, graf=False):
+    def via(self, X, y):
         """
         Calculo de importancia de cada variable segun via.
 
-        :param X: Dataframe con variables predictoras. (DataFrame)
-        :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
-        :return: Dataframe. Importancia por variable. (Dataframe)
+        # Parameters
+        X: Dataframe con variables predictoras. (DataFrame)
+        y: Dataframe solo con variable respuesta. (DataFrame)
+        graf: Boolean. True para graficar importancia por variable. (bool)
+
+        # Return
+        Dataframe. Importancia por variable. (Dataframe)
         """
         # Entreno modelo
         scores, _ = f_regression(X, y)
@@ -151,12 +192,12 @@ class FeatureSelection():
         df_importance = pd.DataFrame({'via': scores}, index=X.columns)
         # print("Resultados via: \n", df_importance)
 
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['via'], y=df_importance.index)
 
         return df_importance
 
-    def rfe(self, X, y, k: int = 5, graf=False):
+    def rfe(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun rfe.
 
@@ -165,33 +206,41 @@ class FeatureSelection():
         :param graf: Boolean. True para graficar importancia por variable. (bool)
         :return: Dataframe. Importancia por variable. (Dataframe)
         """
+        # warnings.filterwarnings('ignore')
         # Definicion de variables
         n_features = 1  # Número deseado de características seleccionadas hasta que se eliminan las menos relevantes
 
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
         # Separo en train y val
-        X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
+        X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
         model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=k, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        # model = LogisticRegression(solver='lbfgs', max_iter=10000)
+
         rfe = RFE(estimator=model, n_features_to_select=n_features)
 
         # Entreno modelo
-        X_selected = rfe.fit_transform(X_train, y_train)
+        rfe.fit_transform(X_train, y_train) # rfe.fit_transform(X_scaled, y)
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'rfe': rfe.ranking_}, index=X.columns)
         # print("Resultados rfe: \n", df_importance)
 
         # Convierto ranking en importancia (a mayor ranking, menor importancia)
-        df_importance['rfe'] = df_importance['rfe'].apply(lambda x: len(X.columns) - x + 1)
+        func = lambda x: len(X.columns) - x + 1
+        df_importance['rfe'] = df_importance['rfe'].apply(func)
         # print("Resultados rfe dsp convertir: \n", df_importance)
 
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['rfe'], y=df_importance.index)
 
         return df_importance
 
-    def lasso_selection(self, X, y, k:int = 5, graf=False):
+    def lasso_selection(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun lasso.
 
@@ -215,7 +264,7 @@ class FeatureSelection():
         # Convierto coeficiente en importancia (a mayor coef en valor abs, mas importancia)
         df_importance['lasso'] = df_importance['lasso'].apply(lambda x: abs(x))  # x es coef
 
-        if graf:
+        if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['lasso'], y=df_importance.index)
 
         return df_importance
@@ -268,7 +317,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: bool = True):
+def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: bool = False):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -281,36 +330,24 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     """
     print('\n Feature Selection...')
     # Definicion de variables
-    fs = FeatureSelection()
+    fs = FeatureSelection(graficar_cada_metodo=False)
     k = 10
-    graficar_cada_metodo = False
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
 
-    # Elimino NaN values puesto que no puedo tener NaN en modelos de ml
-    print("\tReemplazo y remuevo NaN values (uso ML y no puede tener input NaN)... ", end="")
-
-    ## Determino las columns con mucho NaN (mas de nan_threshold%)
-    l_columns_con_poco_nan, l_columns_con_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=75, _print=False)
-
-    ## Elimino registros NaN en las columns con bajo % de NaN (para poder usarlas en X_train)
-    X = X.dropna(subset=l_columns_con_poco_nan)
-    X = clean_data.delete_columns_nan(X, porc_nan_max=0.99)  # Elimino columnas que quedan nan tras el dropna anterior. Esto evita error al rellenar una columna vacia.
-    l_columnas_to_fill = X.drop(l_columns_con_poco_nan, axis=1).columns
-    
-    ## Relleno filas
-    X = clean_data.fill_nan_values(X, l_columnas_to_fill, fill_type='mode')  
+    # Trato NaN values para evitar input=NaN puesto que uso algoritmos de ML para seleccionar variables mas importanetes
+    X = clean_data.drop_and_fill_nan_values(X, percentil_nan=75)
     y = y[y.index.isin(X.index)]
-    print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
+    # print(np.any(np.isinf(X))) # Tiene que dar False
 
     # Detemino importancia de cada variable para cada modelo
     print("\t Calculando importancias de variables segun varios modelos...")
     df_importance = pd.DataFrame(index=X.columns)
-    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
-    df_importance = df_importance.merge(fs.via(X, y, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.random_forest(X, y, k=k, graf=graficar_cada_metodo), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.rfe(X, y, k=k, graf=graficar_cada_metodo), left_index=True, right_index=True)
+    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
+    df_importance = df_importance.merge(fs.via(X, y), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.random_forest(X, y, k=k), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.rfe(X, y, k=k), left_index=True, right_index=True)
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)

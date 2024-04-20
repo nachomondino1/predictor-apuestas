@@ -40,16 +40,7 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
             except:
                 print(f"No existe el dataframe para la competition {competicion_form}")
 
-        if dataframe == "df_player_fifa_sofifa":
-            df_sin_duplicados = df_concat.drop_duplicates()        
-        else:
-             # Identificar los índices duplicados
-            # indices_duplicados = df_concat.index[df_concat.index.duplicated()]
-            # print(len(indices_duplicados))
-
-            # Filtrar el DataFrame para mantener solo las filas cuyo índice no está duplicado
-            df_sin_duplicados = df_concat[~df_concat.index.duplicated()]
-            # print(df_sin_duplicados.shape)
+        df_sin_duplicados = df_concat.drop_duplicates() if dataframe == "df_player_fifa_sofifa" else df_concat[~df_concat.index.duplicated()]
 
         # Si hay duplicados
         if len(df_concat)-len(df_sin_duplicados) > 0:
@@ -114,7 +105,7 @@ def prueba():
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes = ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches']  # ['df_player', 'df_player_temp']  # 
+        l_dataframes = ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
         concat_dfs_per_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country

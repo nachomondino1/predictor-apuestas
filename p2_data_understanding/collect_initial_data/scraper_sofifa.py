@@ -22,11 +22,11 @@ class SofifaCrawler(Crawler):
 
     def select_league_as_filter(self, country, league):
         """
-        Poner el country como filtro para obtener los players solo de la league de dicho country
-        :param crawler:
-        :param country: String. Name de country al que pertenece la league.
-        :param league: String. Name de la league de la cual extraer los players.
-        :return:
+        Selecciona la liga del pais para filtrar el listado de jugadores.
+        
+        # Parameters
+            country: Name de country al que pertenece la league. (str)
+            league: Name de la league de la cual extraer los players. (str)
         """
         print("Seleccionando league del country como filtro...")
         # Cargo competition en el buscador de leagues
@@ -54,27 +54,55 @@ class SofifaCrawler(Crawler):
                 input_league.send_keys(Keys.ARROW_DOWN) # con tab no funciona
     
     def click_submit(self):
+        """
+        Click en boton "Submit"
+        """
         boton_sumbit = super().extract_tag(xpath='.//button[text()="Submit"]', sec_wait=self.SEC_WAIT_MAX)  # Clickeo en "buscar"
         super().click_boton(boton_sumbit)
 
     def extract_pages_pagination(self):
-          
+        """
+        Extraccion de los distintos fifas.
+
+        # Returns:
+            Urls de todos los fifas. (list)
+        """
         l_tag_years = super().extract_tags(xpath='.//select[@name="version"]/option')
         l_urls_years = ["https://sofifa.com/" + tag.get_attribute('value') for tag in l_tag_years]
         return l_urls_years
     
     def extract_pages_sub_pagination(self):
-
+        """
+        Extraccion de la primera y la ultima fecha de actualizacion de un fifa. Un mismo Fifa (e.g. FIFA 22) tiene multiples fechas de actualizacion.
+        
+        # Returns
+            Url con la primera y la ultima actualizacion para el fifa que se quiere extraer. (list)
+        """
         l_tags_act_year = super().extract_tags(xpath='.//select[@name="roster"]/option') # .//h2//div[@class="dropdown"][2]/div/a[not(contains(text(), "World Cup"))] # Ojo con la actualizacion World Cup 2022...  # NO HACE FALTA HACER CLICK EN FLECHITA ANTES -->  #   boton_selec_act_fifa =  crawler.extract_tag(xpath='.//h2//div[@class="dropdown"][2]/a')  # Ver si hace click, tal vez ni hace falta  # crawler.click_boton(boton_selec_act_fifa)
         l_urls_act_year = ["https://sofifa.com/" + tag.get_attribute('value') for tag in l_tags_act_year]
         l_urls_act_year_sel = [l_urls_act_year[0], l_urls_act_year[-1]]  # Selecciono unicamente la primera y la ultima actualizacion
         return l_urls_act_year_sel
     
     def extract_fifa_name(self):
-        fifa = super().extract_tag(xpath='.//select[@name="version"]/option[@selected]', text=True)  # Fifa 21
+        """
+        Extraccion del nombre del fifa.
+
+        # Returns:
+            Nombre del fifa (e.g. "Fifa 21"). (str)
+        """
+        fifa = super().extract_tag(xpath='.//select[@name="version"]/option[@selected]', text=True)
         return fifa
     
     def extract_temporary_player_data(self, tag):
+        """
+        Extracción de datos temporales de los jugadores.
+        
+        # Parameters:
+            tag: Tag con datos de un jugador. (web element)?
+        
+        # Returns:
+            Diccionario con datos temporales del jugador (e.g. age, overall_rating, potential, etc). (dict)
+        """
         # Extraigo datos del jugador
         d_data = {}
         d_data['id_player'] = super().extract_tag(tag_inicial=tag,xpath='.//td[@data-col="pi"]', text=True)
@@ -84,11 +112,21 @@ class SofifaCrawler(Crawler):
         url_team = super().extract_tag(tag_inicial=tag, xpath='.//td/a[starts-with(@href, "/team/")]', attribute='href')
         d_data['value'] = super().extract_tag(tag_inicial=tag, xpath='.//td[@data-col="vl"]', text=True)
         d_data['wage'] = super().extract_tag(tag_inicial=tag, xpath='.//td[@data-col="wg"]', text=True)
-
+        int_reputation_str = super().extract_tag(tag_inicial=tag, xpath='.//td[@data-col="ir"]', text=True)
+        d_data['int_reputation'] = int(int_reputation_str.strip()) if int_reputation_str.strip().isdigit() else int_reputation_str
         d_data['id_team'] = extract_id_from_url_team(url_team)
         return d_data
     
     def extract_timeless_player_data(self, tag):
+        """
+        Extracción de datos atemporales de los jugadores.
+        
+        # Parameters:
+            tag: Tag con datos de un jugador. (web element)?
+        
+        # Returns:
+            Diccionario con datos atemporales del jugador (e.g. nombre, altura, preferred_foot, etc). (dict)
+        """
         # Extraigo datos del jugador
         d_data = {}
         d_data['player_name'] = super().extract_tag(tag_inicial=tag, xpath='.//td[not(@class)]/a', attribute="data-tippy-content")
@@ -101,7 +139,12 @@ class SofifaCrawler(Crawler):
         return d_data
     
     def extract_team_data(self):
-
+        """
+        Extracción de datos temporales de un equipo.
+        
+        # Returns:
+            Diccionario con datos temporales de un equipo (e.g. rival_team, home_stadium, international_prestige, etc). (dict)
+        """
         # team_name
         team_name = super().extract_tag(xpath='.//h1[@class="ellipsis"]', text=True)
 
@@ -126,6 +169,12 @@ class SofifaCrawler(Crawler):
         return d_new_row
 
     def click_next_page(self):
+        """
+        Click en boton "Next" para pasar a siguiente pagina.
+        
+        # Returns:
+            True si hizo click en boton "Next". De lo contrario, False. 
+        """
 
         # Clickeo en boton "Next" para recorrer todas las paginas
         boton_next = super().extract_tag(xpath='.//div[@class="pagination"]/a[text()="Next "]', sec_wait=self.SEC_WAIT_MAX)
@@ -135,19 +184,37 @@ class SofifaCrawler(Crawler):
         return True
 
     def extract_fifa_update_date(self):
-        date_str = super().extract_tag(xpath='.//select[@name="roster"]/option[@selected]', text=True)  # e.g. May 16, 2023
+        """
+        Extraccion de la fecha de actualización del fifa.
+
+        # Returns:
+            String de la fecha de actualizacion del fifa (e.g. "20 Mar, 2024"). (str)
+        """
+        date_str = super().extract_tag(xpath='.//select[@name="roster"]/option[@selected]', text=True)
         return date_str
     
 
 def extract_players(id_country, country, id_competition, league, export=True):
+    """
+    Extraccion de datos de Sofifa de jugadores de la competicion de un pais.
 
+    # Parameters:
+        id_country: Id del pais. (int)
+        country: Nombre del pais (al igual que aparece en Sofifa). (str)
+        id_competition: Id de la competicion. (int)
+        league: Nombre de la competicion cuyos jugadores extraer (al menos parecida a la que aparece en Sofifa). (str)
+        export: True para exportar dataframes. (bool)
+
+    # Returns:
+        Dataframes con datos temporales y atemporales de jugadores de la competencia del pais extraidos de Sofifa.com. (tuple)
+    """
     # Definicion de variables
-    df_player, df_player_fifa = pd.DataFrame(), pd.DataFrame()
-    # path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver" # path_driver_exe = "./p2_data_understanding/collect_initial_data/chromedriver"
     crawler = SofifaCrawler(headless=False)  # Usar False (con True no funciona)
+    df_player, df_player_fifa = pd.DataFrame(), pd.DataFrame()
+    league_form = league.lower().replace(" ", "-")
 
     # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados (age, height, or, pot, valor_merc, etc)
-    url_pagina = 'https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg'
+    url_pagina = 'https://sofifa.com/players?&showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg&showCol%5B%5D=ir' # 'https://sofifa.com/players?showCol%5B%5D=pi&showCol%5B%5D=ae&showCol%5B%5D=hi&showCol%5B%5D=pf&showCol%5B%5D=oa&showCol%5B%5D=pt&showCol%5B%5D=vl&showCol%5B%5D=wg'
     crawler.driver.get(url_pagina)
 
     # Filtro listado de players segun la league del country que busco
@@ -205,11 +272,9 @@ def extract_players(id_country, country, id_competition, league, export=True):
                     d_row_player_temp['date'] = date_str
                     d_row_player_temp['id_country'] = id_country
                     d_row_player_temp['id_competition'] = id_competition
-                    # print(d_row_player_temp)
 
                     # Guardo los datos del jugador para dicho año
-                    df_player_fifa = pd.concat([df_player_fifa, pd.DataFrame(d_row_player_temp, index=[0])])
-
+                    df_player_fifa = pd.concat([df_player_fifa, pd.DataFrame(d_row_player_temp, index=[len(df_player_fifa)])])
                     progress_bar.update(1)
 
                 progress_bar.close()
@@ -218,23 +283,33 @@ def extract_players(id_country, country, id_competition, league, export=True):
 
         # Exporto datos del fifa (Por seguridad)
         if export:
-            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_sofifa/{fifa}_{league}.xlsx', index=True)
-            df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league}.xlsx', index=False)
+            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_sofifa/{fifa}_{league_form}.xlsx', index=True)
+            df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league_form}.xlsx', index=False)
 
     # Exporto dataset final
     if export:
-        df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_sofifa/{league}.xlsx', index=True)
-        df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_fifa_sofifa/{league}.xlsx', index=False)
+        df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_sofifa/{league_form}.xlsx', index=True)
+        df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_fifa_sofifa/{league_form}.xlsx', index=False)
 
     # Cierro webdriver
     crawler.driver.close()
     return df_player, df_player_fifa
 
 def extract_teams(id_country, country, league):
-    # DEFINCION DE PARAMETROS & VARIABLES   
+    """
+    Extraccion de datos de Sofifa de equipos de la competicion de un pais.
+
+    # Parameters:
+        id_country: Id del pais. (int)
+        country: Nombre del pais (al igual que aparece en Sofifa). (str)
+        league: Nombre de la competicion cuyos equipos extraer (al menos parecida a la que aparece en Sofifa). (str)
+
+    # Returns:
+        Dataframe con datos de equipos de la competencia del pais extraidos de Sofifa.com (Dataframe)
+    """
+    # Definicion de variables
+    crawler = SofifaCrawler(headless=False)  # Usar False (con True no funciona)
     df_teams = pd.DataFrame()
-    path_driver_exe = "/Users/nachomondino/Documents/chrome_driver/chromedriver" # path_driver_exe = "./p2_data_understanding/collect_initial_data/chromedriver"
-    crawler = SofifaCrawler(headless=False, path=path_driver_exe)  # Usar False (con True no funciona)
 
     # Ingreso a pagina de sofifa.com seleccionando como filtro los campos buscados (age, height, or, pot, valor_merc, etc)
     url_pagina = "https://sofifa.com/teams"
@@ -274,6 +349,12 @@ def extract_teams(id_country, country, league):
 def extract_id_from_url_team(url_team):
     """
     Extra el id del equipo de la url de dicho equipo.
+
+    # Parameters:
+        url_team: Url de Sofifa.com de un equipo. (str)
+    
+    # Returns:
+        Id del equipo en Sofifa.com (str)
     """
     # Convierto url a string para poder usar replace()
     str_url_team = str(url_team)
@@ -287,52 +368,41 @@ def extract_id_from_url_team(url_team):
     id_team = str_url_team[pos_ini: pos_fin]
     return id_team
 
-def extract_all_teams():
-       # Se extrae una vez y listo o no?
+def prueba():
+    """
+    Funcion para poder correr una prueba especifica del actual archivo independientemente de main.py.
+    """
+    # Seleccionar pais  
+    country = "spain"
+
+    # Levanto paises y busco id_country
+    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+
+    # Levanto competencias y obtengo las competencias del pais
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+
     df_teams_concat = pd.DataFrame()
 
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx', index_col=0)
-    # print(df_countries.head(1))
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx', index_col="id_competition")
-    # print(df_comp.head(1))
-    l_id_countries = [48]  # l_countries = df_comp['id_country'].unique()
+    # POR COMPETITION
+    for i, row in df_comp_country.iterrows():
+        print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
-    # Por pais  
-    for id_country in l_id_countries:
+        if row['is_cup'] == 0:
 
-        # Obtengo ligas del pais
-        country = df_countries[df_countries.index == id_country]['country_name'].values[0]
-        print(country)
-        l_leagues = df_comp[(df_comp['id_country']==id_country) & (df_comp['is_cup']==0)]['competition_sofifa'].values
-        print(l_leagues)
+            # Player
+            # df_player, df_player_fifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
+            # df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
+            # df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
+            
+            # Teams
+            df_teams = extract_teams(id_country, country, row['competition_sofifa'])
+            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
 
-        # Por competencia
-        for league in l_leagues :
-            print(league)
-        
-            # Obtengo equipos del pais
-            df_teams = extract_teams(id_country, country, league)
-            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}.xlsx', index=True)
-
-            # Guardo datos 
             df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
-            print(df_teams_concat.shape)
     
-    df_teams_concat.to_excel('/Users/nachomondino/Desktop/prueba_prueba.xlsx', index=True)
-
-def prueba():
-    # Seleccionar pais  
-    id_country = 48
-    id_competition = 101
-    country = "England"
-    liga = "Championship"
-
-    df_player, df_player_fifa = extract_players(id_country, country, id_competition, liga, export=True)
-    df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}.xlsx', index=True)
-    df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}.xlsx', index=True)
-   
-   
-    # extract_all_teams()
+    df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

@@ -5,22 +5,32 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
 from random import randint
 
-def balance_dataset(X, y, bal_type):  # Borra indice original de X e y
-    
-    # Balanceamos segun variable respuesta
-    if bal_type == 'over':  # Genera overfitting
-        oversampler = RandomOverSampler()  #
-        X, y = oversampler.fit_resample(X, y)
+def balance_dataset(X, y, bal_type: str):
+    """
+    Balanceo de datos
+    # Parameters
+        X: Dataframe solo con variables predictoras.
+        y: Dataframe solo con variable respuesta.
+        bal_type: Tipo de balanceo a aplicar. Puede ser 'over' o 'under'. (str)
 
-    elif bal_type == 'under':  # Genera underfitting si no hago shuffle despues
-        undersampler = RandomUnderSampler()  # Funciona igual que mi funcion pero no cambia dtypes, por lo que, no arroja errores
-        X, y = undersampler.fit_resample(X, y)
+    # Returns
+        X e y pasados como parametros balanceados segun bal_type indicado.
+    """
+    # Balanceamos segun variable respuesta
+    if bal_type == 'over':
+        oversampler = RandomOverSampler()  #
+        X_bal, y_bal = oversampler.fit_resample(X, y)
+
+    elif bal_type == 'under':
+        undersampler = RandomUnderSampler()
+        X_bal, y_bal = undersampler.fit_resample(X, y)
 
     else:
         print("El bal_type ingresado para balancear los datos no es una opcion")
         raise ValueError(f"Error: El bal_type de balanceo '{bal_type}', no es una opcion")
 
-    return X, y
+    print(f"Shape X e y antes de balanceo y despues: \n X: {X.shape} --> {X_bal.shape} \n y: {y.shape} --> {y_bal.shape} ")
+    return X_bal, y_bal
 
 def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=True):
     """
