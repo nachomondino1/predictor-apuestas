@@ -671,7 +671,7 @@ class Modeling:
         
         # Find best hiperparameters
         if params is None:
-            model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=10, _print=True)
+            model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
         else:
             model_best_params = model.set_params(**params)
             # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
@@ -792,9 +792,9 @@ def main():
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'england'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    country = 'france'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, True, True
+    data_unders, data_prep, modeling = True, False, True
     export = True
      
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')

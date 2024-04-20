@@ -88,14 +88,14 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Returns
         Diccionario con ROI para las distintas estrategias de apuesta. (dict)
     """
-    best_roi = -100000
-    roi_max = -100000
     # Hiperparametros
-    ## Result to bet
     l_thr_dif_prob = [-0.15, -0.1, -0.05, 0]
     l_thr_dif_winning = [0, 0.03, 0.05]
-    ## Stake to bet
-    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[5, 0], [10, 0], [20, 0], [30, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.5, 4), (1, 20)], [(0.5, 6), (1, 20)]]}
+    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.5, 4), (1, 20)], [(0.5, 6), (1, 20)]]}
+
+    # Definicion de variables
+    best_roi = -100000
+    roi_max = -100000
 
     # Elimino partidos con odds NaN
     df_sin_odds_nan = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away'])
@@ -109,32 +109,34 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Por combinacion de hiperparametros 
     for prob in l_thr_dif_prob:
         for winning in l_thr_dif_winning:
+            d = {}
             # print(f"\n - thr_prob_min: {prob}\n - thr_prob_win: {winning}")
 
-            # Determinamos el/los resultado/s a apostar (no necesariamente el resultado predicho)
+            # Determinamos el resultado a apostar (no necesariamente el resultado predicho)
             df2 = df.copy()  # esto parece boludo pero es clave sino df2 se le agrega las columnas de variacion de stake y los rdos son falsos...
             df2 = determine_result_to_bet(df2, thr_prob_min=prob, thr_prob_win=winning)
             # print(df2.shape)
             df2 = determine_winning_bets(df2)
 
-            # Vario el stake
+            # Por recta con la cual variar el stake
             for key, value in d_rectas.items():
-                d = {}
                 # print(f"Key: {key} Value: {value}")
 
                 for a1, a2 in value:
                     # print(f'\t a1={a1} ; a2={a2}')
 
-                    # m, b = a1, a2 if key == 'linear' else None, None
-                    m = a1 if key == 'linear' else None
+                    m = a1 if key == 'linear' else None  # m, b = a1, a2 if key == 'linear' else None, None
                     b = a2 if key == 'linear' else None
                     p1 = a1 if key != 'linear' else None
                     p2 = a2 if key != 'linear' else None
                     # print(f'\t m={m} ; b={b} ; p1={p1}; p2={p2}')
 
+                    # Determino stake a apostar segun curva
                     df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
+
+                    # Calculo roi stake a apostar segun curva
                     df_no_se, d_rois, = calculate_roi(df_aux, _print=False)
-                    roi = d_rois['roi_por_partido']
+                    roi = d_rois['roi_por_partido']                    
                     d[f'roi_stake_{key}_{a1}_{a2}'] = roi
                     # print("ROI: ", roi)
 
@@ -142,9 +144,10 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
                         # print(f"ROI MAX: {roi_max} --> {roi}")
                         roi_max = roi
                         d_rois_best = d_rois
+                        best_prob = prob
+                        best_winning = winning
                         best_key = key
-                        best_a1 = a1
-                        best_a2 = a2
+                        best_a1, best_a2 = a1, a2
                         df_pred_best = df_no_se.copy()
 
             # Si es el mejor ROI
@@ -155,11 +158,10 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
                 # print(f"BEST ROI: {best_roi}")
 
                 # Guardar hiperparametros de estrategia...
-                d_best = {'thr_prob_min_best': prob, 'thr_prob_win_best':  winning, 'curva': best_key, 'param1': best_a1, 'param2': best_a2}
+                d_best = {'thr_prob_min_best': best_prob, 'thr_prob_win_best':  best_winning, 'curva': best_key, 'param1': best_a1, 'param2': best_a2}
                 best_d_rois.update(d_best)
 
     print(f"\n La mejor estrategia es: \n - thr_prob_min: {d_best['thr_prob_min_best']}\n - thr_prob_win: {d_best['thr_prob_win_best']}; \n - curva: {d_best['curva']}\n - param1: {d_best['param1']}; \n - param2: {d_best['param2']}")
-    print(best_roi)
     print(best_d_rois)
     return best_df_pred, best_d_rois
 
@@ -466,8 +468,17 @@ def prueba():
     """
     from random import randint
 
-    df_predicciones = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/modeling/df_predicciones.xlsx', index_col=0)
-    df_predicciones = df_predicciones.drop(['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet'], axis=1)
+    df_predicciones = pd.read_excel('/Users/nachomondino/Desktop/prueba_pred.xlsx', index_col=0)
+    # df_predicciones = pd.read_excel('./p6_deployment/data/select_best_model/england/predicciones.xlsx', index_col=0)
+    print(df_predicciones.head(5))
+    
+    l_cols = ['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet']
+    for col in l_cols:
+        try:
+            df_predicciones = df_predicciones.drop(col, axis=1)
+        except:
+            pass
+    # df_predicciones = df_predicciones.drop(['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet'], axis=1)
 
     shuffled_df = df_predicciones.sample(frac=1, random_state=140)  # Usa random_state para reproducibilidad
     df, d_roi = calculate_roi_by_betting_strategy(shuffled_df, _print=True)

@@ -35,10 +35,10 @@ def find_best_hiperparameters(id_country, country, date):
     df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
     df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]
     df_comp_country_sin_cups = df_comp_country[(df_comp_country['is_cup'] == 0)]
-    all_comp = df_comp_country['id_competition'].values
-    comp_sin_b = df_comp_country_sin_sec_div['id_competition'].values
-    comp_sin_cups = df_comp_country_sin_cups['id_competition'].values
-    comp_solo_liga = df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values
+    all_comp = list(df_comp_country['id_competition'].values)
+    comp_sin_b = list(df_comp_country_sin_sec_div['id_competition'].values)
+    comp_sin_cups = list(df_comp_country_sin_cups['id_competition'].values)
+    comp_solo_liga = list(df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values)
     print(all_comp, comp_sin_b, comp_sin_cups, comp_solo_liga)
 
     # Creo directorio automaticamente
@@ -47,13 +47,13 @@ def find_best_hiperparameters(id_country, country, date):
     # Definicion de hiperparametros
     d_params = {
         'construct': {
-            'n_dias_ult_part': [30],
+            'n_dias_ult_part': [30, 60, 90],
             'n_years_h2h': [3],
-            'segun_localia': [False]
+            'segun_localia': [True]
         },
         'clean_data_2': {
-            'n_years_to_select': [10, None], # Filtro cantidad de años de datos?
-            'competencies_to_select': [comp_sin_b, all_comp] # algun hiper para seleccionar algunas competencias y otras no... # 
+            'competencies_to_select': [comp_sin_b, [482, 483, 484, 485]], # algun hiper para seleccionar algunas competencias y otras no... # 
+            'n_years_to_select': [5, 10, None], # Filtro cantidad de años de datos?
         },
         'select': {
             'thr_corr': [0.7, 0.8, 0.9, None],
@@ -103,7 +103,7 @@ def find_best_hiperparameters(id_country, country, date):
         # Clean data 2
         for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
 
-            n_years_to_select, comp_to_select = param_values_00[0], param_values_00[1]
+            n_years_to_select, comp_to_select = param_values_00[1], param_values_00[0]
             print(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
             print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
 
@@ -124,7 +124,7 @@ def find_best_hiperparameters(id_country, country, date):
                     df_sel = pd.read_excel(path, index_col=0)
                 except FileNotFoundError:
                     df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
-                    df_sel.to_excel(path, index=True)
+                    # df_sel.to_excel(path, index=True)
             
                 for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
 
@@ -148,7 +148,7 @@ def find_best_hiperparameters(id_country, country, date):
                         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
 
                         # Si hay suficientes datos
-                        if len(X_test) >= 100:
+                        if len(X_test) >= 50:
                             
                             # Select best model
                             best_model, d_hiper_best_model, d_metrics_best_model, df_pred = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
@@ -225,7 +225,7 @@ def make_directories(ruta_base):
             os.makedirs(directorio)
 
 def main():
-    country = 'argentina'
+    country = 'england'
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
 
