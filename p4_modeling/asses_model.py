@@ -88,7 +88,14 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Returns
         Diccionario con ROI para las distintas estrategias de apuesta. (dict)
     """
-    d = {}
+    # Hiperparametros
+    l_thr_dif_prob = [-0.15, -0.1, -0.05, 0]
+    l_thr_dif_winning = [0, 0.03, 0.05]
+    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.5, 4), (1, 20)], [(0.5, 6), (1, 20)]]}
+
+    # Definicion de variables
+    best_roi = -100000
+    roi_max = -100000
 
     # Elimino partidos con odds NaN
     df_sin_odds_nan = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away'])
@@ -99,31 +106,64 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
     df = calculate_dif_proba_in_predicted_result(df)
 
-    # Determinamos el/los resultado/s a apostar (no necesariamente el resultado predicho)
-    df = determine_result_to_bet(df)
-    # df.to_excel('/Users/nachomondino/Desktop/df_result_to_bet.xlsx', index=True)
+    # Por combinacion de hiperparametros 
+    for prob in l_thr_dif_prob:
+        for winning in l_thr_dif_winning:
+            d = {}
+            # print(f"\n - thr_prob_min: {prob}\n - thr_prob_win: {winning}")
 
-    # Determino el stake a apostar
-    df_aux = determine_stake_to_bet(df, stake_base=stake_base, type_relation='equal')
-    d[f'roi_stake_fijo'] = calculate_roi(df_aux, _print=_print)
+            # Determinamos el resultado a apostar (no necesariamente el resultado predicho)
+            df2 = df.copy()  # esto parece boludo pero es clave sino df2 se le agrega las columnas de variacion de stake y los rdos son falsos...
+            df2 = determine_result_to_bet(df2, thr_prob_min=prob, thr_prob_win=winning)
+            # print(df2.shape)
+            df2 = determine_winning_bets(df2)
 
-    l_rectas = [[10, 0], [20, 0], [30, 0]]
-    for m, b in l_rectas:
-        df_aux = determine_stake_to_bet(df, stake_base=stake_base, type_relation='linear', m=m, b=b)
-        d[f'roi_m{m}_b{b}'] = calculate_roi(df_aux, _print=_print)
-        # if _print:
-        #     df_aux.to_excel(f'/Users/nachomondino/Desktop/df_result_to_bet_roi_{m}_{b}.xlsx', index=True)
+            # Por recta con la cual variar el stake
+            for key, value in d_rectas.items():
+                # print(f"Key: {key} Value: {value}")
 
-    df_aux = determine_stake_to_bet(df, stake_base=stake_base, type_relation="exponential", p1=(0.1, 1), p2=(1, 30))
-    d[f'roi_exponencial'] = calculate_roi(df_aux, _print=_print)
+                for a1, a2 in value:
+                    # print(f'\t a1={a1} ; a2={a2}')
 
-    # Selecciono el mejor ROIs
-    filtered_values = [value for value in d.values() if not pd.isna(value)] # Quito ROI que puedan ser nan
-    d['best_roi'] = max(filtered_values)
-    if _print:
-        print(f"ROIs: {d}")
-        
-    return d
+                    m = a1 if key == 'linear' else None  # m, b = a1, a2 if key == 'linear' else None, None
+                    b = a2 if key == 'linear' else None
+                    p1 = a1 if key != 'linear' else None
+                    p2 = a2 if key != 'linear' else None
+                    # print(f'\t m={m} ; b={b} ; p1={p1}; p2={p2}')
+
+                    # Determino stake a apostar segun curva
+                    df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
+
+                    # Calculo roi stake a apostar segun curva
+                    df_no_se, d_rois, = calculate_roi(df_aux, _print=False)
+                    roi = d_rois['roi_por_partido']                    
+                    d[f'roi_stake_{key}_{a1}_{a2}'] = roi
+                    # print("ROI: ", roi)
+
+                    if roi > roi_max:
+                        # print(f"ROI MAX: {roi_max} --> {roi}")
+                        roi_max = roi
+                        d_rois_best = d_rois
+                        best_prob = prob
+                        best_winning = winning
+                        best_key = key
+                        best_a1, best_a2 = a1, a2
+                        df_pred_best = df_no_se.copy()
+
+            # Si es el mejor ROI
+            if roi_max > best_roi:
+                best_roi = roi_max
+                best_df_pred = df_pred_best.copy()
+                best_d_rois = d_rois_best
+                # print(f"BEST ROI: {best_roi}")
+
+                # Guardar hiperparametros de estrategia...
+                d_best = {'thr_prob_min_best': best_prob, 'thr_prob_win_best':  best_winning, 'curva': best_key, 'param1': best_a1, 'param2': best_a2}
+                best_d_rois.update(d_best)
+
+    print(f"\n La mejor estrategia es: \n - thr_prob_min: {d_best['thr_prob_min_best']}\n - thr_prob_win: {d_best['thr_prob_win_best']}; \n - curva: {d_best['curva']}\n - param1: {d_best['param1']}; \n - param2: {d_best['param2']}")
+    print(best_d_rois)
+    return best_df_pred, best_d_rois
 
 def calculate_dif_proba_in_predicted_result(df: pd.DataFrame, _print: bool = False):
     """
@@ -157,7 +197,7 @@ def calculate_dif_proba_in_predicted_result(df: pd.DataFrame, _print: bool = Fal
 
     return df
 
-def determine_result_to_bet(df: pd.DataFrame, _print: bool = False):
+def determine_result_to_bet(df: pd.DataFrame, thr_prob_min, thr_prob_win, _print: bool = False):
     """
     Determina el/los resultado/s a apostar (no necesariamente coincide con el resultado predicho).
     
@@ -168,6 +208,7 @@ def determine_result_to_bet(df: pd.DataFrame, _print: bool = False):
     # Returns:
         Dataframe pasado como parametro con resultado a apostar, la cuota a apostar, la estrategia utiilizada y la probabilidad del resultado al que se apuesta. (DataFrame)
     """
+
     # Por partido
     for id_match, row in df.iterrows():
         if _print:
@@ -176,15 +217,24 @@ def determine_result_to_bet(df: pd.DataFrame, _print: bool = False):
             print(f"BOOKIE: Probabilidades Bookie: Local:{row['prob_home_bm']:.2f} Empate: {row['prob_draw_bm']:.2f} Visitante: {row['prob_away_bm']:.2f}")
             print(f"Diferencia de probabilidad sobre resultado predicho entre MI MODELO y BOOKIE: {row['dif_prob_mod_bm']}")
 
+        dif_prob_winning = abs(row['prob_class_1'] - row['prob_class_2'])
+
+        if dif_prob_winning <= thr_prob_win:
+            result_to_bet = 0
+            prob_result_to_bet = row['prob_class_0']
+            dif_prob_result_to_bet = row['prob_class_0'] - row['prob_draw_bm']
+            odd_to_bet = row['odds_draw']
+            strategy = f"dif_prob_winning < {thr_prob_win}"
+
         # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
-        if row['dif_prob_mod_bm'] >= 0:
+        elif row['dif_prob_mod_bm'] >= thr_prob_min:
 
             # Apuesto al resultado predicho
             result_to_bet = row['predicted_result']
             dif_prob_result_to_bet = row['dif_prob_mod_bm']
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
             odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
-            strategy = f"dif_prob_mod_bm > 0%"
+            strategy = f"dif_prob_mod_bm > {thr_prob_min}"
             if _print:
                 print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MAYOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
 
@@ -195,10 +245,10 @@ def determine_result_to_bet(df: pd.DataFrame, _print: bool = False):
             dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
             prob_result_to_bet = 1 - max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
             odd_to_bet = calculate_odd_double_chance(row, result_to_bet)
-            strategy = f"dif_prob_mod_bm < 0%"
+            strategy = f"dif_prob_mod_bm < {thr_prob_min}"
             if _print:
                 print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MENOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
-
+    
         # Guardo el resultado a apostar
         df.loc[id_match, 'result_to_bet'] = result_to_bet
         df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
@@ -268,8 +318,9 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         Dataframe pasado como parametro con nueva columna 'multiplier', el multiplicador para variar el stake.
     """
     # Separo puntos en x e y
-    x1, y1 = p1
-    x2, y2 = p2
+    if p1 is not None and p2 is not None:
+        x1, y1 = p1
+        x2, y2 = p2
 
     # Linear
     if type_relation == "equal":  
@@ -318,36 +369,49 @@ def calculate_roi(df: pd.DataFrame, _print: bool = False):
     # Definicion de variables
     dinero_a_apostar = 100 # CUIDADO! NO ES sum(df['stake_mod'])
     dinero_tras_apuestas = dinero_a_apostar
-
-    # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
-    df = determine_winning_bets(df)
-    df_correct = df[df['acerte'] == 1]
-    df.to_excel('/Users/nachomondino/Desktop/df_prueba.xlsx', index=True)
+    n_apuestas = len(df)
+    d_rois = {}
+    l_rois_partido = [50, 100, 150, 200, 250, 300, 400, 500]
+    cont = 0
+    df_correct = df[df['acerte'] == 1]   # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
 
     # Por partido acertado
     for idx, row in df.iterrows():
+        cont += 1
         
-        # Defino stake a 
-        stake_a_apostar = row['stake_to_bet'] # stake_a_apostar =  dinero_tras_apuestas * row['stake_to_bet'] / 100 # Si le doy 0.01 * dinero_tras_apuestas, siempre apuesto el 1% del dinero disponible  # si le doy valor stake_base, entonces seria el 1% del dinero para apostar inicial
+        # Defino stake a apostar 
+        stake_a_apostar =  dinero_tras_apuestas * row['stake_to_bet'] / 100  # Stake como porcentaje del bank
         if _print:
             print(f"Stake [% bank]: {row['stake_to_bet']} Stake [$]: {stake_a_apostar}")
 
         if row['acerte'] == 1:
             # Calculo ingresos por acertar el resultado
             ingresos = stake_a_apostar * row['odd_to_bet']
-            dinero_tras_apuestas += ingresos
+            ganancia = ingresos - stake_a_apostar
+            dinero_tras_apuestas += ganancia
+            df.loc[idx, 'G/P'] = ganancia
             if _print:
                 print(f"\tAcerte! Cuota ganada: {row['odd_to_bet']} Ingresos: ${ingresos:.0f} --> Dinero tras apuesta: ${dinero_tras_apuestas:.0f}")
 
         else:
             dinero_tras_apuestas -= stake_a_apostar
+            df.loc[idx, 'G/P'] = -stake_a_apostar
             if _print:
                 print(f"\tFallé. Cuota apostada: {row['odd_to_bet']} Perdidas: ${stake_a_apostar:.0f} --> Dinero tras apuesta: ${dinero_tras_apuestas:.0f}")
-   
+
+        if cont in l_rois_partido:
+            roi_partido = (dinero_tras_apuestas - dinero_a_apostar) / dinero_a_apostar * 100
+            d_rois[f'roi_{cont}'] = roi_partido / cont
+            df.loc[idx, 'roi_partido'] = roi_partido / cont
+            # print(f"Dinero tras apuestas: {dinero_tras_apuestas} ; Dinero a apostar: {dinero_a_apostar} ; ROI: {roi_partido}")
+
+        df.loc[idx, 'dinero_tras_apuestas'] = dinero_tras_apuestas
+
     # Calculo el ROI
-    n_apuestas = len(df[df['multiplier'] > -1])
     roi = (dinero_tras_apuestas - dinero_a_apostar) / dinero_a_apostar * 100
     roi_por_partido = roi / n_apuestas  # No quiero el ROI mas alto sino el ROI / partido mas alto
+    d_rois['roi'] = roi
+    d_rois['roi_por_partido'] = roi_por_partido
     cuota_media_ganada = sum(df_correct['odd_to_bet'] / len(df_correct))
     cuota_media_apostada = sum(df['odd_to_bet'] / len(df))  # --> no tengo la cuota apostada en cada partido... la eestoy calculando en el ciclo for...
     if _print:
@@ -356,8 +420,8 @@ def calculate_roi(df: pd.DataFrame, _print: bool = False):
         print(f"Cantidad de partidos en los que se apostó: {n_apuestas}, es decir, el {n_apuestas / len(df)*100:.1f}%")
         print(f"\t ROI: {roi:.1f}%. ${dinero_a_apostar:.0f} --> ${dinero_tras_apuestas:.0f}")
         print(f"\t ROI por partido: {roi_por_partido:.1f}%")
-
-    return roi_por_partido
+   
+    return df, d_rois
 
 def determine_winning_bets(df: pd.DataFrame):
     """
@@ -402,12 +466,23 @@ def prueba():
     """
     Para poder correr solamente el actual archivo y poder hacer pruebas especificas.
     """
-    var_resp = 'result'
-    var_pred = 'predict_result'
+    from random import randint
 
-    df_predicciones = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/modeling/df_predicciones.xlsx', index_col=0)
-    df_predicciones = df_predicciones.drop(['stake_mod', 'multiplier'], axis=1)
-    roi = calculate_roi_by_betting_strategy(df_predicciones, _print=True)
+    df_predicciones = pd.read_excel('/Users/nachomondino/Desktop/prueba_pred.xlsx', index_col=0)
+    # df_predicciones = pd.read_excel('./p6_deployment/data/select_best_model/england/predicciones.xlsx', index_col=0)
+    print(df_predicciones.head(5))
+    
+    l_cols = ['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet']
+    for col in l_cols:
+        try:
+            df_predicciones = df_predicciones.drop(col, axis=1)
+        except:
+            pass
+    # df_predicciones = df_predicciones.drop(['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet'], axis=1)
+
+    shuffled_df = df_predicciones.sample(frac=1, random_state=140)  # Usa random_state para reproducibilidad
+    df, d_roi = calculate_roi_by_betting_strategy(shuffled_df, _print=True)
+    df.to_excel("/Users/nachomondino/Desktop/df_pred_best.xlsx", index=True)
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
