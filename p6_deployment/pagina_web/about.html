@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="css/styles.css">
     <title>Icons</title>
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
+
+</head>
 <body>
     <!-- Encabezado -->
     <header class="header">
@@ -31,33 +33,22 @@
         <nav class="header__navbar">
             <ul class="header__nav-list">
                 <li class="header__nav-item"><a href="index.html" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
-                <li class="header__nav-item"><a href="pagina_1.html" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
-                <li class="header__nav-item"><a href="pagina_2.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+                <li class="header__nav-item"><a href="predicciones.html" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+                <li class="header__nav-item"><a href="about.html" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+                <li class="header__nav-item"><a href="contact.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
             </ul>
         </nav>
-    </header>  
+    </header>
 
-    <div class="form-container">
-        <div class="form-contacto-imagen">
-            <img src="images/gmail.png">
-        </div>
-        
-        <form class="form-contacto">
-            <div class="form__section">
-                <input class="form__input" type="email" required="" placeholder="Escriba su email">
-            </div>
-            <div class="form__section">
-                <input class="form__input" type="text" required="" placeholder="Escriba el asunto">
-            </div>
-            <div class="form__section">
-                <textarea class="form__input input--mensaje" placeholder="Escriba su mensaje"></textarea>
-            </div>
-            <div class="form__section">
-                <input class="form__input input--boton" type="submit">
-            </div>
-        </form>
+    <div class="timeline-container">
 
+        <!-- Linea de tiempo, cada div con fondo diferente-->
+        <div class="timeline__event"></div>
+        <div class="timeline__event"></div>
+        <div class="timeline__event"></div>
+        <div class="timeline__event"></div>
     </div>
+
 
     <!-- Pie de pagina -->
     <footer>
@@ -72,8 +63,8 @@
         <!-- Enlaces a paginas -->
         <div class="footer-navbar">
             <ul class="footer-navbar-list">
-                <li class="footer-navbar__item"><a href="pagina_1.html">Sobre nosotros</a></li>
-                <li class="footer-navbar__item"><a href="pagina_2.html">Contacto</a></li>
+                <li class="footer-navbar__item"><a href="about.html">Sobre nosotros</a></li>
+                <li class="footer-navbar__item"><a href="contact.html">Contacto</a></li>
                 <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
                 <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
             </ul>
