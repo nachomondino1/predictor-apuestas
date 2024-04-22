@@ -11,7 +11,7 @@
     --header-height: 64px;
 
     /* Texto */
-    --font-family: Montserrat, sans-serif;
+    --font-family: sans-serif;
     --font-size: 1em;
     --color: black;
 
@@ -91,7 +91,7 @@ a {
     display: none;
     position: absolute; /* para que no modifique el espacio en el header*/
     height: 100vh;
-    width: 60vw;
+    width: 60vw; 
     top: var(--header-height);
     z-index: 1;
     background-color: var(--color-primario);
@@ -130,27 +130,28 @@ a {
 
 
 /* ---------------------- HEADER QUERIES ---------------------- */
-@media only screen and (min-width: 600px) {
+@media only screen and (min-width: 600px) {  /* Esto genera demora en la barra y se nota*/
     .header__open-nav-button {
         display: none; /* Oculto el menu togle en Desktop */
     }
-
+    
     .header__navbar {
         display: block;
         position: static; /* para que si ocupe el espacio en el header*/
         height: var(--header-height);
         align-content: center; /* centra verticalmente el ul en el nav */
     }
-    
     .header__nav-list {
         flex-direction: row;
         justify-content: right;
         margin: 0; /* porque aplico margin en navbar de mobile y queda mal la Desktop... */
     }
-
+    
     .header {
-        justify-content: center; /* como el espacio entre el logo y la barra de nav */
+        justify-content: center;  /* como el espacio entre el logo y la barra de nav */
     }
+    
+
 
 }
 
@@ -222,6 +223,23 @@ footer a {
     align-content: center;
 }
 
+.image-container-text h2 {
+    font-size: 90px;
+    ;
+}
+
+.image-container-text button {
+    text-decoration: none;
+    border-radius: 1rem;
+    border: none;
+    background-color: rgb(22, 148, 22);
+    color: #fff;
+    padding: 0.8rem;
+}
+
+.image-container-text button:hover {
+    opacity: 0.7;
+}
 
 /* ---------------------- WEB PAGE: PREDICCIONES.HTML ---------------------- */
 /* MAIN SECTION */
