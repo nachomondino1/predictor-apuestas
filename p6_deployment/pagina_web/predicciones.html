@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<!-- Metadatos y demas -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Ready to take your sports analysis to the next level? Look no further than Forebet, your premier AI-driven platform for cutting-edge sports predictions.">
+    <meta name="keywords" content="Football predictions, mathematical football predictions, forebet, football, stats, scores, statistics, match previews, livescore, live scores, live predictions">
+    <meta name="author" content="Nombre del autor">
+
+    <title> Predicciones | Apuestas deportivas </title>
+    <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <title>Calendar</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <title>Icons</title>
+    <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
+</head>
+
+<!-- Contenido de la pagina -->
+<body>
+    <!-- Encabezado -->
+    <header class="header">
+
+        <!-- Boton para abrir menú -->
+        <input type="checkbox" class="header__checkbox" id="menu-toggle">
+        <label for="menu-toggle" class="header__open-nav-button" role="button"><i class="fas fa-bars"></i></label>
+        
+                
+        <!-- Logo y nombre de la empresa -->
+        <div class="header__logo-container">
+            <a href="index.html">
+                <img class="header__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+                <h2 class="header__logo-title">GoalProphet</h2>
+            </a>
+        </div> 
+
+        <!-- Barra de Navegación -->
+        <nav class="header__navbar">
+            <ul class="header__nav-list">
+                <li class="header__nav-item"><a href="index.html" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+                <li class="header__nav-item"><a href="predicciones.html" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+                <li class="header__nav-item"><a href="about.html" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+                <li class="header__nav-item"><a href="contact.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+            </ul>
+        </nav>
+    </header>  
+
+    <div class="main-wrapper">
+        <!--
+        <div class="title">
+            <h1> Predicciones del día </h1>
+        </div>
+        -->
+        <!-- Barra lateral de navegacion: Calendario-->
+        <aside class="filters">
+            <h3>Filtros</h3>
+    
+            <div class="calendar-container">
+
+                <h4> Fecha </h4>
+                <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha">
+                <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+                <script>
+                    flatpickr("#fechaSeleccionada", {
+                        dateFormat: "d-m-Y", // Formato de fecha
+                        minDate: "01-01-2024", // Fecha mínima permitida (opcional)
+                        maxDate: new Date().fp_incr(3), // Fecha máxima permitida (opcional)
+                        onChange: function(selectedDates, dateStr, instance) {
+                            // Aquí puedes realizar acciones cuando se selecciona una fecha
+                            console.log("Fecha seleccionada:", dateStr);
+                            // Puedes agregar aquí la lógica para cargar los datos según la fecha seleccionada
+                        }
+                    });
+                </script>                
+            </div>
+
+            <div class="leagues-container">
+                <h4> Leagues </h4>
+                <ul class="filters-leagues__list">
+                    <li class="filters-leagues__item">Premier League</li>
+                    <li class="filters-leagues__item">Serie A</li>
+                    <li class="filters-leagues__item">Bundesliga</li>
+                    <li class="filters-leagues__item">Ligue 1</li>
+                    <li class="filters-leagues__item">La Liga</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Partidos del dia -->
+        <main class="main">
+            <h3>Partidos del dia</h3>
+            <div class="matches-container">
+                <!-- 
+                <ul>
+                    <li class="match_list__item"></li>
+                    <li class="match_list__item"></li>
+                    <li class="match_list__item"></li>
+                    <li class="match_list__item"></li>
+                    <li class="match_list__item"></li>
+                    <li class="match_list__item"></li>
+                </ul>
+                -->
+            </div>
+        </main>
+
+        <!-- ADS -->       
+        <aside class="leagues">     
+            <p> Lorem ipsum, dolor sit amet consectetur adipisicing elit. Sit dolorum debitis facere mollitia eveniet alias cumque sed, corporis consequatur ratione, officia eos tempora atque hic commodi nisi nemo. Labore, nihil.
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Fuga suscipit non id dolores doloribus reprehenderit similique maxime numquam, adipisci pariatur nam esse voluptate tempora, facere atque asperiores quibusdam quas error!
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut odit velit nostrum dolor? Autem ea reiciendis officiis accusamus! Explicabo eum delectus a officia, dolorem veniam rerum quos quas nisi eligendi.
+                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Voluptates vero delectus excepturi optio cum repellat alias earum, incidunt harum, labore aut? Aliquam libero facilis exercitationem dolore repellendus tenetur unde nostrum!
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Accusantium numquam cumque eligendi eum dolorem, vel similique id tempore quae enim. Placeat suscipit, nobis dolores a qui aperiam commodi tempora perspiciatis.
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Sit doloremque est rem quos voluptatibus minima deleniti commodi porro autem repellendus? Quo itaque iste dolorum dolores dolore illum architecto voluptatibus reprehenderit!
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Aut corrupti inventore aliquam qui, eius quidem, iusto hic neque iure, at excepturi consequatur recusandae error reiciendis nesciunt esse laborum ipsam distinctio.
+                Lorem ipsum dolor, sit amet consectetur adipisicing elit. Aut iusto minima quibusdam nostrum illo qui eaque assumenda, accusamus, at laboriosam, in molestias ex! Corporis omnis beatae distinctio. Odio, soluta porro?
+                Lorem ipsum dolor, sit amet consectetur adipisicing elit. Necessitatibus debitis possimus dignissimos quaerat, vel nesciunt blanditiis recusandae alias, exercitationem quis qui et deserunt. Expedita id rem obcaecati, hic molestias nihil!
+                Lorem ipsum dolor sit, amet consectetur adipisicing elit. Similique rerum alias explicabo dolor quam, quod ipsam? Rerum expedita odio vitae esse voluptates, perferendis deserunt? Sequi aliquid doloribus id quisquam error?
+                Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quisquam rem eos saepe. Nisi, fugiat recusandae. Corporis beatae laborum libero aspernatur. Eaque, fugiat ex? Animi praesentium itaque hic? Adipisci, numquam totam!</p>
+        </aside>
+    </div>
+
+    <!-- Pie de pagina -->
+    <footer>
+        <!-- Logo y nombre de la empresa -->
+        <div class="footer__logo-container">
+            <a class="footer__logo-link" href="index.html">
+                <img class="footer__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+                <h2 class="footer__logo-title">GoalProphet</h2>
+            </a>
+        </div> 
+
+        <!-- Enlaces a paginas -->
+        <div class="footer-navbar">
+            <ul class="footer-navbar-list">
+                <li class="footer-navbar__item"><a href="about.html">Sobre nosotros</a></li>
+                <li class="footer-navbar__item"><a href="contact.html">Contacto</a></li>
+                <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
+                <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
+            </ul>
+        </div>
+
+        <!-- Social media -->
+        <div class="footer__social-media">
+            <ul class="footer-social-media-list">
+                <li class="footer-social-media__item"><a href="#"><img src="images/facebook.png" alt="Facebook"> Facebook</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="images/gorjeo.png" alt="Twitter"> Twitter</a></li>
+            </ul>
+        </div>
+
+        <!-- Copyright -->
+        <div class="footer__copyright">
+            <p>&copy; 2024 Football Predictions. Todos los derechos reservados.</p>
+        </div>
+
+    </footer>
+
+</body>
+</html>
