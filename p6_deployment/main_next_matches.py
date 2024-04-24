@@ -346,7 +346,10 @@ class DataPreparationNew(DataPreparation):
             df_etiquetas.to_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_etiquetas_actualizado.xlsx', index=False) 
         return df
 
-    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_used):
+    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_used, comp_to_select):
+
+        # Para evitar ciertas competencias (no tiene sentido filtrar por n_years_to_select pues los partidos son proximos y no los quiero filtrar)
+        df = df[df['id_competition'].isin(comp_to_select)] # Tiene sentido? En la extraccion ya estoy filtrando competencias...
 
         # Separo en X e y
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp] # Separo en X e y
@@ -640,8 +643,8 @@ def main():
     run_missing, data_unders, data_prep, modeling = False, True, True, True
     export = True
     country = "england"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
-    fecha_find_best = '2024-04-13'
-    d_modelos = {'italy': 23, 'england': 45, 'argentina': 1}  # Para inglaterra: Premier League=235 Championship=161
+    fecha_find_best = '2024-04-22'
+    d_modelos = {'italy': 23, 'england': 241, 'argentina': 1}  # Para inglaterra: Premier League=235 Championship=161
    
     # Definicion de variables
     ruta_base = f"./main_find_best_hyper/data/{country}/{fecha_find_best}"
@@ -655,9 +658,8 @@ def main():
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_hyperparameters(country, numero_mejor_modelo, ruta_base)
     tager, scaler, columns_scaled, loaded_model = load_models(country, numero_mejor_modelo, ruta_base, d_hiper)
-    comp_to_select_filt = eval(d_hiper['comp_to_select'])
-    # comp_to_select_filt = eval(d_hiper['comp_to_select'].replace(" ",", "))
-      
+    comp_to_select = eval(d_hiper['comp_to_select'])
+    
     #______________________________________________ MISSING DATA ______________________________________________#
     print("\n", "#"*120, "\n", "MISSING DATA".center(120), "\n", "#"*120, "\n")
     if run_missing:  # Lo puedo correr atemporal de los proximos partidos, dado que tarda,esta bueno correlo seguido para no tener una gran extraccion y tarde mucho
@@ -691,7 +693,7 @@ def main():
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
             df_integrated_missing = convert_columns_to_float(df_integrated_missing)  # Formateo estadisticas a float (no se por que son object)
-      
+
             # Concateno missing y old
             df_int_with_missing = pd.concat([df_integrated, df_integrated_missing], axis=0)
 
@@ -716,7 +718,7 @@ def main():
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if data_unders:
         # Extriago datos de los partidos en los proximos dias
-        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select_filt, n_days=n_days_max_next_matches)
+        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select, n_days=n_days_max_next_matches)
 
         if len(df_match) > 0:
             # Describo datos
@@ -767,7 +769,7 @@ def main():
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_old_int_filt)
         df = dp.construct_data_new(df, df_old_int, df_old_int_filt, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
         df = dp.tag_string_data_to_integer_new(df, tager)
-        df = dp.clean_data_2_new(df, scaler, columns_scaled)
+        df = dp.clean_data_2_new(df, scaler, columns_scaled, comp_to_select)
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         df = dp.treat_nan_values_new(df)
         print("Shape Dataframe antes de Modeling(): ", df.shape)
@@ -801,8 +803,10 @@ def main():
 
         # Determino estrategia de apuuesta
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
-        df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper['thr_prob_min'], thr_prob_win=d_hiper['thr_prob_win'])
-        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper['curva'], m=d_hiper['curva_m'], b=d_hiper['curva_b'], p1=d_hiper['curva_p1'], p2=d_hiper['curva_p2'])
+        # df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper['thr_prob_min'], thr_prob_win=d_hiper['thr_prob_win'])
+        # df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper['curva'], m=d_hiper['curva_m'], b=d_hiper['curva_b'], p1=d_hiper['curva_p1'], p2=d_hiper['curva_p2'])
+        df = asses_model.determine_result_to_bet(df, thr_prob_min=-0.15, thr_prob_win=0)
+        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=30, b=0)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
