@@ -11,7 +11,7 @@ from main import DataPreparation
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
-from p3_data_preparation import format_data, select_data, clean_data, construct_data
+from p3_data_preparation import format_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
 import pickle
@@ -184,8 +184,8 @@ class DataPreparationNew(DataPreparation):
         df_match = format_data.convert_capacity_to_int(df_match)        
 
         # Convierto columnas a float
-        df_match = convert_columns_to_float(df_match)
-        df_match_odds = convert_columns_to_float(df_match_odds)
+        df_match = format_data.convert_columns_to_float(df_match)
+        df_match_odds = format_data.convert_columns_to_float(df_match_odds)
 
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
@@ -546,25 +546,6 @@ def read_last_version_matches(country, _print: bool = True):
             print(df_match.shape, df_match_player.shape, df_match_odds.shape, df_integrated.shape)
     return df_match, df_match_player, df_match_odds, df_integrated
             
-def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
-    """
-    Intenta convertir las columnas object a float
-    """
-    # Selecciono las columnas object
-    l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
-
-    # Por columna object
-    for col in l_columnas_a_codificar:
-
-        # Intento convertirla a float
-        try:
-            df[col] = df[col].astype(float)
-            if _print:
-                print(f"Se convirtio la columna {col} a float!")
-        except:
-            pass
-    return df
-
 def load_hyperparameters(country, n_model, ruta_base):
 
     d = {}
@@ -677,7 +658,7 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
 
             # Guardo df_match y df_match_player concatenados con missing
             if export:
-                # df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo odds a float (no se por que son object)
+                # df_match_odds = format_data.convert_columns_to_float(df_match_odds)  # Formateo odds a float (no se por que son object)
                 df_concat_match = pd.concat([df_match, df_match_miss], axis=0)
                 df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
                 df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
@@ -690,7 +671,7 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
-            # df_integrated_missing = convert_columns_to_float(df_integrated_missing)  # Formateo estadisticas a float (no se por que son object)
+            # df_integrated_missing = format_data.convert_columns_to_float(df_integrated_missing)  # Formateo estadisticas a float (no se por que son object)
 
             # Concateno missing y old
             df_int_with_missing = pd.concat([df_integrated, df_integrated_missing], axis=0)
@@ -819,7 +800,7 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
     country = "italy"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
     fecha_find_best = '2024-04-24'
@@ -827,7 +808,7 @@ if __name__ == "__main__":
 
     n_days_max_next_matches = 1  # Numero de dias maximo desde hoy para extraer partidos
 
-    d_modelos = {'italy': 23, 'england': 36, 'argentina': 1}  # Para inglaterra: Premier League=36 Championship=436
+    d_modelos = {'italy': 470, 'england': 36, 'argentina': 1}  # Para inglaterra: Premier League=36 Championship=436
     n_model = d_modelos[country]
 
     # Extraigo, preparo y predigo proximos partidos

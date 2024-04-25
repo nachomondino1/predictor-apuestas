@@ -9,7 +9,6 @@ from p2_data_understanding import describe_data
 ## Data preparation
 from p3_data_preparation import format_data, select_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
-from p6_deployment.main_next_matches import convert_columns_to_float
 from sklearn.preprocessing import StandardScaler
 ## Modeling
 from p4_modeling import generate_test_design, build_model, asses_model
@@ -181,7 +180,7 @@ class DataPreparation:
         df_match = format_data.convert_goals_to_int(df_match)
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
         ## Todas las columnas
-        df_match = convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
+        df_match = format_data.convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
         # df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo estadisticas a float (no se por que son object)
 
         # Dataframe player_fifa_sofifa
