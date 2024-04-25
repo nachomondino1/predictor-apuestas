@@ -30,12 +30,12 @@ def find_best_hiperparameters(id_country, country, date):
     # Definicion de hiperparametros
     d_params = {
         'construct': {
-            'n_dias_ult_part': [30, 60],
+            'n_dias_ult_part': [30, 60, 90],
             'n_years_h2h': [3],
             'segun_localia': [True]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], [482, 483, 484, 485]], # algun hiper para seleccionar algunas competencias y otras no... # 
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # algun hiper para seleccionar algunas competencias y otras no... # 
             'n_years_to_select': [5, 10, None], # Filtro cantidad de años de datos?
         },
         'select': {
@@ -244,7 +244,7 @@ def select_best_model(df):
 
 def main():
     # Parametros de corrida
-    country = 'england'
+    country = 'italy'
 
     # Definicion de variables
     date_con_hora = datetime.datetime.now()
@@ -256,11 +256,10 @@ def main():
     df_iteration = find_best_hiperparameters(id_country, country, date)
 
     # Preparo datos missing y evaluo modelos en produccion
-    df = assess_model_in_prod.assess_models(country, date, df_iteration)
-    df.to_excel(f'main_find_best_hyper/data/{country}/assess_model_in_prod/df_models_in_prod.xlsx')
+    df = assess_model_in_prod.main(df_iteration, country, date)
 
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    best_model = select_best_model(df)
+    # best_model = select_best_model(df)
 
 if __name__ == '__main__':
     main()
