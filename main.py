@@ -9,6 +9,7 @@ from p2_data_understanding import describe_data
 ## Data preparation
 from p3_data_preparation import format_data, select_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
+from p6_deployment.main_next_matches import convert_columns_to_float
 from sklearn.preprocessing import StandardScaler
 ## Modeling
 from p4_modeling import generate_test_design, build_model, asses_model
@@ -39,16 +40,16 @@ class DataUnderstanding:
     def make_directories(self):
         ruta_base = f'./p2_data_understanding/data/{self.country}/data_seg'
         l_directorios = [f'{ruta_base}/per_season/df_match/',
-                         f'{ruta_base}/per_season/df_match_player/',
-                         f'{ruta_base}/per_season/df_match_odds/',                    
+                        f'{ruta_base}/per_season/df_match_player/',
+                        f'{ruta_base}/per_season/df_match_odds/',                    
                         f'{ruta_base}/per_season/df_player_sofifa/',
-                         f'{ruta_base}/per_season/df_player_fifa_sofifa/',
-                         f'{ruta_base}/per_competition/df_match/',
-                         f'{ruta_base}/per_competition/df_match_player/',
+                        f'{ruta_base}/per_season/df_player_fifa_sofifa/',
+                        f'{ruta_base}/per_competition/df_match/',
+                        f'{ruta_base}/per_competition/df_match_player/',
                         f'{ruta_base}/per_competition/df_match_odds/',
                         f'{ruta_base}/per_competition/df_player_sofifa/',
                         f'{ruta_base}/per_competition/df_player_fifa_sofifa/'
-                         ]
+                        ]
 
         for directorio in l_directorios:
             if not os.path.exists(directorio):
@@ -179,7 +180,10 @@ class DataPreparation:
         ## Goals
         df_match = format_data.convert_goals_to_int(df_match)
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
-            
+        ## Todas las columnas
+        df_match = convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
+        # df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo estadisticas a float (no se por que son object)
+
         # Dataframe player_fifa_sofifa
         ## Fecha
         df_player_fifa_sofifa['date'] = pd.to_datetime(df_player_fifa_sofifa['date'], format='%b %d, %Y')
@@ -315,8 +319,6 @@ class DataPreparation:
         # Construyo variables: "result" y otras
         df = construct_data.determine_result(df, self.var_resp)
         df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
-        # Construyo variables porcentajes (funciona ok!) No tira error de division ni nada. Es nan solo cuando es 0/0 (sin tiirar error).
-        # df['perc_attendance'] = df["attendance"] / df["capacity"]
         df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
      
         # Construyo date numerica
@@ -717,7 +719,7 @@ class Modeling:
         y_pred_prob = model.predict_proba(X_test) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array
         df_pred_proba = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred, f'prob_class_{model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{model.classes_[2]}': y_pred_prob[:, 2]}, index=X_test.index)
-   
+
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100
@@ -735,7 +737,7 @@ class Modeling:
         test_precision_bookmaker = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
         dif_prec = test_accuracy - test_precision_bookmaker
         d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1, 'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec}
- 
+        
         # Concateno dfs
         df_predicciones = pd.concat([df_pred_proba, df_match_odds], axis=1)
         
@@ -774,7 +776,7 @@ class Modeling:
                 # Si la precision_test_es mayor, guardar datos...
                 if d_metrics['roi_por_partido'] > best_roi_max:
                     best_roi_max = d_metrics['roi_por_partido']
-                 
+
                     # Guardo datos del mejor modelo
                     best_model, d_hiper_best_model, cv_acc = model, d_hiper_model, cv_accuracy
                     df_pred, d_metrics_best_model = df_predicciones, d_metrics
@@ -796,7 +798,7 @@ def main():
     var_resp, var_pred = 'result', 'predicted_result'
     data_unders, data_prep, modeling = True, False, True
     export = True
-     
+
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
