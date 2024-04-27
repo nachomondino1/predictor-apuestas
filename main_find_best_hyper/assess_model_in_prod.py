@@ -72,7 +72,7 @@ class DataPreparationNew_2(DataPreparation):
             df_match_odds.to_excel(f'main_find_best_hyper/data/{self.country}/{self.iteration_date}/assess_model_in_prod/data_preparation/format_data/df_match_odds_form.xlsx')
         return df_match, df_match_odds
 
-    def clean_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame):
+    def clean_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame):
         """
         Limpieza inicial de los dataframes
 
@@ -83,38 +83,22 @@ class DataPreparationNew_2(DataPreparation):
         # Returns:
             Dataframe
         """
-        start = time.time()
         print("\nCleaning new data...")
 
         # Dataframe match
         if 'attendance' in df_match.columns:
             df_match = df_match.drop(['attendance'], axis=1)
 
-        # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis -->  No es necesario puesto que ni las recolecto. Pero por el momento lo necesito.
-        print("\nEliminacion de estadisticas irrelevantes")
-        stats_columns = construct_data.determine_stats_columns(df_match)
-        relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
-        df_match = clean_data.delete_not_relevant_stats(df_match, stats_columns, relevant_stats_columns)
-
-        # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
-        non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
-        df_match_player.drop(columns=non_object_columns, inplace=True)
-        print("Shape df_match_player: ", df_match_player.shape)
-
-        # Preparo columnas texto
-        columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
-        df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
-        columns_player_names = list(df_match_player.filter(like='player_name').columns)
-        df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=columns_player_names)
-
-        end = time.time()
-        print(f"Limpieza inicial de datos en {(end - start) / 60:.1f} minutos")
+        df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = self.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
 
         if self.export:
             df_match.to_excel(f'main_find_best_hyper/data/{self.country}/{self.iteration_date}/assess_model_in_prod/data_preparation/clean_data/df_match_cleaned.xlsx')
             df_match_player.to_excel(f'main_find_best_hyper/data/{self.country}/{self.iteration_date}/assess_model_in_prod/data_preparation/clean_data/df_match_player_cleaned.xlsx')
+            df_player_sofifa.to_excel(f'main_find_best_hyper/data/{self.country}/{self.iteration_date}/assess_model_in_prod/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx')
+            df_player_fifa_sofifa.to_excel(f'main_find_best_hyper/data/{self.country}/{self.iteration_date}/assess_model_in_prod/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
+            df_teams_sofifa.to_excel(f'main_find_best_hyper/data/{self.country}/{self.iteration_date}/assess_model_in_prod/data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx')
 
-        return df_match, df_match_player
+        return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
 
     def integrate_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa):
         """
@@ -215,6 +199,7 @@ class DataPreparationNew_2(DataPreparation):
 
         ## Para evitar ciertas competencias (no tiene sentido filtrar por n_years_to_select pues los partidos son proximos y no los quiero filtrar)
         df = df[df['id_competition'].isin(comp_to_select)]
+        print(f"Shape luego de filtrar por comp: {len(df)}")
 
         # Separo en X e y
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp] # Separo en X e y  
@@ -267,11 +252,10 @@ class DataPreparationNew_2(DataPreparation):
         """
         # Rellenar NaN en algunas columnas espeecificas
         columnas_h2h = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        columnas_player_miss = ['dif_mean_val_player_sub' ,'dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss', 'dif_sum_rat_player_miss', 'dif_sum_val_player_miss']         # A veces, las columnas dif de jugadores ausentes es NaN dado que uno delos equipos no tiene jug ausentes. Podria evitarlo.
+        columnas_player_miss = ['dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss', 'dif_sum_rat_player_miss', 'dif_sum_val_player_miss']         # A veces, las columnas dif de jugadores ausentes es NaN dado que uno delos equipos no tiene jug ausentes. Podria evitarlo.
         columns_to_fill = [col for col in (columnas_player_miss + columnas_h2h) if col in df.columns]
         if columns_to_fill:
             df[columns_to_fill] = df[columns_to_fill].fillna(0)
-        # df= df.fillna(0)
 
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
@@ -389,17 +373,16 @@ def load_models(country, n_model, ruta_base, d):
     return tager_loaded, scaler, columns_scaled,loaded_model
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date):
+def main(df_iteration, country, iteration_date, export: bool = True):
     """
     Extrae datos missing, los prepara y predice con modelo ya entrenado. 
     """
     # Definicion de variables
-    export = True
+    df_iteration_prod = pd.DataFrame()
     ruta_base = f"./main_find_best_hyper/data/{country}/{iteration_date}"  # Le agrego assess_model_in_prod
     var_pred = 'predicted_result'
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
-    df_iteration_prod = pd.DataFrame()
 
     # Creo objeto de clases DataUnderstanding y DataPreparation
     dp = DataPreparationNew_2(id_country=id_country, country=country, iteration_date=iteration_date, export=export)
@@ -415,6 +398,7 @@ def main(df_iteration, country, iteration_date):
     df_player_sofifa = pd.read_excel(f"p3_data_preparation/data/{country}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
     df_player_fifa_sofifa = pd.read_excel(f"p3_data_preparation/data/{country}/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
     df_teams_sofifa = pd.read_excel(f"p3_data_preparation/data/{country}/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)
+    print(df_match.shape, df_match_player.shape, df_match_odds.shape, df_player_sofifa.shape, df_player_fifa_sofifa.shape, df_teams_sofifa.shape)
 
     # Filtro por competencias. No quiero partidos de copas (e.g. FA cup) solo de la liga
     df_match, df_match_player, df_match_odds = select_league_matches(df_match, df_match_player, df_match_odds)
@@ -446,9 +430,9 @@ def main(df_iteration, country, iteration_date):
         except (FileNotFoundError, TypeError):
             print("Formateo, limpio e integro datos")
             df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
-            df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
+            df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)
             df_int = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc 
-     
+    
         # Filtro df para seleccionar ultimos x dias  ## Filtro dataset old por fecha para evitar levantar todos los datos y minimizar tiempo de computo. Solo requiero ultimos 5 part de cada team...
         fecha_limite = datetime.datetime.now() - datetime.timedelta(days=d_hiper['n_dias_ult_part']*3)  # Calcular la fecha límite retrocediendo 3 años a partir de la fecha actual
         df_old_int = df_integrated.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
@@ -471,7 +455,7 @@ def main(df_iteration, country, iteration_date):
         # Agrego el resultado a df_match
         df_result = df_cons['result']
         df_result = df_result[df_result.index.isin(df_treat.index)]
-        # Es importante no concatenar partidos de mas porque afecta los partidos a predecir
+        # Es importante no concatenar partidos de mas porque puede hacer el ROI nan (al no tener un predicted_result ni nada al evaluar el ROI)
         df_match_odds_2 = df_match_odds[df_match_odds.index.isin(df_treat.index)]
         df_match_odds_2 = df_match_odds.reindex(df_treat.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
         df_match_2 = df_match[df_match.index.isin(df_treat.index)]
@@ -497,10 +481,8 @@ def main(df_iteration, country, iteration_date):
         df_predicciones['id_team_away'] = df_predicciones['id_team_away'].replace(d_mapeo)
         
         # Concateno datos
-        datos = {k: ', '.join(map(str, v)) if isinstance(v, tuple) else v for k, v in d_roi.items()}
-        df_roi = pd.DataFrame.from_dict(datos, orient='index').T
-        df_roi['n_iteration'] = row['n_iteration']
-        df_roi.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+        d_roi['param1'], d_roi['param2'] = str(d_roi['param1']), str(d_roi['param2'])
+        df_roi = pd.DataFrame(d_roi, index=[row['n_iteration']])
         df_iteration_prod = pd.concat([df_iteration_prod, df_roi], axis=0)
         print(df_iteration_prod)
 
@@ -536,8 +518,8 @@ def select_league_matches(df_match, df_match_player, df_match_odds):
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "italy"
-    iteration_date = '2024-04-24'
+    country = "spain"
+    iteration_date = '2024-04-25'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
 
     # Para filtrar por competiciones (si queres)
