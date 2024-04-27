@@ -91,7 +91,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Hiperparametros
     l_thr_dif_prob = [-0.5, -0.2, -0.15, -0.1, -0.05, 0]
     l_thr_dif_winning = [0, 0.03, 0.05]
-    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.5, 4), (1, 20)], [(0.5, 6), (1, 20)]]}
+    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, 0], [70, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.5, 4), (1, 20)], [(0.5, 6), (1, 20)]]}
     
     # Definicion de variables
     best_roi = -100000
@@ -339,8 +339,8 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         if m is None:
 
             m = (y2-y1) / (x2-x1)
-            b = y1 - m*x1            
-            
+            b = y1 - m*x1
+        
         df['multiplier'] = df['prob_result_to_bet'] * m + b
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
@@ -419,8 +419,7 @@ def calculate_roi(df: pd.DataFrame, _print: bool = False):
         # Si perdi todo el dinero de las apuestas --> ESTO NUNCA DEBERIA SUCEDER AL USAR STAKE COMO % DEL BANK...
         if dinero_tras_apuestas <= 0:
             dinero_tras_apuestas = 0
-            print("WARNING! Hay algun error puesto que el dinero tras apuestas se hizo negativo y esto no es posible.")
-            break
+            raise ValueError("El dinero tras apuestas se hizo negativo y esto no es posible.")
 
     # Calculo el ROI
     roi = (dinero_tras_apuestas - dinero_tras_apuestas_ini) / dinero_tras_apuestas_ini * 100
