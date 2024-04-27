@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-# Create your models here.
+# At the begining of the project! 
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
