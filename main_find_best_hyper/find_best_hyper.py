@@ -1,6 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from p3_data_preparation.select_data import determine_comps
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
@@ -17,49 +18,16 @@ import os
 import datetime
 import assess_model_in_prod
 
-def find_best_hiperparameters(id_country, country, date):
+def find_best_hiperparameters(country, ruta_base, d_params, l_modelos):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
-    # Parametros de find_best
-    l_modelos = [LogisticRegression()]  #SVC(), RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
-
-    # Determino competencias
-    d_comps = determine_comps(id_country)
-
-    # Definicion de hiperparametros
-    d_params = {
-        'construct': {
-            'n_dias_ult_part': [30, 60, 90],
-            'n_years_h2h': [3],
-            'segun_localia': [True]
-        },
-        'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # algun hiper para seleccionar algunas competencias y otras no... # 
-            'n_years_to_select': [5, 10, None], # Filtro cantidad de años de datos?
-        },
-        'select': {
-            'thr_corr': [0.7, 0.8, 0.9, None],
-            'thr_fs': [0.2, 0.1, None], 
-        },
-        'treat_nan': {
-            'fill_na': [None, 'ml'],
-        },
-        'modeling': {
-            'val_size': [0.125],
-            'test_size': [0.125], 
-            'bal_type': [None, 'under'], 
-            'k': [10]
-        }
-    }
     # Definicion de variables
     df_iteration = pd.DataFrame()
     cont_iter = 0
     var_resp, var_pred = 'result', 'predicted_result'
     dp = DataPreparation(country)
     mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
-    ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
-    make_directories(ruta_base) # Creo directorio automaticamente
 
     # Imprimo largo de iteraciones
     n_iter = define_n_iterations(d_params)
@@ -170,31 +138,6 @@ def find_best_hiperparameters(id_country, country, date):
     df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
     return df_iteration
 
-def determine_comps(id_country):
-    """
-    Determina los grupos de competencias para el pais.
-    """
-
-    # Levanto competencias
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-
-    # Selecciono las del pais
-    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
-
-    # Filtro
-    df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]
-    df_comp_country_sin_cups = df_comp_country[(df_comp_country['is_cup'] == 0)]
-
-    # Guardo datos
-    all_comp = list(df_comp_country['id_competition'].values)
-    comp_sin_b = list(df_comp_country_sin_sec_div['id_competition'].values)
-    comp_sin_cups = list(df_comp_country_sin_cups['id_competition'].values)
-    comp_solo_liga = list(df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values)
-    d = {'all_comp': all_comp, 'comp_sin_b': comp_sin_b, 'comp_sin_cups': comp_sin_cups, 'comp_solo_liga': comp_solo_liga}
-    print(d)
-    
-    return d
-
 def define_n_iterations(d_params):
     """
     Calcula el numero de iteraciones y el tiempo estimado para terminar
@@ -244,22 +187,57 @@ def select_best_model(df):
 
 def main():
     # Parametros de corrida
-    country = 'italy'
+    country = 'spain'
 
     # Definicion de variables
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+    ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
+    make_directories(ruta_base)  # Creo directorios
+   
+    # Defino hiperparametros a probar
+    l_modelos = [LogisticRegression()]  #SVC(), RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
+    d_comps = determine_comps(id_country)
+    d_params = {
+        'construct': {
+            'n_dias_ult_part': [30, 60, 90],
+            'n_years_h2h': [3],
+            'segun_localia': [True]
+        },
+        'clean_data_2': {
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # algun hiper para seleccionar algunas competencias y otras no... # 
+            'n_years_to_select': [5, 10, None], # Filtro cantidad de años de datos?
+        },
+        'select': {
+            'thr_corr': [0.7, 0.8, 0.9, None],
+            'thr_fs': [0.2, 0.1, None], 
+        },
+        'treat_nan': {
+            'fill_na': [None, 'ml'],
+        },
+        'modeling': {
+            'val_size': [0.125],
+            'test_size': [0.125], 
+            'bal_type': [None, 'under'], 
+            'k': [10]
+        }
+    }
 
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = find_best_hiperparameters(id_country, country, date)
+    df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos)
 
     # Preparo datos missing y evaluo modelos en produccion
-    df = assess_model_in_prod.main(df_iteration, country, date)
+    df_iteration_prod = assess_model_in_prod.main(df_iteration, country, date)
 
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    # best_model = select_best_model(df)
+    # best_model = select_best_model(df_iteration_prod)
+
+    # Concateno df_iteration y df_iteration_prod
+    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+    df_concat.to_excel('/Users/nachomondino/Desktop/df_iteration_completo.xlsx', index=True)
 
 if __name__ == '__main__':
     main()
