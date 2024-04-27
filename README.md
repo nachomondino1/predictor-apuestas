@@ -18,3 +18,6 @@ actualizar el archivo de requirements.txt corriendo el comando:
 - 2. Ir a VSC, abrir la terminal y para ver todas las ramas creadas remotas correr: `git fetch`
 - 3. Elegis tu rama y corres: `git checkout <nombre_de_rama>`
 
+## Como activar el back end:
+- 1. Cambiar directorio a django_project con cd `django_project`
+- 2. Correr este comando para activar la pagina web de django `python manage.py runserver`
