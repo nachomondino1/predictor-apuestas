@@ -6,10 +6,18 @@ from django.db.models import (
     F,
     ExpressionWrapper
 )  # Q objects to create an 'OR' statament, F objects to create col1==col2
+from django_filters.rest_framework import DjangoFilterBackend
+from home.pagination import DefaultPagination # for generic filtering
 from home.models import Prediction
+from rest_framework.mixins import ListModelMixin, CreateModelMixin
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.filters import SearchFilter, OrderingFilter
+#  from rest_framework.pagination import PageNumberPagination
 from .serializers import PredictionSerializer
 
 # A view function is a function that takes a request and returns a response.
@@ -44,12 +52,14 @@ def say_hello(request):
         request, "hello.html", {"name": "Caro & Nacho Co", "predictions": queryset}
     )
 
+
+""" 
 @api_view() # the request will be an instance of the framework
 def prediction_list(request):
     queryset = Prediction.objects.all()
     serializer = PredictionSerializer(queryset, many=True)
     return Response(serializer.data)  # return HttpResponse('ok')
-""" 
+    
 @api_view()
 def prediction_detail(request, team_name): # id = MLiWiTUt
     prediction = Prediction.objects.get(id_team_home__contains=team_name)
@@ -65,10 +75,77 @@ def prediction_detail(request, id_match): # id = MLiWiTUt
         return Response(serializer.data)
     except Prediction.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-"""
+
 # OPTION 2: use get_object_or_404 that has the try and except inside
-@api_view() # http://127.0.0.1:8000/home/predictions/MLiWiTUt/
+# Function based views
+@api_view(['GET', 'POST']) # http://127.0.0.1:8000/home/predictions/MLiWiTUt/
 def prediction_detail(request, id_match): # id = MLiWiTUt
-    prediction = get_object_or_404(Prediction, id_match=id_match)
-    serializer = PredictionSerializer(prediction)
-    return Response(serializer.data)
+    if request.method == 'GET':
+        prediction = get_object_or_404(Prediction, id_match=id_match)
+        serializer = PredictionSerializer(prediction)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = PredictionSerializer(data=request.data) # deserializer
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        # serializer.validated_data
+        return Response('Ok')
+"""
+
+# OPTION 3: use get_object_or_404 that has the try and except inside
+"""
+Option 1: APIView + functions
+class PredictionList(APIView): 
+    def get(self, request):
+        queryset = Prediction.objects.all()
+        serializer = PredictionSerializer(queryset, many=True)
+        return Response(serializer.data)  # return HttpResponse('ok')
+    
+    def post(self,request):
+        serializer = PredictionSerializer(data=request.data) # deserializer
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response('Ok')
+"""
+
+""" 
+class PredictionDetail(APIView):
+    def get(self, request, id_match):
+        prediction = get_object_or_404(Prediction, id_match=id_match)
+        serializer = PredictionSerializer(prediction)
+        return Response(serializer.data)
+ """
+"""
+Option 3: ListCreateAPIView
+
+class PredictionList(ListCreateAPIView):  # with generic views
+
+    queryset = Prediction.objects.all()
+    serializer_class = PredictionSerializer
+  
+    def get_serializer_context(self):
+        return {'request': self.request}
+
+class PredictionDetail(RetrieveUpdateDestroyAPIView):
+    queryset = Prediction.objects.all()
+    serializer_class = PredictionSerializer
+
+We can change to:If you need some logic!
+    def get_queryset(self):
+        return Prediction.objects.all()
+    def get_serializer_class(self):
+        return PredictionSerializer
+"""
+
+class PredictionViewSet(ModelViewSet):
+    queryset = Prediction.objects.all()
+    serializer_class = PredictionSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter] # SearchFilter: to search string columns
+    filterset_fields = ['id_match', 'date'] # http://127.0.0.1:8000/home/predictions/?id_match=MNMbQMK1
+    # http://127.0.0.1:8000/home/predictions/?date=2024-02-24%2014:30:00.000000
+    pagination_class = DefaultPagination
+    search_fields = ['predicted_result'] # http://127.0.0.1:8000/home/predictions/?search=1
+    ordering_filter = ['prob_class_1']
+
+    def get_serializer_context(self):
+        return {'request': self.request}
