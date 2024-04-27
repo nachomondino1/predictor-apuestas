@@ -361,6 +361,31 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     
     return l_important_features
 
+def determine_comps(id_country):
+    """
+    Determina los grupos de competencias para el pais.
+    """
+
+    # Levanto competencias
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+
+    # Selecciono las del pais
+    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+
+    # Filtro
+    df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]
+    df_comp_country_sin_cups = df_comp_country[(df_comp_country['is_cup'] == 0)]
+
+    # Guardo datos
+    all_comp = list(df_comp_country['id_competition'].values)
+    comp_sin_b = list(df_comp_country_sin_sec_div['id_competition'].values)
+    comp_sin_cups = list(df_comp_country_sin_cups['id_competition'].values)
+    comp_solo_liga = list(df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values)
+    d = {'all_comp': all_comp, 'comp_sin_b': comp_sin_b, 'comp_sin_cups': comp_sin_cups, 'comp_solo_liga': comp_solo_liga}
+    print(d)
+    
+    return d
+
 def prueba():
     from p3_data_preparation import format_data
 

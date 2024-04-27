@@ -27,7 +27,10 @@ class TextPreparation:
         """Remueve acentos de los textos"""
         d = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u'}
         for col in columns:
-            df[col] = df[col].replace(d, regex=True)
+            try:
+                df[col] = df[col].replace(d, regex=True)
+            except ValueError:
+                pass
         return df
 
     def delete_special_characters(self, df, columns):
@@ -35,7 +38,10 @@ class TextPreparation:
         d = {'ã': 'a', 'â': 'a', 'ä': 'a', 'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ø': 'o',
              'û': 'u', 'ü': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
         for col in columns:
-            df[col] = df[col].replace(d, regex=True)
+            try:
+                df[col] = df[col].replace(d, regex=True)
+            except ValueError:
+                pass
         return df
 
     def delete_punctuation(self, df, columns):

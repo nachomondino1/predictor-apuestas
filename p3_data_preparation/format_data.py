@@ -90,7 +90,7 @@ def convert_capacity_to_int(df):
 
     for col in l_columns:
 
-         # Comprobar si la columna contiene valores de tipo cadena (string)
+        # Comprobar si la columna contiene valores de tipo cadena (string)
         if df[col].dtype == 'object':
             # Reemplazar los espacios en blanco en los valores de la columna
             df[col] = df[col].str.replace(' ', '')
@@ -99,6 +99,25 @@ def convert_capacity_to_int(df):
             df[col] = df[col].astype(float) # Pues si tiene nan, es float.
         else:
             print(f"Fallo la conversion de la columna {col} a float")
+    return df
+
+def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
+    """
+    Intenta convertir las columnas object a float
+    """
+    # Selecciono las columnas object
+    l_columnas_a_codificar = df.select_dtypes(include=['object']).columns
+
+    # Por columna object
+    for col in l_columnas_a_codificar:
+
+        # Intento convertirla a float
+        try:
+            df[col] = df[col].astype(float)
+            if _print:
+                print(f"Se convirtio la columna {col} a float!")
+        except:
+            pass
     return df
 
 def convert_columns_to_int(df):
