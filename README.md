@@ -19,5 +19,10 @@ actualizar el archivo de requirements.txt corriendo el comando:
 - 3. Elegis tu rama y corres: `git checkout <nombre_de_rama>`
 
 ## Como activar el back end:
-- 1. Cambiar directorio a django_project con cd `django_project`
-- 2. Correr este comando para activar la pagina web de django `python manage.py runserver`
+- 1. Cambiar directorio a django_project con `cd django_project`
+- 2. Correr el sigueinte comando para activar la pagina web de django `python manage.py runserver`
+- 3. Ir a la url para obtener: 
+    - All predictions: http://127.0.0.1:8000/home/predictions/ . Corre: `GET /home/predictions/ HTTP/1.1`
+    - Filtered predictions: http://127.0.0.1:8000/home/predictions/?date=2024-02-24&id_match=&ordering=time . Corre: `GET /home/predictions/?date=2024-02-24&id_match=&ordering=time HTTP/1.1`
+    - Predictions by match_id: http://127.0.0.1:8000/home/predictions/MNMbQMK1/ . Corre: `GET /home/predictions/MNMbQMK1/ HTTP/1.1`
+    - Home: http://127.0.0.1:8000/home/hello/ . Corre: `GET /home/hello/ HTTP/1.1`
