@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
-# Application definition
+# Application definition: third parties libraries and the apps we created
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters', # to filter
     'rest_framework', # api calls
+    'djoser', # to authenticate
     'home',
     'core',
     'debug_toolbar' # debug in page
@@ -126,7 +127,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -137,10 +139,26 @@ INTERNAL_IPS = [
     "127.0.0.1",
 ]
 
+# We are uding the 'JSON Web token authentication' method
 REST_FRAMEWORK = {
     'COERCE_DECIMAL_TO_STRING': False,
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
     #'DEFAULT_PAGINATION_CLASS':'rest_framework.pagination.PageNumberPagination',
     #'PAGE_SIZE':10 
     }
 
+# Prefix of the request header (authentication token to the server)
+SIMPLE_JWT = {
+   'AUTH_HEADER_TYPES': ('JWT',),
+}
+
 AUTH_USER_MODEL = 'core.User'
+
+DJOSER = {
+
+    'SERIALIZERS': {
+        'user_create' : 'core.serializers.UserCreateSerializer'
+    },
+}
