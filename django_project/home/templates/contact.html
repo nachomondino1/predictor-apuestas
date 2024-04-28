@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title> Predicciones | Apuestas deportivas </title>
-    <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
-    <link rel="stylesheet" href="css/normalize.css">
-    <link rel="stylesheet" href="css/styles.css">
-    <title>Icons</title>
+    {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'images/logo.jpeg' %}" >
+    <link rel="stylesheet" type="text/css"  href="{% static 'css/normalize.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
 <body>
     <!-- Encabezado -->
