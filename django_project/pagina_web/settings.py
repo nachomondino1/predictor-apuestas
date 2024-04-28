@@ -87,7 +87,7 @@ DATABASES = {
        'NAME': 'predictor_apuestas', # name of the db we created in Workbench
        'HOST': 'localhost',
        'USER': 'root',
-       'PASSWORD': 'MiComidaFavoritaMilanesa_2024' # This is only for development
+       'PASSWORD': 'nMipucc580!' # 'MiComidaFavoritaMilanesa_2024' # This is only for development
     }
 }
 
@@ -128,6 +128,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

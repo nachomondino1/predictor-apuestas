@@ -1,17 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+<!-- Metadatos y demas -->
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Ready to take your sports analysis to the next level? Look no further than Forebet, your premier AI-driven platform for cutting-edge sports predictions.">
+    <meta name="keywords" content="Football predictions, mathematical football predictions, forebet, football, stats, scores, statistics, match previews, livescore, live scores, live predictions">
+    <meta name="author" content="Nombre del autor">
 
     <title> Predicciones | Apuestas deportivas </title>
-    <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
-    <link rel="stylesheet" href="css/normalize.css">
-    <link rel="stylesheet" href="css/styles.css">
-    <title>Icons</title>
+    {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'images/logo.jpeg' %}" >
+    <link rel="stylesheet" type="text/css"  href="{% static 'css/normalize.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
-
 </head>
+
+<!-- Contenido de la pagina -->
 <body>
     <!-- Encabezado -->
     <header class="header">
@@ -38,17 +45,19 @@
                 <li class="header__nav-item"><a href="contact.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
             </ul>
         </nav>
-    </header>
+    </header>  
 
-    <div class="timeline-container">
+    <div class="container">
+        <div class="image-container">
+            <div class="image-container-text">
+                <h2> El futuro del fútbol: predicciones con IA </h2>
+                <p> Descubre nuestro sistema de predicción de resultados de fútbol. Utilizando un avanzado modelo de machine learning, te ofrecemos pronósticos precisos para cada partido, permitiéndote anticipar quién ganará, perderá o empatará. </p>
+                <button onclick="window.location.href='predicciones.html'">Ir a predicciones</button>
+            </div>
+        </div>
 
-        <!-- Linea de tiempo, cada div con fondo diferente-->
-        <div class="timeline__event"></div>
-        <div class="timeline__event"></div>
-        <div class="timeline__event"></div>
-        <div class="timeline__event"></div>
+        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Nulla harum rerum eligendi quibusdam culpa exercitationem quis quos vero laudantium, explicabo modi itaque natus numquam ducimus beatae nostrum blanditiis esse perspiciatis.</p>
     </div>
-
 
     <!-- Pie de pagina -->
     <footer>
@@ -84,5 +93,6 @@
         </div>
 
     </footer>
+
 </body>
 </html>

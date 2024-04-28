@@ -9,13 +9,12 @@
     <meta name="author" content="Nombre del autor">
 
     <title> Predicciones | Apuestas deportivas </title>
-    <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
-    <link rel="stylesheet" href="css/normalize.css">
-    <link rel="stylesheet" href="css/styles.css">
-    <title>Calendar</title>
+    {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'images/logo.jpeg' %}" >
+    <link rel="stylesheet" type="text/css"  href="{% static 'css/normalize.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <title>Icons</title>
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
 </head>
 
@@ -32,7 +31,7 @@
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
             <a href="index.html">
-                <img class="header__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+                <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
         </div> 
@@ -93,16 +92,11 @@
         <main class="main">
             <h3>Partidos del dia</h3>
             <div class="matches-container">
-                <!-- 
                 <ul>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                </ul>
-                -->
+                    {% for prediction in predictions %}
+                    <li class="match_list__item">{{ prediction.id_match }} - {{ prediction.date }} - {{ prediction.predicted_result }}</li> 
+                    {% endfor %}
+                </ul>            
             </div>
         </main>
 
@@ -127,7 +121,7 @@
         <!-- Logo y nombre de la empresa -->
         <div class="footer__logo-container">
             <a class="footer__logo-link" href="index.html">
-                <img class="footer__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+                <img class="footer__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="footer__logo-title">GoalProphet</h2>
             </a>
         </div> 
@@ -145,8 +139,8 @@
         <!-- Social media -->
         <div class="footer__social-media">
             <ul class="footer-social-media-list">
-                <li class="footer-social-media__item"><a href="#"><img src="images/facebook.png" alt="Facebook"> Facebook</a></li>
-                <li class="footer-social-media__item"><a href="#"><img src="images/gorjeo.png" alt="Twitter"> Twitter</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="{% static 'images/facebook.png' %}" alt="Logo Facebook"> Facebook</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="{% static 'images/gorjeo.png' %}" alt="Logo Twitter"> Twitter</a></li>
             </ul>
         </div>
 

@@ -1,3 +1,4 @@
+from typing import Any
 from django.shortcuts import render, get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -149,3 +150,11 @@ class PredictionViewSet(ModelViewSet):
 
     def get_serializer_context(self):
         return {'request': self.request}
+    
+def view_predicciones(request):
+    
+    prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
+    queryset = Prediction.objects.annotate(prob_home=prob_home)
+    return render(
+        request, "predicciones.html", {"name": "Caro & Nacho Co", "predictions": queryset}
+    )

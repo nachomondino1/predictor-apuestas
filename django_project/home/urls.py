@@ -25,5 +25,5 @@ urlpatterns = [
 urlpatterns = [
     path('', include(router.urls)),
     path('hello/', views.say_hello),
+    path('predicciones/', views.view_predicciones),
 ]
-
