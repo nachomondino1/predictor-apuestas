@@ -1,5 +1,5 @@
-from typing import Any
 from django.shortcuts import render, get_object_or_404
+from django.core.mail import send_mail, mail_admins, BadHeaderError, EmailMessage
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import (
@@ -8,8 +8,9 @@ from django.db.models import (
     ExpressionWrapper
 )  # Q objects to create an 'OR' statament, F objects to create col1==col2
 from django_filters.rest_framework import DjangoFilterBackend
+from templated_mail.mail import BaseEmailMessage
 from home.pagination import DefaultPagination # for generic filtering
-from home.models import Prediction
+from home.models import Prediction, UploadImage
 from rest_framework.mixins import ListModelMixin, CreateModelMixin
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.decorators import api_view
@@ -19,7 +20,7 @@ from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 #  from rest_framework.pagination import PageNumberPagination
-from .serializers import PredictionSerializer
+from .serializers import PredictionSerializer, ImageSerializer
 
 # A view function is a function that takes a request and returns a response.
 # It's a request handler and in some framewroks is called an action.
@@ -48,6 +49,24 @@ def say_hello(request):
     """
     prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
     queryset = Prediction.objects.annotate(prob_home=prob_home)
+    try: 
+        send_mail('subject', 'message', 'info@domain.com', ['ca.mondino.renna@gmail.com'])
+        # Send email to admins only
+        # mail_admins('subject', 'message', html_message='message')
+        # Send email with attached file
+        # message = EmailMessage('subject', 'message', 'info@domain.com', ['ca.mondino.renna@gmail.com'])
+        # message.attach_file('home/static/images/AI.jpeg')
+        # message.send()
+        # To send templated emails
+        """ 
+        message = BaseEmailMessage(
+            template_name = "emails/template_email.html",
+            context = {'name':'Carolina'}
+        )
+        message.send(['ca.mondinio.renna@gmail.com'])
+        """
+    except BadHeaderError: 
+        pass
     # queryset = Predictions.objects.all()
     return render(
         request, "hello.html", {"name": "Caro & Nacho Co", "predictions": queryset}
@@ -151,10 +170,12 @@ class PredictionViewSet(ModelViewSet):
     def get_serializer_context(self):
         return {'request': self.request}
     
-def view_predicciones(request):
-    
-    prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
-    queryset = Prediction.objects.annotate(prob_home=prob_home)
-    return render(
-        request, "predicciones.html", {"name": "Caro & Nacho Co", "predictions": queryset}
-    )
+
+class ImageViewSet(ModelViewSet):
+    serializer_class = ImageSerializer
+
+    queryset = UploadImage.objects.all()
+
+    #def get_queryset(self):
+    #    return UploadImage.objects.filter(product_id=self.kwargs[''])
+

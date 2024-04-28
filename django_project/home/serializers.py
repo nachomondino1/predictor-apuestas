@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from home.models import Prediction
+from home.models import Prediction, UploadImage
 
 # class PredictionSerializer(serializers.Serializer):
 class PredictionSerializer(serializers.ModelSerializer):
@@ -44,3 +44,8 @@ class PredictionSerializer(serializers.ModelSerializer):
             return "home"
         elif prediction.predicted_result == "2":
             return "away"
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UploadImage
+        fields = ['image']

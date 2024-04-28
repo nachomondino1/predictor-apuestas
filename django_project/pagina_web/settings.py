@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_filters', # to filter
+    'corsheaders',
     'rest_framework', # api calls
     'djoser', # to authenticate
     'home',
@@ -47,6 +48,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -87,7 +89,7 @@ DATABASES = {
        'NAME': 'predictor_apuestas', # name of the db we created in Workbench
        'HOST': 'localhost',
        'USER': 'root',
-       'PASSWORD': 'nMipucc580!' # 'MiComidaFavoritaMilanesa_2024' # This is only for development
+       'PASSWORD': 'MiComidaFavoritaMilanesa_2024' #'nMipucc580!' # 'MiComidaFavoritaMilanesa_2024' # This is only for development
     }
 }
 
@@ -127,8 +129,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-
+MEDIAFILES_DIRS = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -138,6 +141,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8001",
+    "http://127.0.0.1:8001"
+]
+
 
 # We are uding the 'JSON Web token authentication' method
 REST_FRAMEWORK = {
@@ -162,3 +171,12 @@ DJOSER = {
         'user_create' : 'core.serializers.UserCreateSerializer'
     },
 }
+
+# To send emails with SMTP server. http://localhost:5000/
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'localhost'
+EMAIL_HOST_USER = ''
+EMAIL_HOST_PASSWORD = ''
+EMAIL_PORT = 2525
+DEFAULT_FROM_EMAIL = 'ca.mondino.renna@gmail.com'
+ADMINS = [('Carolina', 'ca.mondino.renna@gmail.com'), ]
