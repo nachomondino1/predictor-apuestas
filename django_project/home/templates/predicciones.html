@@ -30,7 +30,7 @@
                 
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
-            <a href="index.html">
+            <a href="{% url 'index' %}">
                 <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
@@ -39,10 +39,10 @@
         <!-- Barra de Navegación -->
         <nav class="header__navbar">
             <ul class="header__nav-list">
-                <li class="header__nav-item"><a href="index.html" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
-                <li class="header__nav-item"><a href="predicciones.html" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
-                <li class="header__nav-item"><a href="about.html" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
-                <li class="header__nav-item"><a href="contact.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+                <li class="header__nav-item"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+                <li class="header__nav-item"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+                <li class="header__nav-item"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+                <li class="header__nav-item"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
             </ul>
         </nav>
     </header>  
@@ -120,7 +120,7 @@
     <footer>
         <!-- Logo y nombre de la empresa -->
         <div class="footer__logo-container">
-            <a class="footer__logo-link" href="index.html">
+            <a class="footer__logo-link" href="{% url 'index' %}">
                 <img class="footer__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="footer__logo-title">GoalProphet</h2>
             </a>
@@ -129,8 +129,8 @@
         <!-- Enlaces a paginas -->
         <div class="footer-navbar">
             <ul class="footer-navbar-list">
-                <li class="footer-navbar__item"><a href="about.html">Sobre nosotros</a></li>
-                <li class="footer-navbar__item"><a href="contact.html">Contacto</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'about' %}">Sobre nosotros</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'contact' %}">Contacto</a></li>
                 <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
                 <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
             </ul>

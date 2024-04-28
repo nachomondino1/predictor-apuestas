@@ -27,11 +27,10 @@
         <input type="checkbox" class="header__checkbox" id="menu-toggle">
         <label for="menu-toggle" class="header__open-nav-button" role="button"><i class="fas fa-bars"></i></label>
         
-                
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
-            <a href="index.html">
-                <img class="header__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+            <a href="{% url 'index' %}">
+                <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
         </div> 
@@ -39,10 +38,10 @@
         <!-- Barra de Navegación -->
         <nav class="header__navbar">
             <ul class="header__nav-list">
-                <li class="header__nav-item"><a href="index.html" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
-                <li class="header__nav-item"><a href="predicciones.html" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
-                <li class="header__nav-item"><a href="about.html" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
-                <li class="header__nav-item"><a href="contact.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+                <li class="header__nav-item"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+                <li class="header__nav-item"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+                <li class="header__nav-item"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+                <li class="header__nav-item"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
             </ul>
         </nav>
     </header>  
@@ -52,7 +51,7 @@
             <div class="image-container-text">
                 <h2> El futuro del fútbol: predicciones con IA </h2>
                 <p> Descubre nuestro sistema de predicción de resultados de fútbol. Utilizando un avanzado modelo de machine learning, te ofrecemos pronósticos precisos para cada partido, permitiéndote anticipar quién ganará, perderá o empatará. </p>
-                <button onclick="window.location.href='predicciones.html'">Ir a predicciones</button>
+                <button onclick="window.location.href='predicciones.html'">Ir a predicciones</button>  <!-- <button onclick="window.location.href='{% url 'predicciones' %}'">Ir a predicciones</button>   -->
             </div>
         </div>
 
@@ -63,8 +62,8 @@
     <footer>
         <!-- Logo y nombre de la empresa -->
         <div class="footer__logo-container">
-            <a class="footer__logo-link" href="index.html">
-                <img class="footer__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+            <a class="footer__logo-link" href="{% url 'index' %}">
+                <img class="footer__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="footer__logo-title">GoalProphet</h2>
             </a>
         </div> 
@@ -72,8 +71,8 @@
         <!-- Enlaces a paginas -->
         <div class="footer-navbar">
             <ul class="footer-navbar-list">
-                <li class="footer-navbar__item"><a href="about.html">Sobre nosotros</a></li>
-                <li class="footer-navbar__item"><a href="contact.html">Contacto</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'about' %}">Sobre nosotros</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'contact' %}">Contacto</a></li>
                 <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
                 <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
             </ul>
@@ -82,8 +81,8 @@
         <!-- Social media -->
         <div class="footer__social-media">
             <ul class="footer-social-media-list">
-                <li class="footer-social-media__item"><a href="#"><img src="images/facebook.png" alt="Facebook"> Facebook</a></li>
-                <li class="footer-social-media__item"><a href="#"><img src="images/gorjeo.png" alt="Twitter"> Twitter</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="{% static 'images/facebook.png' %}" alt="Logo Facebook"> Facebook</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="{% static 'images/gorjeo.png' %}" alt="Logo Twitter"> Twitter</a></li>
             </ul>
         </div>
 
@@ -91,7 +90,6 @@
         <div class="footer__copyright">
             <p>&copy; 2024 Football Predictions. Todos los derechos reservados.</p>
         </div>
-
     </footer>
 
 </body>

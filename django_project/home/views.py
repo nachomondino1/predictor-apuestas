@@ -150,11 +150,18 @@ class PredictionViewSet(ModelViewSet):
 
     def get_serializer_context(self):
         return {'request': self.request}
-    
-def view_predicciones(request):
-    
+
+def index(request):
+    return render(request, 'index.html')
+
+def predicciones(request):
     prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
     queryset = Prediction.objects.annotate(prob_home=prob_home)
-    return render(
-        request, "predicciones.html", {"name": "Caro & Nacho Co", "predictions": queryset}
-    )
+    return render(request, 'predicciones.html', {"name": "Caro & Nacho Co", "predictions": queryset})
+
+def about(request):
+    return render(request, 'about.html')
+
+def contact(request):
+    return render(request, 'contact.html')
+
