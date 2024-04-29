@@ -1,0 +1,91 @@
+
+/* ---------------------- WEB PAGE: PREDICCIONES.HTML ---------------------- */
+/* MAIN SECTION */
+.main-wrapper {
+    display: flex;
+    flex-direction: column;
+    padding: 0% var(--margin);
+}
+
+/* Primer aside */
+.calendar-container {
+    display: flex;  
+    flex-direction: column;
+    align-items: center;
+    list-style: none;
+
+    padding: 0;
+    margin-bottom: 2rem; 
+}
+
+#fechaSeleccionada {
+    border: none;
+    border-bottom: 2px solid var(--color-primario);
+    width: 70%;
+}
+
+.filters-leagues__list {
+    list-style: none;
+    padding-left: 1rem;
+    text-align: left;
+}
+
+.calendar-container, .leagues-container, .ads-container, .main, .leagues {
+    border: 0.1rem solid rgba(34, 34, 38, 0.08);
+    border-radius: 2rem;
+    box-shadow: rgba(34, 34, 38, 0.08) 0px 1px 8px 2px;
+
+    background-color: #fff;
+    margin: 1rem 0.8rem;
+    padding: 1rem;
+}
+
+/* Main */
+.matches_list {
+    list-style: none;
+    padding: 1% 5%;
+    display: grid;
+    grid-template-columns: 1fr;  /* date, teams, prob_home, prob_away, pred_result */
+    max-width: 100%;
+}
+
+.matches_list__item {
+    display: grid;
+    grid-template-columns: 20% 40% 10% 10% 10% 10%;
+    /* grid-template-rows: inherit; */
+    border-bottom: 1px solid rgb(52, 52, 52);
+    justify-items: center;
+    align-items: center;
+    padding: 1% 1%;
+}
+
+.header_matches_list {
+    background-color: rgba(34, 34, 38, 0.08);
+}
+
+/* .matches_list__item:hover {
+   opacity: 0.7;
+   background-color: #212121;
+} */
+
+
+/* Segundo aside */
+
+
+/* MAIN QUERIES */
+@media only screen and (min-width: 600px) {
+    .main-wrapper {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .filters, .leagues {
+        width: 20vw;
+        /* max-width: 30vw; */
+    }
+
+    .main {
+        width: 40vw;
+        /* max-width: 40vw; */
+    }
+}

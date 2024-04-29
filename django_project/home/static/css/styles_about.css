@@ -1,0 +1,10 @@
+/* ---------------------- WEB PAGE: about.html ("SOBRE NOSOTROS") ---------------------- */
+.timeline-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline__event {
+    height: 40px;
+    border: 1px solid red;
+}

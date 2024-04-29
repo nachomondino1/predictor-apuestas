@@ -13,6 +13,7 @@
     <link rel="icon" type="image/x-icon" href="{% static 'images/logo.jpeg' %}" >
     <link rel="stylesheet" type="text/css"  href="{% static 'css/normalize.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles_index.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,7 +34,9 @@
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
             <a href="{% url 'index' %}">
-                <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
+                <div class="logo-container">
+                    <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
+                </div>
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
         </div> 
