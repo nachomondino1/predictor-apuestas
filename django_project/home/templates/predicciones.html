@@ -14,6 +14,9 @@
     <link rel="stylesheet" type="text/css"  href="{% static 'css/normalize.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
 </head>
@@ -55,10 +58,9 @@
         -->
         <!-- Barra lateral de navegacion: Calendario-->
         <aside class="filters">
-            <h3>Filtros</h3>
-    
-            <div class="calendar-container">
+            <!-- <h3>Filtros</h3> -->
 
+            <div class="calendar-container">
                 <h4> Fecha </h4>
                 <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha">
                 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -86,22 +88,64 @@
                     <li class="filters-leagues__item">La Liga</li>
                 </ul>
             </div>
+
+            <div class="ads-container">
+                <h4>Ads</h4>
+                <p>Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quia, quos vitae. Dignissimos facere consectetur id? Cum ea dolore itaque illum sit ut eveniet, omnis nemo mollitia laborum error commodi a!</p>
+            </div>
+
         </aside>
 
         <!-- Partidos del dia -->
         <main class="main">
             <h3>Partidos del dia</h3>
             <div class="matches-container">
-                <ul>
+
+                <ul class="matches_list">
+                    <!-- List Header -->
+                    <li class="matches_list__item header_matches_list"> 
+                        <div class="date">Date</div>
+                        <div class="teams">Teams</div>
+                        <div class="probabilidad_home">Prob. Home</div>
+                        <div class="probabilidad_draw">Prob. Draw</div>
+                        <div class="probabilidad_away">Prob. Away</div>
+                        <div class="result">Resultado</div>
+                    </li>
+
                     {% for prediction in predictions %}
-                    <li class="match_list__item">{{ prediction.id_match }} - {{ prediction.date }} - {{ prediction.predicted_result }}</li> 
+                    <li class="matches_list__item"> 
+                        <div class="date">
+                            {{ prediction.date }}
+                        </div>
+
+                        <div class="teams">
+                            <div>
+                                {{ prediction.id_team_home }}
+                            </div>
+                            <div>
+                                {{ prediction.id_team_away }}
+                            </div>
+                        </div>
+                        <div class="probabilidad_home">
+                            {{ prediction.prob_class_1 }}
+                        </div>
+                        <div class="probabilidad_draw">
+                            {{ prediction.prob_class_0 }}
+                        </div>
+                        <div class="probabilidad_away">
+                            {{ prediction.prob_class_2 }}
+                        </div>
+                        <div class="result">
+                            {{ prediction.predicted_result }}
+                        </div>
                     {% endfor %}
                 </ul>            
             </div>
         </main>
 
         <!-- ADS -->       
-        <aside class="leagues">     
+        <aside class="leagues">
+            <h4> Leagues </h4>    
             <p> Lorem ipsum, dolor sit amet consectetur adipisicing elit. Sit dolorum debitis facere mollitia eveniet alias cumque sed, corporis consequatur ratione, officia eos tempora atque hic commodi nisi nemo. Labore, nihil.
                 Lorem ipsum dolor sit amet consectetur adipisicing elit. Fuga suscipit non id dolores doloribus reprehenderit similique maxime numquam, adipisci pariatur nam esse voluptate tempora, facere atque asperiores quibusdam quas error!
                 Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut odit velit nostrum dolor? Autem ea reiciendis officiis accusamus! Explicabo eum delectus a officia, dolorem veniam rerum quos quas nisi eligendi.
