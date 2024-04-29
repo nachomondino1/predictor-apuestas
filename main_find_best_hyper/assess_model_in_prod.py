@@ -304,26 +304,9 @@ def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
             pass
     return df
 
-def load_hyperparameters(country, n_model, ruta_base):
+def load_hyperparameters(row_hiper):
 
     d = {}
-
-    # Si se levanta de main.py
-    if n_model is None:
-        
-        row_hiper = pd.read_excel(f'./p3_data_preparation/data/{country}/df_hiper_prep.xlsx')
-
-        ## Levanto columnas utilizadas para entrenar el modelo
-        df_selected = pd.read_excel(f'./p3_data_preparation/data/{country}/df_selected.xlsx', index_col=0)
-        df_selected = df_selected.drop(['result'], axis=1)
-        selected_columns = list(df_selected.columns)
-
-    else:
-        df_iteration = pd.read_excel(f"{ruta_base}/df_iteration.xlsx")
-        row_hiper = df_iteration[df_iteration['n_iteration'] == n_model] # row_ite
-
-        ## Levanto columnas utilizadas para entrenar el modelo
-        selected_columns = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
 
     # Guardo hiperparametros en diccionario
     ## Construct_data
@@ -335,41 +318,22 @@ def load_hyperparameters(country, n_model, ruta_base):
     d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
     d['comp_to_select'] = row_hiper['comp_to_select'].values[0]
     ## Select_data
-    d['selected_columns'] = selected_columns
-    ## Estrategia de apuesta
-    # d['thr_prob_min'] = row_hiper['thr_prob_min_best'].values[0]
-    # d['thr_prob_win'] = row_hiper['thr_prob_win_best'].values[0]
-    # d['curva'] = row_hiper['curva'].values[0]
-    # param1 = row_hiper['param1'].values[0]
-    # param2 = row_hiper['param2'].values[0]
-    # d['curva_m'] = param1 if d['curva'] == 'linear' else None
-    # d['curva_b'] = param2 if d['curva'] == 'linear' else None
-    # d['curva_p1'] = eval(param1) if d['curva'] != 'linear' else None
-    # d['curva_p2'] = eval(param2) if d['curva'] != 'linear' else None
+    d['selected_columns'] = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
 
     print("\nHiperparametros cargados:")
     for key, value in d.items():
         print(f'\t {key}: {value}')
     return d
 
-def load_models(country, n_model, ruta_base, d):
+def load_models(n_model, ruta_base, d):
 
-    # Si se levanta de main.py
-    if n_model is None:
-        path_tag = f"./p3_data_preparation/data/{country}/df_etiquetas.xlsx"
-        path_scaler = f"./p3_data_preparation/data/{country}/scaler_model.pkl"
-        path_model = f"./p4_modeling/data/{country}/modelo.pkl"
+    # Levanto hiperparametros de DataPreparation de la iteracion 
+    n_ult_part, n_years_h2h, segun_localia, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['n_years_to_select'], d['comp_to_select']
 
-    # Si se levanta de find_best_hyper.py
-    else:
-        n_ult_part, n_years_h2h, segun_localia, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['n_years_to_select'], d['comp_to_select']
-        path_tag = f'{ruta_base}/data_preparation/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
-        path_scaler = f'{ruta_base}/data_preparation/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl'
-        path_model = f"{ruta_base}/modeling/{n_model}_model.pkl"
-
-    tager_loaded = pd.read_excel(path_tag)
-    scaler, columns_scaled = joblib.load(path_scaler)
-    loaded_model = pickle.load(open(path_model, "rb"))
+    # Cargo modelos segun hiperparametros
+    tager_loaded = pd.read_excel(f'{ruta_base}/data_preparation/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}.xlsx')
+    scaler, columns_scaled = joblib.load(f'{ruta_base}/data_preparation/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl')
+    loaded_model = pickle.load(open(f"{ruta_base}/modeling/{n_model}_model.pkl", "rb"))
     return tager_loaded, scaler, columns_scaled,loaded_model
 
 ################################################### MAIN ###################################################
@@ -391,9 +355,9 @@ def main(df_iteration, country, iteration_date, export: bool = True):
     print("\n", "#"*120, "\n", "DATA UNDERSTANDING".center(120), "\n", "#"*120, "\n")
     # Levanto datos
     ## Flashscore
-    df_match = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/df_match_miss.xlsx', index_col=0)
-    df_match_player = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/df_match_player_miss.xlsx', index_col=0)
-    df_match_odds = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/df_match_odds_miss.xlsx', index_col=0)
+    df_match = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+    df_match_player = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
+    df_match_odds = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
     ## Sofifa
     df_player_sofifa = pd.read_excel(f"p3_data_preparation/data/{country}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
     df_player_fifa_sofifa = pd.read_excel(f"p3_data_preparation/data/{country}/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
@@ -408,12 +372,15 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 
     # Por iteracion
     for idx, row in df_iteration.iterrows():
+
+        # Definicion de variables
         n_model = row['n_iteration']
+        row_hiper = df_iteration[df_iteration['n_iteration'] == n_model]
         print("\n", "#"*120, "\n", f"MODEL Nº {n_model}".center(120), "\n", "#"*120, "\n")
 
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
-        d_hiper = load_hyperparameters(country, n_model, ruta_base)
-        tager, scaler, columns_scaled, loaded_model = load_models(country, n_model, ruta_base, d_hiper)
+        d_hiper = load_hyperparameters(row_hiper)
+        tager, scaler, columns_scaled, loaded_model = load_models(n_model, ruta_base, d_hiper)
         
         #______________________________________________ DATA PREPARATION ______________________________________________#
         print("DATA PREPARATION".center(120, "-"))
@@ -518,13 +485,8 @@ def select_league_matches(df_match, df_match_player, df_match_odds):
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "spain"
-    iteration_date = '2024-04-25'
+    country = "italy"
+    iteration_date = '2024-04-29'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
-
-    # Para filtrar por competiciones (si queres)
-    # print("1", df_iteration.shape)
-    # df_iteration = df_iteration[df_iteration['comp_to_select'].apply(lambda x: eval(x) == [482, 483, 484, 485])]
-    # print("2", df_iteration.shape)
-
+    
     main(df_iteration, country, iteration_date)
