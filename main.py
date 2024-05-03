@@ -318,11 +318,7 @@ class DataPreparation:
         df = construct_data.determine_result(df, self.var_resp)
         df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
         df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-     
-        # Construyo date numerica
-        # fecha_referencia = pd.to_datetime('2000-01-01') # Definir la fecha de referencia
-        # df['dias_desde_referencia'] = (df['date'] - fecha_referencia).dt.days  # Calcular los días transcurridos desde la fecha de referencia
-
+        
         # Construyo variables rendimiento del equipo
         ## Puntos
         df = construct_data.determine_points(df)
@@ -785,16 +781,13 @@ class Modeling:
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
 
 ##################################################### MAIN #####################################################
-def main():
+def main(country, d_run, export: bool = True):
     """
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, False, True
-    export = True
-
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
@@ -818,7 +811,7 @@ def main():
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
         df_player_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_sofifa.xlsx', index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx')
+        df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx', index_col=0)
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
 
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
@@ -864,7 +857,6 @@ def main():
         k = 10
         df_hiper_mod = pd.DataFrame(data={'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}, index=[0])        
 
-        l_modelos = [LogisticRegression(), RandomForestClassifier()]
         modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
         model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
 
@@ -901,13 +893,15 @@ def main():
         model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
         df_pred, d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
-        # Analizo mas de un modelo
-        # d_best_hiper, model_best_params, d_best_model = mo.select_best_model(l_modelos, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, k=k, export=False)
-
         if export:
             df_hiper_mod.to_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx', index=True)
             pickle.dump(model, open(f"./p4_modeling/data/{country}/modeling/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    main()
+
+    # Definicion de variables
+    country = 'spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+
+    main(country, d_params, export=True)

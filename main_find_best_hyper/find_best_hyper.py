@@ -185,30 +185,70 @@ def select_best_model(df):
     # print("Mejores hiperparámetros:", best_hyperparameters)
     # print("ROI obtenido:", best_roi_max)
 
-def main():
-    # Parametros de corrida
-    country = 'spain'
+def determine_comps(id_country):
+    """
+    Determina los grupos de competencias para el pais.
+    """
+    # Levanto competencias
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+
+    # Selecciono las del pais
+    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+
+    # Filtro
+    df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]
+    df_comp_country_sin_cups = df_comp_country[(df_comp_country['is_cup'] == 0)]
+
+    # Guardo datos
+    all_comp = list(df_comp_country['id_competition'].values)
+    comp_sin_b = list(df_comp_country_sin_sec_div['id_competition'].values)
+    comp_sin_cups = list(df_comp_country_sin_cups['id_competition'].values)
+    comp_solo_liga = list(df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values)
+    d = {'all_comp': all_comp, 'comp_sin_b': comp_sin_b, 'comp_sin_cups': comp_sin_cups, 'comp_solo_liga': comp_solo_liga}
+    print(d)
+    
+    return d
+
+def main(country, d_params):
 
     # Definicion de variables
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
     ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
     make_directories(ruta_base)  # Creo directorios
    
+    # Preparao datos, entreno modelos y evaluo en df_test
+    df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos)
+
+    # Preparo datos missing y evaluo modelos en produccion
+    df_iteration_prod = assess_model_in_prod.main(df_iteration, country, date)
+
+    # Selecciono el mejor modelo (mayor roi por partido en produccion)
+    # best_model = select_best_model(df_iteration_prod)
+
+    # Concateno df_iteration y df_iteration_prod
+    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+    df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
+
+if __name__ == '__main__':
+    # Parametros de corrida
+    country = 'england'
+    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+
     # Defino hiperparametros a probar
-    l_modelos = [LogisticRegression()]  #SVC(), RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     d_comps = determine_comps(id_country)
+    l_modelos = [LogisticRegression(), SVC()]  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     d_params = {
         'construct': {
-            'n_dias_ult_part': [30, 60, 90],
+            'n_dias_ult_part': [30, 60],
             'n_years_h2h': [3],
-            'segun_localia': [True]
+            'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # algun hiper para seleccionar algunas competencias y otras no... # 
-            'n_years_to_select': [5, 10, None], # Filtro cantidad de años de datos?
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], #  d_comps['all_comp'] # Italy y Spain no tienen la b en df_match
+            'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
             'thr_corr': [0.7, 0.8, 0.9, None],
@@ -225,19 +265,4 @@ def main():
         }
     }
 
-    # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos)
-
-    # Preparo datos missing y evaluo modelos en produccion
-    df_iteration_prod = assess_model_in_prod.main(df_iteration, country, date)
-
-    # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    # best_model = select_best_model(df_iteration_prod)
-
-    # Concateno df_iteration y df_iteration_prod
-    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-    df_concat.to_excel('/Users/nachomondino/Desktop/df_iteration_completo.xlsx', index=True)
-
-if __name__ == '__main__':
-    main()
+    main(country, d_params)

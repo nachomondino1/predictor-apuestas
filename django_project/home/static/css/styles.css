@@ -1,29 +1,23 @@
-/* ---------------------- DEFINICION DE VARIABLES ---------------------- */
+/* -------------------------------------------- DEFINICION DE VARIABLES -------------------------------------------- */
 :root {
     /* Colores */
     --color-primario: #212121;
     --color-primario-pastel: #AED6F1;
     --color-secundario:  #F4F6F6;
     --color-neutro: #212121;
-    --color-de-fondo: #e2eaff;
-
+    --color-de-fondo: #f2f2f2; 
     /* Tamaños */
-    --header-height: 64px;
+    --header-height: 7vh;
 
     /* Texto */
-    --font-family: sans-serif;
-    --font-size: 1em;
+    --font-family: "Outfit", sans-serif;
+    --font-size: 1.3vw;
     --color: black;
 
-    --margin: 10%
+    --margin: 10%;
 }
 
-/* TEMPORAL PARA ENTENDER LO QUE PASA*/
-aside, main {
-    border: 1px solid #f00;
-}
-
-/* ---------------------- GENERALES? ---------------------- */
+/* -------------------------------------------- GENERALES? -------------------------------------------- */
 body {
     font-family: var(--font-family);
     color: var(--color);
@@ -39,12 +33,16 @@ body {
     width: 100vw;
 }
 
+/* ul {
+    padding: 0 !important;
+} */
+
 a {
     text-decoration: none;
     color:black;
 }
 
-/* ---------------------- HEADER SECTION ---------------------- */
+/* -------------------------------------------- HEADER SECTION -------------------------------------------- */
 .header {
     display: flex;
     justify-content: space-between;
@@ -61,9 +59,9 @@ a {
 
 /* Boton para abrir menu */
 .header__open-nav-button {
-    font-size: 2rem;
+    font-size: 9vw;
     position: absolute; /* para que no modifique el espacio en el header */
-    right: 100px;
+    right: var(--margin);
     color: #fff;
 }
 
@@ -80,10 +78,13 @@ a {
 
 .header__logo {
     object-fit: cover;
-    max-width: 100%;
-    width: 50px;
-    margin: 0px 1rem;
+    height: calc(var(--header-height) * 0.8);
+    margin-right: 10px;
     border-radius: 50%;
+}
+
+.header__logo-title {
+    font-size: min(4vw, 36px); 
 }
 
 /* Barra de navegacion */
@@ -91,8 +92,9 @@ a {
     display: none;
     position: absolute; /* para que no modifique el espacio en el header*/
     height: 100vh;
-    width: 60vw; 
+    width: 70vw; 
     top: var(--header-height);
+    left: 0; /* para que empiece desde la punta izquierda*/
     z-index: 1;
     background-color: var(--color-primario);
 }
@@ -107,16 +109,14 @@ a {
     justify-content: start; 
     text-align: left;
     list-style: none;
+
+    margin-left: var(--margin);
     padding: 0;
 }
 
 .header__nav-item {
-    margin: 2rem 3rem;
-}
-
-.header__nav-item-img {
-    height: 1rem;
-    color: #fff;
+    margin: 3vh;
+    font-size: 2vh;
 }
 
 .header__nav-item a {
@@ -129,8 +129,13 @@ a {
 }
 
 
-/* ---------------------- HEADER QUERIES ---------------------- */
+/* -------------------------------------------- HEADER QUERIES -------------------------------------------- */
 @media only screen and (min-width: 600px) {  /* Esto genera demora en la barra y se nota*/
+    .header {
+        display: flex;
+        flex-direction: row;
+    }
+
     .header__open-nav-button {
         display: none; /* Oculto el menu togle en Desktop */
     }
@@ -138,24 +143,29 @@ a {
     .header__navbar {
         display: block;
         position: static; /* para que si ocupe el espacio en el header*/
+
+        /* Reinicio tamaños */
+        width: 60vw; /* TENGO QUE HACER QUE OCUPE EL 100% DE LA PANTALLA */
         height: var(--header-height);
+
         align-content: center; /* centra verticalmente el ul en el nav */
     }
     .header__nav-list {
         flex-direction: row;
-        justify-content: right;
+        justify-content: right; /* Centra horizontalmente items */
+        align-items: center; /* Centra verticalmente items */
         margin: 0; /* porque aplico margin en navbar de mobile y queda mal la Desktop... */
+        height: inherit;
     }
-    
-    .header {
-        justify-content: center;  /* como el espacio entre el logo y la barra de nav */
+
+    .header__nav-item {
+        font-size: min(2vw, 24px);
+        margin: 0 2vw; /*Reemplazo margin que tenian los elementos*/
+        text-align: center;
     }
-    
-
-
 }
 
-/* ---------------------- FOOTER SECTION ---------------------- */
+/* -------------------------------------------- FOOTER SECTION -------------------------------------------- */
 footer {
     display: grid;
     grid-template-rows: repeat(3, auto);
@@ -195,172 +205,4 @@ footer {
 
 footer a {
     color: white;
-}
-
-/* ---------------------- WEB PAGE: INDEX.HTML ---------------------- */
-.image-container {
-    height: 70vh;
-    width: 100%;
-
-    background-image: url("../images/AI_2.jpeg");
-    background-position: center; /* Center the image */
-    background-repeat: no-repeat; /* Do not repeat the image */
-    background-size: cover; /* Resize the background image to cover the entire container */
-
-    display: flex;
-    flex-direction: column;
-}
-
-.image-container-text {
-    color: #fff;
-    text-align: left;
-    font-size: x-large;
-
-    width: 35vw;
-    height: 100%;
-    padding: 1.5em;
-
-    align-content: center;
-}
-
-.image-container-text h2 {
-    font-size: 90px;
-    ;
-}
-
-.image-container-text button {
-    text-decoration: none;
-    border-radius: 1rem;
-    border: none;
-    background-color: rgb(22, 148, 22);
-    color: #fff;
-    padding: 0.8rem;
-}
-
-.image-container-text button:hover {
-    opacity: 0.7;
-}
-
-/* ---------------------- WEB PAGE: PREDICCIONES.HTML ---------------------- */
-/* MAIN SECTION */
-.main-wrapper {
-    display: flex;
-    flex-direction: column;
-    padding: 0% var(--margin);
-}
-
-/* Primer aside */
-.calendar-container {
-    display: flex;  
-    flex-direction: column;
-    align-items: center;
-    list-style: none;
-
-    padding: 0;
-    margin-bottom: 2rem; 
-}
-
-#fechaSeleccionada {
-    border: none;
-    border-bottom: 2px solid var(--color-primario);
-    width: 70%;
-}
-
-.filters-leagues__list {
-    list-style: none;
-    padding-left: 1rem;
-    text-align: left;
-}
-
-.filters, .main, .leagues {
-    border: 0.1rem solid black;
-    /* box-shadow: 0.2rem 0.2rem rgb(159, 156, 156); */
-    background-color: #fff;
-    border-radius: 2rem;
-    margin: 1rem;
-}
-
-/* Segundo aside */
-
-/* MAIN QUERIES */
-@media only screen and (min-width: 600px) {
-    .main-wrapper {
-        flex-direction: row;
-        justify-content: center;
-    }
-
-    .filters, .leagues {
-        width: 20vw;
-        max-width: 30vw;
-    }
-
-    .main {
-        width: 30vw;
-        max-width: 40vw;
-    }
-}
-
-/* ---------------------- WEB PAGE: about.html ("SOBRE NOSOTROS") ---------------------- */
-
-.timeline-container {
-    display: flex;
-    flex-direction: column;
-}
-
-.timeline__event {
-    height: 40px;
-    border: 1px solid red;
-}
-
-/* ---------------------- WEB PAGE: contact.html ("CONTACTO") ---------------------- */
-.form-container {
-    display: flex; /* imagen e inputs en paralelo*/
-    position: relative;
-
-    background-color: #fff;
-    border: 1px solid black;
-    border-radius: 1rem;
-
-    align-items: center;
-    justify-content: space-evenly;
-    flex-wrap: wrap;
-
-    margin: 2rem var(--margin);
-}
-
-.form-contacto {
-    width: 60%;
-    text-align: center;
-}
-
-.form__input {
-    width: 90%;
-    margin-bottom: 1rem;
-    border: none;
-    border-bottom: 3px solid var(--color-primario);
-    background-color: transparent;
-}
-
-.input--mensaje {
-    resize: none;
-    min-height: 10rem;
-}
-
-.input--boton {
-    background-color: var(--color-primario);
-    color: #fff;
-    padding: 0.3rem;
-}
-
-.input--boton:hover {
-    opacity: 0.7;
-}
-
-.form__input:focus {
-    background-color: rgb(209, 209, 209);
-    outline: none;
-}
-
-.form-contacto-imagen img {
-    width: 70%;
 }
