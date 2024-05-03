@@ -91,7 +91,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Hiperparametros
     l_thr_dif_prob = [-0.5, -0.2, -0.15, -0.1, -0.05, 0]
     l_thr_dif_winning = [0, 0.03, 0.05]
-    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, 0], [70, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.5, 4), (1, 20)], [(0.5, 6), (1, 20)]]}
+    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, 0], [70, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)]]}
     
     # Definicion de variables
     best_roi = -100000

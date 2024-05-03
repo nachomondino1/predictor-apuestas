@@ -320,28 +320,16 @@ class DataPreparationNew(DataPreparation):
 
         return df_new
 
-    def tag_string_data_to_integer_new(self, df: pd.DataFrame, tager_loaded, _print: bool = True):
+    def tag_string_data_to_integer_new(self, df: pd.DataFrame, df_etiquetas_loaded, _print: bool = True):
         """
         Utilizando las mismas etiquetas que cuando se entreno el modelo para el pais, convierto columnas string a integer
         """
         print("\nTagging string data to integer..")
         # Elimino season para no etiquetarla?
-       
         df = df.drop(['season'], axis=1)
 
-        # Intento levantar df_etiquetas con etiquetas nuevas # Una vez que df_eti_2 funcione ok, Exportar df_etiquetas_2 y usar este en lugar de df_etiquetas puesto que esta mas actualizado...
-        # df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx')
-        ''' 
-        try:    
-            df_etiquetas = pd.read_excel(f'./p6_deployment/data/{self.country}/data_preparation/df_etiquetas_actualizado.xlsx')
-            print("Levento etiquetas actualizado")
-        except:
-            df_etiquetas = pd.read_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx')
-            print("Levento etiquetas viejo puesto que no hay uno actualizado")
-        '''
-
         # Codifico variables categoricas a numericas con el mismo sistema que se uso en el dataframe original (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df, df_etiquetas = format_data.convert_columns_to_int_2(df, tager_loaded)  # Si o si tengo que devolver df_etiquetas?
+        df, df_etiquetas = format_data.convert_columns_to_int_already_tagged(df, df_etiquetas_loaded)  # Si o si tengo que devolver df_etiquetas?
         if _print:
             df.to_excel('/Users/nachomondino/Desktop/df_codificacion_next_matches.xlsx')
 
@@ -547,6 +535,29 @@ def read_last_version_matches(country, _print: bool = True):
             print(df_match.shape, df_match_player.shape, df_match_odds.shape, df_integrated.shape)
     return df_match, df_match_player, df_match_odds, df_integrated
             
+def load_df_etiquetas(country, n_model, ruta_base, d):
+
+    # Intento levantar df_etiquetas con etiquetas nuevas # Una vez que df_eti_2 funcione ok, Exportar df_etiquetas_2 y usar este en lugar de df_etiquetas puesto que esta mas actualizado...    
+    try:    
+        df_etiquetas = pd.read_excel(f'./p6_deployment/data/{country}/data_preparation/df_etiquetas_actualizado.xlsx')
+        print("1) Levento etiquetas actualizado")
+
+    except FileNotFoundError:
+        print("2) Levento etiquetas viejo puesto que no hay uno actualizado")
+        # Si se levanta de main.py
+        if n_model is None:
+            path_tag = f"./p3_data_preparation/data/{country}/df_etiquetas.xlsx"
+
+        # Si se levanta de find_best_hyper.py
+        else:
+            n_ult_part, n_years_h2h, segun_localia = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia']
+            path_tag = f'{ruta_base}/data_preparation/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+
+        df_etiquetas = pd.read_excel(path_tag, index_col=0)
+        
+    print(df_etiquetas.head(3))
+    return df_etiquetas
+
 def load_data_preparation_hyperparameters(country, n_model, ruta_base):
     """
     Cargo hiperparametros de DataPreparation()
@@ -595,7 +606,7 @@ def load_modeling_hyperparameters(country, n_model, ruta_base):
 
     # Si se levanta de main.py
     if n_model is None:
-        row_hiper = pd.read_excel(f'./p3_data_preparation/data/{country}/df_hiper_mod.xlsx')
+        row_hiper_bet_strat = pd.read_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx')
 
     else:
         df_iteration_prod = pd.read_excel(f"{ruta_base}/df_iteration_prod.xlsx", index_col=0)
@@ -621,7 +632,6 @@ def load_models(country, n_model, ruta_base, d):
 
     # Si se levanta de main.py
     if n_model is None:
-        path_tag = f"./p3_data_preparation/data/{country}/df_etiquetas.xlsx"
         path_scaler = f"./p3_data_preparation/data/{country}/scaler_model.pkl"
         path_model = f"./p4_modeling/data/{country}/modelo.pkl"
 
@@ -632,10 +642,9 @@ def load_models(country, n_model, ruta_base, d):
         path_scaler = f'{ruta_base}/data_preparation/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl'
         path_model = f"{ruta_base}/modeling/{n_model}_model.pkl"
 
-    tager_loaded = pd.read_excel(path_tag)
     scaler, columns_scaled = joblib.load(path_scaler)
     loaded_model = pickle.load(open(path_model, "rb"))
-    return tager_loaded, scaler, columns_scaled,loaded_model
+    return scaler, columns_scaled, loaded_model
     
 def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH):
     """
@@ -697,7 +706,8 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, ruta_base)
-    tager, scaler, columns_scaled, loaded_model = load_models(country, n_model, ruta_base, d_hiper)
+    scaler, columns_scaled, loaded_model = load_models(country, n_model, ruta_base, d_hiper)
+    df_etiquetas = load_df_etiquetas(country, n_model, ruta_base, d_hiper)
     comp_to_select = eval(d_hiper['comp_to_select'])
     
     #______________________________________________ MISSING DATA ______________________________________________#
@@ -748,8 +758,9 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
         except FileNotFoundError:
             df_int_with_missing = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
             print("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
-        print(df_int_with_missing.head(3))
-        print(df_int_with_missing.shape)
+   
+    print(f"\nShape of df_integrated_with_missing (siempre es un poco menor a df_match_with_missing pero no se por qué): {df_int_with_missing.shape}")  # Calculo que debe ser por la eliminacion de partidos con goles="-" que hice de df_integrated en main.py
+    print(df_int_with_missing.head(3))
 
     #______________________________________________ DATA UNDERSTANDING ______________________________________________#
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
@@ -805,7 +816,7 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
         df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_old_int_filt)
         df = dp.construct_data_new(df, df_old_int, df_old_int_filt, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
-        df = dp.tag_string_data_to_integer_new(df, tager)
+        df = dp.tag_string_data_to_integer_new(df, df_etiquetas)
         df = dp.clean_data_2_new(df, scaler, columns_scaled, comp_to_select)
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         df = dp.treat_nan_values_new(df)
@@ -862,16 +873,20 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
+    country = "england"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    n_days_max_next_matches = 2  # Numero de dias maximo desde hoy para extraer partidos
+    all_true = False
+    if all_true:
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+    else:
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
-    country = "italy"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
-    fecha_find_best = '2024-04-29'
-    ruta_base = f"./main_find_best_hyper/data/{country}/{fecha_find_best}"
-
-    n_days_max_next_matches = 1  # Numero de dias maximo desde hoy para extraer partidos
-
-    d_modelos = {'italy': 2, 'england': 36, 'argentina': 1, 'spain': 3}  # italy=470 spain=428 # Para inglaterra: Premier League=36 Championship=436
+    # Defino variables
+    d_modelos = {'italy': 2, 'england': 1034, 'spain': 419, 'argentina': None}
+    d_fecha_ite = {'italy': '2024-04-29', 'england': '2024-04-29', 'spain': '2024-04-29', 'argentina': None} # Falla para Champ porque es ing tambien... '2024-05-01'
     n_model = d_modelos[country]
+    fecha_find_best = d_fecha_ite[country]
+    ruta_base = f"./main_find_best_hyper/data/{country}/{fecha_find_best}"
 
     # Extraigo, preparo y predigo proximos partidos
     main(d_run, country, ruta_base, n_days_max_next_matches, n_model)

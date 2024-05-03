@@ -158,7 +158,7 @@ def convert_columns_to_int(df):
     return df, df_etiquetas
 
 # main_next_matches.py
-def convert_columns_to_int_2(df, df_etiquetas):
+def convert_columns_to_int_already_tagged(df, df_etiquetas):
     """
     Etiquetado usando un df_etiquetas ya creado. Es para main_next_matches. Tengo en cuenta posibles nuevas etiquetas y las agrego a df_etiquetas
     """

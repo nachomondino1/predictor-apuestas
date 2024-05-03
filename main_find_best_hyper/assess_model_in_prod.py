@@ -260,7 +260,7 @@ class DataPreparationNew_2(DataPreparation):
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
         if len(df) != len(df_sin_dup):
-            text = f"Cuidado! No se hara la prediccion para {len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN."
+            text = f"Cuidado! Se eliminan {len(df)-len(df_sin_dup)} partidos de {len(df)} puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN."
             warnings.warn(text)
 
         if self.export: 
@@ -316,9 +316,15 @@ def load_hyperparameters(row_hiper):
     ## Clean_data_2
     n_years_to_select = row_hiper['n_years_to_select'].values[0]
     d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
-    d['comp_to_select'] = row_hiper['comp_to_select'].values[0]
+    try:
+        d['comp_to_select'] = eval(row_hiper['comp_to_select'].values[0])
+    except TypeError: # Falla aqui cuando corro el find_best.
+        d['comp_to_select'] = list(row_hiper['comp_to_select'].values[0])
     ## Select_data
-    d['selected_columns'] = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
+    try:
+        d['selected_columns'] = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
+    except TypeError:  # Falla aqui cuando corro el find_best.
+        d['selected_columns'] = list(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
 
     print("\nHiperparametros cargados:")
     for key, value in d.items():
@@ -409,7 +415,7 @@ def main(df_iteration, country, iteration_date, export: bool = True):
         # Preparo
         df_cons = dp.construct_data_new(df_int, df_old_int, df_old_int_filt, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
         df_tag = dp.tag_string_data_to_integer_new(df_cons, tager)
-        df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, eval(d_hiper['comp_to_select']))
+        df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'])
         df_sel = dp.select_data_new(df_clean, d_hiper['selected_columns'])
         df_treat = dp.treat_nan_values_new(df_sel)
         print("Shape Dataframe antes de Modeling(): ", df_treat.shape)
@@ -437,7 +443,9 @@ def main(df_iteration, country, iteration_date, export: bool = True):
         # Concateno conjunto de datos
         df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
         df_predicciones = pd.concat([df_match_2, df_match_odds_2, df_pred_proba], axis=1)
-        
+        df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+        df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
+
         # Evaluo predicciones del modelo
         df_predicciones, d_roi = calculate_roi_by_betting_strategy(df_predicciones, _print=False)
         print("Metricas: ", d_roi)
@@ -450,6 +458,7 @@ def main(df_iteration, country, iteration_date, export: bool = True):
         # Concateno datos
         d_roi['param1'], d_roi['param2'] = str(d_roi['param1']), str(d_roi['param2'])
         df_roi = pd.DataFrame(d_roi, index=[row['n_iteration']])
+        df_roi['X_shape_missing'] = [df_treat.shape]  # Me interesa saber el largo del df_missing
         df_iteration_prod = pd.concat([df_iteration_prod, df_roi], axis=0)
         print(df_iteration_prod)
 
@@ -485,8 +494,20 @@ def select_league_matches(df_match, df_match_player, df_match_odds):
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "italy"
-    iteration_date = '2024-04-29'
+    country = "england"
+    iteration_date = '2024-05-01'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
-    
-    main(df_iteration, country, iteration_date)
+
+    # Para filtrar por competiciones (si queres)
+    # print("1", df_iteration.shape)
+    # df_iteration = df_iteration[df_iteration['comp_to_select'].apply(lambda x: eval(x) == [481, 482, 483, 484])]
+    # print("2", df_iteration.shape)
+
+    # Evaluo modelos en produccion
+    df_iteration_prod = main(df_iteration, country, iteration_date) # df_iteration_prod = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_prod.xlsx', index_col=0)
+
+    # Concateno df_iteration y df_iteration_prod
+    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+    df_concat.to_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_completo.xlsx', index=True)  # df_concat.to_excel(f'/Users/nachomondino/Desktop/df_iteration_completo_{country}.xlsx', index=True)
+

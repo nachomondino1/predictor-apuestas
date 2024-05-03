@@ -855,7 +855,7 @@ def main(country, d_run, export: bool = True):
         val_size, test_size = 0.125, 0.125
         bal_type = None
         k = 10
-        df_hiper_mod = pd.DataFrame(data={'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}, index=[0])        
+        d_hiper_mod = {'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}
 
         modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
         model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
@@ -893,6 +893,10 @@ def main(country, d_run, export: bool = True):
         model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
         df_pred, d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
+        # Construyo dataframe con hiperparametros de Modeling() (incluyendo los de la estrategia de apuesta)
+        d_hiper_mod.update(d_metrics)
+        df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
+
         if export:
             df_hiper_mod.to_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx', index=True)
             pickle.dump(model, open(f"./p4_modeling/data/{country}/modeling/modelo.pkl", "wb"))
@@ -901,7 +905,7 @@ def main(country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion de variables
-    country = 'spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
-    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+    country = 'france'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    d_params = {'data_unders': True, 'data_prep': False, 'modeling': False}
 
     main(country, d_params, export=True)

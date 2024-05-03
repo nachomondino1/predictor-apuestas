@@ -232,8 +232,9 @@ def main(country, d_params):
     df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
 
 if __name__ == '__main__':
+
     # Parametros de corrida
-    country = 'england'
+    country = 'argentina'
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
@@ -247,7 +248,7 @@ if __name__ == '__main__':
             'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], #  d_comps['all_comp'] # Italy y Spain no tienen la b en df_match
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']],  # Italy y Spain no tienen la b en df_match
             'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
@@ -260,7 +261,7 @@ if __name__ == '__main__':
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.125], 
-            'bal_type': [None, 'under'], 
+            'bal_type': [None, 'under', 'over'], 
             'k': [10]
         }
     }
