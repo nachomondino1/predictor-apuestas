@@ -7,10 +7,9 @@ from pprint import pprint
 router = routers.DefaultRouter()
 
 # Routers: We registry the view set here
-router = routers.DefaultRouter()
 router.register('predictions', views.PredictionViewSet, basename='predictions')
+router.register('images', views.ImageViewSet, basename='media/images')
 pprint(router.urls)
-# http://127.0.0.1:8000/home/predictions.json --> in json format
 
 # prediction_router = routers.NestedDefaultRouter(router, 'predictions', lookup='pred')
 
@@ -25,4 +24,14 @@ urlpatterns = [
     path('predicciones/', views.predicciones, name='predicciones'), # path('predicciones/', views.predicciones, name='predicciones'),
     path('about/', views.about, name='about'),
     path('contact/', views.contact, name='contact'),
+    # path('hello/', views.say_hello),
+    # path('predictions/', views.PredictionList.as_view()),
+    # path('predictions/<str:pk>/', views.PredictionDetail.as_view()) # <str:id> <str:team_name> <str:id_match>
+]
+ """
+urlpatterns = [
+    path('', include(router.urls)),
+    path('hello/', views.say_hello),
+    path('predicciones/', views.PredictionViewSet.as_view({'get': 'list'})),
+>>>>>>> staging
 ]

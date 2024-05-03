@@ -1,5 +1,6 @@
 from django.db import models
 from uuid import uuid4
+from .validators import validate_file_size
 
 # To generate a new migration: python manage.py makemigrations
 # To execute the migrations: python manage.py migrate
@@ -251,3 +252,6 @@ class Odd(models.Model):
    odds_home = models.DecimalField(max_digits=5, decimal_places=2)
    odds_draw = models.DecimalField(max_digits=5, decimal_places=2)
    odds_away = models.DecimalField(max_digits=5, decimal_places=2)
+
+class UploadImage(models.Model):
+   image = models.ImageField(upload_to='media/images', validators=[validate_file_size])
