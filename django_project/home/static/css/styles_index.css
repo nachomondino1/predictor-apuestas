@@ -33,12 +33,18 @@
 }
 
 .image-container-text button {
-    text-decoration: none;
+    width: 50%;
+
+    padding: 0.8rem;
+    /* margin: 0px auto; centro el boton  */
+
     border-radius: 1rem;
     border: none;
-    background-color: rgb(22, 148, 22);
+
+    background-color: rgb(34, 104, 235);
     color: #fff;
-    padding: 0.8rem;
+    text-decoration: none;
+    word-wrap: break-word;
 }
 
 .image-container-text button:hover {
