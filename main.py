@@ -205,7 +205,6 @@ class DataPreparation:
         """
         start = time.time()
         print("\nCleanning data...")
-        # warnings.filterwarnings('ignore')
 
         # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
         print("\nEliminacion de estadisticas irrelevantes")
@@ -221,6 +220,7 @@ class DataPreparation:
         # Preparacion de texto
         print("\nPreparacion de columnas string")
         ## FLASHSCORE
+        df_match = clean_data.clean_teams_names(df_match)
         columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
         df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
         columns_player_names = list(df_match_player.filter(like='player_name').columns)

@@ -14,13 +14,14 @@ def convert_ball_possession_to_int(df):
     """
     func = lambda x: float(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan
 
-    df["ball_possession_home"] = df["ball_possession_home"].apply(func)
-    df["ball_possession_away"] = df["ball_possession_away"].apply(func)
+    if ("ball_possession_home" in df.columns) and ('ball_possession_away' in df.columns):
+        df["ball_possession_home"] = df["ball_possession_home"].apply(func)
+        df["ball_possession_away"] = df["ball_possession_away"].apply(func)
     
-    # Verifica si todos los elementos de la columna son de tipo float
-    if not all(isinstance(value, float) for value in df["ball_possession_home"]):
-        # Si no todos los elementos son de tipo float, raise una advertencia
-        warnings.warn(f"Not all elements in the column '' are float.")
+        # Verifica si todos los elementos de la columna son de tipo float
+        if not all(isinstance(value, float) for value in df["ball_possession_home"]):
+            # Si no todos los elementos son de tipo float, raise una advertencia
+            warnings.warn(f"Not all elements in the column '' are float.")
     
     return df
 
@@ -85,20 +86,26 @@ def convert_goals_to_int(df):
     return df
 
 def convert_capacity_to_int(df):
-
+    """
+    Convierte columnas "capacity" y "attendance" de object a integer.
+    """
     l_columns = ['capacity', 'attendance']
 
+    # Por columna
     for col in l_columns:
 
-        # Comprobar si la columna contiene valores de tipo cadena (string)
-        if df[col].dtype == 'object':
-            # Reemplazar los espacios en blanco en los valores de la columna
-            df[col] = df[col].str.replace(' ', '')
+        # Si la columna esta en el dataframe
+        if col in df.columns:
 
-            # Convertir la columna al tipo de datos correcto (entero)
-            df[col] = df[col].astype(float) # Pues si tiene nan, es float.
-        else:
-            print(f"Fallo la conversion de la columna {col} a float")
+            # Comprobar si la columna contiene valores de tipo cadena (string)
+            if df[col].dtype == 'object':
+                # Reemplazar los espacios en blanco en los valores de la columna
+                df[col] = df[col].str.replace(' ', '')
+
+                # Convertir la columna al tipo de datos correcto (entero)
+                df[col] = df[col].astype(float) # Pues si tiene nan, es float.
+            else:
+                print(f"Fallo la conversion de la columna {col} a float")
     return df
 
 def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
