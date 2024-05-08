@@ -1,4 +1,6 @@
 # Importo librerias
+import argparse
+from distutils.util import strtobool
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
@@ -860,16 +862,35 @@ def main(d_run: dict, country: str, ruta_base: str, n_days_max_next_matches: int
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    # Para correrlo desde consola: python p6_deployment/main_next_matches.py --run_missing "False" --data_unders "False" --data_prep "True" --modeling "True" --export "True" --country "Italy" --fecha_find_best "2024-04-29" --n_days_max_next_matches "1"
 
-    # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
-
-    country = "italy"  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    # Defino los argumentos
     fecha_find_best = '2024-04-29'
-    ruta_base = f"./main_find_best_hyper/data/{country}/{fecha_find_best}"
-
+    country = "italy"
     n_days_max_next_matches = 1  # Numero de dias maximo desde hoy para extraer partidos
 
+    parser = argparse.ArgumentParser(description="Descripción del script")
+    parser.add_argument("--run_missing", default=False, type=lambda x: bool(strtobool(x.strip())), help="Ejecutar análisis de datos faltantes")
+    parser.add_argument("--data_unders", default=False, type=lambda x: bool(strtobool(x.strip())),  help="Ejecutar submuestreo de datos")
+    parser.add_argument("--data_prep", default=True, type=lambda x: bool(strtobool(x.strip())), help="Ejecutar preparación de datos")
+    parser.add_argument("--modeling", default=True, type=lambda x: bool(strtobool(x.strip())), help="Ejecutar modelado")
+    parser.add_argument("--export", default=True, type=lambda x: bool(strtobool(x.strip())), help="Exportar resultados")
+    parser.add_argument("--country", type=str, default = country,  help="Nombre del país")
+    parser.add_argument("--fecha_find_best", type=str, default = fecha_find_best, help="Fecha para encontrar mejores hiperparámetros")
+    parser.add_argument("--n_days_max_next_matches", default = n_days_max_next_matches, type=int, help="Número máximo de días para extraer partidos")
+
+    args = parser.parse_args()
+
+    # Defino condiciones del analisis
+    d_run = {'run_missing': args.run_missing, 'data_unders': args.data_unders, 'data_prep': args.data_prep, 
+             'modeling': args.modeling, 'export': args.export}
+
+    # Extraer otros argumentos
+    country = args.country.lower()
+    fecha_find_best = args.fecha_find_best
+    n_days_max_next_matches = args.n_days_max_next_matches
+    ruta_base = f"./main_find_best_hyper/data/{country}/{fecha_find_best}"
+    
     d_modelos = {'italy': 2, 'england': 36, 'argentina': 1, 'spain': 3}  # italy=470 spain=428 # Para inglaterra: Premier League=36 Championship=436
     n_model = d_modelos[country]
 
