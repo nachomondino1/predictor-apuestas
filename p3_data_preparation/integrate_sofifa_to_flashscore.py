@@ -132,7 +132,7 @@ def match_dataframes_by_str_column(df1, df2, column_to_relation, column_to_integ
                 df_map = pd.concat([df_map, pd.DataFrame(d_data, index=[len(df_map)])]) 
 
                 if _print:
-                    print(f'No hizo match puesto que la opcion con mas coincidencia fue {row_best_coincidende['porcentaje_coincidencia']} (menor a {thr_coincidence_min}). La mejor coincidencia para "{row[column_to_relation]}" fue "{row_best_coincidende['team_name']}".')
+                    print(f'No hizo match puesto que la opcion con mas coincidencia fue {row_best_coincidende["porcentaje_coincidencia"]} (menor a {thr_coincidence_min}). La mejor coincidencia para "{row[column_to_relation]}" fue {row_best_coincidende["team_name"]}.')
     
         progress_bar.update(1)
     progress_bar.close()

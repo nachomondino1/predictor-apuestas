@@ -398,7 +398,7 @@ def prueba():
             
             # Teams
             df_teams = extract_teams(id_country, country, row['competition_sofifa'])
-            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
+            df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{row["competition_sofifa"]}.xlsx', index=True)
 
             df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
     
