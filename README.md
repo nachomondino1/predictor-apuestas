@@ -9,8 +9,15 @@
 
 ## Actualizar el Virtual Environment luego de agregar una libreria: 
 
+- Si otra persona actualizó el requirements.txt y queres actualizar tu virtualenv local:
+    1) Activa tu entorno virtual si aún no lo has hecho. Puedes hacerlo con el siguiente comando: <br>
+    `source /ruta/a/tu/entorno_virtual/bin/activate` <br>
+    2) Una vez activado el entorno virtual, puedes usar el comando pip para instalar las dependencias del archivo requirements.txt. Para instalar todas las dependencias listadas en requirements.txt, simplemente ejecuta: <br>
+    `pip install -r requirements.txt` <br>
+    Después de ejecutar este comando, tu entorno virtual estará actualizado con las dependencias especificadas en el archivo requirements.txt. <br>
+
 - Cada vez que agreguemos librerias nuevas al virtual environment, debemos 
-actualizar el archivo de requirements.txt corriendo el comando: 
+actualizar el archivo de requirements.txt corriendo el comando: <br>
 `pip freeze > requirements.txt`
 
 ## Como crear una nueva rama: 
