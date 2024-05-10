@@ -194,45 +194,6 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str):
     df[n_col_2] = df[n_col_2].apply(func)
     return df
 
-def calculate_dif_col_stats(df, l_stats, n_days, segun_localia): # ver que estan bien los cambios que hice... creo que si igual
-    """
-    Construye variables diferencia de estadisticas entre local y visitante.
-    
-    # Parameters
-        df: Dataframe. (DataFrame)
-        l_stats: Estadisticas a promediar y calcular diferencia (e.g. 'ball_possession'). (list) # Me gustaria pasarle 'ball_possession_home' y ball_possession_away' 
-        n_days: Numero de dias para los cuales promediar la estadistica
-        segun_localia: 
-
-    # Returns
-        Dataframe pasado como parametro con ...
-    """
-    # Por estadistica del partido
-    for var in l_stats: # e.g. shots_on_goal
-        print(f"Estadistica a promediar: {var}")
-        
-        # try: --> En teoria no deberia fallar nunca creo. Y si lo uso, deberia ser especifico con el error que quiero evitar.
-
-        # PROMEDIANDO LA ESTADISTICA Y LUEGO CALCULANDO LA DIFERENCIA       
-        # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-        df = determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
-        df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
-        
-        # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-        not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
-        df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
-        df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
-
-        # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-        not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
-        df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
-        df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
-
-        # except:
-        #     print(f"Falló el calculo de diferencia para la variable {var}")
-        #     pass
-    return df
-
 def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, _print: bool = False):
     """
     Obtiene el promedio de las stats en los ultimos matchs
@@ -245,7 +206,7 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
-    n_days = int(n_days*2) if segun_localia else n_days  # no me gusta esto... o si? 
+    n_days = int(n_days*2) if segun_localia else n_days  # no me gusta esto... o si? Tecnicamente tambien tiene efecto en main_next_matches.py porque uso esta funcion... asique no habria problema.
 
     # Por partido
     for id_match, row in df.iterrows():

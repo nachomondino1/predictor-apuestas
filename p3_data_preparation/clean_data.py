@@ -35,8 +35,8 @@ class TextPreparation:
 
     def delete_special_characters(self, df, columns):
         """Remueve caracteres especiales de los textos"""
-        d = {'ã': 'a', 'â': 'a', 'ä': 'a', 'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ø': 'o',
-             'û': 'u', 'ü': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
+        d = {'ã': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ê': 'e', 'ë': 'e', 'è': 'e','î': 'i', 'ï': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ø': 'o', 
+            'ó': 'o', 'û': 'u', 'ü': 'u', 'ù': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
         for col in columns:
             try:
                 df[col] = df[col].replace(d, regex=True)
