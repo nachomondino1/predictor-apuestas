@@ -490,7 +490,7 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
 
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
-    competition_form = competition.lower().replace(" ", "-")  # formateo competition para las rutas de archivo y urls
+    competition_form = competition.lower().replace(".", "").replace(" ", "-")  # formateo competition para las rutas de archivo y urls
     ruta_base = f"./p2_data_understanding/data/{country_form}/data_seg"
 
     # Ingreso a pagina

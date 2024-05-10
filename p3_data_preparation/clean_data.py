@@ -35,8 +35,8 @@ class TextPreparation:
 
     def delete_special_characters(self, df, columns):
         """Remueve caracteres especiales de los textos"""
-        d = {'ã': 'a', 'â': 'a', 'ä': 'a', 'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ø': 'o',
-             'û': 'u', 'ü': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
+        d = {'ã': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ê': 'e', 'ë': 'e', 'è': 'e','î': 'i', 'ï': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ø': 'o', 
+            'ó': 'o', 'û': 'u', 'ü': 'u', 'ù': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
         for col in columns:
             try:
                 df[col] = df[col].replace(d, regex=True)
@@ -112,9 +112,8 @@ def clean_teams_names(df):
     """
     # Limpio string 'Vencedor' en el nombre de algunos equipos.
     d_sub_strings_adic = {"winner": '', "advancing to next round": ''}  # Tengo que tener cuidado, reemplazo strings... pueden ser substring y cambiarlo sin querer hacerlo.
-    df['team_name'] = df['team_name'].replace(d_sub_strings_adic, regex=True).str.strip()
-    # df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
-    # df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['team_home'] = df['team_home'].replace(d_sub_strings_adic, regex=True).str.strip()
+    df['team_away'] = df['team_away'].replace(d_sub_strings_adic, regex=True).str.strip()
     return df
 
 # 2) Eliminacion de columnas no relevantes
