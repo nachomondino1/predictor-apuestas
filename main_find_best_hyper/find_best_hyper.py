@@ -18,7 +18,7 @@ import os
 import datetime
 import assess_model_in_prod
 
-def find_best_hiperparameters(country, ruta_base, d_params, l_modelos):
+def find_best_hiperparameters(country, ruta_base, d_params, l_modelos, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
@@ -52,12 +52,14 @@ def find_best_hiperparameters(country, ruta_base, d_params, l_modelos):
             print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
 
             df_constructed = dp.construct_data(df_integrated, n_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=False)
-            df_constructed.to_excel(path, index=True)
+            if export:
+                df_constructed.to_excel(path, index=True)
 
         # Etiqueto df_constructed
         df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=False)
         path = f'{ruta_base}/data_preparation/df_etiquetas_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
-        df_etiquetas.to_excel(path, index=True)
+        if export:
+            df_etiquetas.to_excel(path, index=True)
 
         # Clean data 2
         for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
@@ -123,19 +125,22 @@ def find_best_hiperparameters(country, ruta_base, d_params, l_modelos):
                                         'k': k}
                             row_data.update(d_metrics_best_model)
                             df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                            df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
+                            if export:
+                                df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
 
-                            # Guardo datos del modelo
-                            pickle.dump(best_model, open(f"{ruta_base}/modeling/{cont_iter}_model.pkl", "wb"))
-                            df_pred.to_excel(f'{ruta_base}/modeling/{cont_iter}_df_predicciones.xlsx', index=True)
-                            try:
-                                df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
-                                df_hiper_best_model.to_csv(f"{ruta_base}/modeling/{cont_iter}_model_hiper.csv")
-                            except:
-                                pass
+                                # Guardo datos del modelo
+                                pickle.dump(best_model, open(f"{ruta_base}/modeling/{cont_iter}_model.pkl", "wb"))
+                                df_pred.to_excel(f'{ruta_base}/modeling/{cont_iter}_df_predicciones.xlsx', index=True)
+                                try:
+                                    df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
+                                    df_hiper_best_model.to_csv(f"{ruta_base}/modeling/{cont_iter}_model_hiper.csv")
+                                except:
+                                    pass
 
     # Guardo datos de todas las iteraciones
-    df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
+    if export:
+        df_iteration.to_excel(f'{ruta_base}/df_iteration.xlsx', index=False)
+
     return df_iteration
 
 def define_n_iterations(d_params):
@@ -209,19 +214,19 @@ def determine_comps(id_country):
     
     return d
 
-def main(country, d_params):
+def main(country, l_modelos, d_params, export: bool = True):
 
     # Definicion de variables
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
     ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
-    make_directories(ruta_base)  # Creo directorios
-   
+    make_directories(ruta_base) # Creo directorios
+
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos)
+    df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos, export=export)
 
     # Preparo datos missing y evaluo modelos en produccion
-    df_iteration_prod = assess_model_in_prod.main(df_iteration, country, date)
+    df_iteration_prod = assess_model_in_prod.main(df_iteration, country, date, export=export)
 
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
     # best_model = select_best_model(df_iteration_prod)
@@ -229,12 +234,18 @@ def main(country, d_params):
     # Concateno df_iteration y df_iteration_prod
     df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-    df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
+
+    if export:
+        df_iteration.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
+
+    return df_concat
 
 if __name__ == '__main__':
 
     # Parametros de corrida
     country = 'argentina'
+
+    # Definicion de variables
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
@@ -248,7 +259,7 @@ if __name__ == '__main__':
             'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']],  # Italy y Spain no tienen la b en df_match
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
             'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
@@ -261,9 +272,9 @@ if __name__ == '__main__':
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.125], 
-            'bal_type': [None, 'under', 'over'], 
+            'bal_type': [None, 'under', 'over'],
             'k': [10]
         }
     }
 
-    main(country, d_params)
+    df_iteration = main(country, l_modelos, d_params, export=True)
