@@ -447,6 +447,9 @@ def determine_winning_bets(df: pd.DataFrame):
     # Returns
         Dataframe pasado como parametro con una nueva columna, 'acerte' indicando si se acertó el resultado apostado o no.
     """
+    # inicializo columna "acerte"
+    df['acerte'] = 0
+
     # Por partido
     for id_match, row in df.iterrows():
 

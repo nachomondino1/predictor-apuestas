@@ -57,6 +57,11 @@ class FlashscoreCrawler(Crawler):
             print("The season is not a string. Probably it failed the extraction.")
         return season_year
 
+    def click_results_page(self):
+        xpath_button = './/div[@class="container__heading"]//div[@class="tabs__group"]/a[@class="tabs__tab results"]'
+        boton_mostrar = super().extract_tag(xpath=xpath_button, sec_wait=self.SEC_WAIT_MAX*2, print_fail=False)
+        super().click_boton(boton_mostrar)
+
     def click_show_more_matches(self):
         """
         Click en boton "Show more matches" hasta que ya no haya mas. Es decir, carga todos los partidos.
@@ -484,8 +489,7 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
         df_match_odds: Dataframe.
     """
     # DEFINCION DE PARAMETROS & VARIABLES
-    # warnings.filterwarnings("ignore")
-    crawler = FlashscoreCrawler()
+    crawler = FlashscoreCrawler(headless=True)
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     # Formateo variables para guardado de datos
@@ -515,6 +519,9 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
         crawler.driver.get(url_season)
         season_year = crawler.extract_season_year()
         print(f" {season_year} ".center(120, "-"))
+
+        # Click en hoja "Results"
+        crawler.click_results_page()
 
         # Si ya extraje la season
         check = not check_if_season_already_extracted(ruta_base, competition_form, season_year) if l_ids_already_collected is None else True 

@@ -24,22 +24,22 @@ class DataUnderstandingNew():
     def __init__(self, id_country, country, export: bool = True):
         self.id_country = id_country
         self.country = country.lower()
-        self.make_directories()
         self.export = export
-        #super().__init__(country)
+        self.make_directories()
 
     def make_directories(self):
         l_directorios = [
             f'./p6_deployment/data/{self.country}/data_understanding',
             f'./p6_deployment/data/{self.country}/missing/data_understanding/all',
             f'./p6_deployment/data/{self.country}/missing/old_concat_missing',   
-            f'./p6_deployment/data/{self.country}/missing/data_preparation',
+            f'./p6_deployment/data/{self.country}/missing/data_preparation/all',
         ]
     
-        for directorio in l_directorios:
-            if not os.path.exists(directorio):
-                # Si no existe, crear el directorio
-                os.makedirs(directorio)
+        if self.export:
+            for directorio in l_directorios:
+                if not os.path.exists(directorio):
+                    # Si no existe, crear el directorio
+                    os.makedirs(directorio)
 
     def collect_initial_data_new(self, l_competencies, n_days: int = 7, _print: bool = True):
         """
@@ -99,7 +99,8 @@ class DataUnderstandingNew():
             print(f' COUNTRY: {self.country} '.center(120, '#'))
             print(f'Competencias de {self.country}: \n {df_comp_country}')
 
-        # Solo extriago las competencias que tengo en los datos viejos 
+        # Solo extriago las competencias que tengo en los datos viejos
+        l_ids_extracted = list(df_match.index) 
         l_competencies = df_match['id_competition'].unique()
         print("Competencias extraidas: ", l_competencies)
 
@@ -113,7 +114,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=1, l_ids_already_collected=l_ids_extracted, export=False)
             if _print:
                 print(f"Cantidad de partidos faltantes en df_match: {df_match_miss.shape[0]}")
 
@@ -161,10 +162,11 @@ class DataPreparationNew(DataPreparation):
             f'{self.ruta_base}/construct_data',
         ]
 
-        for directorio in l_directorios:
-            if not os.path.exists(directorio):
-                # Si no existe, crear el directorio
-                os.makedirs(directorio)
+        if self.export:
+            for directorio in l_directorios:
+                if not os.path.exists(directorio):
+                    # Si no existe, crear el directorio
+                    os.makedirs(directorio)
 
     def format_data_new(self, df_match: pd.DataFrame, df_match_odds: pd.DataFrame):
         """
@@ -403,7 +405,7 @@ class DataPreparationNew(DataPreparation):
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
         if len(df) != len(df_sin_dup):
-            text = f"Cuidado! No se hara la prediccion para {len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN."
+            text = f"Cuidado! De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN."
             warnings.warn(text)
 
         if self.export: 
@@ -718,12 +720,10 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
     if d_run['run_missing']: 
         
         # Levanto datos
+        df_match, df_match_player, df_match_odds, df_integrated = read_last_version_matches(country) # Obtengo ultima version de df_match y df_match_player
         df_player_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
         df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
-
-        # Obtengo ultima version de df_match y df_match_player
-        df_match, df_match_player, df_match_odds, df_integrated = read_last_version_matches(country)
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match)
@@ -747,8 +747,18 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
             # Concateno missing y old (que puede tener algunos missing ya)
             df_int_with_missing = pd.concat([df_integrated, df_integrated_missing], axis=0)
 
+
+            # Levanto partidos missing ya integrados
+            try:
+                df_integrated_missing_all = pd.read_excel(f'./p6_deployment/data/{country}/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)
+            except FileNotFoundError:
+                df_integrated_missing_all = pd.DataFrame()
+            # Concateno partidos missing ya integrados con los nuevos partidos missing integrados
+            df_integrated_missing_all = pd.concat([df_integrated_missing_all, df_integrated_missing], axis=0)
+            
             if export:
                 df_integrated_missing.to_excel(f'./p6_deployment/data/{country}/missing/data_preparation/df_integrated_missing.xlsx', index=True)
+                df_integrated_missing_all.to_excel(f'./p6_deployment/data/{country}/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
                 df_int_with_missing.to_excel(f'./p6_deployment/data/{country}/missing/old_concat_missing/df_integrated.xlsx', index=True)
 
         else:
@@ -892,9 +902,9 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "france"
-    n_days_max_next_matches = 3  # Numero de dias maximo desde hoy para extraer partidos
-    d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+    country = "germany"
+    n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos
     main(d_run, country, n_days_max_next_matches, export=d_run['export'])

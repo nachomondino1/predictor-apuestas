@@ -16,8 +16,7 @@ from p4_modeling import asses_model
 
 def make_directories(ruta_base):  # Pasarle direcotio o l_directorios como argumento...
     l_directorios = [
-        f'{ruta_base}/assess_model_in_prod/data_preparation/format_data',
-        f'{ruta_base}/assess_model_in_prod/data_preparation/clean_data',
+        f'{ruta_base}/assess_model_in_prod/data_preparation',
         f'{ruta_base}/assess_model_in_prod/modeling',
     ]
 
@@ -27,19 +26,7 @@ def make_directories(ruta_base):  # Pasarle direcotio o l_directorios como argum
             os.makedirs(directorio)
 
 # Data understanding
-def read_data(country):
-    ## Flashscore
-    df_match = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
-    df_match_player = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
-    df_match_odds = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
-    ## Sofifa
-    df_player_sofifa = pd.read_excel(f"p2_data_understanding/data/{country}/df_player_sofifa.xlsx", index_col=0)
-    df_player_fifa_sofifa = pd.read_excel(f"p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx")
-    df_teams_sofifa = pd.read_excel(f"p2_data_understanding/data/{country}/df_teams_sofifa.xlsx", index_col=0)
-    print(df_match.shape, df_match_player.shape, df_match_odds.shape, df_player_sofifa.shape, df_player_fifa_sofifa.shape, df_teams_sofifa.shape)
-    return df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
-
-def select_league_matches(df_match, df_match_player, df_match_odds):
+def select_league_matches(df):
     """
     Filtra partidos seleccionado solo aquellos que son de liga (eliminando partidos de copa)
     """
@@ -50,11 +37,9 @@ def select_league_matches(df_match, df_match_player, df_match_odds):
     l_leagues = list(df_comp[df_comp['is_cup']==0]['id_competition'].values) # l_comp = [481, 485]
     print("Ligas: ", l_leagues)
 
-    df_match = df_match[df_match['id_competition'].isin(l_leagues)]
-    df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
-    df_match_odds = df_match_odds[df_match_odds.index.isin(df_match.index)]
-    print(f"Shape sin copas: {df_match.shape}")
-    return df_match, df_match_player, df_match_odds
+    df = df[df['id_competition'].isin(l_leagues)]
+    print(f"Shape sin copas: {df.shape}")
+    return df
 
 def load_hyperparameters(row_hiper):
 
@@ -103,28 +88,29 @@ def main(df_iteration, country, iteration_date, export: bool = True):
     # Definicion de variables
     df_iteration_prod = pd.DataFrame()
     ruta_base = f"./main_find_best_hyper/data/{country}/{iteration_date}"  # Le agrego assess_model_in_prod
-    make_directories(ruta_base)  # Creo directorios
-    var_pred = 'predicted_result'
+    make_directories(ruta_base)  # Creo directorios 
 
     # Creo objeto de clase DataPreparationNew
     ruta_base_data_prep =f"./main_find_best_hyper/data/{country}/{iteration_date}/assess_model_in_prod/data_preparation" 
-    dp = DataPreparationNew(country=country, ruta_base=ruta_base_data_prep, export=export)
+    dp = DataPreparationNew(country=country, ruta_base=ruta_base_data_prep, export=False)
 
     #______________________________________________ DATA UNDERSTANDING ______________________________________________#  # --> Levanto dfs missing de p6_deployment
     print("\n", "#"*120, "\n", "DATA UNDERSTANDING".center(120), "\n", "#"*120, "\n")
     # Levanto datos
-    df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = read_data(country)  ## Datos "missing"
-    df_old_int = pd.read_excel(f'p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)  ## Datos con los que entrenó el modelo
-    df_old_int = df_old_int.sort_values(by='date', ascending=False)  # Ordeno por fecha ascendente. Funciona? Es entendida como datetime la columna? Si.
+    df_match_odds = pd.read_excel(f'p6_deployment/data/{country}/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
     df_teams = pd.read_excel(f'p3_data_preparation/data/{country}/integrate_data/df_teams.xlsx', index_col=0)
-
+    df_int_missing = pd.read_excel(f'p6_deployment/data/{country}/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)  # tienen que ser /all...
+    
     # Determino la fecha del partido missing mas "viejo"
-    df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    fecha_minima = df_match['date'].min()
+    df_int_missing['date'] = pd.to_datetime(df_int_missing['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime --> estoy casi seguro que no hace falta.
+    fecha_minima = df_int_missing['date'].min()
     print(f"Fecha minima: {fecha_minima}")
 
     # Filtro por competencias. No quiero partidos de copas (e.g. FA cup) solo de la liga
-    df_match, df_match_player, df_match_odds = select_league_matches(df_match, df_match_player, df_match_odds)
+    df_int_missing = select_league_matches(df_int_missing)
+   
+    # Construyo la variable "result"
+    df_int = construct_data.determine_result(df_int_missing, 'result')  # Es necesaria? Creo que si porque en main_next_matches.py no le construyo result...
 
     # Por iteracion
     for idx, row in df_iteration.iterrows():
@@ -140,30 +126,22 @@ def main(df_iteration, country, iteration_date, export: bool = True):
         
         #______________________________________________ DATA PREPARATION ______________________________________________#
         print("DATA PREPARATION".center(120, "-"))
-        # Verifico si es necesario integrar o si ya lo hice
+        path_cons = f'{ruta_base_data_prep}/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx'
         try:
-            df_int = pd.read_excel(f'{ruta_base}/assess_model_in_prod/data_preparation/df_integrated.xlsx', index_col=0)
-            print(len(df_int), len(df_match))
-            if not(len(df_int) == len(df_match)):
-                print("Hay un dataframe integrado pero le faltan partidos.")
-                raise TypeError
-            else:
-                print("Se levanto df ya integrado y se evito integrar nuevamente...")
-                
-        except (FileNotFoundError, TypeError):
-            print("Formateo, limpio e integro datos")
-            df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
-            df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) # uso de main.py puesto que tengo estadisticas y demas
-            df_int = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc 
-            
-            df_match = construct_data.determine_result(df_match, 'result')  # Es necesaria? Creo que si porque en main_next_matches.py no le construyo result...
+            df_cons = pd.read_excel(path_cons, index_col=0)
+            print("Evito construir datos dado que levanto dataframe ya construido")
+        except FileNotFoundError:      
+            # Levanto datos viejos  
+            df_old_int = pd.read_excel(f'p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)  ## Datos con los que entrenó el modelo
+            df_old_int = df_old_int.sort_values(by='date', ascending=False)  # Ordeno por fecha ascendente. Funciona? Es entendida como datetime la columna? Si.
 
-        # Construyo datos usando partidos viejos
-        fecha_limite = fecha_minima - datetime.timedelta(days=d_hiper['n_dias_ult_part'])  # ATENCION! n_dias_ult_part desde el partido missing mas viejo
-        print(f"Fecha limite desde partido missing mas viejo: {fecha_limite}")
-        df_old_int_to_construct = df_old_int[(df_old_int['date'] >= fecha_limite) & (df_old_int['date'] <= fecha_minima)]
-        df_cons = dp.construct_data_new(df_int, df_old_int, df_old_int_to_construct, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
-
+            # Construyo datos usando partidos viejos
+            fecha_limite = fecha_minima - datetime.timedelta(days=d_hiper['n_dias_ult_part'])  # ATENCION! n_dias_ult_part desde el partido missing mas viejo
+            print(f"Fecha limite desde partido missing mas viejo: {fecha_limite}")
+            df_old_int_to_construct = df_old_int[(df_old_int['date'] >= fecha_limite) & (df_old_int['date'] <= fecha_minima)]
+            df_cons = dp.construct_data_new(df_int, df_old_int, df_old_int_to_construct, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
+            df_cons.to_excel(path_cons, index=True)
+       
         # Sigo preparando datos
         df_tag = dp.tag_string_data_to_integer_new(df_cons, tager)
         df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'])
@@ -176,16 +154,16 @@ def main(df_iteration, country, iteration_date, export: bool = True):
         # Realizo predicciones sobre los nuevos partidos
         y_pred_prob = loaded_model.predict_proba(df_treat)
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
-        df_pred_proba = pd.DataFrame({var_pred: y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
+        df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
 
         # Agrego resultado y cuotas a df_match
         df_match_odds_2 = df_match_odds[df_match_odds.index.isin(df_treat.index)]
         df_match_odds_2 = df_match_odds.reindex(df_treat.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-        df_match_2 = df_match.loc[df_match.index.isin(df_treat.index), ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'result']]
+        df_match = df_int.loc[df_int.index.isin(df_treat.index), ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'result']]
 
         # Concateno conjunto de datos
         df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
-        df_predicciones = pd.concat([df_match_2, df_match_odds_2, df_pred_proba], axis=1)
+        df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba], axis=1)
         df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
@@ -220,8 +198,8 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "spain"
-    iteration_date = '2024-05-06'
+    country = "argentina"
+    iteration_date = '2024-05-07'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
 
     # Evaluo modelos en produccion
