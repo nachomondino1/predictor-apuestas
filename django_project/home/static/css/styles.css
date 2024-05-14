@@ -1,0 +1,208 @@
+/* -------------------------------------------- DEFINICION DE VARIABLES -------------------------------------------- */
+:root {
+    /* Colores */
+    --color-primario: #212121;
+    --color-primario-pastel: #AED6F1;
+    --color-secundario:  #F4F6F6;
+    --color-neutro: #212121;
+    --color-de-fondo: #f2f2f2; 
+    /* Tamaños */
+    --header-height: 7vh;
+
+    /* Texto */
+    --font-family: "Outfit", sans-serif;
+    --font-size: 1.3vw;
+    --color: black;
+
+    --margin: 10%;
+}
+
+/* -------------------------------------------- GENERALES? -------------------------------------------- */
+body {
+    font-family: var(--font-family);
+    color: var(--color);
+    font-size: var(--font-size);
+    box-sizing: border-box;
+    text-align: center;
+    background: var(--color-de-fondo);
+
+    display: grid;
+    grid-template-rows: var(--header-height) auto min-content; /* 1 fila para el encabezado, 1 fila para el cuerpo, 1 fila para el pie de página */
+    grid-template-columns: 1fr; /*  2 de margenes y una central */ 
+    min-height: 100vh; /* Para garantizar que la pagina ocupe siempre al menos el 100% del viewport height */
+    width: 100vw;
+}
+
+/* ul {
+    padding: 0 !important;
+} */
+
+a {
+    text-decoration: none;
+    color:black;
+}
+
+/* -------------------------------------------- HEADER SECTION -------------------------------------------- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: var(--header-height);
+    background-color: var(--color-primario);
+
+    position: sticky; /* a diferencia de fixed, mantiene la posicion en el dom */
+    top: 0;
+    z-index: 10; /* para que quede la barra no quede oculta atras del body */
+
+    padding: 0% var(--margin);
+}
+
+/* Boton para abrir menu */
+.header__open-nav-button {
+    font-size: 9vw;
+    position: absolute; /* para que no modifique el espacio en el header */
+    right: var(--margin);
+    color: #fff;
+}
+
+.header .header__checkbox {
+    display: none; /* oculto el checkbox puesto que tengo el menu toggle en su lugar */
+}
+
+/* ## Logo y nombre de la empresa */
+.header__logo-container a {
+    display: flex; /* el logo y el nombre de la empresa en linea */
+    align-items: center;
+    color: #fff;
+}
+
+.header__logo {
+    object-fit: cover;
+    height: calc(var(--header-height) * 0.8);
+    margin-right: 10px;
+    border-radius: 50%;
+}
+
+.header__logo-title {
+    font-size: min(4vw, 36px); 
+}
+
+/* Barra de navegacion */
+.header__navbar {
+    display: none;
+    position: absolute; /* para que no modifique el espacio en el header*/
+    height: 100vh;
+    width: 70vw; 
+    top: var(--header-height);
+    left: 0; /* para que empiece desde la punta izquierda*/
+    z-index: 1;
+    background-color: var(--color-primario);
+}
+
+.header__checkbox:checked ~ .header__navbar {
+    display: flex;  /* Despliego la barra si se hizo click en el menu toggle */
+}
+
+.header__nav-list {
+    display: flex;  /* Para poder distribuir links en la barra de navegacion */
+    flex-direction: column;
+    justify-content: start; 
+    text-align: left;
+    list-style: none;
+
+    margin-left: var(--margin);
+    padding: 0;
+}
+
+.header__nav-item {
+    margin: 3vh;
+    font-size: 2vh;
+}
+
+.header__nav-item a {
+    color: #fff;
+}
+
+.header__nav-item:is(:hover, :focus) {
+    text-decoration: underline #fff;
+    opacity: 0.7;    
+}
+
+
+/* -------------------------------------------- HEADER QUERIES -------------------------------------------- */
+@media only screen and (min-width: 600px) {  /* Esto genera demora en la barra y se nota*/
+    .header {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .header__open-nav-button {
+        display: none; /* Oculto el menu togle en Desktop */
+    }
+    
+    .header__navbar {
+        display: block;
+        position: static; /* para que si ocupe el espacio en el header*/
+
+        /* Reinicio tamaños */
+        width: 60vw; /* TENGO QUE HACER QUE OCUPE EL 100% DE LA PANTALLA */
+        height: var(--header-height);
+
+        align-content: center; /* centra verticalmente el ul en el nav */
+    }
+    .header__nav-list {
+        flex-direction: row;
+        justify-content: right; /* Centra horizontalmente items */
+        align-items: center; /* Centra verticalmente items */
+        margin: 0; /* porque aplico margin en navbar de mobile y queda mal la Desktop... */
+        height: inherit;
+    }
+
+    .header__nav-item {
+        font-size: min(2vw, 24px);
+        margin: 0 2vw; /*Reemplazo margin que tenian los elementos*/
+        text-align: center;
+    }
+}
+
+/* -------------------------------------------- FOOTER SECTION -------------------------------------------- */
+footer {
+    display: grid;
+    grid-template-rows: repeat(3, auto);
+    grid-template-columns: repeat(2, 1fr);
+    background-color: var(--color-neutro);
+    color: white;
+    padding: 0% var(--margin);
+}
+
+.footer__logo-container, .footer__copyright {
+    grid-column: span 2;
+}
+
+.footer__logo-link {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.footer__logo {
+    border-radius: 50%;
+    /*    margin: 0 1rem; ojo que mueve todo...*/
+    height: 3rem;
+}
+
+.footer-navbar-list, .footer-social-media-list {
+    padding: 0; /* no se porque el <ul> viene con padding... no se lo puedo sacar desde el body...*/
+}
+
+.footer-navbar__item, .footer-social-media__item {
+    list-style: none;
+}
+
+.footer-social-media-list img {
+    height: 1rem;
+}
+
+footer a {
+    color: white;
+}

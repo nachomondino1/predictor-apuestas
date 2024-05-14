@@ -1,0 +1,53 @@
+
+/* ---------------------- WEB PAGE: contact.html ("CONTACTO") ---------------------- */
+.form-container {
+    display: flex; /* imagen e inputs en paralelo*/
+    position: relative;
+
+    background-color: #fff;
+    border: 1px solid black;
+    border-radius: 1rem;
+
+    align-items: center;
+    justify-content: space-evenly;
+    flex-wrap: wrap;
+
+    margin: 2rem var(--margin);
+}
+
+.form-contacto {
+    width: 60%;
+    text-align: center;
+}
+
+.form__input {
+    width: 90%;
+    margin-bottom: 1rem;
+    border: none;
+    border-bottom: 3px solid var(--color-primario);
+    background-color: transparent;
+}
+
+.input--mensaje {
+    resize: none;
+    min-height: 10rem;
+}
+
+.input--boton {
+    background-color: var(--color-primario);
+    color: #fff;
+    padding: 0.3rem;
+}
+
+.input--boton:hover {
+    opacity: 0.7;
+}
+
+.form__input:focus {
+    background-color: rgb(209, 209, 209);
+    outline: none;
+}
+
+.form-contacto-imagen img {
+    width: 70%;
+}

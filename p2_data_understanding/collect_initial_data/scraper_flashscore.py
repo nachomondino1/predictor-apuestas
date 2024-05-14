@@ -57,6 +57,11 @@ class FlashscoreCrawler(Crawler):
             print("The season is not a string. Probably it failed the extraction.")
         return season_year
 
+    def click_results_page(self):
+        xpath_button = './/div[@class="container__heading"]//div[@class="tabs__group"]/a[@class="tabs__tab results"]'
+        boton_mostrar = super().extract_tag(xpath=xpath_button, sec_wait=self.SEC_WAIT_MAX*2, print_fail=False)
+        super().click_boton(boton_mostrar)
+
     def click_show_more_matches(self):
         """
         Click en boton "Show more matches" hasta que ya no haya mas. Es decir, carga todos los partidos.
@@ -83,15 +88,19 @@ class FlashscoreCrawler(Crawler):
     
     def extract_id_next_matches(self, n_days):
             
+        import time
         # Extraigo partidos (items) y sus ids --> NO PUDE EXTRAER LOS SVG.. PERO SI EL DIV DE EVENT_TIME... VER 
         l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[@class="sportName soccer"]//div[contains(@class, "event__match--scheduled")]', sec_wait=self.SEC_WAIT_MAX)
+        # print(f"Cantidad de proximos partidos en total: {len(l_items)}")
 
         # Filtro partidos por fecha
         l_items_filt = self.select_items_by_date(l_items, n_days)
+        # print(f"Cantidad de proximos partidos dentro de {n_days}: {len(l_items_filt)}")
 
         # Obtengo ids
         l_ids = [item.get_attribute('id') for item in l_items_filt]
         l_ids_clean = clean_id(l_ids)
+        # print(f"Cantidad de ids extraidos dentro de {n_days}: {len(l_ids_clean)}")
         return l_ids_clean
 
     def extract_match_data(self, next_matches:bool = False):
@@ -484,13 +493,12 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
         df_match_odds: Dataframe.
     """
     # DEFINCION DE PARAMETROS & VARIABLES
-    # warnings.filterwarnings("ignore")
-    crawler = FlashscoreCrawler()
+    crawler = FlashscoreCrawler(headless=True)
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
-    competition_form = competition.lower().replace(" ", "-")  # formateo competition para las rutas de archivo y urls
+    competition_form = competition.lower().replace(".", "").replace(" ", "-")  # formateo competition para las rutas de archivo y urls
     ruta_base = f"./p2_data_understanding/data/{country_form}/data_seg"
 
     # Ingreso a pagina
@@ -515,6 +523,9 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
         crawler.driver.get(url_season)
         season_year = crawler.extract_season_year()
         print(f" {season_year} ".center(120, "-"))
+
+        # Click en hoja "Results"
+        crawler.click_results_page()
 
         # Si ya extraje la season
         check = not check_if_season_already_extracted(ruta_base, competition_form, season_year) if l_ids_already_collected is None else True 
@@ -593,7 +604,7 @@ def check_if_season_already_extracted(ruta_base, competition_form, season_year):
     except:
         return False
 
-def extract_next_matches(id_country, country: str, id_competicion, competition: str, is_cup, n_days): # -> tuple[pd.DataFrame, pd.DataFrame]
+def extract_next_matches(id_country, country: str, id_competicion, competition: str, is_cup, n_days: int): # -> tuple[pd.DataFrame, pd.DataFrame]
     """
     Extraccion de los partidos de los proximos <n_days> dias en la competicion <competition> del pais <country>.
     """
@@ -601,20 +612,20 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     crawler = FlashscoreCrawler(headless=True)
 
-    # Formateo variables para guardado de datos
+    # Formateo variables para construir url
     country_form = country.lower().replace(' ', "-")
     competition_form = competition.lower().replace(" ", "-")  # formateo competition para las rutas de archivo y urls
-
-     # Ingreso a pagina
     url = f'https://www.flashscore.com/football/{country_form}/{competition_form}/fixtures/'
-    crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
     print(f'URL competición: {url}')
 
+    # Ingreso a pagina
+    crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
+
     # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
-    crawler.accept_cookies()   
+    crawler.accept_cookies()  
     season_year = crawler.extract_season_year() 
     print(f" {season_year} ".center(120, "-"))
-    
+
     # Extraigo partidos
     l_ids = crawler.extract_id_next_matches(n_days)
     progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso

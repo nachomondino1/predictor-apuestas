@@ -21,7 +21,7 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
         # Por competition del country
         for i, row in df_comp_pais.iterrows():
 
-            competicion_form = row['competition_flashscore'].lower().replace(" ", "-")
+            competicion_form = row['competition_flashscore'].lower().replace(" ", "-")  # competicion_form = row['competition_sofifa'].lower().replace(" ", "-")
             print(f" Competition: {row['competition_flashscore']} ".center(120, "-"))
 
             # Levanto su dataframe
@@ -92,20 +92,21 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
         if export:
             df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
-def prueba():
-     # Definicion de variables
-    country = "England"
+
+if __name__ == "__main__":
+    # Definicion de variables
+    country = "germany"
     export = True
     competicion, temporada = True, False
     
     # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country]['id_country'].values[0]
+    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
     print(id_country)
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes = ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
+        l_dataframes =  ['df_player_sofifa', 'df_player_fifa_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
         concat_dfs_per_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country
@@ -114,6 +115,3 @@ def prueba():
         l_filenames = ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]
         competition = "premier_league"
         concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export)
-
-if __name__ == "__main__":
-    prueba()

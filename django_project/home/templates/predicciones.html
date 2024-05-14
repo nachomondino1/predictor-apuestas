@@ -9,13 +9,16 @@
     <meta name="author" content="Nombre del autor">
 
     <title> Predicciones | Apuestas deportivas </title>
-    <link rel="icon" href="images/logo.jpeg" type="image/x-icon">
-    <link rel="stylesheet" href="css/normalize.css">
-    <link rel="stylesheet" href="css/styles.css">
-    <title>Calendar</title>
+    {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'images/logo.jpeg' %}" >
+    <link rel="stylesheet" type="text/css"  href="{% static 'css/normalize.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles_predicciones.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <title>Icons</title>
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
 </head>
 
@@ -31,8 +34,8 @@
                 
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
-            <a href="index.html">
-                <img class="header__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+            <a href="{% url 'index' %}">
+                <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
         </div> 
@@ -40,26 +43,21 @@
         <!-- Barra de Navegación -->
         <nav class="header__navbar">
             <ul class="header__nav-list">
-                <li class="header__nav-item"><a href="index.html" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
-                <li class="header__nav-item"><a href="predicciones.html" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
-                <li class="header__nav-item"><a href="about.html" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
-                <li class="header__nav-item"><a href="contact.html" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+                <li class="header__nav-item"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+                <li class="header__nav-item"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+                <li class="header__nav-item"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+                <li class="header__nav-item"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
             </ul>
         </nav>
     </header>  
 
     <div class="main-wrapper">
-        <!--
-        <div class="title">
-            <h1> Predicciones del día </h1>
-        </div>
-        -->
+        
         <!-- Barra lateral de navegacion: Calendario-->
         <aside class="filters">
-            <h3>Filtros</h3>
-    
-            <div class="calendar-container">
+            <!-- <h3>Filtros</h3> -->
 
+            <div class="calendar-container">
                 <h4> Fecha </h4>
                 <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha">
                 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -87,27 +85,64 @@
                     <li class="filters-leagues__item">La Liga</li>
                 </ul>
             </div>
+
+            <div class="ads-container">
+                <h4>Ads</h4>
+                <p>Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quia, quos vitae. Dignissimos facere consectetur id? Cum ea dolore itaque illum sit ut eveniet, omnis nemo mollitia laborum error commodi a!</p>
+            </div>
+
         </aside>
 
         <!-- Partidos del dia -->
         <main class="main">
             <h3>Partidos del dia</h3>
             <div class="matches-container">
-                <!-- 
-                <ul>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                    <li class="match_list__item"></li>
-                </ul>
-                -->
+
+                <ul class="matches_list">
+                    <!-- List Header -->
+                    <li class="matches_list__item header_matches_list"> 
+                        <div class="date">Date</div>
+                        <div class="teams">Teams</div>
+                        <div class="probabilidad_home">Prob. Home</div>
+                        <div class="probabilidad_draw">Prob. Draw</div>
+                        <div class="probabilidad_away">Prob. Away</div>
+                        <div class="result">Resultado</div>
+                    </li>
+
+                    {% for prediction in predictions %}
+                    <li class="matches_list__item"> 
+                        <div class="date">
+                            {{ prediction.date }}
+                        </div>
+
+                        <div class="teams">
+                            <div>
+                                {{ prediction.id_team_home }}
+                            </div>
+                            <div>
+                                {{ prediction.id_team_away }}
+                            </div>
+                        </div>
+                        <div class="probabilidad_home">
+                            {{ prediction.prob_class_1 }}
+                        </div>
+                        <div class="probabilidad_draw">
+                            {{ prediction.prob_class_0 }}
+                        </div>
+                        <div class="probabilidad_away">
+                            {{ prediction.prob_class_2 }}
+                        </div>
+                        <div class="result">
+                            {{ prediction.predicted_result }}
+                        </div>
+                    {% endfor %}
+                </ul>            
             </div>
         </main>
 
         <!-- ADS -->       
-        <aside class="leagues">     
+        <aside class="leagues">
+            <h4> Leagues </h4>    
             <p> Lorem ipsum, dolor sit amet consectetur adipisicing elit. Sit dolorum debitis facere mollitia eveniet alias cumque sed, corporis consequatur ratione, officia eos tempora atque hic commodi nisi nemo. Labore, nihil.
                 Lorem ipsum dolor sit amet consectetur adipisicing elit. Fuga suscipit non id dolores doloribus reprehenderit similique maxime numquam, adipisci pariatur nam esse voluptate tempora, facere atque asperiores quibusdam quas error!
                 Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut odit velit nostrum dolor? Autem ea reiciendis officiis accusamus! Explicabo eum delectus a officia, dolorem veniam rerum quos quas nisi eligendi.
@@ -126,8 +161,8 @@
     <footer>
         <!-- Logo y nombre de la empresa -->
         <div class="footer__logo-container">
-            <a class="footer__logo-link" href="index.html">
-                <img class="footer__logo" src="images/logo.jpeg" alt="Logo de la compañia" title="Logo de la compañia">
+            <a class="footer__logo-link" href="{% url 'index' %}">
+                <img class="footer__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="footer__logo-title">GoalProphet</h2>
             </a>
         </div> 
@@ -135,8 +170,8 @@
         <!-- Enlaces a paginas -->
         <div class="footer-navbar">
             <ul class="footer-navbar-list">
-                <li class="footer-navbar__item"><a href="about.html">Sobre nosotros</a></li>
-                <li class="footer-navbar__item"><a href="contact.html">Contacto</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'about' %}">Sobre nosotros</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'contact' %}">Contacto</a></li>
                 <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
                 <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
             </ul>
@@ -145,8 +180,8 @@
         <!-- Social media -->
         <div class="footer__social-media">
             <ul class="footer-social-media-list">
-                <li class="footer-social-media__item"><a href="#"><img src="images/facebook.png" alt="Facebook"> Facebook</a></li>
-                <li class="footer-social-media__item"><a href="#"><img src="images/gorjeo.png" alt="Twitter"> Twitter</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="{% static 'images/facebook.png' %}" alt="Logo Facebook"> Facebook</a></li>
+                <li class="footer-social-media__item"><a href="#"><img src="{% static 'images/gorjeo.png' %}" alt="Logo Twitter"> Twitter</a></li>
             </ul>
         </div>
 

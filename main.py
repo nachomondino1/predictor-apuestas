@@ -205,7 +205,6 @@ class DataPreparation:
         """
         start = time.time()
         print("\nCleanning data...")
-        # warnings.filterwarnings('ignore')
 
         # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
         print("\nEliminacion de estadisticas irrelevantes")
@@ -225,10 +224,11 @@ class DataPreparation:
         df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
         columns_player_names = list(df_match_player.filter(like='player_name').columns)
         df_match_player = clean_data.prepare_text_columns(df_match_player, l_cols_to_process=columns_player_names)
-     
+        df_match = clean_data.clean_teams_names(df_match)  # una vez que ya aplique el lower()
+
         ## SOFIFA
         ### Dataframe player sofifa (df)
-        df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name'])  # Preaparo texto para integrar
+        df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
         ## Dataframe teams sofifa (df_teams_sofifa)
         df_teams_sofifa = clean_data.prepare_text_columns(df_teams_sofifa, l_cols_to_process=['team_name'])
 
@@ -266,28 +266,30 @@ class DataPreparation:
         start = time.time()
         print("\nIntegrating data...")
 
-        # Creo los dataframes df_teams, df_player, df_coaches de Flashscore.
-        df_teams = create_df_teams(df_match)
-        # df_coaches = create_df_coaches(df_match)
-        df_player = create_df_player(df_match_player)
-        # Agregar si quiero crear otro df como df_stadiums o df_referees
+        # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
+        print("\nIntegrating team's data to df_match...")
+        try:
+            df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
+        except FileNotFoundError:
+            df_teams = create_df_teams(df_match)
+            df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
+        
+        df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
+
+       # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
+        print("\nIntegrating player's data to df_match...")
+        try:
+            df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
+        except FileNotFoundError:
+            df_player = create_df_player(df_match_player)
+            df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+        
+        df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away'] # main_next a veces no tiene coaches.. deeberia copiar antes...
-        cols_to_drop_filt = [col for col in cols_to_drop if col in df_match.columns]
-        df_match = df_match.drop(cols_to_drop_filt, axis=1)
-        # player_name_cols = [col for col in df.columns if 'player_name' in col] # no hace falta pues cuando integro solo uso las columnas id...
-        # df_match_player = df_match.drop(player_name_cols, axis=1)
-
-        # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
-        print("\nIntegrating team's data to df_match...")
-        df_map_teams_fs_so = match_dataframes_by_str_column(df_teams, df_teams_sofifa, column_to_relation='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
-        df_match = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
-
-        # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
-        print("\nIntegrating player's data to df_match...")
-        df_map_players_fs_so = match_dataframes_by_str_column(df_player, df_player_sofifa, column_to_relation="player_name", column_to_integrate='id_player', thr_coincidence_min=90)
-        df = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
+        cols_to_drop_filt = [col for col in cols_to_drop if col in df.columns]
+        df = df.drop(cols_to_drop_filt, axis=1)
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
@@ -295,7 +297,6 @@ class DataPreparation:
         if export:
             df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
             df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
-            # df_coaches.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_coaches.xlsx", index=True)
             df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
             df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_integrated.xlsx', index=True)
@@ -314,41 +315,49 @@ class DataPreparation:
         start = time.time()
         print("\nConstructing data...")
 
-        # Construyo variables: "result" y otras
+        # VARIABLE RESPUESTA
         df = construct_data.determine_result(df, self.var_resp)
-        df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
         df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-     
-        # Construyo date numerica
-        # fecha_referencia = pd.to_datetime('2000-01-01') # Definir la fecha de referencia
-        # df['dias_desde_referencia'] = (df['date'] - fecha_referencia).dt.days  # Calcular los días transcurridos desde la fecha de referencia
-
-        # Construyo variables rendimiento del equipo
-        ## Puntos
+        
+        # VARIABLES HISTORICAS
+        df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
         df = construct_data.determine_points(df)
-        ## Historial entre si
         if not without_h2h:
             df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=True)
             df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=False)
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
 
-        # STATS
         # Determino cuales son las variables stats automaticamente
         stats_columns = construct_data.determine_stats_columns(df)
         print(f"Stats a promediar en ultimos partidos: {stats_columns}")
 
         # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
-        df = construct_data.calculate_dif_col_stats(df, stats_columns, n_days, segun_localia)
-       
-        # PLAYER
-        # Construyo variables de diferencias para las variables promedio de los players
+        for var in stats_columns: # e.g. shots_on_goal
+            print(f"Estadistica a promediar: {var}")
+            
+            # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
+            df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
+            df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+            
+            # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+            not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
+            df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
+            df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
+
+            # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+            not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
+            df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
+            df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
+
+        # Historica de jugadores
         df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia) # Variable para ponderar estadisticas
         df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
-        df = construct_data.calculate_dif_col_players(df)
-    
-        # TEAM
-        ## Rival team de Sofifa
+
+        # VARIABLE DE JUGADORES
+        df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
+
+        # VARIABLE DE EQUIPO
         func = lambda row: 1 if (row['id_team_home_rival_team'] == row['id_team_away']) or (row['id_team_away_rival_team'] == row['id_team_home']) else 0
         df['is_rival_match'] = df.apply(func, axis=1)
         df = df.drop(columns=['id_team_home_rival_team', 'id_team_away_rival_team'], axis=1)
@@ -363,6 +372,7 @@ class DataPreparation:
 
     def tag_string_data_to_integer(self, df: pd.DataFrame, export: bool = True):
         """
+        Conversion de columnas tipo "object" a "integer"
         """
         # Elimino columna 'season'
         df = df.drop(['season'], axis=1)  # Arrooja error TypeError porque tiene tanto str como int en los valores originales y el label solo puede recibir un tipo (str o int). Season tiene valores como "2021" y "2020_2021", los primeros los entiende como int y los segundos como str.
@@ -785,16 +795,13 @@ class Modeling:
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
 
 ##################################################### MAIN #####################################################
-def main():
+def main(country, d_run, export: bool = True):
     """
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    country = 'spain'  # country = str(input("Choose country to extract (e.g. England, Germany, etc): "))
+    data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
-    data_unders, data_prep, modeling = False, False, True
-    export = True
-
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
 
@@ -818,7 +825,7 @@ def main():
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
         df_player_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_sofifa.xlsx', index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx')
+        df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx') #  index_col=0 --> si lo uso falla la integracion porque pone 'id_player' como index
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
 
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
@@ -862,9 +869,8 @@ def main():
         val_size, test_size = 0.125, 0.125
         bal_type = None
         k = 10
-        df_hiper_mod = pd.DataFrame(data={'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}, index=[0])        
+        d_hiper_mod = {'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}
 
-        l_modelos = [LogisticRegression(), RandomForestClassifier()]
         modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
         model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
 
@@ -901,8 +907,9 @@ def main():
         model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
         df_pred, d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
-        # Analizo mas de un modelo
-        # d_best_hiper, model_best_params, d_best_model = mo.select_best_model(l_modelos, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, k=k, export=False)
+        # Construyo dataframe con hiperparametros de Modeling() (incluyendo los de la estrategia de apuesta)
+        d_hiper_mod.update(d_metrics)
+        df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
 
         if export:
             df_hiper_mod.to_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx', index=True)
@@ -910,4 +917,9 @@ def main():
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    main()
+
+    # Definicion de variables
+    country = 'germany'
+    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+
+    main(country, d_params, export=True)
