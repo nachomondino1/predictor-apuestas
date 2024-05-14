@@ -88,11 +88,11 @@ def main(df_iteration, country, iteration_date, export: bool = True):
     # Definicion de variables
     df_iteration_prod = pd.DataFrame()
     ruta_base = f"./main_find_best_hyper/data/{country}/{iteration_date}"  # Le agrego assess_model_in_prod
+    ruta_base_data_prep =f"./main_find_best_hyper/data/{country}/{iteration_date}/assess_model_in_prod/data_preparation" 
     make_directories(ruta_base)  # Creo directorios 
 
     # Creo objeto de clase DataPreparationNew
-    ruta_base_data_prep =f"./main_find_best_hyper/data/{country}/{iteration_date}/assess_model_in_prod/data_preparation" 
-    dp = DataPreparationNew(country=country, ruta_base=ruta_base_data_prep, export=False)
+    dp = DataPreparationNew(country=country, export=False)
 
     #______________________________________________ DATA UNDERSTANDING ______________________________________________#  # --> Levanto dfs missing de p6_deployment
     print("\n", "#"*120, "\n", "DATA UNDERSTANDING".center(120), "\n", "#"*120, "\n")
@@ -135,13 +135,17 @@ def main(df_iteration, country, iteration_date, export: bool = True):
             df_old_int = pd.read_excel(f'p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)  ## Datos con los que entrenó el modelo
             df_old_int = df_old_int.sort_values(by='date', ascending=False)  # Ordeno por fecha ascendente. Funciona? Es entendida como datetime la columna? Si.
 
-            # Construyo datos usando partidos viejos
-            fecha_limite = fecha_minima - datetime.timedelta(days=d_hiper['n_dias_ult_part'])  # ATENCION! n_dias_ult_part desde el partido missing mas viejo
-            print(f"Fecha limite desde partido missing mas viejo: {fecha_limite}")
+            # Filto partidos viejos seleccionandos los ultimos partidos
+            days_to_filt = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
+            fecha_limite = fecha_minima - datetime.timedelta(days=days_to_filt)  # ATENCION! n_dias_ult_part desde el partido missing mas viejo
             df_old_int_to_construct = df_old_int[(df_old_int['date'] >= fecha_limite) & (df_old_int['date'] <= fecha_minima)]
+            print(f"n_dias_ult_part: {d_hiper['n_dias_ult_part']} ; Segun localia: {d_hiper['segun_localia']} --> days_to_filt: {days_to_filt}" )
+            print(f"Fecha limite desde partido missing mas viejo: {fecha_limite}")
+
+            # Construyo datos usando partidos viejos
             df_cons = dp.construct_data_new(df_int, df_old_int, df_old_int_to_construct, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
             df_cons.to_excel(path_cons, index=True)
-       
+        
         # Sigo preparando datos
         df_tag = dp.tag_string_data_to_integer_new(df_cons, tager)
         df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'])

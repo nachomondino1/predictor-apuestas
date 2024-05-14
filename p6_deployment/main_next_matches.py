@@ -146,13 +146,12 @@ class DataUnderstandingNew():
 
 class DataPreparationNew(DataPreparation):
 
-    def __init__(self, country, ruta_base: str, export: bool = True):
-
-        self.ruta_base = ruta_base
+    def __init__(self, country, export: bool = True):
+        self.country = country
+        self.ruta_base = f"./p6_deployment/data/{country}/data_preparation"
         self.export = export
         self.make_directories()
         super().__init__(country)
-
 
     def make_directories(self):  # Pasarle direcotio o l_directorios como argumento...
         l_directorios = [
@@ -626,7 +625,7 @@ def load_modeling_hyperparameters(country, n_model, ruta_base):
     d['curva_b'] = param2 if d['curva'] == 'linear' else None
     d['curva_p1'] = eval(param1) if d['curva'] != 'linear' else None
     d['curva_p2'] = eval(param2) if d['curva'] != 'linear' else None
- 
+
     print("Hiperparametros cargados:")
     for key, value in d.items():
         print(f'\t {key}: {value}')
@@ -713,8 +712,8 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
-    dp_missing = DataPreparation(country=country)
-    
+    dp = DataPreparationNew(country=country, export=export) # Creo objeto de clase DataPreparation
+
     #______________________________________________ MISSING DATA ______________________________________________#
     print("\n", "#"*120, "\n", "MISSING DATA".center(120), "\n", "#"*120, "\n")
     if d_run['run_missing']: 
@@ -739,14 +738,13 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
                 concat_and_export_all_missing(df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH=f"./p6_deployment/data/{country}/missing/data_understanding/all")
 
             # Preparo datos
-            df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp_missing.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
-            df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp_missing.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
-            df_integrated_missing = dp_missing.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
+            df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
+            df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
+            df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
             # df_integrated_missing = format_data.convert_columns_to_float(df_integrated_missing)  # Formateo estadisticas a float (no se por que son object)
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_int_with_missing = pd.concat([df_integrated, df_integrated_missing], axis=0)
-
 
             # Levanto partidos missing ya integrados
             try:
@@ -778,8 +776,6 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
     # Defino variables  # Podria llevarlo despues de Data Understanding solo si no usase "comp_to_select" en la extraccion para filtrar las competencias a extraer.
     n_model, iteration_date_dt = read_data_of_best_model(country)
     ruta_base = f"./main_find_best_hyper/data/{country}/{iteration_date_dt}"
-    ruta_base_data_prep = f"./p6_deployment/data/{country}/data_preparation"
-    dp = DataPreparationNew(country=country, ruta_base=ruta_base_data_prep, export=export) # Creo objeto de clase DataPreparation
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, ruta_base)
@@ -840,7 +836,10 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_old_int_to_fill)
 
         # Construyo datos usando "df_old_int" para poder construir variables historicas
-        fecha_limite = datetime.datetime.now() - datetime.timedelta(days=d_hiper['n_dias_ult_part']) 
+        days_to_filt = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
+        print(f"n_dias_ult_part: {d_hiper['n_dias_ult_part']} ; Segun localia: {d_hiper['segun_localia']} --> days_to_filt: {days_to_filt}" )
+        fecha_minima = df['date'].min()
+        fecha_limite = fecha_minima - datetime.timedelta(days=days_to_filt) 
         df_old_int_to_construct = df_old_int[df_old_int['date'] >= fecha_limite]  # Filtro df para seleccionar ultimos x dias. Minimizo tiempo de computo
         df = dp.construct_data_new(df, df_old_int, df_old_int_to_construct, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
         
@@ -902,7 +901,7 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "germany"
+    country = "england"
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
