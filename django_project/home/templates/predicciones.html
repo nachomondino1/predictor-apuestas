@@ -59,28 +59,17 @@
 
     <div class="main-wrapper">
         
-        <!-- Barra lateral de navegacion: Calendario-->
+        <!-- Barra lateral de navegacion-->
         <aside class="filters">
             <!-- <h3>Filtros</h3> -->
 
             <div class="calendar-container">
                 <h4> Fecha </h4>
-                <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha">
-                <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-                <script>
-                    flatpickr("#fechaSeleccionada", {
-                        dateFormat: "d-m-Y", // Formato de fecha
-                        minDate: "01-01-2024", // Fecha mínima permitida (opcional)
-                        maxDate: new Date().fp_incr(3), // Fecha máxima permitida (opcional)
-                        onChange: function(selectedDates, dateStr, instance) {
-                            // Aquí puedes realizar acciones cuando se selecciona una fecha
-                            console.log("Fecha seleccionada:", dateStr);
-                            // Puedes agregar aquí la lógica para cargar los datos según la fecha seleccionada
-                        }
-                    });
-                </script>                
+                <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha" value="{{ fecha_seleccionada }}"> 
+                <!-- <p>Fecha Seleccionada: {{ fecha_seleccionada }} </p> -->
             </div>
-
+            
+            <!-- Ligas -->
             <div class="leagues-container">
                 <h4> Leagues </h4>
                 <ul class="filters-leagues__list">
@@ -92,6 +81,7 @@
                 </ul>
             </div>
 
+            <!-- ADS -->
             <div class="ads-container">
                 <h4>Ads</h4>
                 <p>Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quia, quos vitae. Dignissimos facere consectetur id? Cum ea dolore itaque illum sit ut eveniet, omnis nemo mollitia laborum error commodi a!</p>
@@ -197,6 +187,8 @@
         </div>
 
     </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script type="text/javascript" src="{% static 'javascript/script.js' %}"></script>
 
 </body>
