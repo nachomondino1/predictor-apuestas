@@ -6,12 +6,15 @@
     --color-secundario:  #F4F6F6;
     --color-neutro: #212121;
     --color-de-fondo: #f2f2f2; 
+
     /* Tamaños */
     --header-height: 7vh;
 
     /* Texto */
     --font-family: "Outfit", sans-serif;
-    --font-size: 1.3vw;
+    --font-size: min(14px, 1.3vw);
+    --font-size-header: min(1.5vw, 18px);
+    --font-size-header-logo: min(4vw, 30px);
     --color: black;
 
     --margin: 10%;
@@ -33,9 +36,10 @@ body {
     width: 100vw;
 }
 
-/* ul {
-    padding: 0 !important;
-} */
+ul {
+    margin: 0;
+    padding: 0;
+}
 
 a {
     text-decoration: none;
@@ -44,29 +48,22 @@ a {
 
 /* -------------------------------------------- HEADER SECTION -------------------------------------------- */
 .header {
+    /* Alineacion */
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    height: var(--header-height);
-    background-color: var(--color-primario);
+    align-items: center;  /* centro verticalmente */
 
+    /* Posicion */
     position: sticky; /* a diferencia de fixed, mantiene la posicion en el dom */
     top: 0;
     z-index: 10; /* para que quede la barra no quede oculta atras del body */
-
+    
+    /* Tamaño */
+    height: var(--header-height);
     padding: 0% var(--margin);
-}
 
-/* Boton para abrir menu */
-.header__open-nav-button {
-    font-size: 9vw;
-    position: absolute; /* para que no modifique el espacio en el header */
-    right: var(--margin);
-    color: #fff;
-}
-
-.header .header__checkbox {
-    display: none; /* oculto el checkbox puesto que tengo el menu toggle en su lugar */
+    /* Color */
+    background-color: var(--color-primario);
 }
 
 /* ## Logo y nombre de la empresa */
@@ -74,53 +71,77 @@ a {
     display: flex; /* el logo y el nombre de la empresa en linea */
     align-items: center;
     color: #fff;
+    transition: scale 0.3s;
 }
 
-.header__logo {
+.header__logo-image {
     object-fit: cover;
     height: calc(var(--header-height) * 0.8);
+    width: auto;
     margin-right: 10px;
     border-radius: 50%;
 }
 
+.header__logo-container a:hover {
+    scale: 1.1;
+}
+
 .header__logo-title {
-    font-size: min(4vw, 36px); 
+    font-size: var(--font-size-header-logo); 
 }
 
-/* Barra de navegacion */
-.header__navbar {
-    display: none;
-    position: absolute; /* para que no modifique el espacio en el header*/
-    height: 100vh;
-    width: 70vw; 
-    top: var(--header-height);
-    left: 0; /* para que empiece desde la punta izquierda*/
-    z-index: 1;
-    background-color: var(--color-primario);
-}
-
-.header__checkbox:checked ~ .header__navbar {
-    display: flex;  /* Despliego la barra si se hizo click en el menu toggle */
-}
-
+/* Barra de navegacion MOBILE*/
 .header__nav-list {
-    display: flex;  /* Para poder distribuir links en la barra de navegacion */
-    flex-direction: column;
-    justify-content: start; 
-    text-align: left;
+    /* Alineacion */
+    display: flex;
+    justify-content: flex-end; /* Alinea todo al final de la direccion flex, en este caso, al final de la linea, es como un right=0 */
+    align-items: center; /* centrar verticalmente */
+
+    /* Tamaño */
+    width: 100%;
+
+    /* Otro */
     list-style: none;
-
-    margin-left: var(--margin);
-    padding: 0;
 }
 
-.header__nav-item {
-    margin: 3vh;
-    font-size: 2vh;
-}
-
-.header__nav-item a {
+.header__nav-list a {
     color: #fff;
+    padding: 0 15px; /* espacio lateral entre items */
+}
+
+.header__nav-item:hover {
+    opacity: 0.7;
+}
+
+.mobile-navbar {
+    /* Alineacion */
+    display: none;
+    flex-direction: column;
+    justify-content: start;
+    text-align: left;
+
+    /* Posicion */
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+
+    /* Tamaño */
+    height: 100vh;
+    width: 0%;
+    transition: width 0.5s ease; /* Agregamos una transición suave a la propiedad width */
+    overflow-x: hidden; /* Las palabras no salen de la caja al hacer la transicion */
+
+    /* Color */
+    background-color: rgb(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+}
+
+.mobile-navbar li {
+    margin-left: var(--margin);
+    margin-top: 3vh;
+    font-size: 3vh;
+    width: 100%;
 }
 
 .header__nav-item:is(:hover, :focus) {
@@ -128,42 +149,25 @@ a {
     opacity: 0.7;    
 }
 
+.menu-toggle {
+    display: block;
+}
+
+.hideOnMobile {
+    display: none;
+}
 
 /* -------------------------------------------- HEADER QUERIES -------------------------------------------- */
-@media only screen and (min-width: 600px) {  /* Esto genera demora en la barra y se nota*/
-    .header {
-        display: flex;
-        flex-direction: row;
+@media only screen and (min-width: 800px) {
+    .hideOnDesktop {
+        display: none !important; /* tuve que usar important porque sino js la deja abierta */
     }
 
-    .header__open-nav-button {
-        display: none; /* Oculto el menu togle en Desktop */
-    }
-    
-    .header__navbar {
+    .hideOnMobile {
         display: block;
-        position: static; /* para que si ocupe el espacio en el header*/
-
-        /* Reinicio tamaños */
-        width: 60vw; /* TENGO QUE HACER QUE OCUPE EL 100% DE LA PANTALLA */
-        height: var(--header-height);
-
-        align-content: center; /* centra verticalmente el ul en el nav */
-    }
-    .header__nav-list {
-        flex-direction: row;
-        justify-content: right; /* Centra horizontalmente items */
-        align-items: center; /* Centra verticalmente items */
-        margin: 0; /* porque aplico margin en navbar de mobile y queda mal la Desktop... */
-        height: inherit;
-    }
-
-    .header__nav-item {
-        font-size: min(2vw, 24px);
-        margin: 0 2vw; /*Reemplazo margin que tenian los elementos*/
-        text-align: center;
     }
 }
+
 
 /* -------------------------------------------- FOOTER SECTION -------------------------------------------- */
 footer {

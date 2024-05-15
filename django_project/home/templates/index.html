@@ -24,32 +24,37 @@
 
 <!-- Contenido de la pagina -->
 <body>
+
     <!-- Encabezado -->
     <header class="header">
 
-        <!-- Boton para abrir menú -->
-        <input type="checkbox" class="header__checkbox" id="menu-toggle">
-        <label for="menu-toggle" class="header__open-nav-button" role="button"><i class="fas fa-bars"></i></label>
-        
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
             <a href="{% url 'index' %}">
-                <div class="logo-container">
-                    <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
-                </div>
+                <img class="header__logo-image" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
         </div> 
 
         <!-- Barra de Navegación -->
         <nav class="header__navbar">
-            <ul class="header__nav-list">
+            <!-- MOBILE -->
+            <ul class="header__nav-list mobile-navbar hideOnDesktop" id="mobile-navbar">
+                <li onclick=closeSidebar() class="header__nav-item"><a><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></a></li>
                 <li class="header__nav-item"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
                 <li class="header__nav-item"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
                 <li class="header__nav-item"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
                 <li class="header__nav-item"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+            </ul>  
+            <!-- DESKTOP -->
+            <ul class="header__nav-list desktop-navbar" id="desktop-navbar">
+                <li class="header__nav-item hideOnMobile"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+                <li class="header__nav-item hideOnMobile"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+                <li class="header__nav-item hideOnMobile"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+                <li class="header__nav-item hideOnMobile"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+                <li onclick=openSidebar() class="header__nav-item menu-toggle hideOnDesktop"><a><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368"><path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></svg></a></li>
             </ul>
-        </nav>
+        </nav> 
     </header>  
 
     <div class="index-container">
@@ -96,5 +101,7 @@
         </div>
     </footer>
 
+    <!-- Scripts de JavaScript -->
+    <script type="text/javascript" src="{% static 'javascript/script.js' %}"></script>
 </body>
 </html>

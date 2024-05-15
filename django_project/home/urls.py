@@ -28,10 +28,12 @@ urlpatterns = [
     # path('predictions/', views.PredictionList.as_view()),
     # path('predictions/<str:pk>/', views.PredictionDetail.as_view()) # <str:id> <str:team_name> <str:id_match>
 ]
- """
+
+"""
 urlpatterns = [
     path('', include(router.urls)),
     path('hello/', views.say_hello),
     path('predicciones/', views.PredictionViewSet.as_view({'get': 'list'})),
 >>>>>>> staging
 ]
+"""
