@@ -27,54 +27,49 @@
     <!-- Encabezado -->
     <header class="header">
 
-        <!-- Boton para abrir menú -->
-        <input type="checkbox" class="header__checkbox" id="menu-toggle">
-        <label for="menu-toggle" class="header__open-nav-button" role="button"><i class="fas fa-bars"></i></label>
-        
-                
         <!-- Logo y nombre de la empresa -->
         <div class="header__logo-container">
             <a href="{% url 'index' %}">
-                <img class="header__logo" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
+                <img class="header__logo-image" src="{% static 'images/logo.jpeg' %}" alt="Logo de la compañia" title="Logo de la compañia">
                 <h2 class="header__logo-title">GoalProphet</h2>
             </a>
         </div> 
 
-        <!-- Barra de Navegación -->
-        <nav class="header__navbar">
-            <ul class="header__nav-list">
-                <li class="header__nav-item"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
-                <li class="header__nav-item"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
-                <li class="header__nav-item"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
-                <li class="header__nav-item"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
-            </ul>
-        </nav>
+    <!-- Barra de Navegación -->
+    <nav class="header__navbar">
+        <!-- MOBILE -->
+        <ul class="header__nav-list mobile-navbar hideOnDesktop" id="mobile-navbar">
+            <li onclick=closeSidebar() class="header__nav-item"><a><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></a></li>
+            <li class="header__nav-item"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+            <li class="header__nav-item"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+            <li class="header__nav-item"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+            <li class="header__nav-item"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+        </ul>  
+        <!-- DESKTOP -->
+        <ul class="header__nav-list desktop-navbar" id="desktop-navbar">
+            <li class="header__nav-item hideOnMobile"><a href="{% url 'index' %}" target="_self"> <i class="fa-solid fa-house"></i> Inicio</a></li>
+            <li class="header__nav-item hideOnMobile"><a href="{% url 'predicciones' %}" target="_self"><i class="fa fa-futbol-o" aria-hidden="true"></i> Predicciones</a></li>
+            <li class="header__nav-item hideOnMobile"><a href="{% url 'about' %}" target="_self"><i class="fa fa-users" aria-hidden="true"></i> Sobre Nosotros</a></li>
+            <li class="header__nav-item hideOnMobile"><a href="{% url 'contact' %}" target="_self"><i class="fas fa-envelope"></i> Contacto</a></li>
+            <li onclick=openSidebar() class="header__nav-item menu-toggle hideOnDesktop"><a><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368"><path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></svg></a></li>
+        </ul>
+    </nav> 
+        
     </header>  
 
     <div class="main-wrapper">
         
-        <!-- Barra lateral de navegacion: Calendario-->
-        <aside class="filters">
+        <!-- Barra lateral de navegacion-->
+        <aside class="aside-izquierda">
             <!-- <h3>Filtros</h3> -->
 
             <div class="calendar-container">
                 <h4> Fecha </h4>
-                <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha">
-                <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-                <script>
-                    flatpickr("#fechaSeleccionada", {
-                        dateFormat: "d-m-Y", // Formato de fecha
-                        minDate: "01-01-2024", // Fecha mínima permitida (opcional)
-                        maxDate: new Date().fp_incr(3), // Fecha máxima permitida (opcional)
-                        onChange: function(selectedDates, dateStr, instance) {
-                            // Aquí puedes realizar acciones cuando se selecciona una fecha
-                            console.log("Fecha seleccionada:", dateStr);
-                            // Puedes agregar aquí la lógica para cargar los datos según la fecha seleccionada
-                        }
-                    });
-                </script>                
+                <input type="text" id="fechaSeleccionada" placeholder="Selecciona la fecha" value="{{ fecha_seleccionada }}"> 
+                <!-- <p>Fecha Seleccionada: {{ fecha_seleccionada }} </p> -->
             </div>
-
+            
+            <!-- Ligas -->
             <div class="leagues-container">
                 <h4> Leagues </h4>
                 <ul class="filters-leagues__list">
@@ -86,9 +81,11 @@
                 </ul>
             </div>
 
+            <!-- ADS -->
             <div class="ads-container">
-                <h4>Ads</h4>
-                <p>Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quia, quos vitae. Dignissimos facere consectetur id? Cum ea dolore itaque illum sit ut eveniet, omnis nemo mollitia laborum error commodi a!</p>
+                <div class="ad_image">
+                    <img src="{% static 'images/ad.jpeg' %}">
+                </div>
             </div>
 
         </aside>
@@ -141,19 +138,12 @@
         </main>
 
         <!-- ADS -->       
-        <aside class="leagues">
-            <h4> Leagues </h4>    
-            <p> Lorem ipsum, dolor sit amet consectetur adipisicing elit. Sit dolorum debitis facere mollitia eveniet alias cumque sed, corporis consequatur ratione, officia eos tempora atque hic commodi nisi nemo. Labore, nihil.
-                Lorem ipsum dolor sit amet consectetur adipisicing elit. Fuga suscipit non id dolores doloribus reprehenderit similique maxime numquam, adipisci pariatur nam esse voluptate tempora, facere atque asperiores quibusdam quas error!
-                Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut odit velit nostrum dolor? Autem ea reiciendis officiis accusamus! Explicabo eum delectus a officia, dolorem veniam rerum quos quas nisi eligendi.
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Voluptates vero delectus excepturi optio cum repellat alias earum, incidunt harum, labore aut? Aliquam libero facilis exercitationem dolore repellendus tenetur unde nostrum!
-                Lorem ipsum dolor sit amet consectetur adipisicing elit. Accusantium numquam cumque eligendi eum dolorem, vel similique id tempore quae enim. Placeat suscipit, nobis dolores a qui aperiam commodi tempora perspiciatis.
-                Lorem ipsum dolor sit amet consectetur adipisicing elit. Sit doloremque est rem quos voluptatibus minima deleniti commodi porro autem repellendus? Quo itaque iste dolorum dolores dolore illum architecto voluptatibus reprehenderit!
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Aut corrupti inventore aliquam qui, eius quidem, iusto hic neque iure, at excepturi consequatur recusandae error reiciendis nesciunt esse laborum ipsam distinctio.
-                Lorem ipsum dolor, sit amet consectetur adipisicing elit. Aut iusto minima quibusdam nostrum illo qui eaque assumenda, accusamus, at laboriosam, in molestias ex! Corporis omnis beatae distinctio. Odio, soluta porro?
-                Lorem ipsum dolor, sit amet consectetur adipisicing elit. Necessitatibus debitis possimus dignissimos quaerat, vel nesciunt blanditiis recusandae alias, exercitationem quis qui et deserunt. Expedita id rem obcaecati, hic molestias nihil!
-                Lorem ipsum dolor sit, amet consectetur adipisicing elit. Similique rerum alias explicabo dolor quam, quod ipsam? Rerum expedita odio vitae esse voluptates, perferendis deserunt? Sequi aliquid doloribus id quisquam error?
-                Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quisquam rem eos saepe. Nisi, fugiat recusandae. Corporis beatae laborum libero aspernatur. Eaque, fugiat ex? Animi praesentium itaque hic? Adipisci, numquam totam!</p>
+        <aside class="aside-derecha">
+            <div class="ads-container">
+                <div class="ad_image">
+                    <img src="{% static 'images/ad.jpeg' %}">
+                </div>
+            </div>
         </aside>
     </div>
 
@@ -172,8 +162,8 @@
             <ul class="footer-navbar-list">
                 <li class="footer-navbar__item"><a href="{% url 'about' %}">Sobre nosotros</a></li>
                 <li class="footer-navbar__item"><a href="{% url 'contact' %}">Contacto</a></li>
-                <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
-                <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'legal' %}">Política de privacidad</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'legal' %}">Términos y condiciones</a></li>
             </ul>
         </div>
 
@@ -191,6 +181,9 @@
         </div>
 
     </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script type="text/javascript" src="{% static 'javascript/script.js' %}"></script>
 
 </body>
 </html>

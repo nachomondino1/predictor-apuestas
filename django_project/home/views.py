@@ -173,10 +173,28 @@ class PredictionViewSet(ModelViewSet):
 def index(request):
     return render(request, 'index.html')
 
+
+from datetime import datetime, timedelta
+
 def predicciones(request):
     prob_home = ExpressionWrapper(F('prob_home_bm') * 100, output_field=models.IntegerField())
+    
     queryset = Prediction.objects.annotate(prob_home=prob_home)
-    return render(request, 'predicciones.html', {"name": "Caro & Nacho Co", "predictions": queryset})
+    
+    # Si se proporciona una fecha seleccionada, filtrar por ella
+    fecha_seleccionada = request.GET.get('fechaSeleccionada')
+    if fecha_seleccionada:
+        fecha_seleccionada = datetime.strptime(fecha_seleccionada, '%d-%m-%Y')
+        fecha_siguiente = fecha_seleccionada + timedelta(days=1)  # Añadir un día para el rango de fecha siguiente
+        queryset = queryset.filter(date__gte=fecha_seleccionada, date__lt=fecha_siguiente)        # queryset = queryset.filter(date=fecha_seleccionada)
+    else:
+        # Si no hay fecha seleccionada, usar la fecha actual
+        fecha_seleccionada = datetime.now()
+    
+    # Formatear la fecha seleccionada en el formato deseado
+    fecha_seleccionada_formatted = fecha_seleccionada.strftime('%d-%m-%Y')   # Es FUNDAMENTAL para que el codigo HTML reciba la fecha formateada y lo ponga como el value del input
+    return render(request, 'predicciones.html', {"name": "Caro & Nacho Co", "predictions": queryset, "fecha_seleccionada": fecha_seleccionada_formatted})
+
 
 def about(request):
     return render(request, 'about.html')
@@ -184,7 +202,9 @@ def about(request):
 def contact(request):
     return render(request, 'contact.html')
 
-  
+def legal(request):
+    return render(request, 'legal.html')
+
 
 class ImageViewSet(ModelViewSet):
     serializer_class = ImageSerializer

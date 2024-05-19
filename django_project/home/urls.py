@@ -24,14 +24,17 @@ urlpatterns = [
     path('predicciones/', views.predicciones, name='predicciones'), # path('predicciones/', views.predicciones, name='predicciones'),
     path('about/', views.about, name='about'),
     path('contact/', views.contact, name='contact'),
+    path('legal/', views.legal, name='legal'),
     # path('hello/', views.say_hello),
     # path('predictions/', views.PredictionList.as_view()),
     # path('predictions/<str:pk>/', views.PredictionDetail.as_view()) # <str:id> <str:team_name> <str:id_match>
 ]
- """
+
+"""
 urlpatterns = [
     path('', include(router.urls)),
     path('hello/', views.say_hello),
     path('predicciones/', views.PredictionViewSet.as_view({'get': 'list'})),
 >>>>>>> staging
 ]
+"""
