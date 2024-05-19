@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,9 +15,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
+</head>
+
 <body>
 
-    <!-- Encabezado -->
+    <!-- ENCABEZADO -->
     <header class="header">
 
         <!-- Logo y nombre de la empresa -->
@@ -49,6 +52,7 @@
         
     </header>  
 
+    <!-- MAIN -->
     <div class="form-container">
 
         <div class="form-contacto-imagen">
@@ -78,7 +82,7 @@
 
     </div>
 
-    <!-- Pie de pagina -->
+    <!-- PIE DE PAGINA -->
     <footer>
         <!-- Logo y nombre de la empresa -->
         <div class="footer__logo-container">
@@ -93,8 +97,8 @@
             <ul class="footer-navbar-list">
                 <li class="footer-navbar__item"><a href="{% url 'about' %}">Sobre nosotros</a></li>
                 <li class="footer-navbar__item"><a href="{% url 'contact' %}">Contacto</a></li>
-                <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
-                <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'legal' %}">Política de privacidad</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'legal' %}">Términos y condiciones</a></li>
             </ul>
         </div>
 
@@ -111,6 +115,8 @@
             <p>&copy; 2024 Football Predictions. Todos los derechos reservados.</p>
         </div>
     </footer>
+
+    <!-- JAVASCRIPT SCRIPTS -->
     <script type="text/javascript" src="{% static 'javascript/script.js' %}"></script>
 </body>
 </html>

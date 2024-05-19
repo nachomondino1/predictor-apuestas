@@ -16,6 +16,7 @@
     <script src="https://kit.fontawesome.com/f30352a5c7.js" crossorigin="anonymous"></script>
 
 </head>
+
 <body>
     <!-- Encabezado -->
     <header class="header">
@@ -120,8 +121,8 @@
             <ul class="footer-navbar-list">
                 <li class="footer-navbar__item"><a href="{% url 'about' %}">Sobre nosotros</a></li>
                 <li class="footer-navbar__item"><a href="{% url 'contact' %}">Contacto</a></li>
-                <li class="footer-navbar__item"><a href="#">Política de privacidad</a></li>
-                <li class="footer-navbar__item"><a href="#">Términos y condiciones</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'legal' %}">Política de privacidad</a></li>
+                <li class="footer-navbar__item"><a href="{% url 'legal' %}">Términos y condiciones</a></li>
             </ul>
         </div>
 
@@ -139,6 +140,7 @@
         </div>
     </footer>
 
+    <!-- Javascript scripts -->
     <script type="text/javascript" src="{% static 'javascript/script.js' %}"></script>
 </body>
 </html>

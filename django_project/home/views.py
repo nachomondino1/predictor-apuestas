@@ -202,7 +202,9 @@ def about(request):
 def contact(request):
     return render(request, 'contact.html')
 
-  
+def legal(request):
+    return render(request, 'legal.html')
+
 
 class ImageViewSet(ModelViewSet):
     serializer_class = ImageSerializer

@@ -1,44 +1,54 @@
 /* -------------------------------------------- DEFINICION DE VARIABLES -------------------------------------------- */
 :root {
-    /* Colores */
+    /* Box model */
+    --header-height: 7vh;
+    --side-margin: 10%; /* Se entiende a lo largo de todos los CSS, no se como */
+    --vertical-margin: 3%;
+
+    /* Background Colors */
     --color-primario: #212121;
     --color-primario-pastel: #AED6F1;
     --color-secundario:  #F4F6F6;
     --color-neutro: #212121;
     --color-de-fondo: #f2f2f2; 
-
-    /* Tamaños */
-    --header-height: 7vh;
-
-    /* Texto */
+    
+    /* Font */
     --font-family: "Outfit", sans-serif;
     --font-size: min(14px, 1.3vw);
     --font-size-header: min(1.5vw, 18px);
     --font-size-header-logo: min(4vw, 30px);
     --color: black;
-
-    --margin: 10%;
 }
 
 /* -------------------------------------------- GENERALES? -------------------------------------------- */
 body {
-    font-family: var(--font-family);
-    color: var(--color);
-    font-size: var(--font-size);
-    box-sizing: border-box;
-    text-align: center;
-    background: var(--color-de-fondo);
-
+    /* Display */
     display: grid;
-    grid-template-rows: var(--header-height) auto min-content; /* 1 fila para el encabezado, 1 fila para el cuerpo, 1 fila para el pie de página */
+    grid-template-rows: var(--header-height) auto auto; /* 1 fila para el encabezado, 1 fila para el cuerpo, 1 fila para el pie de página */
     grid-template-columns: 1fr; /*  2 de margenes y una central */ 
+
+    /* Box model */
     min-height: 100vh; /* Para garantizar que la pagina ocupe siempre al menos el 100% del viewport height */
     width: 100vw;
+    box-sizing: border-box;
+
+    /* Font */
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    text-align: center;
+    color: var(--color);
+
+    /* Color */
+    background: var(--color-de-fondo);
 }
 
 ul {
     margin: 0;
     padding: 0;
+}
+
+li {
+    list-style: none;
 }
 
 a {
@@ -48,19 +58,19 @@ a {
 
 /* -------------------------------------------- HEADER SECTION -------------------------------------------- */
 .header {
-    /* Alineacion */
+    /* Display & Position */
     display: flex;
-    justify-content: space-between;
-    align-items: center;  /* centro verticalmente */
-
-    /* Posicion */
     position: sticky; /* a diferencia de fixed, mantiene la posicion en el dom */
     top: 0;
     z-index: 10; /* para que quede la barra no quede oculta atras del body */
     
-    /* Tamaño */
+    /* Alineación */
+    justify-content: space-between;
+    align-items: center;  /* centro verticalmente */
+
+    /* Box model */
     height: var(--header-height);
-    padding: 0% var(--margin);
+    padding: 0% var(--side-margin);
 
     /* Color */
     background-color: var(--color-primario);
@@ -78,7 +88,7 @@ a {
     object-fit: cover;
     height: calc(var(--header-height) * 0.8);
     width: auto;
-    margin-right: 10px;
+    margin-right: 1vw;
     border-radius: 50%;
 }
 
@@ -92,12 +102,14 @@ a {
 
 /* Barra de navegacion MOBILE*/
 .header__nav-list {
-    /* Alineacion */
+    /* Display */
     display: flex;
+
+    /* Alineación */
     justify-content: flex-end; /* Alinea todo al final de la direccion flex, en este caso, al final de la linea, es como un right=0 */
     align-items: center; /* centrar verticalmente */
 
-    /* Tamaño */
+    /* Box model */
     width: 100%;
 
     /* Otro */
@@ -106,7 +118,7 @@ a {
 
 .header__nav-list a {
     color: #fff;
-    padding: 0 15px; /* espacio lateral entre items */
+    padding: 0 1vw; /* espacio lateral entre items */
 }
 
 .header__nav-item:hover {
@@ -114,23 +126,25 @@ a {
 }
 
 .mobile-navbar {
-    /* Alineacion */
+    /* Display & position */
     display: none;
     flex-direction: column;
-    justify-content: start;
-    text-align: left;
-
-    /* Posicion */
     position: fixed;
     top: 0;
     left: 0;
     z-index: 1;
 
-    /* Tamaño */
+    /* Alineacion */
+    justify-content: start;
+    text-align: left; 
+
+    /* Box model */
     height: 100vh;
     width: 0%;
-    transition: width 0.5s ease; /* Agregamos una transición suave a la propiedad width */
     overflow-x: hidden; /* Las palabras no salen de la caja al hacer la transicion */
+
+    /* Transicion */
+    transition: width 0.5s ease; /* Agregamos una transición suave a la propiedad width */
 
     /* Color */
     background-color: rgb(0, 0, 0, 0.4);
@@ -138,10 +152,13 @@ a {
 }
 
 .mobile-navbar li {
-    margin-left: var(--margin);
-    margin-top: 3vh;
-    font-size: 3vh;
+    /* Box model */
     width: 100%;
+    margin-left: var(--side-margin);
+    margin-top: 3vh;
+
+    /* font */
+    font-size: 3vh;
 }
 
 .header__nav-item:is(:hover, :focus) {
@@ -171,12 +188,17 @@ a {
 
 /* -------------------------------------------- FOOTER SECTION -------------------------------------------- */
 footer {
+    /* Display */
     display: grid;
     grid-template-rows: repeat(3, auto);
     grid-template-columns: repeat(2, 1fr);
+
+    /* Box model */
+    padding: 0% var(--side-margin);
+
+    /* Color */
     background-color: var(--color-neutro);
     color: white;
-    padding: 0% var(--margin);
 }
 
 .footer__logo-container, .footer__copyright {
@@ -191,22 +213,18 @@ footer {
 
 .footer__logo {
     border-radius: 50%;
-    /*    margin: 0 1rem; ojo que mueve todo...*/
-    height: 3rem;
-}
-
-.footer-navbar-list, .footer-social-media-list {
-    padding: 0; /* no se porque el <ul> viene con padding... no se lo puedo sacar desde el body...*/
-}
-
-.footer-navbar__item, .footer-social-media__item {
-    list-style: none;
+    width: 3vw;
 }
 
 .footer-social-media-list img {
-    height: 1rem;
+    width: 1vw;
 }
 
 footer a {
     color: white;
+}
+
+footer a:hover {
+    text-decoration: underline #fff;
+    opacity: 0.7;
 }
