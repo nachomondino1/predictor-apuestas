@@ -25,9 +25,9 @@ actualizar el archivo de requirements.txt corriendo el comando: <br>
 - 2. Ir a VSC, abrir la terminal y para ver todas las ramas creadas remotas correr: `git fetch`
 - 3. Elegis tu rama y corres: `git checkout <nombre_de_rama>`
 
-## Como activar el back end:
+## Como correr django para ver la pagina web:
 - 1. Cambiar directorio a django_project con `cd django_project`
-- 2. Correr el sigueinte comando para activar la pagina web de django `python manage.py runserver`
+- 2. Correr el siguiente comando para activar la pagina web de django `python manage.py runserver`
 - 3. Ir a la url para obtener: 
     - All predictions: http://127.0.0.1:8000/home/predictions/ . Corre: `GET /home/predictions/ HTTP/1.1`
     - Filtered predictions: http://127.0.0.1:8000/home/predictions/?date=2024-02-24&id_match=&ordering=time . Corre: `GET /home/predictions/?date=2024-02-24&id_match=&ordering=time HTTP/1.1`
