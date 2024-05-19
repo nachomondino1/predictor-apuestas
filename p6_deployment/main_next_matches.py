@@ -830,13 +830,13 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
         df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         
         # Relleno datos aun no disponibles con datos en ultimos partidos 
+        days_to_filt = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
         df_old_int = df_int_with_missing.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
-        fecha_limite_seguridad = datetime.datetime.now() - datetime.timedelta(days=100)  # uso mas dias por si justo no hay partidos dentro de "n_dias_ult_part"
+        fecha_limite_seguridad = datetime.datetime.now() - datetime.timedelta(days=days_to_filt)  # uso mas dias por si justo no hay partidos dentro de "n_dias_ult_part"
         df_old_int_to_fill = df_old_int[df_old_int['date'] >= fecha_limite_seguridad]  # Funciona ok, tiene los partidos missing.
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_old_int_to_fill)
 
         # Construyo datos usando "df_old_int" para poder construir variables historicas
-        days_to_filt = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
         print(f"n_dias_ult_part: {d_hiper['n_dias_ult_part']} ; Segun localia: {d_hiper['segun_localia']} --> days_to_filt: {days_to_filt}" )
         fecha_minima = df['date'].min()
         fecha_limite = fecha_minima - datetime.timedelta(days=days_to_filt) 
@@ -901,7 +901,7 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "england"
+    country = "spain"
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 

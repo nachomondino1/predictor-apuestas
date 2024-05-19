@@ -303,9 +303,9 @@ def determine_stake_to_bet(df, stake_base, type_relation: str = 'equal', p1: tup
     df['stake_to_bet'] =  df['multiplier']  * stake_base
 
     # Ajusto valores de stake_to_bet segun valor minimo y valor maximo
-    # val_min, val_max = 0, 10
-    # func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
-    # df['stake_to_bet'] = df['stake_to_bet'].apply(func)
+    val_min, val_max = 0, 100  # Evito que el stake a apostar sea mayor al 100% del bank
+    func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
+    df['stake_to_bet'] = df['stake_to_bet'].apply(func)
     return df
 
 def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None):
@@ -341,7 +341,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
         
-        df['multiplier'] = df['prob_result_to_bet'] * m + b
+        df['multiplier'] = df['prob_result_to_bet'] * m + b  #  df['multiplier'] = (df['prob_result_to_bet'] * df['odd_to_bet']) * m + b
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass
