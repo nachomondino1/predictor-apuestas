@@ -1,0 +1,118 @@
+/* MAIN SECTION */
+.main-wrapper {
+    /* Display */
+    display: flex;
+    flex-direction: column;
+
+    /* Box model */
+    padding: 0% var(--side-margin);
+    margin: 4vh 0;
+}
+
+.calendar-container, .leagues-container, .ads-container, .main {
+    /* Box model */
+    height: min-content; /* altura de contenedores */
+    padding: 1rem;  /* margenes de texto al borde del contenedor */
+    margin-bottom: 1vh;
+
+    /* Color */
+    background-color: #fff;
+    border: 0.1rem solid rgba(34, 34, 38, 0.08);
+    border-radius: 2rem;
+    box-shadow: rgba(34, 34, 38, 0.08) 0px 1px 8px 2px;
+}
+
+.main {
+    /* Box model */
+    margin-left: 1vw;
+    margin-right: 1vw;
+}
+
+/* Primer aside */
+.calendar-container {
+    /* Display */
+    display: flex;  
+    flex-direction: column;
+    align-items: center;
+
+    /* Otro */
+    list-style: none;
+}
+
+#fechaSeleccionada {
+    border: none;
+    border-bottom: 2px solid var(--color-primario);
+    width: 70%;
+}
+
+.filters-leagues__list {
+    padding-left: 1rem;
+    list-style: none;
+    text-align: left;
+}
+
+/* Main */
+.matches_list {
+    /* Display */
+    display: grid;
+    grid-template-columns: 1fr;  /* date, teams, prob_home, prob_away, pred_result */
+
+    /* Box model */
+    padding: 1% 5%;
+    max-width: 100%;
+
+    /* Otro */
+    list-style: none;
+}
+
+.header_matches_list {
+    background-color: rgba(34, 34, 38, 0.08);
+    word-break: break-all;
+}
+
+.matches_list__item {
+    /* Display */
+    display: grid;
+    grid-template-columns: 20% 40% 10% 10% 10% 10%;
+
+    /* Alineacion */
+    justify-items: center;
+    align-items: center;
+
+    /* Box model */
+    padding: 1% 1%;
+
+    /* Bordes */
+    border-bottom: 1px solid rgb(52, 52, 52);
+
+}
+
+.matches_list__item:not(.header_matches_list):hover {
+    opacity: 0.7;
+    background-color: #535252;
+    color: #fff;
+}
+
+/* Segundo aside */
+.ad_image img {
+    /* Box model */
+    object-fit: contain;
+    height: auto;
+    width: 100%;
+}
+
+/* MAIN QUERIES */
+@media only screen and (min-width: 600px) {
+    .main-wrapper {
+        flex-direction: row;
+        justify-content: center;
+    }
+
+    .aside-izquierda, .aside-derecha {
+        width: 20vw;
+    }
+
+    .main {
+        width: 40vw;
+    }
+}
