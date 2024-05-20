@@ -617,7 +617,6 @@ def load_modeling_hyperparameters(country, n_model, ruta_base):
 
     # Guardo hiperparametros en diccionario
     d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best']
-    d['thr_prob_win'] = row_hiper_bet_strat['thr_prob_win_best']
     d['curva'] = row_hiper_bet_strat['curva']
     param1 = row_hiper_bet_strat['param1']
     param2 = row_hiper_bet_strat['param2']
@@ -883,7 +882,7 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
         # Determino estrategia de apuuesta
         func = lambda x: x if x is None else int(x)  # Para formatear m y b (Falla para españa) --> lo deberia implementar cdo levanto hiper
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
-        df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'], thr_prob_win=d_hiper_mod['thr_prob_win'])
+        df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
         df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -901,7 +900,7 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "spain"
+    country = "italy"
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 

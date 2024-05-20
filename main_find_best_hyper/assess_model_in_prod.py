@@ -142,6 +142,11 @@ def main(df_iteration, country, iteration_date, export: bool = True):
             print(f"n_dias_ult_part: {d_hiper['n_dias_ult_part']} ; Segun localia: {d_hiper['segun_localia']} --> days_to_filt: {days_to_filt}" )
             print(f"Fecha limite desde partido missing mas viejo: {fecha_limite}")
 
+            # Relleno datos aun no disponibles con datos en ultimos partidos 
+            df_int, df_c1, df_c2 = dp.fill_data_not_available_yet(df_int, df_old_int_to_construct)
+            df_c1.to_excel(f'{ruta_base_data_prep}/df_fill_c1_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx', index=True)
+            df_c2.to_excel(f'{ruta_base_data_prep}/df_fill_c2_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx', index=True)
+
             # Construyo datos usando partidos viejos
             df_cons = dp.construct_data_new(df_int, df_old_int, df_old_int_to_construct, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
             df_cons.to_excel(path_cons, index=True)
