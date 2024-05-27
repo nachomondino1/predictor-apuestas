@@ -81,7 +81,7 @@ class FlashscoreCrawler(Crawler):
         """
         Obtiene todos los partidos de la temporada y luego sus ids
         """
-        l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[@class="event__match event__match--static event__match--twoLine" or @title="Click for match detail!"]', sec_wait=self.SEC_WAIT_MAX)
+        l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[contains(@class, "event__match--static") or @title="Click for match detail!"]', sec_wait=self.SEC_WAIT_MAX)
         l_ids = [item.get_attribute('id') for item in l_items]
         l_ids_clean = clean_id(l_ids)
         return l_ids_clean

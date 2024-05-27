@@ -333,10 +333,9 @@ class DataPreparationNew(DataPreparation):
 
         # Codifico variables categoricas a numericas con el mismo sistema que se uso en el dataframe original (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int_already_tagged(df, df_etiquetas_loaded)  # Si o si tengo que devolver df_etiquetas?
-        if _print:
-            df.to_excel('/Users/nachomondino/Desktop/df_codificacion_next_matches.xlsx')
-
+    
         if self.export:
+            df.to_excel(f'{self.ruta_base}/df_tagged.xlsx', index=True) 
             df_etiquetas.to_excel(f'{self.ruta_base}/df_etiquetas_actualizado.xlsx', index=False) 
         return df
 
@@ -900,7 +899,7 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "italy"
+    country = "argentina"
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
