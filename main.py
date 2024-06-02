@@ -86,31 +86,31 @@ class DataUnderstanding:
                 df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_odds.xlsx', index=True)
                 
             # Si la competition es una liga
-            if row['is_cup'] == 0:
+            # if row['is_cup'] == 0:
 
-                # Extraigo datos de players de Sofifa 
-                ## Player
-                df_player_sofifa, df_player_fifa_sofifa = scraper_sofifa.extract_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
-                df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
-                df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
-                if export:
-                    df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_sofifa.xlsx', index=True)
-                    df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_fifa_sofifa.xlsx', index=True)
+            #     # Extraigo datos de players de Sofifa 
+            #     ## Player
+            #     df_player_sofifa, df_player_fifa_sofifa = scraper_sofifa.extract_players(self.id_country, self.country, row['id_competition'], row['competition_sofifa'], export=export)
+            #     df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
+            #     df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
+            #     if export:
+            #         df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_sofifa.xlsx', index=True)
+            #         df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_fifa_sofifa.xlsx', index=True)
                
-                ## Teams
-                df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
-                df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
-                if export:
-                    df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_teams_sofifa.xlsx', index=True)
+            #     ## Teams
+            #     df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
+            #     df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
+            #     if export:
+            #         df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_teams_sofifa.xlsx', index=True)
        
         # Exporto datasets con competiciones del country
         if export:
             df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
             df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_player.xlsx', index=True)
             df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
-            df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_sofifa.xlsx', index=True)
-            df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
-            df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams_sofifa.xlsx', index=True)
+            # df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_sofifa.xlsx', index=True)
+            # df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
+            # df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams_sofifa.xlsx', index=True)
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat
 
@@ -795,7 +795,7 @@ class Modeling:
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
 
 ##################################################### MAIN #####################################################
-def main(country, d_run, export: bool = True):
+def main(id_country, d_run, export: bool = True):
     """
     Extraction, processing and analysis of matches to predict match results.
     """
@@ -803,8 +803,8 @@ def main(country, d_run, export: bool = True):
     data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
-
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
     dp = DataPreparation(country) # Creo objeto de clase DataPreparation
@@ -919,7 +919,7 @@ def main(country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion de variables
-    country = 'germany'
-    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+    id_country = 167
+    d_params = {'data_unders': True, 'data_prep': False, 'modeling': False}
 
-    main(country, d_params, export=True)
+    main(id_country, d_params, export=True)
