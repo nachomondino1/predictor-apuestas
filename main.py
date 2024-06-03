@@ -273,7 +273,11 @@ class DataPreparation:
         except FileNotFoundError:
             df_teams = create_df_teams(df_match)
             df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
-        
+
+            if export:
+                df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
+                df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
+
         df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
 
        # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
@@ -283,6 +287,10 @@ class DataPreparation:
         except FileNotFoundError:
             df_player = create_df_player(df_match_player)
             df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+
+            if export:
+                df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
+                df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
         
         df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
@@ -295,10 +303,6 @@ class DataPreparation:
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         
         if export:
-            df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
-            df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
-            df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
-            df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
             df.to_excel(f'./p3_data_preparation/data/{self.country}/df_integrated.xlsx', index=True)
 
         return df
@@ -920,6 +924,6 @@ if __name__ == "__main__":
 
     # Definicion de variables
     id_country = 167
-    d_params = {'data_unders': True, 'data_prep': False, 'modeling': False}
+    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)
