@@ -81,7 +81,7 @@ class FlashscoreCrawler(Crawler):
         """
         Obtiene todos los partidos de la temporada y luego sus ids
         """
-        l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[@class="event__match event__match--static event__match--twoLine" or @title="Click for match detail!"]', sec_wait=self.SEC_WAIT_MAX)
+        l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[contains(@class, "event__match--static") or @title="Click for match detail!"]', sec_wait=self.SEC_WAIT_MAX)
         l_ids = [item.get_attribute('id') for item in l_items]
         l_ids_clean = clean_id(l_ids)
         return l_ids_clean
@@ -134,7 +134,7 @@ class FlashscoreCrawler(Crawler):
         ## Si existe la seccion "odds pre-match", extraigo odds de Bet365
         if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las oddss pero no hay valores...
             d_row_match_odds.update(self.extract_odds())
-
+        
         ## Si tiene hoja "Formations", extraigo campos
         if self._print:
             print("Obtengo datos de hoja 'Lineups'...")
@@ -244,8 +244,8 @@ class FlashscoreCrawler(Crawler):
             if tag_lineup:
 
                 # Extraigo listado de jugadores
-                l_tags_player_home = super().extract_tags(tag_inicial=tag_lineup, xpath='.//following-sibling::div//div[@class="lf__side"][1]//*[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
-                l_tags_player_away = super().extract_tags(tag_inicial=tag_lineup, xpath='.//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+                l_tags_player_home = super().extract_tags(tag_inicial=tag_lineup, xpath='.//following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+                l_tags_player_away = super().extract_tags(tag_inicial=tag_lineup, xpath='.//following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
 
                 if l_tags_player_home:
                     # Obtengo urls de jugadores
@@ -258,7 +258,7 @@ class FlashscoreCrawler(Crawler):
                     # Guardo datos
                     for i, url in enumerate(l_urls_home):
                         d_row.update({f'id_player_{titularidad}_home_{i + 1}': l_ids_home[i], f'player_name_{titularidad}_home_{i + 1}': l_names_home[i]}) #  "player_url": url
-                   
+                
                 if l_tags_player_away:
                     l_urls_away = [tag.get_attribute('href') for tag in l_tags_player_away]
 
@@ -285,8 +285,8 @@ class FlashscoreCrawler(Crawler):
         if seccion_entrenadores:
 
             # Extraigo entrenadores
-            coach_home_tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./following-sibling::div//div[@class="lf__side"][1]//a[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN)
-            coach_away__tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./following-sibling::div//div[@class="lf__side"][2]//a[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN)
+            coach_home_tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN)
+            coach_away__tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN)
 
             if coach_home_tag:
                 # Obtengo url de coach home
@@ -508,7 +508,7 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
 
     # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
     crawler.accept_cookies()
-  
+
     # Extraigo urls de las distintas seasons (años) de la competition
     l_urls_seasons = crawler.extract_urls_seasons(n_seasons_max)
     print(f'Cantidad de seasons: {len(l_urls_seasons)}')
@@ -518,7 +518,7 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
 
         if n_season > 9:
             crawler.SEC_WAIT_MED = crawler.SEC_WAIT_MIN
-         
+        
         # Ingreso a pagina de season e imprimo año de la season
         crawler.driver.get(url_season)
         season_year = crawler.extract_season_year()

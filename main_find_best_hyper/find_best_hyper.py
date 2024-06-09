@@ -214,11 +214,13 @@ def determine_comps(id_country):
     
     return d
 
-def main(country, l_modelos, d_params, export: bool = True):
+def main(l_modelos, d_params, export: bool = True):
 
     # Definicion de variables
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
+    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
     ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
     make_directories(ruta_base) # Creo directorios
 
@@ -243,11 +245,7 @@ def main(country, l_modelos, d_params, export: bool = True):
 if __name__ == '__main__':
 
     # Parametros de corrida
-    country = 'argentina'
-
-    # Definicion de variables
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+    id_country = 167
 
     # Defino hiperparametros a probar
     d_comps = determine_comps(id_country)
@@ -259,7 +257,7 @@ if __name__ == '__main__':
             'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
+            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # d_comps['comp_sin_b'] # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
             'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
@@ -277,4 +275,4 @@ if __name__ == '__main__':
         }
     }
 
-    df_iteration = main(country, l_modelos, d_params, export=True)
+    df_iteration = main(l_modelos, d_params, export=True)
