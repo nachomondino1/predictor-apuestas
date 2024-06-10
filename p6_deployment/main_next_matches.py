@@ -899,9 +899,9 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "argentina"
+    country = "england"
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos
     main(d_run, country, n_days_max_next_matches, export=d_run['export'])
