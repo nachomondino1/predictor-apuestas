@@ -1,0 +1,26 @@
+name: Transfer Excel Files
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Transfer files via SCP
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        REMOTE_USER: ${{ secrets.REMOTE_USER }}
+        REMOTE_PATH: /ruta/remota/destino/
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        scp -o StrictHostKeyChecking=no /Users/nachomondino/Documents/GitHub/predictor-apuestas/p6_deployment/data/historial_predicciones.xlsx $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
