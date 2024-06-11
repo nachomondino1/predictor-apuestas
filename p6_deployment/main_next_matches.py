@@ -333,10 +333,9 @@ class DataPreparationNew(DataPreparation):
 
         # Codifico variables categoricas a numericas con el mismo sistema que se uso en el dataframe original (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int_already_tagged(df, df_etiquetas_loaded)  # Si o si tengo que devolver df_etiquetas?
-        if _print:
-            df.to_excel('/Users/nachomondino/Desktop/df_codificacion_next_matches.xlsx')
-
+    
         if self.export:
+            df.to_excel(f'{self.ruta_base}/df_tagged.xlsx', index=True) 
             df_etiquetas.to_excel(f'{self.ruta_base}/df_etiquetas_actualizado.xlsx', index=False) 
         return df
 
@@ -617,7 +616,6 @@ def load_modeling_hyperparameters(country, n_model, ruta_base):
 
     # Guardo hiperparametros en diccionario
     d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best']
-    d['thr_prob_win'] = row_hiper_bet_strat['thr_prob_win_best']
     d['curva'] = row_hiper_bet_strat['curva']
     param1 = row_hiper_bet_strat['param1']
     param2 = row_hiper_bet_strat['param2']
@@ -878,12 +876,12 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 
         # Concateno conjunto de datos
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
+        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
 
         # Determino estrategia de apuuesta
         func = lambda x: x if x is None else int(x)  # Para formatear m y b (Falla para españa) --> lo deberia implementar cdo levanto hiper
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
-        df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'], thr_prob_win=d_hiper_mod['thr_prob_win'])
+        df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
         df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -891,19 +889,54 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
         df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
         df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
 
+        # Guardo predicciones en historial
+        # Levanto df_historial
+        df_hist = pd.read_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index_col=0)
+        df_historial = load_pred_in_historial(df, df_hist)
+        
         if export:
             df.to_excel(f'./p6_deployment/data/{country}/predicciones.xlsx', index=True)
+            df_historial.to_excel(f'./p6_deployment/data/historial_predicciones_actualizado.xlsx', index=True)
 
     end = time.time()
     print(f"Main_next_matches en {(end - start)/60:.1f} minutos")
+
+def load_pred_in_historial(df, df_hist):
+    """
+    Cargar predicciones de proximos partidos a historial de predicciones
+    """
+    # Por proximo partido
+    for idx, row in df.iterrows():
+        print(f'Partido Nº {idx}')
+
+        # Convertir row a DataFrame
+        row_df = pd.DataFrame([row])
+        row_df.index = [idx]
+
+        # Si ya esta en df_hist
+        if idx in df_hist.index:
+            copiado1 = row['copiado_formaciones']
+            copiado2 = df_hist.loc[idx, 'copiado_formaciones']
+            print(copiado1, copiado2)
+
+            # Si tengo el partido con formaciones y no esta en df_hist
+            if (copiado2 == 1) and (pd.isna(copiado1)):
+                df_hist = df_hist.drop([idx])
+                df_hist = pd.concat([df_hist, row_df], axis=0)
+        else:
+            # Lo cargo (ya sea con o sin formaciones)
+            df_hist = pd.concat([df_hist, row_df], axis=0)
+
+    return df_hist
+
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "spain"
+    country = "england"
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos
     main(d_run, country, n_days_max_next_matches, export=d_run['export'])
