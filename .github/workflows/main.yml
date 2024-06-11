@@ -14,29 +14,15 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Test SSH Connection 
-      uses: appleboy/ssh-action@v0.1.5  # Documentacion: https://github.com/marketplace/actions/ssh-remote-commands
-      with:
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        port: 22
-        # Metodo 1: SSH Key
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        passphrase: ${{ secrets.PASSPHRASE }}
-        # Metodo 2: Password
-        # password: ${{ secrets.SSH_password }}
-        script: |
-          echo "SSH connection successful"
-
     - name: Transfer files via SCP
-      uses: appleboy/scp-action@master
+      uses: appleboy/scp-action@master # Documentacion: https://github.com/marketplace/actions/ssh-remote-commands
       with:
         host: ${{ secrets.REMOTE_HOST }}
         username: ${{ secrets.REMOTE_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         passphrase: ${{ secrets.PASSPHRASE }}
         source: "p6_deployment/data/historial_predicciones.xlsx"  # el path relativo desde el directorio raíz del repositorio donde se ejecuta la acción
-        target: ${{ secrets.REMOTE_PATH }}
+        target: "/usr/local/lsws/Example/html/landing_prueba/landing/populate_excel_to_sql/"
         port: 22
 
 
