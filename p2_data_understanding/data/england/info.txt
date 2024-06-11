@@ -1,0 +1,30 @@
+
+########################################### EXTRACCION FLASHSCORE ###########################################
+Fecha de extraccion: aprox 1/3/2024 (aprox 1 Marzo de 2024)
+Competiciones extraidas y cantidad de temporadas: 
+    - 481 - Premier League: Max. 
+    - 482 - Communnity Shield hasta 2008 (hay hasta 1990).
+    - 483 - Fa Cup: hasta 2010/11 (hay hasta 1998/99)
+    - 484 - EFL cup: hasta 2010/11 (hay hasta 1998/99)
+    - 485 - Championship: hasta 2004 (hay hasta 89/90)
+Cantidad de partidos: 32561
+
+Notas:
+    - No volvi a extraer luego de mover df_teams, df_coaches y df_player de extracción a integracion. Opte por hacerlo manualmente (al parecer funciono).
+    - Quedaron algunas temporadas viejas de FA cup, EFL y Championship sin extraer.
+
+
+########################################### EXTRACCION SOFIFA ###########################################
+Fecha de extraccion: aprox 1/3/2024 (aprox 1 Marzo de 2024)
+Competiciones extraidas: 
+    - Premier League
+    - Championship
+Cantidad de jugadores: 7710 (ambas ligas)
+
+
+Probablemente podria tener cierta mejora en los rdos al extraer los aprtidos que faltan en algunas competencias.
+Sin embargo, para mi no es necesario puesto que: 
+    - los datos que faltan son prácticamente sin datos de formaciones. Ayudara un poco en historial y demás pero no creo que su impacto sea tan alto. 
+    - lo que me importa es tener un modelo rentable y en teoria ya lo tengo. Es suficiente para los objetivos de la segunda iteracion.
+
+Mas adelante, cuando comience la tercera iteracion, extraere los partidos que faltan y correre un nuevo find_best y assess_model_in_prod.
