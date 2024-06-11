@@ -13,14 +13,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ls -la ~/.ssh
+        cat ~/.ssh/id_rsa
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "echo 'SSH connection successful'"
+
     - name: Transfer files via SCP
+      run: |
+        scp -o StrictHostKeyChecking=no /Users/nachomondino/Documents/GitHub/predictor-apuestas/p6_deployment/data/historial_predicciones.xlsx $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
         REMOTE_USER: ${{ secrets.REMOTE_USER }}
-        REMOTE_PATH: /ruta/remota/destino/
-      run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-        chmod 600 ~/.ssh/id_ed25519
-        scp -o StrictHostKeyChecking=no /Users/nachomondino/Documents/GitHub/predictor-apuestas/p6_deployment/data/historial_predicciones.xlsx $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH
+        REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
