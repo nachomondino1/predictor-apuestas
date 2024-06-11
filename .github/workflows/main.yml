@@ -22,7 +22,7 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         passphrase: ${{ secrets.PASSPHRASE }}
         source: "p6_deployment/data/historial_predicciones.xlsx"  # el path relativo desde el directorio raíz del repositorio donde se ejecuta la acción
-        target: "/usr/local/lsws/Example/html/landing_prueba/landing/populate_excel_to_sql/"
+        target: "/usr/local/lsws/Example/html/landing_prueba/landing/populate_excel_to_sql/prueba/"
         port: 22
 
 
