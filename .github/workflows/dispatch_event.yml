@@ -1,0 +1,26 @@
+name: Dispatch Event
+
+on:
+  push:
+    paths:
+      - p6_deployment/data/historial_predicciones.xlsx
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout this repository
+      uses: actions/checkout@v4
+
+    - name: Install Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Dispatch event to second repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      run: |
+        python dispatch_event.py
+        
