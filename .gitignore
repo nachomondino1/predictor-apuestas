@@ -28,5 +28,3 @@ __pycache__/
 .vscode/
 .DS_Store
 *.pyc
-
-config_webhook.py
