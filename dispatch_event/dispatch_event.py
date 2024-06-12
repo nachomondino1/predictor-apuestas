@@ -1,13 +1,15 @@
 import requests
 import json
+import os
 
 # Configura tus variables
 TARGET_OWNER = "mondineta"  # Cambia esto al nombre de tu usuario u organización en GitHub
 TARGET_REPO = "landing"  # Cambia esto al nombre del segundo repositorio
-GITHUB_TOKEN = "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"  # Tu token de acceso personal de GitHub
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')  # Obtener el token de acceso personal de las variables de entorno
 
 # URL de la API de GitHub para despachar el evento
 url = f"https://api.github.com/repos/{TARGET_OWNER}/{TARGET_REPO}/dispatches"
+
 
 # Datos del evento
 payload = {
