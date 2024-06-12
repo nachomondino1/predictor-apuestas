@@ -3,8 +3,7 @@ name: Transfer Excel Files
 on:
   push:
     branches:
-      - staging
-      - main
+      - prod
 
 jobs:
   deploy:
