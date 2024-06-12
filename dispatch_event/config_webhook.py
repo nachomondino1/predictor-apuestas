@@ -8,7 +8,7 @@ TARGET_OWNER = "mondineta"
 REPO = "predictor-apuestas"    # Cambia esto al nombre del primer repositorio
 TARGET_REPO = "landing"  # Cambia esto al nombre del segundo repositorio
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')  # Tu token de acceso personal de GitHub (definir por terminal con 'export GITHUB_TOKEN=your_personal_access_token')
-WEBHOOK_SECRET = os.getenv('GITHUB_TOKEN')  # El secreto que usaste para el webhook (definir por terminal con 'export GITHUB_TOKEN=your_personal_access_token')
+WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET')  # El secreto que usaste para el webhook (definir por terminal con 'export WEBHOOK_SECRET=your_personal_access_token')
 
 # URL de la API de GitHub para configurar el webhook
 url = f"https://api.github.com/repos/{OWNER}/{REPO}/hooks"
