@@ -12,6 +12,8 @@ jobs:
     steps:
     - name: Checkout this repository
       uses: actions/checkout@v4
+      with:
+        ref: prod  # Branch
 
     - name: Install Python
       uses: actions/setup-python@v5
