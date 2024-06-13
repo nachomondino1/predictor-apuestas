@@ -10,18 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-    - name: Set up sparse checkout
+    
+    - name: Set up Git and sparse checkout
       run: |
         git config --global core.sparseCheckout true
-        mkdir -p .git/info
+        git init predictor-apuestas
+        cd predictor-apuestas
+        git remote add origin https://github.com/nachomondino1/predictor-apuestas.git
         echo "p6_deployment/data/predicciones.xlsx" >> .git/info/sparse-checkout
-    
-    - name: Checkout this repository
-      uses: actions/checkout@v4
-      with:
-        ref: prod  # Branch
-        sparse-checkout: true
+        git fetch origin prod
+        git checkout prod
+
+    # - name: Checkout this repository
+    #   uses: actions/checkout@v4
+    #   with:
+    #     ref: prod  # Branch
 
     - name: Install Python
       uses: actions/setup-python@v5
