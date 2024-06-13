@@ -1,0 +1,25 @@
+
+########################################### EXTRACCION FLASHSCORE ###########################################
+Fecha de extraccion: aprox 1/3/2024 (aprox 1 Marzo de 2024)
+Competiciones extraidas y cantidad de temporadas: 
+    - Liga Profesional de Fútbol: Max. Hasta 1999/2000.
+    - Copa de la Liga: Max. Hasta 2020.
+    - B nacional: Max. Hasta 2000/01
+    - Copa Argentina: Max. Hasta 2011/12
+    - Supercopa: Max. Hasta 2012/13
+    - Supercopa internacional: Max. Hasta 2022/23.
+    - Trofeo de Campeones: Max. Hasta 2019.
+Cantidad de partidos: 20968 
+
+Notas:
+    - No volvi a extraer luego de mover df_teams, df_coaches y df_player de extracción a integracion. Opte por hacerlo manualmente (al parecer funciono).
+
+
+########################################### EXTRACCION SOFIFA ###########################################
+Fecha de extraccion: aprox 1/3/2024 (aprox 1 Marzo de 2024)
+Competiciones extraidas:
+    - Liga Profesional de Fútbol
+Cantidad de jugadores: 3358
+
+Notas: 
+    - La B nacional no esta en el fifa, por lo que, no la puedo extraer. Eso significa que no tendre datos de jugadores en partidos que involucren equipos de la B nacional, resultand en que no podré predecir el rdos de estos partidos.

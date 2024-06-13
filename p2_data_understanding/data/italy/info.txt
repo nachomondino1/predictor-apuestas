@@ -1,0 +1,20 @@
+########################################### EXTRACCION FLASHSCORE ###########################################
+Fecha de extraccion: 4/4/2024 (4 de Abril de 2024)
+Competiciones extraidas y cantidad de temporadas: 
+    - 771 - Serie A: Max. Hasta Serie A 1989/1990
+    - 772 - Super cup: Max. Hasta Supercopa 1990
+    - 773 - Coppa Italia: Max. Hasta Copa Italia 1998/1999
+Cantidad de partidos: 14175
+
+Notas:
+    - No extraje 774 - Serie B
+
+
+########################################### EXTRACCION SOFIFA ###########################################
+Fecha de extraccion: 4/4/2024 (4 de Abril de 2024)
+Competiciones extraidas: 
+    - 774 - Serie A
+Cantidad de jugadores: 3804
+
+Notas:
+    - No extraje 774 - Serie B. Calculo que fue porque no la extraje para Flashscore.

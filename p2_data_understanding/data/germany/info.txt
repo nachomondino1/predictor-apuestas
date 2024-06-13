@@ -1,0 +1,21 @@
+
+########################################### EXTRACCION FLASHSCORE ###########################################
+Fecha de inicio de extraccion: 21.30 hs del 5/5/2024 (5 de Mayo de 2024)
+Fecha de fin de extraccion: 17 hs del 8/5/2024 (8 de Mayo de 2024)
+Competiciones extraidas y cantidad de temporadas: 
+    - 591	Bundesliga: Max. Hasta 1989/1990
+    - 592	2. Bundesliga: Max. Hasta 1989/1990
+    - 593	DFB Pokal: Max. Hasta 1998/1999
+    - 594	Super Cup: Max. Hasta 1990. Con el parate del 1996 al 2008.
+Cantidad de partidos: 23667
+
+########################################### EXTRACCION SOFIFA ###########################################
+Fecha de extraccion: 5/5/2024 (5 de Mayo de 2024)
+Competiciones extraidas: 
+    - 591	Bundesliga: Max.
+    - 592	2. Bundesliga: Max.
+Cantidad de jugadores: 5497
+
+Interrupciones por internet: 
+    - Durante la noche del 5/5 al 6/5
+    - Durante la noche del 6/5 al 7/5
