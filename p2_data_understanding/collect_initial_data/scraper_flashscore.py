@@ -81,14 +81,13 @@ class FlashscoreCrawler(Crawler):
         """
         Obtiene todos los partidos de la temporada y luego sus ids
         """
-        l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[contains(@class, "event__match--static") or @title="Click for match detail!"]', sec_wait=self.SEC_WAIT_MAX)
+        l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[starts-with(@class, "event__match ")]', sec_wait=self.SEC_WAIT_MAX)
         l_ids = [item.get_attribute('id') for item in l_items]
         l_ids_clean = clean_id(l_ids)
         return l_ids_clean
     
     def extract_id_next_matches(self, n_days):
             
-        import time
         # Extraigo partidos (items) y sus ids --> NO PUDE EXTRAER LOS SVG.. PERO SI EL DIV DE EVENT_TIME... VER 
         l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[@class="sportName soccer"]//div[contains(@class, "event__match--scheduled")]', sec_wait=self.SEC_WAIT_MAX)
         # print(f"Cantidad de proximos partidos en total: {len(l_items)}")
@@ -159,10 +158,14 @@ class FlashscoreCrawler(Crawler):
         """
         d_row = {}
         d_field_xpath = {
-            'referee': './/div[@class="matchInfoData"]//span[contains(text(), "Referee")]/following-sibling::span[@class="matchInfoItem__value"]', # Intente el svg (para evitar el texto "Referee") pero no lo encuentra
-            'venue': './/div[@class="matchInfoData"]//span[contains(text(), "Venue")]/following-sibling::span[@class="matchInfoItem__value"]', 
-            'capacity': './/div[@class="matchInfoData"]//span[contains(text(), "Capacity")]/following-sibling::span[@class="matchInfoItem__value"]', 
-            'attendance': './/div[@class="matchInfoData"]//span[contains(text(), "Attendance")]/following-sibling::span[@class="matchInfoItem__value"]'
+            'referee': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Referee")]/parent::div/following-sibling::div', # Intente el svg (para evitar el texto "Referee") pero no lo encuentra
+            'venue': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Venue")]/parent::div/following-sibling::div', 
+            'capacity': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Capacity")]/parent::div/following-sibling::div', 
+            'attendance': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Attendance")]/parent::div/following-sibling::div'
+            # 'referee': './/div[@class="matchInfoData"]//span[contains(text(), "Referee")]/following-sibling::span[@class="matchInfoItem__value"]', # Intente el svg (para evitar el texto "Referee") pero no lo encuentra
+            # 'venue': './/div[@class="matchInfoData"]//span[contains(text(), "Venue")]/following-sibling::span[@class="matchInfoItem__value"]', 
+            # 'capacity': './/div[@class="matchInfoData"]//span[contains(text(), "Capacity")]/following-sibling::span[@class="matchInfoItem__value"]', 
+            # 'attendance': './/div[@class="matchInfoData"]//span[contains(text(), "Attendance")]/following-sibling::span[@class="matchInfoItem__value"]'
         }
 
         # Extraigo el primer campo con espera para evitar extraer sin que haya cargado la pagina
