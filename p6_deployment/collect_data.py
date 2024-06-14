@@ -26,6 +26,7 @@ def collect_data(l_countries):
         df = load_and_update_predictions(df_country, df)
     
     # Exporto datos
+    df.index.name = 'id_match'
     df.to_excel(f'./p6_deployment/data/predicciones.xlsx', index=True)
 
 def load_and_update_predictions(df, df_hist):
