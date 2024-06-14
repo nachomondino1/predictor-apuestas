@@ -11,19 +11,13 @@ jobs:
 
     steps:
     
-    # - name: Set up Git and sparse checkout
-    #   run: |
-    #     git config --global core.sparseCheckout true
-    #     git init predictor-apuestas
-    #     cd predictor-apuestas
-    #     git remote add origin https://github.com/nachomondino1/predictor-apuestas.git
-    #     echo "p6_deployment/data/predicciones.xlsx" >> .git/info/sparse-checkout
-    #     git fetch origin prod
-    #     git checkout prod
-
     - name: Checkout this repository
       uses: actions/checkout@v4
       with:
+        sparse-checkout: |
+          p6_deployment/data/predicciones.xlsx
+          dispatch_event
+        sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
     - name: Install Python
