@@ -21,17 +21,22 @@ def generate_cron_jobs(file_path):
 
     return cron_jobs
 
+
 def update_github_workflow(cron_jobs, workflow_path):
     workflow_content = """name: Run predictions
 
 on:
+  schedule:
 """
+    for cron in cron_jobs.keys():
+        workflow_content += f"    - cron: \"{cron}\"\n"
+
+    workflow_content += "jobs:\n"
     for cron, countries in cron_jobs.items():
         l_countries = ','.join(map(str, countries))
-        workflow_content += f"  schedule:\n    - cron: \"{cron}\"\n"
+        job_name = f"collect-data-job-{cron.replace(' ', '-').replace('*', 'star')}"
         workflow_content += f"""
-jobs:
-  collect-data-job-{cron.replace(" ", "-").replace("*", "star")}:
+  {job_name}:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -44,13 +49,13 @@ jobs:
           ref: prod  # Branch
 
       - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
       - name: Install dependencies
-      run: pip install pandas openpyxl
-      
+        run: pip install pandas openpyxl
+
       - name: Run collect_data script
         run: python p6_deployment/collect_data.py --l_countries "{l_countries}"
 """
