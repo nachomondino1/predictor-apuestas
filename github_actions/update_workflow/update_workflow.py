@@ -1,5 +1,4 @@
 import pandas as pd
-import os
 from collections import defaultdict
 
 def generate_cron_jobs(file_path):
@@ -43,8 +42,9 @@ on:
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            p6_deployment/data/schedules.xlsx
-            p6_deployment/update_workflow.py
+            github_actions/update_workflow/schedules.xlsx
+            github_actions/update_workflow/update_workflow.py
+            p6_deployment/collect_data.py
           sparse-checkout-cone-mode: false
           ref: prod  # Branch
 
