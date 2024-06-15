@@ -1,31 +1,32 @@
 import pandas as pd
 from main_next_matches import main
+from datetime import datetime
 
-
-def collect_data(l_countries):
+def collect_data(id_country, n_days=3):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
-    n_days_max_next_matches = 3 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
 
     # Levanto predicciones.xlsx
     try:
         df = pd.read_excel(f'./p6_deployment/data/predicciones.xlsx', index_col=0)
+
+        # Elimino partidos viejos de predicciones --> Ver si funciona ok
+        df = df[df['date'] >=  datetime.now()]
+
     except FileNotFoundError:
         df = pd.DataFrame()
 
-    # Por pais
-    for country in l_countries:
+    # Extraigo, preparo y predigo proximos partidos
+    df_country = main(d_run, id_country, n_days, export=d_run['export'])
 
-        # Extraigo, preparo y predigo proximos partidos
-        df_country = main(d_run, country, n_days_max_next_matches, export=d_run['export'])
-
-        # Guardo predicciones en historial
-        df = load_and_update_predictions(df_country, df)
+    # Guardo predicciones en historial
+    df = load_and_update_predictions(df_country, df)
     
     # Exporto datos
+    df.index.name = 'id_match'
     df.to_excel(f'./p6_deployment/data/predicciones.xlsx', index=True)
 
 def load_and_update_predictions(df, df_hist):
@@ -59,7 +60,8 @@ def load_and_update_predictions(df, df_hist):
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    l_countries = ["england", 'germany', 'france', 'italy'] 
-    #  'spain' --> volver a entrenar modelos.
+    # Defino argumentos
+    id_country = 6
+    n_days_max_next_matches = 3 # Numero de dias maximo desde hoy para extraer partidos
 
-    collect_data(l_countries)
+    collect_data(id_country, n_days=n_days_max_next_matches)

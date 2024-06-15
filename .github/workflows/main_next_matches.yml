@@ -1,0 +1,80 @@
+name: Run predictions
+
+on:
+  schedule:
+    - cron: "45 17 15 6 *"
+    - cron: "15 20 15 6 *"
+    - cron: "45 12 16 6 *"
+jobs:
+
+  collect-data-job-45-17-15-6-star-6:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/update_workflow/schedules.xlsx
+            github_actions/update_workflow/update_workflow.py
+            p6_deployment/collect_data.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --id_country 6
+
+  collect-data-job-15-20-15-6-star-6:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/update_workflow/schedules.xlsx
+            github_actions/update_workflow/update_workflow.py
+            p6_deployment/collect_data.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --id_country 6
+
+  collect-data-job-45-12-16-6-star-6:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/update_workflow/schedules.xlsx
+            github_actions/update_workflow/update_workflow.py
+            p6_deployment/collect_data.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --id_country 6
