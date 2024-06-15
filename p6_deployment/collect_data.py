@@ -2,13 +2,12 @@ import pandas as pd
 from main_next_matches import main
 from datetime import datetime
 
-def collect_data(id_country, n_days=90):
+def collect_data(id_country, n_days=3):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
-
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
 
     # Levanto predicciones.xlsx
     try:
@@ -62,8 +61,7 @@ def load_and_update_predictions(df, df_hist):
 if __name__ == "__main__":
 
     # Defino argumentos
-    id_country = 48
-    # l_countries = ["england", 'germany', 'france', 'italy']     #  'spain' --> volver a entrenar modelos.
+    id_country = 6
     n_days_max_next_matches = 3 # Numero de dias maximo desde hoy para extraer partidos
 
     collect_data(id_country, n_days=n_days_max_next_matches)

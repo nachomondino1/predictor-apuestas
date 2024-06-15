@@ -271,16 +271,12 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
                 suma_against =  np.sum(values_against_home_clean) + np.sum(values_against_away_clean)
 
             # Si hay al menos un valor que promediar, guardo promedio
-            if total_partidos > 0:
+            if total_partidos > 0 and total_partidos_against > 0:
                 # Calcular el promedio
                 df.loc[id_match, f'mean_last_match_{variable_form}'] = suma / total_partidos
+                df.loc[id_match, f'mean_last_match_{variable_form}_against'] = suma_against / total_partidos_against
                 if _print:
                     print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
-            
-            if total_partidos_against > 0:
-                df.loc[id_match, f'mean_last_match_{variable_form}_against'] = suma_against / total_partidos_against
-             
-
     return df
 
 ## Player
