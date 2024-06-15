@@ -14,6 +14,12 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          p6_deployment/data/schedules.xlsx
+          p6_deployment/update_workflow.py
+        sparse-checkout-cone-mode: false
+        ref: prod  # Branch
 
     - name: Set up Python
       uses: actions/setup-python@v5
