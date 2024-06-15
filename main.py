@@ -268,29 +268,29 @@ class DataPreparation:
 
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
-        try:
-            df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
-        except FileNotFoundError:
-            df_teams = create_df_teams(df_match)
-            df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
+        # try:
+        #     df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
+        # except FileNotFoundError:
+        df_teams = create_df_teams(df_match)
+        df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
 
-            if export:
-                df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
-                df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
+        if export:
+            df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
+            df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
 
         df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
 
        # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
         print("\nIntegrating player's data to df_match...")
-        try:
-            df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
-        except FileNotFoundError:
-            df_player = create_df_player(df_match_player)
-            df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+        # try:
+        #     df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
+        # except FileNotFoundError:
+        df_player = create_df_player(df_match_player)
+        df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
 
-            if export:
-                df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
-                df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
+        if export:
+            df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
+            df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
         
         df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
