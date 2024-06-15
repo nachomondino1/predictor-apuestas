@@ -2,13 +2,13 @@ name: Run predictions
 
 on:
   schedule:
-    - cron: "45 11 19 5 *"
-    - cron: "15 10 18 5 *"
-    - cron: "45 15 19 5 *"
-    - cron: "30 15 26 5 *"
+    - cron: "0 12 19 5 *"
+    - cron: "30 10 18 5 *"
+    - cron: "0 16 19 5 *"
+    - cron: "45 15 26 5 *"
 jobs:
 
-  collect-data-job-45-11-19-5-star:
+  collect-data-job-0-12-19-5-star-48:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,9 +30,9 @@ jobs:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --l_countries "48"
+        run: python p6_deployment/collect_data.py --id_country 48
 
-  collect-data-job-15-10-18-5-star:
+  collect-data-job-30-10-18-5-star-59:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -54,9 +54,9 @@ jobs:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --l_countries "59"
+        run: python p6_deployment/collect_data.py --id_country 59
 
-  collect-data-job-45-15-19-5-star:
+  collect-data-job-0-16-19-5-star-55:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -78,9 +78,9 @@ jobs:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --l_countries "55"
+        run: python p6_deployment/collect_data.py --id_country 55
 
-  collect-data-job-30-15-26-5-star:
+  collect-data-job-45-15-26-5-star-77:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -102,4 +102,4 @@ jobs:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --l_countries "77"
+        run: python p6_deployment/collect_data.py --id_country 77

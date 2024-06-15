@@ -6,20 +6,14 @@ def generate_cron_jobs(file_path):
     # Levanta schedules.xlsx
     df = pd.read_excel(file_path) # sheet_name='schedules'
 
-    # Formateo date y time como una sola columna y datetime --> si tengo separada date y time
-    # df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time_cron'])
-
     # Por fecha
-    cron_jobs = defaultdict(list)
+    cron_jobs = []
     for _, row in df.iterrows():
-        
-        # La convierto en formato cron
-        dt = row['date_mod']
+        dt = row['date']
         cron_expression = f"{dt.minute} {dt.hour} {dt.day} {dt.month} *"
-        cron_jobs[cron_expression].append(row['id_country'])
+        cron_jobs.append((cron_expression, row['id_country']))
 
     return cron_jobs
-
 
 def update_github_workflow(cron_jobs, workflow_path):
     workflow_content = """name: Run predictions
@@ -27,13 +21,14 @@ def update_github_workflow(cron_jobs, workflow_path):
 on:
   schedule:
 """
-    for cron in cron_jobs.keys():
+    for cron, _ in cron_jobs:
         workflow_content += f"    - cron: \"{cron}\"\n"
 
     workflow_content += "jobs:\n"
-    for cron, countries in cron_jobs.items():
-        l_countries = ','.join(map(str, countries))
-        job_name = f"collect-data-job-{cron.replace(' ', '-').replace('*', 'star')}"
+
+    for cron, country in cron_jobs:
+        job_name = f"collect-data-job-{cron.replace(' ', '-').replace('*', 'star')}-{country}"
+
         workflow_content += f"""
   {job_name}:
     runs-on: ubuntu-latest
@@ -57,7 +52,7 @@ on:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --l_countries "{l_countries}"
+        run: python p6_deployment/collect_data.py --id_country {country}
 """
 
     with open(workflow_path, 'w') as file:
