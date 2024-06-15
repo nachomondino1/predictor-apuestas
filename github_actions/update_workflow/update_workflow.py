@@ -53,6 +53,17 @@ on:
 
       - name: Run collect_data script
         run: python p6_deployment/collect_data.py --id_country {country}
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 """
 
     with open(workflow_path, 'w') as file:
