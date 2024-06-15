@@ -3,7 +3,7 @@ name: Run predictions
 on:
   schedule:
     - cron: "45 17 15 6 *"
-    - cron: "45 19 15 6 *"
+    - cron: "50 19 15 6 *"
     - cron: "15 20 15 6 *"
     - cron: "45 12 16 6 *"
 jobs:
@@ -32,7 +32,7 @@ jobs:
       - name: Run collect_data script
         run: python p6_deployment/collect_data.py --id_country 6
   
-  collect-data-job-45-19-15-6-star-6:
+  collect-data-job-50-19-15-6-star-6:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
