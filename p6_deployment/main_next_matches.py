@@ -698,7 +698,7 @@ def read_data_of_best_model(country):
     return n_model, iteration_date_dt
 
 ################################################### MAIN ###################################################
-def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool = True):
+def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
     """
@@ -706,7 +706,7 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 
     # Determino id_country
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
@@ -907,9 +907,9 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "germany"
+    id_country = 148
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos
-    main(d_run, country, n_days_max_next_matches, export=d_run['export'])
+    main(d_run, id_country, n_days_max_next_matches, export=d_run['export'])

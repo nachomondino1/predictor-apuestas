@@ -2,12 +2,12 @@ import pandas as pd
 from main_next_matches import main
 
 
-def collect_data(l_countries, n_days):
+def collect_data(id_country, n_days=3):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
 
     # Levanto predicciones.xlsx
     try:
@@ -15,14 +15,11 @@ def collect_data(l_countries, n_days):
     except FileNotFoundError:
         df = pd.DataFrame()
 
-    # Por pais
-    for country in l_countries:
+    # Extraigo, preparo y predigo proximos partidos
+    df_country = main(d_run, id_country, n_days, export=d_run['export'])
 
-        # Extraigo, preparo y predigo proximos partidos
-        df_country = main(d_run, country, n_days_max_next_matches, export=d_run['export'])
-
-        # Guardo predicciones en historial
-        df = load_and_update_predictions(df_country, df)
+    # Guardo predicciones en historial
+    df = load_and_update_predictions(df_country, df)
     
     # Exporto datos
     df.index.name = 'id_match'
@@ -60,7 +57,8 @@ def load_and_update_predictions(df, df_hist):
 if __name__ == "__main__":
 
     # Defino argumentos
-    l_countries = ["england", 'germany', 'france', 'italy']     #  'spain' --> volver a entrenar modelos.
+    id_country = 48
+    # l_countries = ["england", 'germany', 'france', 'italy']     #  'spain' --> volver a entrenar modelos.
     n_days_max_next_matches = 3 # Numero de dias maximo desde hoy para extraer partidos
 
-    collect_data(l_countries, n_days=n_days_max_next_matches)
+    collect_data(id_country, n_days=n_days_max_next_matches)
