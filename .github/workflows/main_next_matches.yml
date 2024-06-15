@@ -3,7 +3,7 @@ name: Run predictions
 on:
   schedule:
     - cron: "45 17 15 6 *"
-    - cron: "15 19 15 6 *"
+    - cron: "35 19 15 6 *"
     - cron: "15 20 15 6 *"
     - cron: "45 12 16 6 *"
 jobs:
@@ -32,7 +32,7 @@ jobs:
       - name: Run collect_data script
         run: python p6_deployment/collect_data.py --id_country 6
   
-  collect-data-job-15-19-15-6-star-6:
+  collect-data-job-35-19-15-6-star-6:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -55,7 +55,18 @@ jobs:
 
       - name: Run collect_data script
         run: python p6_deployment/collect_data.py --id_country 6
-        
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+      
   collect-data-job-15-20-15-6-star-6:
     runs-on: ubuntu-latest
     steps:
