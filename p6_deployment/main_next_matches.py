@@ -687,14 +687,13 @@ def concat_and_export_all_missing(df_match_miss, df_match_player_miss, df_match_
     df_match_player_miss_comp_ct.to_excel(f'{BASE_PATH}/df_match_player_miss.xlsx', index=True)
     df_match_odds_miss_comp_ct.to_excel(f'{BASE_PATH}/df_match_odds_miss.xlsx', index=True)
 
-def read_data_of_best_model(country):
+def read_data_of_best_model(id_country):
     
     df_best_models = pd.read_excel("./main_find_best_hyper/data/df_best_models.xlsx")
-    row_country = df_best_models[df_best_models['country'] == country]
+    row_country = df_best_models[df_best_models['id_country'] == id_country]
     n_model = int(row_country['n_model'].values[0])
     iteration_date_str = row_country['iteration_date'].values[0]
     iteration_date_dt = pd.to_datetime(iteration_date_str, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
-    print(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
     return n_model, iteration_date_dt
 
 ################################################### MAIN ###################################################
@@ -772,8 +771,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     print(df_int_with_missing.head(3))
 
     # Defino variables  # Podria llevarlo despues de Data Understanding solo si no usase "comp_to_select" en la extraccion para filtrar las competencias a extraer.
-    n_model, iteration_date_dt = read_data_of_best_model(country)
+    n_model, iteration_date_dt = read_data_of_best_model(id_country)
     ruta_base = f"./main_find_best_hyper/data/{country}/{iteration_date_dt}"
+    print(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, ruta_base)
@@ -795,8 +795,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         if len(df_match) > 0:
             du.describe_data_new(df_match, df_match_player, df_match_odds)
         else:
-            d_run['data_prep'], d_run['modeling'], export = False, False, False
             print("No hay proximos partidos para los cuales predecir su resultado.")
+            return pd.DataFrame()
     
     elif d_run['data_prep']:
         # Levanto datos ya extraidos
@@ -907,7 +907,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    id_country = 148
+    id_country = 48
     n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 

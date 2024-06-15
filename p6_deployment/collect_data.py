@@ -1,17 +1,22 @@
 import pandas as pd
 from main_next_matches import main
+from datetime import datetime
 
-
-def collect_data(id_country, n_days=3):
+def collect_data(id_country, n_days=90):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
     d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
 
+
     # Levanto predicciones.xlsx
     try:
         df = pd.read_excel(f'./p6_deployment/data/predicciones.xlsx', index_col=0)
+
+        # Elimino partidos viejos de predicciones --> Ver si funciona ok
+        df = df[df['date'] >=  datetime.now()]
+
     except FileNotFoundError:
         df = pd.DataFrame()
 
