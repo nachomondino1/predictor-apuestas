@@ -9,7 +9,7 @@ def generate_cron_jobs(file_path):
     # Por fecha
     cron_jobs = []
     for _, row in df.iterrows():
-        dt = row['date']
+        dt = row['date_mod']
         cron_expression = f"{dt.minute} {dt.hour} {dt.day} {dt.month} *"
         cron_jobs.append((cron_expression, row['id_country']))
 
