@@ -1,0 +1,107 @@
+name: Run predictions
+
+on:
+  schedule:
+    - cron: "45 11 19 5 *"
+
+jobs:
+  collect-data-job-45-11-19-5-star:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            p6_deployment/data/schedules.xlsx
+            p6_deployment/update_workflow.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+      - name: Install dependencies
+      run: pip install pandas openpyxl
+      
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --l_countries "48"
+  schedule:
+    - cron: "15 10 18 5 *"
+
+jobs:
+  collect-data-job-15-10-18-5-star:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            p6_deployment/data/schedules.xlsx
+            p6_deployment/update_workflow.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+      - name: Install dependencies
+      run: pip install pandas openpyxl
+      
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --l_countries "59"
+  schedule:
+    - cron: "45 15 19 5 *"
+
+jobs:
+  collect-data-job-45-15-19-5-star:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            p6_deployment/data/schedules.xlsx
+            p6_deployment/update_workflow.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+      - name: Install dependencies
+      run: pip install pandas openpyxl
+      
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --l_countries "55"
+  schedule:
+    - cron: "30 15 26 5 *"
+
+jobs:
+  collect-data-job-30-15-26-5-star:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            p6_deployment/data/schedules.xlsx
+            p6_deployment/update_workflow.py
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+      - name: Install dependencies
+      run: pip install pandas openpyxl
+      
+      - name: Run collect_data script
+        run: python p6_deployment/collect_data.py --l_countries "77"

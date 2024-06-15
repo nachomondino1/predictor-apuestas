@@ -889,6 +889,13 @@ def main(d_run:dict, country:str, n_days_max_next_matches:int = 7, export:bool =
         df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
         df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
 
+        # Formateo fecha y separo en "date" y 'time'
+        # df.rename(columns={'date': 'datetime'}, inplace=True) # Cambia el nombre de la columna 'date' a 'datetime'
+        # df['datetime'] = pd.to_datetime(df['datetime'])  # Convierte la columna 'datetime' a formato datetime
+        # df['date'] = df['datetime'].dt.date         # Crea la columna 'date' extrayendo solo la parte de la fecha
+        # df['time'] = df['datetime'].dt.time          # Crea la columna 'time' extrayendo solo la parte de la hora
+        # df.drop('datetime', axis=1, inplace=True)    # Elimina la columna original 'datetime' si ya no la necesitas
+
         if export:
             df.to_excel(f'./p6_deployment/data/{country}/predicciones.xlsx', index=True)
 

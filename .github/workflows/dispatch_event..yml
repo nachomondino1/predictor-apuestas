@@ -16,7 +16,7 @@ jobs:
       with:
         sparse-checkout: |
           p6_deployment/data/predicciones.xlsx
-          dispatch_event
+          github_actions/dispatch_event
         sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
@@ -28,10 +28,10 @@ jobs:
     - name: Install dependencies # Por ejemplo, requests
       run: |
         python -m pip install --upgrade pip
-        pip install -r dispatch_event/requirements.txt
+        pip install -r github_actions/dispatch_event/requirements.txt
 
     - name: Dispatch event to second repository
       env:
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
       run: |
-        python dispatch_event/dispatch_event.py
+        python github_actions/dispatch_event/dispatch_event.py
