@@ -2,8 +2,7 @@ name: Run predictions
 
 on:
   schedule:
-    - cron: "08 17 15 6 *"
-    - cron: "08 23 15 6 *"
+    - cron: "*/1 * * * *"
 
 jobs:
   collect-data-job-08-17-15-6-star-6:
