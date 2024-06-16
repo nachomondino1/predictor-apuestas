@@ -23,10 +23,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-
-      - name: Activate virtual environment and run collect_data script
+ 
+      - name: Create virtual environment & Install dependencies
         run: |
+          python -m venv venv_mnm
           source venv_mnm/bin/activate
+          pip install -r requirements_mnm.txt
+
+      - name: Run collect_data script
+        run: |
           python p6_deployment/collect_data.py --id_country 6
 
       - name: Commit and push predictions.xlsx
