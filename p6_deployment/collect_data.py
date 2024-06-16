@@ -1,5 +1,7 @@
+import sys
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-from main_next_matches import main
+from p6_deployment.main_next_matches import main
 from datetime import datetime
 
 def collect_data(id_country, n_days=3):
