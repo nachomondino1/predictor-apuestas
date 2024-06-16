@@ -703,7 +703,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
     # Determino id_country
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
