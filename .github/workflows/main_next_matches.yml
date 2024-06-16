@@ -24,14 +24,10 @@ jobs:
         with:
           python-version: '3.x'
 
-      # - name: Install dependencies
-      #   run: pip install pandas openpyxl
-
-      - name: Activate virtual environment
-        run: source venv_mnm/bin/activate
-
-      - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --id_country 6
+      - name: Activate virtual environment and run collect_data script
+        run: |
+          source venv_mnm/bin/activate
+          python p6_deployment/collect_data.py --id_country 6
 
       - name: Commit and push predictions.xlsx
         run: |
