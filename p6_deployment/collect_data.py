@@ -1,7 +1,7 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-from p6_deployment.main_next_matches import main
+from p6_deployment import main_next_matches
 from datetime import datetime
 
 def collect_data(id_country, n_days=3):
@@ -22,7 +22,7 @@ def collect_data(id_country, n_days=3):
         df = pd.DataFrame()
 
     # Extraigo, preparo y predigo proximos partidos
-    df_country = main(d_run, id_country, n_days, export=d_run['export'])
+    df_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
 
     # Guardo predicciones en historial
     df = load_and_update_predictions(df_country, df)
