@@ -1,8 +1,9 @@
 name: Run predictions
 
 on:
-  schedule: # Horario en UTC=0 --> argentina es UTC-3
-    - cron: "*/1 * * * *"
+  push
+  # schedule: # Horario en UTC=0 --> argentina es UTC-3
+  #   - cron: "*/1 * * * *"
 
 jobs:
   collect-data-job-08-17-15-6-star-6:
