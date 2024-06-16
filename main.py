@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 ### Build model
 from sklearn.decomposition import PCA
 from sklearn.tree import DecisionTreeClassifier
-import xgboost as xgb  # XGBoost
+# import xgboost as xgb  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM

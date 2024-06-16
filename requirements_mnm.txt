@@ -1,0 +1,10 @@
+pandas
+selenium
+webdriver-manager
+tqdm
+scikit-learn
+plotly
+fuzzywuzzy
+imbalanced-learn
+openpyxl
+python-Levenshtein
