@@ -24,10 +24,8 @@ jobs:
         with:
           python-version: '3.x'
  
-      - name: Create virtual environment & Install dependencies
+      - name: Install dependencies
         run: |
-          python -m venv venv_mnm
-          source venv_mnm/bin/activate
           pip install -r requirements_mnm.txt
 
       - name: Run collect_data script
