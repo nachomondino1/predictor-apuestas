@@ -4,12 +4,12 @@ import pandas as pd
 from p6_deployment import main_next_matches
 from datetime import datetime
 
-def collect_data(id_country, n_days=3):
+def collect_data(id_country, n_days=7):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
 
     # Levanto predicciones.xlsx
     try:
