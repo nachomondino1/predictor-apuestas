@@ -10,12 +10,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          sparse-checkout: |
-            github_actions/update_workflow/schedules.xlsx
-            github_actions/update_workflow/update_workflow.py
-            p6_deployment/collect_data.py
-            p6_deployment/main_next_matches.py  # Asegúrate de incluir este archivo si es necesario
-          sparse-checkout-cone-mode: false
+        #   sparse-checkout: |
+        #     github_actions/update_workflow/schedules.xlsx
+        #     github_actions/update_workflow/update_workflow.py
+        #     p6_deployment/collect_data.py
+        #     p6_deployment/main_next_matches.py  # Asegúrate de incluir este archivo si es necesario
+        #   sparse-checkout-cone-mode: false
           ref: prod  # Branch
 
       - name: Set up Python
