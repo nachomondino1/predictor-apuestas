@@ -5,7 +5,7 @@ on:
     - cron: '0 0 */3 * *'  # Ejecutar cada 3 días a la medianoche
   push:
     paths:
-      - 'p6_deployment/data/schedules.xlsx'
+      - 'github_actions/update_workflow/schedules.xlsx'
 
 jobs:
   update-workflow:
@@ -16,8 +16,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
-          p6_deployment/data/schedules.xlsx
-          p6_deployment/update_workflow.py
+          github_actions/update_workflow/schedules.xlsx
+          github_actions/update_workflow/update_workflow.py
         sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
