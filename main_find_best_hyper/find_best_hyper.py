@@ -1,7 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
-from p3_data_preparation.select_data import determine_comps
+from p3_data_preparation.select_data import determine_country_competitions
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
@@ -190,30 +190,6 @@ def select_best_model(df):
     # print("Mejores hiperparámetros:", best_hyperparameters)
     # print("ROI obtenido:", best_roi_max)
 
-def determine_comps(id_country):
-    """
-    Determina los grupos de competencias para el pais.
-    """
-    # Levanto competencias
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-
-    # Selecciono las del pais
-    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
-
-    # Filtro
-    df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]
-    df_comp_country_sin_cups = df_comp_country[(df_comp_country['is_cup'] == 0)]
-
-    # Guardo datos
-    all_comp = list(df_comp_country['id_competition'].values)
-    comp_sin_b = list(df_comp_country_sin_sec_div['id_competition'].values)
-    comp_sin_cups = list(df_comp_country_sin_cups['id_competition'].values)
-    comp_solo_liga = list(df_comp_country_sin_cups[(df_comp_country_sin_cups['is_second_division'] == 0)]['id_competition'].values)
-    d = {'all_comp': all_comp, 'comp_sin_b': comp_sin_b, 'comp_sin_cups': comp_sin_cups, 'comp_solo_liga': comp_solo_liga}
-    print(d)
-    
-    return d
-
 def main(l_modelos, d_params, export: bool = True):
 
     # Definicion de variables
@@ -248,7 +224,7 @@ if __name__ == '__main__':
     id_country = 167
 
     # Defino hiperparametros a probar
-    d_comps = determine_comps(id_country)
+    d_comps = determine_country_competitions(id_country)
     l_modelos = [LogisticRegression(), SVC()]  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     d_params = {
         'construct': {
@@ -257,8 +233,8 @@ if __name__ == '__main__':
             'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # d_comps['comp_sin_b'] # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
-            'n_years_to_select': [3, 5, 10, None],
+            'competencies_to_select': [d_comps['comp_sin_b']], # d_comps['comp_sin_b'] # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
+            'n_years_to_select': [5, 10, None],
         },
         'select': {
             'thr_corr': [0.7, 0.8, 0.9, None],
@@ -270,8 +246,8 @@ if __name__ == '__main__':
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.125], 
-            'bal_type': [None, 'under', 'over'],
-            'k': [10]
+            'bal_type': [None, 'under'], #  'over'
+            'k': [10] 
         }
     }
 

@@ -413,7 +413,7 @@ class DataPreparationNew(DataPreparation):
     
 
 # fill_data_not_available_yet()
-def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill, _print: bool = True): 
+def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill, _print: bool = False): 
     """
     Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
 
@@ -703,7 +703,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
     # Determino id_country
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
@@ -904,8 +904,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    id_country = 59
-    n_days_max_next_matches = 1 # Numero de dias maximo desde hoy para extraer partidos
+    id_country = 167
+    n_days_max_next_matches = 7 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos

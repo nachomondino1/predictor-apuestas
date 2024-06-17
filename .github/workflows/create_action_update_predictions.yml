@@ -1,0 +1,32 @@
+name: Update Predictions with formations
+
+on:
+  schedule:
+    - cron: '0 0 */3 * *'  # Ejecutar cada 3 días a la medianoche
+  push:
+    paths:
+      - 'github_actions/automatize_predict/schedules.xlsx'
+
+jobs:
+  update-workflow:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          github_actions/automatize_predict
+        sparse-checkout-cone-mode: false
+        ref: prod  # Branch
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: pip install pandas openpyxl
+
+    - name: Run update script
+      run: python github_actions/automatize_predict/create_action_update_predictions.py

@@ -1,0 +1,44 @@
+name: Get predictions next 15 days
+
+on:
+  schedule: # https://www.crondrive.com/test-cron-expression?utf8=%E2%9C%93&expression=0+2+*+*+*&time_zone=UTC&commit=Test
+    - cron: "35 20 17 6 *"  # Prueba
+    - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
+
+jobs:
+  collect_predictions:
+    runs-on: ubuntu-latest
+
+    # Agrego permisos para poder hacer push
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+ 
+      - name: Install dependencies
+        run: |
+          pip install -r requirements_mnm.txt
+
+      - name: Run collect_predictions script
+        run: |
+          python github_actions/automatize_predict/collect_predictions.py 15 "[167]"  # [48, 55, 59, 77, 167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add predicciones.xlsx of next 15 days"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
