@@ -807,7 +807,7 @@ def main(id_country, d_run, export: bool = True):
     data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
     
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
@@ -838,7 +838,7 @@ def main(id_country, d_run, export: bool = True):
     if data_prep:
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
-        d_comps = select_data.determine_comps(id_country)
+        d_comps = select_data.determine_country_competitions(id_country)
         n_days, n_years_h2h, segun_localia = 30, 3, False
         thr_corr, thr_fs = 0.7, 0.1
         n_years_to_select, comp_to_select = 10, d_comps['comp_sin_b']

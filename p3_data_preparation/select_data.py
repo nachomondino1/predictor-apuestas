@@ -361,7 +361,7 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     
     return l_important_features
 
-def determine_comps(id_country):
+def determine_country_competitions(id_country):
     """
     Determina los grupos de competencias para el pais.
     """
