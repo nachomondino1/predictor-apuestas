@@ -10,7 +10,7 @@ from datetime import datetime
 # - Tiene que generar el historial_predicciones.xlsx igual (para tenerlo no solo en MySQL sino tambien local)
 # - Tengo que actualizar historial_predicciones.xlsx con el resultado del partido una vez que ya termino.
 
-def collect_predictions(l_countries, n_days):
+def collect_predictions(l_countries: list, n_days: float):
     """
     Recoleccion de predicciones de todos los paises
     """
@@ -69,17 +69,11 @@ def load_and_update_predictions(df, df_hist):
 
     return df_hist
 
-def prueba():
-    # Definicion de parametros
-    # l_countries = [48, 55, 59, 77, 167]
-    # n_days = 7 # Numero de dias maximo desde hoy para extraer partidos
-    return l_countries, n_days
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # l_countries, n_days = prueba()
-    l_countries = ast.literal_eval(sys.argv[2])
-    n_days = int(sys.argv[1])
+    n_days = float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
+    l_countries = ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
 
     collect_predictions(l_countries, n_days)    

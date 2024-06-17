@@ -16,7 +16,8 @@ def create_schedule(df_next_matches, minutos_a_restar=15):
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
     # Exportar schedules.xlsx
-    df.to_excel('github_actions/update_workflow/schedules.xlsx', index=False)
+    df.to_excel('github_actions/automatize_predict/schedules.xlsx', index=False)
+    return df
 
 def generate_cron_jobs(df):
     # Por fecha
@@ -29,22 +30,26 @@ def generate_cron_jobs(df):
     return cron_jobs
 
 def create_cronjob_action(cron_jobs, workflow_path):
-    workflow_content = """name: Run predictions
+    workflow_content = """name: Update predictions with line-ups
 
 on:
   schedule:
 """
     for cron, _ in cron_jobs:
-        workflow_content += f"    - cron: \"{cron}\"\n"
+        workflow_content += f"    - cron: \"{cron} {"America/Argentina/Buenos_Aires"}\"\n"
 
     workflow_content += "jobs:\n"
 
-    for cron, country in cron_jobs:
-        job_name = f"collect-data-job-{cron.replace(' ', '-').replace('*', 'star')}-{country}"
+    for cron, id_country in cron_jobs:
+        job_name = f"collect-data-job-{cron.replace(' ', '-').replace('*', 'star')}-{id_country}"
 
         workflow_content += f"""
   {job_name}:
     runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,7 +68,7 @@ on:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python github_actions/automatize_predict/collect_predictions.py --id_country {country}
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [{id_country}]
 
       - name: Commit and push predictions.xlsx
         run: |
@@ -84,12 +89,12 @@ on:
 if __name__ == "__main__":
     
     # Defino argumentos
-    minutos_a_restar = 15 # Definir la cantidad de minutos a restar
+    # minutos_a_restar = 15 #int(sys.argv[1]) # Definir la cantidad de minutos a restar
     df_next_matches = pd.read_excel('p6_deployment/data/predicciones.xlsx') # Levantar proximos partidos    
     workflow_path = '.github/workflows/update_predictions.yml'
 
     # Creo schedules.xlsx
-    df_schedules = create_schedule(df_next_matches, minutos_a_restar) # pd.read_excel(file_path) # sheet_name='schedules' # file_path = 'github_actions/automatize_predict/schedules.xlsx'
+    df_schedules = create_schedule(df_next_matches) # pd.read_excel(file_path) # sheet_name='schedules' # file_path = 'github_actions/automatize_predict/schedules.xlsx'
 
     # Formateo fecha como fecha de cronjob
     cron_jobs = generate_cron_jobs(df_schedules)
