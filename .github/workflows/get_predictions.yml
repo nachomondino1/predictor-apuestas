@@ -1,10 +1,7 @@
 name: Get predictions next 15 days
 
 on:
-  schedule: # https://www.crondrive.com/test-cron-expression?utf8=%E2%9C%93&expression=0+2+*+*+*&time_zone=UTC&commit=Test
-    - cron: "56 20 17 6 *"  # Prueba
-    - cron: "57 20 17 6 *"  # Prueba
-    - cron: "58 20 17 6 *"  # Prueba
+  schedule:
     - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
 
 jobs:
