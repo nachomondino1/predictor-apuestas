@@ -36,7 +36,7 @@ on:
   schedule:
 """
     for cron, _ in cron_jobs:
-        workflow_content += f"    - cron: \"{cron} {"America/Argentina/Buenos_Aires"}\"\n"
+        workflow_content += f"    - cron: \"{cron}\"\n"
 
     workflow_content += "jobs:\n"
 
