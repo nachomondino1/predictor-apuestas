@@ -5,7 +5,7 @@ from collections import defaultdict
 
 def create_schedule(df_next_matches, minutos_a_restar=15):
     """
-    Obtengo fecha y hora y pais para el cual correr automatize_predict.py
+    Obtengo fecha y hora y pais para el cual correr collect_predictions.py
     """
     # Obtener fechas unicas y paises 
     df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
@@ -63,7 +63,7 @@ on:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python github_actions/automatize_predict/automatize_predict.py --id_country {country}
+        run: python github_actions/automatize_predict/collect_predictions.py --id_country {country}
 
       - name: Commit and push predictions.xlsx
         run: |
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # Defino argumentos
     minutos_a_restar = 15 # Definir la cantidad de minutos a restar
     df_next_matches = pd.read_excel('p6_deployment/data/predicciones.xlsx') # Levantar proximos partidos    
-    workflow_path = '.github/workflows/automatize_predict.yml'
+    workflow_path = '.github/workflows/update_predictions.yml'
 
     # Creo schedules.xlsx
     df_schedules = create_schedule(df_next_matches, minutos_a_restar) # pd.read_excel(file_path) # sheet_name='schedules' # file_path = 'github_actions/automatize_predict/schedules.xlsx'

@@ -1,0 +1,46 @@
+name: Run predictions
+
+on:
+  schedule:
+    - cron: "* * */1 * *"
+
+jobs:
+  collect_predictions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+        #   sparse-checkout: |
+        #     venv_mnm
+        #     github_actions/update_workflow/schedules.xlsx
+        #     github_actions/update_workflow/update_workflow.py
+        #     p6_deployment/collect_data.py
+        #     p6_deployment/main_next_matches.py  # Asegúrate de incluir este archivo si es necesario
+        #   sparse-checkout-cone-mode: false
+          ref: staging  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+ 
+      - name: Install dependencies
+        run: |
+          pip install -r requirements_mnm.txt
+
+      - name: Run collect_data script
+        run: |
+          python github_actions/automatize_predict/collect_predictions.py --id_country 6
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add predicciones.xlsx of next 15 days"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
