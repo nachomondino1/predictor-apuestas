@@ -2,7 +2,7 @@ name: Get predictions next 15 days
 
 on:
   schedule: # https://www.crondrive.com/test-cron-expression?utf8=%E2%9C%93&expression=0+2+*+*+*&time_zone=UTC&commit=Test
-    - cron: "01 20 17 6 *"  # Prueba
+    - cron: "35 20 17 6 *"  # Prueba
     - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ignacio/deployment/automatize_predict  # Branch
+          ref: prod  # Branch
 
       - name: Set up Python
         uses: actions/setup-python@v5
