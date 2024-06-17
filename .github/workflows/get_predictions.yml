@@ -2,6 +2,7 @@ name: Get predictions next 15 days
 
 on:
   schedule:
+    - cron: "*/5 * * * *"  # Prueba
     - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
 
 jobs:
