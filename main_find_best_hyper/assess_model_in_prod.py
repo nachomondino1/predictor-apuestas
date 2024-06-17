@@ -207,8 +207,8 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    country = "argentina"
-    iteration_date = '2024-05-07'
+    country = "usa"
+    iteration_date = '2024-06-03'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
 
     # Evaluo modelos en produccion

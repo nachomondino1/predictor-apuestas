@@ -1,35 +1,45 @@
 import sys
+import ast
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p6_deployment import main_next_matches
 from datetime import datetime
 
-def collect_data(id_country, n_days=7):
+# Mejoras a implementar:
+# - Tiene que recolectar todos los paises. --> dsp tengo que actualizar create_action_automatize_predict para que tome el argumento l_countries en vez de id_country.Tiene que usar l_countries con los id_countries que comparaten mismo horario.
+# - Tiene que generar el historial_predicciones.xlsx igual (para tenerlo no solo en MySQL sino tambien local)
+# - Tengo que actualizar historial_predicciones.xlsx con el resultado del partido una vez que ya termino.
+
+def collect_predictions(l_countries: list, n_days: float):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
     d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
+    df = pd.DataFrame()
 
-    # Levanto predicciones.xlsx
+    # Levanto historial_predicciones.xlsx
     try:
-        df = pd.read_excel(f'./p6_deployment/data/predicciones.xlsx', index_col=0)
-
-        # Elimino partidos viejos de predicciones --> Ver si funciona ok
-        df = df[df['date'] >=  datetime.now()]
-
+        df_hist = pd.read_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index_col=0)
     except FileNotFoundError:
-        df = pd.DataFrame()
+        df_hist = pd.DataFrame()
 
-    # Extraigo, preparo y predigo proximos partidos
-    df_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
+    # Por country
+    for id_country in l_countries:
 
-    # Guardo predicciones en historial
-    df = load_and_update_predictions(df_country, df)
-    
+        # Extraigo, preparo y predigo proximos partidos
+        df_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
+
+        # Concatenar df_countries....
+        df = pd.concat([df, df_country], axis=0)
+
+        # Guardo predicciones en historial
+        df_hist = load_and_update_predictions(df_country, df)
+
     # Exporto datos
     df.index.name = 'id_match'
     df.to_excel(f'./p6_deployment/data/predicciones.xlsx', index=True)
+    df_hist.to_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index=True)
 
 def load_and_update_predictions(df, df_hist):
     """
@@ -62,8 +72,8 @@ def load_and_update_predictions(df, df_hist):
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    # Defino argumentos
-    id_country = 6
-    n_days_max_next_matches = 3 # Numero de dias maximo desde hoy para extraer partidos
+    # l_countries, n_days = prueba()
+    n_days = float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
+    l_countries = ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
 
-    collect_data(id_country, n_days=n_days_max_next_matches)
+    collect_predictions(l_countries, n_days)    

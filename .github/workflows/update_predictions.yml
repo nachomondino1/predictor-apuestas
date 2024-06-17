@@ -1,0 +1,309 @@
+name: Update predictions with line-ups
+
+on:
+  schedule:
+    - cron: "15 23 19 6 *"
+    - cron: "30 23 19 6 *"
+    - cron: "15 0 20 6 *"
+    - cron: "15 2 20 6 *"
+    - cron: "15 23 22 6 *"
+    - cron: "15 0 23 6 *"
+    - cron: "15 1 23 6 *"
+    - cron: "15 2 23 6 *"
+jobs:
+
+  collect-data-job-15-23-19-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-30-23-19-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-15-0-20-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-15-2-20-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-15-23-22-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-15-0-23-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-15-1-23-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
+
+  collect-data-job-15-2-23-6-star-167:
+    runs-on: ubuntu-latest
+
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github_actions/automatize_predict
+          sparse-checkout-cone-mode: false
+          ref: prod  # Branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run collect_data script
+        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [167]
+
+      - name: Commit and push predictions.xlsx
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${ secrets.TOKEN }
