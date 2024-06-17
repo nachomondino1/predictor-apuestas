@@ -3,11 +3,16 @@ name: Get predictions next 15 days
 on:
   push
   # schedule:
-  #   - cron: "0 0 */2 * *"  # Ejecutar cada 2 días a la medianoche
+  #   - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche
 
 jobs:
   collect_predictions:
     runs-on: ubuntu-latest
+
+    # Agrego permisos para poder hacer push
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+      # pull-requests: write      # 'write' access to pull requests
 
     steps:
       - name: Checkout repository
@@ -34,7 +39,7 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python github_actions/automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 167]"
+          python github_actions/automatize_predict/collect_predictions.py 7 "[48, 55, 59, 77, 167]"
 
       - name: Commit and push predictions.xlsx
         run: |
