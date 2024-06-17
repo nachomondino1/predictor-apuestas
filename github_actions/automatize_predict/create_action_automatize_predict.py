@@ -1,11 +1,24 @@
+import sys
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from collections import defaultdict
 
-def generate_cron_jobs(file_path):
-    
-    # Levanta schedules.xlsx
-    df = pd.read_excel(file_path) # sheet_name='schedules'
+def create_schedule(df_next_matches, minutos_a_restar=15):
+    """
+    Obtengo fecha y hora y pais para el cual correr automatize_predict.py
+    """
+    # Obtener fechas unicas y paises 
+    df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
+    df = df.drop_duplicates()   # Obtener los registros únicos
 
+    # Restar x minutos a cada hora
+    delta = pd.to_timedelta(minutos_a_restar, unit='m')
+    df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
+
+    # Exportar schedules.xlsx
+    df.to_excel('github_actions/update_workflow/schedules.xlsx', index=False)
+
+def generate_cron_jobs(df):
     # Por fecha
     cron_jobs = []
     for _, row in df.iterrows():
@@ -15,7 +28,7 @@ def generate_cron_jobs(file_path):
 
     return cron_jobs
 
-def update_github_workflow(cron_jobs, workflow_path):
+def create_cronjob_action(cron_jobs, workflow_path):
     workflow_content = """name: Run predictions
 
 on:
@@ -37,9 +50,7 @@ on:
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            github_actions/update_workflow/schedules.xlsx
-            github_actions/update_workflow/update_workflow.py
-            p6_deployment/collect_data.py
+            github_actions/automatize_predict
           sparse-checkout-cone-mode: false
           ref: prod  # Branch
 
@@ -52,7 +63,7 @@ on:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python p6_deployment/collect_data.py --id_country {country}
+        run: python github_actions/automatize_predict/automatize_predict.py --id_country {country}
 
       - name: Commit and push predictions.xlsx
         run: |
@@ -69,13 +80,19 @@ on:
     with open(workflow_path, 'w') as file:
         file.write(workflow_content)
 
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    
     # Defino argumentos
-    file_path = 'github_actions/update_workflow/schedules.xlsx'
-    workflow_path = '.github/workflows/main_next_matches.yml'
+    minutos_a_restar = 15 # Definir la cantidad de minutos a restar
+    df_next_matches = pd.read_excel('p6_deployment/data/predicciones.xlsx') # Levantar proximos partidos    
+    workflow_path = '.github/workflows/automatize_predict.yml'
+
+    # Creo schedules.xlsx
+    df_schedules = create_schedule(df_next_matches, minutos_a_restar) # pd.read_excel(file_path) # sheet_name='schedules' # file_path = 'github_actions/automatize_predict/schedules.xlsx'
 
     # Formateo fecha como fecha de cronjob
-    cron_jobs = generate_cron_jobs(file_path)
+    cron_jobs = generate_cron_jobs(df_schedules)
 
     # Actualizo workflow 'Collect Data' segun fechas
-    update_github_workflow(cron_jobs, workflow_path)
+    create_cronjob_action(cron_jobs, workflow_path)
