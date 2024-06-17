@@ -1,4 +1,4 @@
-name: Update Workflow
+name: Update Predictions with formations
 
 on:
   schedule:

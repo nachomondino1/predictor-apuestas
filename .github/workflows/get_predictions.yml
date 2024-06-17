@@ -1,8 +1,9 @@
-name: Run predictions
+name: Get predictions next 15 days
 
 on:
-  schedule:
-    - cron: "0 0 */2 * *"  # Ejecutar cada 2 días a la medianoche
+  push
+  # schedule:
+  #   - cron: "0 0 */2 * *"  # Ejecutar cada 2 días a la medianoche
 
 jobs:
   collect_predictions:
