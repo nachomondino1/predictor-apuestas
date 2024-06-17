@@ -29,7 +29,7 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python github_actions/automatize_predict/collect_predictions.py 7 "[167]"  # [48, 55, 59, 77, 167]
+          python github_actions/automatize_predict/collect_predictions.py 15 "[167]"  # [48, 55, 59, 77, 167]
 
       - name: Commit and push predictions.xlsx
         run: |
