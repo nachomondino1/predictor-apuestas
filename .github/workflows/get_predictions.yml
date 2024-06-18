@@ -1,6 +1,9 @@
 name: Get predictions next 15 days
 
 on:
+  push: # Solo por pruebas porque aun no entiendo el schedule
+    # branches:
+    #   - prod
   schedule:
     - cron: "*/2 * * * *"  # Prueba
     - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
