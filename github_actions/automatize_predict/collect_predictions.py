@@ -5,10 +5,9 @@ import pandas as pd
 from p6_deployment import main_next_matches
 from datetime import datetime
 
-# Mejoras a implementar:
-# - Tiene que recolectar todos los paises. --> dsp tengo que actualizar create_action_automatize_predict para que tome el argumento l_countries en vez de id_country.Tiene que usar l_countries con los id_countries que comparaten mismo horario.
-# - Tiene que generar el historial_predicciones.xlsx igual (para tenerlo no solo en MySQL sino tambien local)
-# - Tengo que actualizar historial_predicciones.xlsx con el resultado del partido una vez que ya termino.
+# Mejoras a implementar
+# # - Tengo que actualizar historial_predicciones.xlsx con el resultado del partido una vez que ya termino.
+# Chequear que historial_predicciones.xslx esta bien construido y se actualiza correctamente.
 
 def collect_predictions(l_countries: list, n_days: float):
     """
@@ -73,7 +72,7 @@ def load_and_update_predictions(df, df_hist):
 if __name__ == "__main__":
 
     # l_countries, n_days = prueba()
-    n_days = float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
-    l_countries = ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
+    n_days = 1.5 #float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
+    l_countries = [167] #ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
 
     collect_predictions(l_countries, n_days)    
