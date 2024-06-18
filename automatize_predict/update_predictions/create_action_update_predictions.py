@@ -16,7 +16,7 @@ def create_schedule(df_next_matches, minutos_a_restar=15):
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
     # Exportar schedules.xlsx
-    df.to_excel('github_actions/automatize_predict/schedules.xlsx', index=False)
+    df.to_excel('automatize_predict/update_predictions/schedules.xlsx', index=False)
     return df
 
 def generate_cron_jobs(df):
@@ -47,39 +47,62 @@ on:
   {job_name}:
     runs-on: ubuntu-latest
 
+    # Asocio cron con job
+    if: github.event.schedule == '{cron}'
+
+    # Permisos para push
     permissions:                # Job-level permissions configuration starts here
       contents: write           # 'write' access to repository contents
 
     steps:
+
+      # Clono repo de producto en maquina ubuntu donde corre el workflow
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          sparse-checkout: |
-            github_actions/automatize_predict
-          sparse-checkout-cone-mode: false
           ref: prod  # Branch
 
+      # Instalo dependencias
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+ 
+      - name: Set up cache for pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_mnm.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: pip install pandas openpyxl
+        run: |
+          pip install -r requirements_mnm.txt
 
+      # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [{id_country}]
+        run: python automatize_predict/collect_predictions.py 0.05 [{id_country}]
 
+        
+      # Push to Github de predicciones.xlsx
       - name: Commit and push predictions.xlsx
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add p6_deployment/data/predicciones.xlsx
           git commit -m "Add updated predicciones.xlsx"
           git push
+
+      # Dispatch
+      - name: Dispatch event to second repository
         env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          python automatize_predict/dispatch_event/dispatch_event.py
 """
 
     with open(workflow_path, 'w') as file:
