@@ -16,7 +16,7 @@ def create_schedule(df_next_matches, minutos_a_restar=15):
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
     # Exportar schedules.xlsx
-    df.to_excel('github_actions/automatize_predict/schedules.xlsx', index=False)
+    df.to_excel('automatize_predict/update_predictions/schedules.xlsx', index=False)
     return df
 
 def generate_cron_jobs(df):
@@ -55,7 +55,7 @@ on:
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            github_actions/automatize_predict
+            automatize_predict
           sparse-checkout-cone-mode: false
           ref: prod  # Branch
 
@@ -68,18 +68,18 @@ on:
         run: pip install pandas openpyxl
 
       - name: Run collect_data script
-        run: python github_actions/automatize_predict/collect_predictions.py 0.05 [{id_country}]
+        run: python automatize_predict/collect_predictions.py 0.05 [{id_country}]
 
       - name: Commit and push predictions.xlsx
+        env:
+          # Set the environment variable GITHUB_TOKEN if needed for push authentication
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add p6_deployment/data/predicciones.xlsx
           git commit -m "Add updated predicciones.xlsx"
-          git push
-        env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
 """
 
     with open(workflow_path, 'w') as file:
