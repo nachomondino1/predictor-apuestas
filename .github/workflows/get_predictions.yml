@@ -2,11 +2,11 @@ name: Get predictions next 15 days
 
 on:
   schedule:
-    - cron: "*/2 * * * *"  # Prueba
+    # - cron: "*/2 * * * *"  # Prueba
     - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
-  push:
-    branches:
-      - prod
+  # push:  # En pruebas
+  #   branches:
+  #     - prod
 
 jobs:
   collect_predictions:
@@ -43,7 +43,7 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python automatize_predict/collect_predictions.py 1.5 "[167]"  # [48, 55, 59, 77, 167]
+          python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]"
 
       - name: Commit and push predictions.xlsx
         env:
