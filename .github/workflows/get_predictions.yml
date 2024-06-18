@@ -6,11 +6,12 @@ on:
   push: # Solo por pruebas porque aun no entiendo el schedule
     branches:
       - prod
-      - staging
       
 jobs:
   collect_predictions:
     runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/prod'  # Asegura que el job se ejecute solo en la rama prod
 
     # Agrego permisos para poder hacer push
     permissions:                # Job-level permissions configuration starts here
