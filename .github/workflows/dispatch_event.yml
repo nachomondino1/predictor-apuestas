@@ -1,7 +1,7 @@
 name: Dispatch Event
 
 on:
-  push:
+  push
     # branches:
     #   - prod  # Asegúrate de que esta acción escuche los eventos de push en 'prod'
     # paths:
