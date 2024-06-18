@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    # if: github.event.schedule == '10 20 18 6 *'
+    if: github.event.schedule == '10 20 18 6 *'
 
     steps:
 
