@@ -72,7 +72,7 @@ def load_and_update_predictions(df, df_hist):
 if __name__ == "__main__":
 
     # l_countries, n_days = prueba()
-    n_days = 1.5 #float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
-    l_countries = [167] #ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
+    n_days = float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
+    l_countries = ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
 
     collect_predictions(l_countries, n_days)    
