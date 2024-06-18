@@ -2,6 +2,8 @@ name: Dispatch Event
 
 on:
   push:
+    branches:
+      - prod  # Asegúrate de que esta acción escuche los eventos de push en 'prod'
     paths:
       - p6_deployment/data/predicciones.xlsx
 
@@ -14,10 +16,10 @@ jobs:
     - name: Checkout this repository
       uses: actions/checkout@v4
       with:
-      #   sparse-checkout: |
-      #     p6_deployment/data/predicciones.xlsx
-      #     github_actions/dispatch_event
-      #   sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          p6_deployment/data/predicciones.xlsx
+          github_actions/dispatch_event
+        sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
     - name: Install Python
