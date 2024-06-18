@@ -14,10 +14,10 @@ jobs:
     - name: Checkout this repository
       uses: actions/checkout@v4
       with:
-        sparse-checkout: |
-          p6_deployment/data/predicciones.xlsx
-          github_actions/dispatch_event
-        sparse-checkout-cone-mode: false
+      #   sparse-checkout: |
+      #     p6_deployment/data/predicciones.xlsx
+      #     github_actions/dispatch_event
+      #   sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
     - name: Install Python
