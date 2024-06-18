@@ -1,7 +1,7 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-
+from datetime import datetime
 
 def create_schedule(df_next_matches, minutos_a_restar=15):
     """
@@ -118,7 +118,8 @@ if __name__ == "__main__":
     
     # Defino argumentos
     # minutos_a_restar = 15 #int(sys.argv[1]) # Definir la cantidad de minutos a restar
-    df_next_matches = pd.read_excel('p6_deployment/data/predicciones.xlsx') # Levantar proximos partidos    
+    df_next_matches = pd.read_excel('p6_deployment/data/historial_predicciones.xlsx') # Levantar proximos partidos  --> tengo que garantizar que sean los partidos de los proximos 15 dias.
+    df_next_matches = df_next_matches[df_next_matches['date'].dt.date >= datetime.now().date()]
     workflow_path = '.github/workflows/update_predictions.yml'
 
     # Creo schedules.xlsx
