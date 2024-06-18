@@ -44,13 +44,28 @@ jobs:
         run: |
           python github_actions/automatize_predict/collect_predictions.py 2 "[167]"  # [48, 55, 59, 77, 167]
 
-      - name: Commit and push predictions.xlsx
+      # Configura git
+      - name: Set up Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add predicciones.xlsx of next 15 days"
-          git push origin prod  # Especifica la rama 'prod' aquí
+
+      # Commit y push de los cambios
+      - name: Commit and push changes
         env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          PAT: ${{ secrets.TOKEN }}
+        run: |
+          git add p6_deployment/data/predicciones.xlsx
+          git commit -m "Add updated predicciones.xlsx"
+          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+
+      # - name: Commit and push predictions.xlsx
+      #   run: |
+      #     git config --global user.name 'github-actions[bot]'
+      #     git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      #     git add p6_deployment/data/predicciones.xlsx
+      #     git commit -m "Add predicciones.xlsx of next 15 days"
+      #     git push origin prod  # Especifica la rama 'prod' aquí
+      #   env:
+      #     # Set the environment variable GITHUB_TOKEN if needed for push authentication
+      #     GITHUB_TOKEN: ${{ secrets.TOKEN }}
