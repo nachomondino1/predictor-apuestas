@@ -8,3 +8,4 @@ fuzzywuzzy
 imbalanced-learn
 openpyxl
 python-Levenshtein
+requests
