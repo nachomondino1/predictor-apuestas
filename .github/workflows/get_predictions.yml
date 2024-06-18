@@ -62,3 +62,9 @@ jobs:
       #   env:
       #     # Set the environment variable GITHUB_TOKEN if needed for push authentication
       #     GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Dispatch event to second repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          python github_actions/dispatch_event/dispatch_event.py
