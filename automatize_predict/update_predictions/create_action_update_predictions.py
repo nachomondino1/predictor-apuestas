@@ -1,18 +1,21 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-from collections import defaultdict
+
 
 def create_schedule(df_next_matches, minutos_a_restar=15):
     """
     Obtengo fecha y hora y pais para el cual correr collect_predictions.py
     """
+    utc_argentina = 3  # Argentina es UTC-3
+
     # Obtener fechas unicas y paises 
     df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
     df = df.drop_duplicates()   # Obtener los registros únicos
 
     # Restar x minutos a cada hora
-    delta = pd.to_timedelta(minutos_a_restar, unit='m')
+    delta_time = minutos_a_restar - utc_argentina * 60  # [minutos]
+    delta = pd.to_timedelta(delta_time, unit='m')
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
     # Exportar schedules.xlsx
@@ -30,6 +33,8 @@ def generate_cron_jobs(df):
     return cron_jobs
 
 def create_cronjob_action(cron_jobs, workflow_path):
+    
+    # Schedule
     workflow_content = """name: Update predictions with line-ups
 
 on:
@@ -38,8 +43,13 @@ on:
     for cron, _ in cron_jobs:
         workflow_content += f"    - cron: \"{cron}\"\n"
 
-    workflow_content += "jobs:\n"
+    # Permissions
+    workflow_content += "\npermissions: write-all\n"
 
+    # Jobs
+    workflow_content += "\njobs:\n"
+
+    # Por job
     for cron, id_country in cron_jobs:
         job_name = f"collect-data-job-{cron.replace(' ', '-').replace('*', 'star')}-{id_country}"
 
@@ -49,10 +59,6 @@ on:
 
     # Asocio cron con job
     if: github.event.schedule == '{cron}'
-
-    # Permisos para push
-    permissions:                # Job-level permissions configuration starts here
-      contents: write           # 'write' access to repository contents
 
     steps:
 
@@ -83,7 +89,6 @@ on:
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
         run: python automatize_predict/collect_predictions.py 0.05 [{id_country}]
-
         
       # Push to Github de predicciones.xlsx
       - name: Commit and push predictions.xlsx
