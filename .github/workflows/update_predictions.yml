@@ -2,7 +2,7 @@ name: Update predictions with line-ups
 
 on:
   schedule:
-    - cron: "0 21 18 6 *"
+    - cron: "15 21 18 6 *"
     - cron: "15 23 19 6 *"
     - cron: "30 23 19 6 *"
     - cron: "15 0 20 6 *"
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '0 21 18 6 *'
+    if: github.event.schedule == '15 21 18 6 *'
 
     steps:
 
@@ -50,7 +50,7 @@ jobs:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 1.5 [167]
+        run: python automatize_predict/collect_predictions.py 2 [167]
         
       # Push to Github de predicciones.xlsx
       - name: Commit and push predictions.xlsx
@@ -62,7 +62,7 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add p6_deployment/data/predicciones.xlsx
           git commit -m "Add updated predicciones.xlsx"
-          git push
+          git push origin prod
 
       # Dispatch
       - name: Dispatch event to second repository

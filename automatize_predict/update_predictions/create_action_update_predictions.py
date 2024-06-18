@@ -100,7 +100,7 @@ on:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add p6_deployment/data/predicciones.xlsx
           git commit -m "Add updated predicciones.xlsx"
-          git push
+          git push origin prod
 
       # Dispatch
       - name: Dispatch event to second repository
