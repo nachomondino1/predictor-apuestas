@@ -4,10 +4,15 @@ on:
   schedule:
     - cron: "*/2 * * * *"  # Prueba
     - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
+  push:
+    branches:
+      - prod
 
 jobs:
   collect_predictions:
     runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/prod'  # Asegura que el job se ejecute solo en la rama prod
 
     # Agrego permisos para poder hacer push
     permissions:                # Job-level permissions configuration starts here
