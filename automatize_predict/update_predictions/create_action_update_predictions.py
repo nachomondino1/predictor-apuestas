@@ -89,7 +89,8 @@ on:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 "[{id_country}]" '{{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}}'
+        run: |
+          python automatize_predict/collect_predictions.py 1 "[{id_country}]" '{{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}}'
         
       # Push to Github
       - name: Commit and push all changes
