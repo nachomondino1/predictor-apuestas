@@ -1,4 +1,4 @@
-name: Update Predictions with formations
+name: Create Update action
 
 on:
   schedule:
