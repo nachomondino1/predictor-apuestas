@@ -904,7 +904,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    id_country = 167
+    id_country = 148
     n_days_max_next_matches = 7 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 

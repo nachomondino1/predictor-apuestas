@@ -41,7 +41,7 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]"
+          python automatize_predict/collect_predictions.py 15 "[167]" '{"run_missing": true, "data_unders": false, "data_prep": false, "modeling": false, "export": true}'
 
       - name: Commit and push all changes
         env:
