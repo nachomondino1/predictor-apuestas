@@ -11,7 +11,7 @@ from datetime import datetime
 # - Tiene que generar el historial_predicciones.xlsx igual (para tenerlo no solo en MySQL sino tambien local)
 # - Tengo que actualizar historial_predicciones.xlsx con el resultado del partido una vez que ya termino.
 
-def collect_predictions(l_countries: list, n_days: float):
+def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_hist):
     """
     Recoleccion de predicciones de todos los paises
     """
