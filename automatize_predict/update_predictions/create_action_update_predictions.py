@@ -3,18 +3,19 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from datetime import datetime
 
-def create_schedule(df_next_matches, minutos_a_restar=15):
+def create_schedule(df_next_matches, min_before_match=15):
     """
     Obtengo fecha y hora y pais para el cual correr collect_predictions.py
     """
-    utc_argentina = 3  # Argentina es UTC-3
+    hours_utc_argentina = 3  # Argentina es UTC-3
+    min_delay_schedule = 0  # La action tarda hasta 5 minutos desde schedule time en correrse
 
     # Obtener fechas unicas y paises 
     df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
     df = df.drop_duplicates()   # Obtener los registros únicos
 
     # Restar x minutos a cada hora
-    delta_time = minutos_a_restar - utc_argentina * 60  # [minutos]
+    delta_time = min_before_match + min_delay_schedule - hours_utc_argentina * 60  # [minutos]
     delta = pd.to_timedelta(delta_time, unit='m')
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
@@ -88,7 +89,7 @@ on:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [{id_country}] {{'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}}
+        run: python automatize_predict/collect_predictions.py 0.05 "[{id_country}]" "{{'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}}"
         
       # Push to Github
       - name: Commit and push all changes
