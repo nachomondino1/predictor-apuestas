@@ -15,7 +15,7 @@ def collect_predictions(l_countries: list, n_days: float):
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
+    d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
     df = pd.DataFrame()
 
     # Levanto historial_predicciones.xlsx
