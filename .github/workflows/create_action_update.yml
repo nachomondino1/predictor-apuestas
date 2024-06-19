@@ -30,6 +30,6 @@ jobs:
     - name: Install dependencies
       run: pip install pandas openpyxl
 
-    # Ejecuto create_action_update_predictions.py
+    # Ejecuto create_action_update.py
     - name: Create cronjob in next matches's schedule.
-      run: python automatize_predict/update_predictions/create_action_update_predictions.py
+      run: python automatize_predict/update_predictions/create_action_update.py

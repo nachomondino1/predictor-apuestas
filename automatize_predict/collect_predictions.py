@@ -31,8 +31,8 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_hist):
 
     # Exporto datos
     df.index.name = 'id_match'
-    df.to_excel(f'./p6_deployment/data/predicciones.xlsx', index=True)
-    df_hist.to_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index=True)
+    df.to_excel(f'p6_deployment/data/predicciones.xlsx', index=True)
+    df_hist.to_excel(f'p6_deployment/data/historial_predicciones.xlsx', index=True)
 
 def load_and_update_predictions(df, df_hist):
     """

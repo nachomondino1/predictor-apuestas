@@ -24,6 +24,7 @@ def create_schedule(df_next_matches, min_before_match=15):
     return df
 
 def generate_cron_jobs(df):
+    """Convierte cada fecha en una expresión cron"""
     # Por fecha
     cron_jobs = []
     for _, row in df.iterrows():
@@ -90,7 +91,7 @@ on:
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
         run: |
-          python automatize_predict/collect_predictions.py 1 "[{id_country}]" '{{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}}'
+          python automatize_predict/collect_predictions.py 0.05 "[{id_country}]" '{{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}}'
         
       # Push to Github
       - name: Commit and push all changes
