@@ -2,239 +2,14 @@ name: Update predictions with line-ups
 
 on:
   schedule:
-    - cron: "15 21 18 6 *"
-    - cron: "15 23 19 6 *"
-    - cron: "30 23 19 6 *"
-    - cron: "15 0 20 6 *"
     - cron: "15 2 20 6 *"
-    - cron: "15 23 22 6 *"
-    - cron: "15 0 23 6 *"
-    - cron: "15 1 23 6 *"
-    - cron: "15 2 23 6 *"
+    - cron: "30 2 20 6 *"
+    - cron: "15 3 20 6 *"
+    - cron: "15 5 20 6 *"
 
 permissions: write-all
 
 jobs:
-
-  job_prueba:
-    runs-on: ubuntu-latest
-
-    # Asocio cron con job
-    if: github.event.schedule == '15 21 18 6 *'
-
-    steps:
-
-      # Clono repo de producto en maquina ubuntu donde corre el workflow
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: prod  # Branch
-
-      # Instalo dependencias
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
- 
-      - name: Set up cache for pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${ runner.os }-pip-${ hashFiles('**/requirements_mnm.txt') }
-          restore-keys: |
-            ${ runner.os }-pip-
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements_mnm.txt
-
-      # Ejecución de collect_predictions.py
-      - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 2 [167]
-        
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
-        env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push origin prod
-
-      # Dispatch
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
-
-  collect-data-job-15-23-19-6-star-167:
-    runs-on: ubuntu-latest
-
-    # Asocio cron con job
-    if: github.event.schedule == '15 23 19 6 *'
-
-    steps:
-
-      # Clono repo de producto en maquina ubuntu donde corre el workflow
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: prod  # Branch
-
-      # Instalo dependencias
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
- 
-      - name: Set up cache for pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${ runner.os }-pip-${ hashFiles('**/requirements_mnm.txt') }
-          restore-keys: |
-            ${ runner.os }-pip-
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements_mnm.txt
-
-      # Ejecución de collect_predictions.py
-      - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
-        
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
-        env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
-
-      # Dispatch
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
-
-  collect-data-job-30-23-19-6-star-167:
-    runs-on: ubuntu-latest
-
-    # Asocio cron con job
-    if: github.event.schedule == '30 23 19 6 *'
-
-    steps:
-
-      # Clono repo de producto en maquina ubuntu donde corre el workflow
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: prod  # Branch
-
-      # Instalo dependencias
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
- 
-      - name: Set up cache for pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${ runner.os }-pip-${ hashFiles('**/requirements_mnm.txt') }
-          restore-keys: |
-            ${ runner.os }-pip-
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements_mnm.txt
-
-      # Ejecución de collect_predictions.py
-      - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
-        
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
-        env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
-
-      # Dispatch
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
-
-  collect-data-job-15-0-20-6-star-167:
-    runs-on: ubuntu-latest
-
-    # Asocio cron con job
-    if: github.event.schedule == '15 0 20 6 *'
-
-    steps:
-
-      # Clono repo de producto en maquina ubuntu donde corre el workflow
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: prod  # Branch
-
-      # Instalo dependencias
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
- 
-      - name: Set up cache for pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${ runner.os }-pip-${ hashFiles('**/requirements_mnm.txt') }
-          restore-keys: |
-            ${ runner.os }-pip-
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements_mnm.txt
-
-      # Ejecución de collect_predictions.py
-      - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
-        
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
-        env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
-
-      # Dispatch
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
 
   collect-data-job-15-2-20-6-star-167:
     runs-on: ubuntu-latest
@@ -270,19 +45,19 @@ jobs:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
+        run: python automatize_predict/collect_predictions.py 0.05 [167] {'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}
         
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
+      # Push to Github
+      - name: Commit and push all changes
         env:
           # Set the environment variable GITHUB_TOKEN if needed for push authentication
           GITHUB_TOKEN: ${ secrets.TOKEN }
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
+          git add .  # Agregar todos los cambios
+          git commit -m "Update predictions with line-ups"
+          git push origin prod
 
       # Dispatch
       - name: Dispatch event to second repository
@@ -291,11 +66,11 @@ jobs:
         run: |
           python automatize_predict/dispatch_event/dispatch_event.py
 
-  collect-data-job-15-23-22-6-star-167:
+  collect-data-job-30-2-20-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '15 23 22 6 *'
+    if: github.event.schedule == '30 2 20 6 *'
 
     steps:
 
@@ -325,19 +100,19 @@ jobs:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
+        run: python automatize_predict/collect_predictions.py 0.05 [167] {'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}
         
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
+      # Push to Github
+      - name: Commit and push all changes
         env:
           # Set the environment variable GITHUB_TOKEN if needed for push authentication
           GITHUB_TOKEN: ${ secrets.TOKEN }
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
+          git add .  # Agregar todos los cambios
+          git commit -m "Update predictions with line-ups"
+          git push origin prod
 
       # Dispatch
       - name: Dispatch event to second repository
@@ -346,11 +121,11 @@ jobs:
         run: |
           python automatize_predict/dispatch_event/dispatch_event.py
 
-  collect-data-job-15-0-23-6-star-167:
+  collect-data-job-15-3-20-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '15 0 23 6 *'
+    if: github.event.schedule == '15 3 20 6 *'
 
     steps:
 
@@ -380,19 +155,19 @@ jobs:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
+        run: python automatize_predict/collect_predictions.py 0.05 [167] {'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}
         
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
+      # Push to Github
+      - name: Commit and push all changes
         env:
           # Set the environment variable GITHUB_TOKEN if needed for push authentication
           GITHUB_TOKEN: ${ secrets.TOKEN }
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
+          git add .  # Agregar todos los cambios
+          git commit -m "Update predictions with line-ups"
+          git push origin prod
 
       # Dispatch
       - name: Dispatch event to second repository
@@ -401,11 +176,11 @@ jobs:
         run: |
           python automatize_predict/dispatch_event/dispatch_event.py
 
-  collect-data-job-15-1-23-6-star-167:
+  collect-data-job-15-5-20-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '15 1 23 6 *'
+    if: github.event.schedule == '15 5 20 6 *'
 
     steps:
 
@@ -435,74 +210,19 @@ jobs:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
+        run: python automatize_predict/collect_predictions.py 0.05 [167] {'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}
         
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
+      # Push to Github
+      - name: Commit and push all changes
         env:
           # Set the environment variable GITHUB_TOKEN if needed for push authentication
           GITHUB_TOKEN: ${ secrets.TOKEN }
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
-
-      # Dispatch
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
-
-  collect-data-job-15-2-23-6-star-167:
-    runs-on: ubuntu-latest
-
-    # Asocio cron con job
-    if: github.event.schedule == '15 2 23 6 *'
-
-    steps:
-
-      # Clono repo de producto en maquina ubuntu donde corre el workflow
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: prod  # Branch
-
-      # Instalo dependencias
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
- 
-      - name: Set up cache for pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${ runner.os }-pip-${ hashFiles('**/requirements_mnm.txt') }
-          restore-keys: |
-            ${ runner.os }-pip-
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements_mnm.txt
-
-      # Ejecución de collect_predictions.py
-      - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [167]
-        
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
-        env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${ secrets.TOKEN }
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
-          git push
+          git add .  # Agregar todos los cambios
+          git commit -m "Update predictions with line-ups"
+          git push origin prod
 
       # Dispatch
       - name: Dispatch event to second repository

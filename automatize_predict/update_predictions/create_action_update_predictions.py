@@ -88,18 +88,18 @@ on:
 
       # Ejecución de collect_predictions.py
       - name: Run collect_data script
-        run: python automatize_predict/collect_predictions.py 0.05 [{id_country}]
+        run: python automatize_predict/collect_predictions.py 0.05 [{id_country}] {{'run_missing': false, 'data_unders': true, 'data_prep': true, 'modeling': true, 'export': true}}
         
-      # Push to Github de predicciones.xlsx
-      - name: Commit and push predictions.xlsx
+      # Push to Github
+      - name: Commit and push all changes
         env:
           # Set the environment variable GITHUB_TOKEN if needed for push authentication
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add updated predicciones.xlsx"
+          git add .  # Agregar todos los cambios
+          git commit -m "Update predictions with line-ups"
           git push origin prod
 
       # Dispatch
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     
     # Defino argumentos
     # minutos_a_restar = 15 #int(sys.argv[1]) # Definir la cantidad de minutos a restar
-    df_next_matches = pd.read_excel('p6_deployment/data/historial_predicciones.xlsx') # Levantar proximos partidos  --> tengo que garantizar que sean los partidos de los proximos 15 dias.
+    df_next_matches = pd.read_excel('p6_deployment/data/historial_predicciones.xlsx') # Levantar proximos partidos --> tengo que garantizar que sean los partidos de los proximos 15 dias.
     df_next_matches = df_next_matches[df_next_matches['date'].dt.date >= datetime.now().date()]
     workflow_path = '.github/workflows/update_predictions.yml'
 
