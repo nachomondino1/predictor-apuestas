@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: prod  # Branch
+          ref: staging  # Branch
 
       - name: Set up Python
         uses: actions/setup-python@v5
