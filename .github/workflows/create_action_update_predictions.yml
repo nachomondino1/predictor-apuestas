@@ -2,10 +2,7 @@ name: Update Predictions with formations
 
 on:
   schedule:
-    - cron: '0 0 */3 * *'  # Ejecutar cada 3 días a la medianoche
-  push:
-    paths:
-      - 'automatize_predict/update_predictions/schedules.xlsx'
+    - cron: "0 0 * * FRI"  # Ejecutar Viernes a la medianoche
 
 jobs:
   update-workflow:

@@ -1,19 +1,16 @@
 name: Get predictions next 15 days
 
 on:
+  push: # Para actualizar predicciones de USA por tener nuevo modelo
+    branches:
+      - prod
   schedule:
-    # - cron: "*/2 * * * *"  # Prueba
-    - cron: "0 0 */7 * *"  # Ejecutar cada 2 días a la medianoche 
-  # push:  # En pruebas
-  #   branches:
-  #     - prod
+    - cron: "0 0 * * MON"  # Ejecutar Lunes a la medianoche
 
 jobs:
   collect_predictions:
     runs-on: ubuntu-latest
-
-    if: github.ref == 'refs/heads/prod'  # Asegura que el job se ejecute solo en la rama prod
-
+    
     # Agrego permisos para poder hacer push
     permissions:                # Job-level permissions configuration starts here
       contents: write           # 'write' access to repository contents
@@ -43,17 +40,16 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]"
+          python automatize_predict/collect_predictions.py 2 "[167]" '{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
 
-      - name: Commit and push predictions.xlsx
+      - name: Commit and push all changes
         env:
-          # Set the environment variable GITHUB_TOKEN if needed for push authentication
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add p6_deployment/data/predicciones.xlsx
-          git commit -m "Add predicciones.xlsx of next 15 days"
+          git add .  # Agregar todos los cambios
+          git commit -m "Get predictions next 15 days"
           git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
 
       - name: Dispatch event to second repository

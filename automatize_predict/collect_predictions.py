@@ -1,6 +1,7 @@
 import sys
-import ast
 sys.path.append('.')  # Fallaba el import de main
+import ast
+import json
 import pandas as pd
 from p6_deployment import main_next_matches
 from datetime import datetime
@@ -9,19 +10,12 @@ from datetime import datetime
 # # - Tengo que actualizar historial_predicciones.xlsx con el resultado del partido una vez que ya termino.
 # Chequear que historial_predicciones.xslx esta bien construido y se actualiza correctamente.
 
-def collect_predictions(l_countries: list, n_days: float):
+def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_hist):
     """
     Recoleccion de predicciones de todos los paises
     """
     # Defino condiciones del analisis
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # momentaneamente data_unders es False por pruebas
     df = pd.DataFrame()
-
-    # Levanto historial_predicciones.xlsx
-    try:
-        df_hist = pd.read_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index_col=0)
-    except FileNotFoundError:
-        df_hist = pd.DataFrame()
 
     # Por country
     for id_country in l_countries:
@@ -74,5 +68,12 @@ if __name__ == "__main__":
     # l_countries, n_days = prueba()
     n_days = float(sys.argv[1])  # e.g. 7  # Numero de dias maximo desde hoy para extraer partidos
     l_countries = ast.literal_eval(sys.argv[2])  # e.g. [48, 55, 59, 77, 167]
+    d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario  {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 
-    collect_predictions(l_countries, n_days)    
+    # Levanto historial_predicciones.xlsx
+    try:
+        df_hist = pd.read_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index_col=0)
+    except FileNotFoundError:
+        df_hist = pd.DataFrame()
+
+    collect_predictions(d_run, l_countries, n_days, df_hist)    
