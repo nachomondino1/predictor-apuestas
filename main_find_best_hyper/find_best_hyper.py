@@ -234,7 +234,7 @@ if __name__ == '__main__':
         },
         'clean_data_2': {
             'competencies_to_select': [d_comps['comp_sin_b']], # d_comps['comp_sin_b'] # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
-            'n_years_to_select': [5, 10, None],
+            'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
             'thr_corr': [0.7, 0.8, 0.9, None],
