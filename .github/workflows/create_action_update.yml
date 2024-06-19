@@ -1,14 +1,18 @@
-name: Update Predictions with formations
+name: Create action update_predictions.yml in schedule
 
 on:
   schedule:
-    - cron: "0 0 * * FRI"  # Ejecutar Viernes a la medianoche
+    - cron: "0 3 * * MON"  # Ejecutar Lunes a la madrugada (luego de get_predictios.yml)
 
 jobs:
+
   update-workflow:
+
     runs-on: ubuntu-latest
 
     steps:
+
+    # Checkout repo
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -17,6 +21,7 @@ jobs:
         sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
+    # Instalo dependencias
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -25,5 +30,6 @@ jobs:
     - name: Install dependencies
       run: pip install pandas openpyxl
 
-    - name: Run update script
-      run: python automatize_predict/update_predictions/create_action_update_predictions.py
+    # Ejecuto create_action_update.py
+    - name: Create cronjob in next matches's schedule.
+      run: python automatize_predict/update_predictions/create_action_update.py

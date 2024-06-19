@@ -31,8 +31,8 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_hist):
 
     # Exporto datos
     df.index.name = 'id_match'
-    df.to_excel(f'./p6_deployment/data/predicciones.xlsx', index=True)
-    df_hist.to_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index=True)
+    df.to_excel(f'p6_deployment/data/predicciones.xlsx', index=True)
+    df_hist.to_excel(f'p6_deployment/data/historial_predicciones.xlsx', index=True)
 
 def load_and_update_predictions(df, df_hist):
     """
@@ -71,9 +71,6 @@ if __name__ == "__main__":
     d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario  {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
 
     # Levanto historial_predicciones.xlsx
-    try:
-        df_hist = pd.read_excel(f'./p6_deployment/data/historial_predicciones.xlsx', index_col=0)
-    except FileNotFoundError:
-        df_hist = pd.DataFrame()
+    df_hist = pd.read_excel(f'p6_deployment/data/historial_predicciones.xlsx', index_col=0)
 
     collect_predictions(d_run, l_countries, n_days, df_hist)    
