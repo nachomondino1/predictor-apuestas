@@ -1,9 +1,9 @@
 name: Get predictions next 15 days
 
 on:
-  push: # Para actualizar predicciones de USA por tener nuevo modelo
-    branches:
-      - prod
+  # push: # Para actualizar predicciones de USA por tener nuevo modelo
+  #   branches:
+  #     - prod
   schedule:
     - cron: "0 0 * * MON"  # Ejecutar Lunes a la medianoche
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python automatize_predict/collect_predictions.py 2 "[167]" '{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
+          python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
 
       - name: Commit and push all changes
         env:
