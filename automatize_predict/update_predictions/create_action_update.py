@@ -28,6 +28,7 @@ def generate_cron_jobs(df):
     cron_jobs = []
     for _, row in df.iterrows():
         dt = row['date_mod']
+        print(f"Fecha: {dt} --> min: {dt.minute} hora: {dt.hour} day: {dt.day} month: {dt.month}")
         cron_expression = f"{dt.minute} {dt.hour} {dt.day} {dt.month} *"
         cron_jobs.append((cron_expression, row['id_country']))
 
