@@ -3,19 +3,19 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from datetime import datetime
 
+
 def create_schedule(df_next_matches, min_before_match=15):
     """
     Obtengo fecha y hora y pais para el cual correr collect_predictions.py
-    """
-    min_utc_argentina = 3 * 60  # Argentina es UTC-3
 
+    Disclaimer: Si lo corres localmente, restar 180 minutos a min_before_match puesto que Argentina es UTC -3 y la action se corre en UTC.
+    """
     # Obtener fechas unicas y paises 
     df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
     df = df.drop_duplicates()   # Obtener los registros únicos
 
     # Restar x minutos a cada hora
-    delta_time = min_before_match - min_utc_argentina  # [minutos]
-    delta = pd.to_timedelta(delta_time, unit='m')
+    delta = pd.to_timedelta(min_before_match, unit='m')
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
     # Exportar schedules.xlsx

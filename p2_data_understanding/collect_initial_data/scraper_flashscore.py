@@ -126,9 +126,10 @@ class FlashscoreCrawler(Crawler):
         ## Si tiene hoja "stats", extraigo campos
         if self._print:
             print("Obtengo datos de hoja 'Stats'...")
-        boton_stats = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Stats"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
-        if super().click_boton(boton_stats) is not False:
-            d_row_match.update(self.extract_stats())
+        if not next_matches:
+            boton_stats = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Stats"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
+            if super().click_boton(boton_stats) is not False:
+                d_row_match.update(self.extract_stats())
 
         ## Si existe la seccion "odds pre-match", extraigo odds de Bet365
         if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las oddss pero no hay valores...
@@ -162,10 +163,6 @@ class FlashscoreCrawler(Crawler):
             'venue': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Venue")]/parent::div/following-sibling::div', 
             'capacity': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Capacity")]/parent::div/following-sibling::div', 
             'attendance': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Attendance")]/parent::div/following-sibling::div'
-            # 'referee': './/div[@class="matchInfoData"]//span[contains(text(), "Referee")]/following-sibling::span[@class="matchInfoItem__value"]', # Intente el svg (para evitar el texto "Referee") pero no lo encuentra
-            # 'venue': './/div[@class="matchInfoData"]//span[contains(text(), "Venue")]/following-sibling::span[@class="matchInfoItem__value"]', 
-            # 'capacity': './/div[@class="matchInfoData"]//span[contains(text(), "Capacity")]/following-sibling::span[@class="matchInfoItem__value"]', 
-            # 'attendance': './/div[@class="matchInfoData"]//span[contains(text(), "Attendance")]/following-sibling::span[@class="matchInfoItem__value"]'
         }
 
         # Extraigo el primer campo con espera para evitar extraer sin que haya cargado la pagina

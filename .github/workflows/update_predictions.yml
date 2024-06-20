@@ -2,20 +2,20 @@ name: Update predictions with line-ups
 
 on:
   schedule:
-    - cron: "15 2 20 6 *"
-    - cron: "30 2 20 6 *"
-    - cron: "15 3 20 6 *"
-    - cron: "15 5 20 6 *"
+    - cron: "15 23 22 6 *"
+    - cron: "15 0 23 6 *"
+    - cron: "15 1 23 6 *"
+    - cron: "15 2 23 6 *"
 
 permissions: write-all
 
 jobs:
 
-  collect-data-job-15-2-20-6-star-167:
+  collect-data-job-15-23-22-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '15 2 20 6 *'
+    if: github.event.schedule == '15 23 22 6 *'
 
     steps:
 
@@ -67,11 +67,11 @@ jobs:
         run: |
           python automatize_predict/dispatch_event/dispatch_event.py
 
-  collect-data-job-30-2-20-6-star-167:
+  collect-data-job-15-0-23-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '30 2 20 6 *'
+    if: github.event.schedule == '15 0 23 6 *'
 
     steps:
 
@@ -123,11 +123,11 @@ jobs:
         run: |
           python automatize_predict/dispatch_event/dispatch_event.py
 
-  collect-data-job-15-3-20-6-star-167:
+  collect-data-job-15-1-23-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '15 3 20 6 *'
+    if: github.event.schedule == '15 1 23 6 *'
 
     steps:
 
@@ -179,11 +179,11 @@ jobs:
         run: |
           python automatize_predict/dispatch_event/dispatch_event.py
 
-  collect-data-job-15-5-20-6-star-167:
+  collect-data-job-15-2-23-6-star-167:
     runs-on: ubuntu-latest
 
     # Asocio cron con job
-    if: github.event.schedule == '15 5 20 6 *'
+    if: github.event.schedule == '15 2 23 6 *'
 
     steps:
 
