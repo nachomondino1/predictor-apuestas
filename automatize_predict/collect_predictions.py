@@ -22,15 +22,29 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_hist):
         df = pd.concat([df, df_country], axis=0)
 
     # Guardo predicciones en historial
-    print(f"Antes de cargar historial: {df_hist.shape}")
-    df_hist = pd.concat([df_hist, df], axis=0)
-    df_hist.drop_duplicates(keep='last')  # Asi, si cargo con formaciones, me quedo con ese en vez de sin.
-    print(f"Luego de cargar country al historial: {df_hist.shape}")
+    df_hist = save_historial_predictions(df, df_hist)
 
     # Exporto datos
     df.index.name = 'id_match'  # Es importante para la base de datos MySQL # df.set_index('id_match', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df.to_excel(f'p6_deployment/data/predicciones.xlsx', index=True)
     df_hist.to_excel(f'p6_deployment/data/historial_predicciones.xlsx', index=True)
+
+def save_historial_predictions(df, df_hist):
+    """
+    Guarda predicciones en historial de predicciones
+    """
+    print(f"Antes de cargar historial: {df_hist.shape}")\
+    
+    # Concateno predicciones a historial
+    df_hist = pd.concat([df_hist, df], axis=0)
+
+    # Elimino los duplicados # Asi, si cargo con formaciones, me quedo con ese en vez de sin.
+    df_hist['index_column'] = df_hist.index  # Convertir el índice a una columna temporal
+    df_hist_dedup = df_hist.drop_duplicates(subset=['index_column'], keep='last')  # Eliminar duplicados basados en la columna temporal, manteniendo la última aparición
+    df_hist_dedup = df_hist_dedup.set_index('index_column')  # Volver a establecer la columna temporal como el índice
+    df_hist_dedup.index.name = None # Eliminar la columna temporal
+    print(f"Luego de cargar country al historial: {df_hist.shape}")
+    return df_hist_dedup
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
