@@ -15,8 +15,10 @@ jobs:
     
     # Agrego permisos para poder hacer push
     permissions:  # Job-level permissions configuration starts here
-      contents: write # Permiso para pushear cambios a repo de Github
-      actions: write  # Permiso para modificar un workflow
+      # contents: write # Permiso para pushear cambios a repo de Github
+      # actions: write  # Permiso para modificar un workflow
+      permissions: write-all
+
 
     steps:
 
