@@ -12,6 +12,10 @@ jobs:
   update-workflow:
 
     runs-on: ubuntu-latest
+    
+    # Agrego permisos para poder hacer push
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
 
     steps:
 
