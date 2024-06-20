@@ -33,13 +33,14 @@ def save_historial_predictions(df, df_hist):
     """
     Guarda predicciones en historial de predicciones
     """
-    print(f"Antes de cargar historial: {df_hist.shape}")\
+    print(f"Antes de cargar historial: {df_hist.shape}")
     
     # Concateno predicciones a historial
     df_hist = pd.concat([df_hist, df], axis=0)
 
     # Eliminar filas con índices duplicados, manteniendo solo la primera aparición
     df_hist = df_hist[~df_hist.index.duplicated(keep='last')]
+    print(f"Despues de cargar historial: {df_hist.shape}")
     return df_hist
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     
     # Agrego permisos para poder hacer push
-    permissions:                # Job-level permissions configuration starts here
-      contents: write           # 'write' access to repository contents
+    permissions:  # Job-level permissions configuration starts here
+      contents: write # Permiso para pushear cambios a repo de Github
 
     steps:
 
@@ -45,11 +45,12 @@ jobs:
 
     # Git push (para actualizar update_predictions.yml)
     - name: Commit and push all changes
-      env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add .  # Agregar todos los cambios
         git commit -m "Create update_predictions.yml"
-        git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+        # git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+        git push origin prod
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
