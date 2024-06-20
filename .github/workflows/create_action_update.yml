@@ -1,6 +1,9 @@
 name: Create action update_predictions.yml in schedule
 
 on:
+  push: # Prueba
+    branches:
+      - staging
   schedule:
     - cron: "0 3 * * MON"  # Ejecutar Lunes a la madrugada (luego de get_predictios.yml)
 
