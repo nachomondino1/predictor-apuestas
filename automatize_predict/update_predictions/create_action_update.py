@@ -15,7 +15,7 @@ def create_schedule(df_next_matches, min_before_match=15):
     df = df.drop_duplicates()   # Obtener los registros únicos
 
     # Restar x minutos a cada hora
-    delta_time = min_before_match + min_delay_schedule - hours_utc_argentina * 60  # [minutos]
+    delta_time = min_before_match + min_delay_schedule - (hours_utc_argentina * 60)  # [minutos]
     delta = pd.to_timedelta(delta_time, unit='m')
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
