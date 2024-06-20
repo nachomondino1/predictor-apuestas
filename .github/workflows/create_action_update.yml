@@ -51,6 +51,6 @@ jobs:
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add .  # Agregar todos los cambios
-        git commit -m "Get predictions next 15 days"
+        git commit -m "Create update_predictions.yml"
         git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
 
