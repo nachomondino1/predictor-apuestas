@@ -4,6 +4,7 @@ on:
   push: # Para actualizar predicciones de USA por tener nuevo modelo
     branches:
       - prod
+      - staging
   schedule:
     - cron: "0 0 * * MON"  # Ejecutar Lunes a la medianoche
 
