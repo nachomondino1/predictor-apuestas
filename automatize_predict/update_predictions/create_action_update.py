@@ -7,15 +7,14 @@ def create_schedule(df_next_matches, min_before_match=15):
     """
     Obtengo fecha y hora y pais para el cual correr collect_predictions.py
     """
-    hours_utc_argentina = 3  # Argentina es UTC-3
-    min_delay_schedule = 0  # La action tarda hasta 5 minutos desde schedule time en correrse
+    min_utc_argentina = 3 * 60  # Argentina es UTC-3
 
     # Obtener fechas unicas y paises 
     df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
     df = df.drop_duplicates()   # Obtener los registros únicos
 
     # Restar x minutos a cada hora
-    delta_time = min_before_match + min_delay_schedule - hours_utc_argentina * 60  # [minutos]
+    delta_time = min_before_match - min_utc_argentina  # [minutos]
     delta = pd.to_timedelta(delta_time, unit='m')
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 

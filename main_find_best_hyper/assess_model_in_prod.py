@@ -200,6 +200,11 @@ def main(df_iteration, country, iteration_date, export: bool = True):
     # Exporto datos
     if export:
         df_iteration_prod.to_excel(f'{ruta_base}/df_iteration_prod.xlsx')
+        
+        # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
+        df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+        df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+        df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
     
     return df_iteration_prod
 
@@ -208,13 +213,13 @@ if __name__ == "__main__":
 
     # Defino condiciones del analisis
     country = "usa"
-    iteration_date = '2024-06-03'
+    iteration_date = '2024-06-18'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
 
     # Evaluo modelos en produccion
-    df_iteration_prod = main(df_iteration, country, iteration_date) # df_iteration_prod = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_prod.xlsx', index_col=0)
+    df_iteration_prod = main(df_iteration, country, iteration_date)
 
     # Concateno df_iteration y df_iteration_prod
     df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-    df_concat.to_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_completo.xlsx', index=True)  # df_concat.to_excel(f'/Users/nachomondino/Desktop/df_iteration_completo_{country}.xlsx', index=True)
+    df_concat.to_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_completo.xlsx', index=True)
