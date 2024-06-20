@@ -17,6 +17,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
+          .github
           automatize_predict
           p6_deployment
         sparse-checkout-cone-mode: false
