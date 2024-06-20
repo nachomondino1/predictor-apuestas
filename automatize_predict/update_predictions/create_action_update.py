@@ -63,7 +63,6 @@ on:
     if: github.event.schedule == '{cron}'
 
     steps:
-
       # Clono repo de producto en maquina ubuntu donde corre el workflow
       - name: Checkout repository
         uses: actions/checkout@v4
