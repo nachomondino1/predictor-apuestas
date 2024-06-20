@@ -48,6 +48,7 @@ class Crawler:
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-dev-tools")
         options.add_argument("--disable-browser-side-navigation")
         options.add_argument("--disable-gpu")
         options.add_argument("--incognito")
