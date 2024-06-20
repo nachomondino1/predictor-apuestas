@@ -38,13 +38,9 @@ def save_historial_predictions(df, df_hist):
     # Concateno predicciones a historial
     df_hist = pd.concat([df_hist, df], axis=0)
 
-    # Elimino los duplicados # Asi, si cargo con formaciones, me quedo con ese en vez de sin.
-    df_hist['index_column'] = df_hist.index  # Convertir el índice a una columna temporal
-    df_hist_dedup = df_hist.drop_duplicates(subset=['index_column'], keep='last')  # Eliminar duplicados basados en la columna temporal, manteniendo la última aparición
-    df_hist_dedup = df_hist_dedup.set_index('index_column')  # Volver a establecer la columna temporal como el índice
-    df_hist_dedup.index.name = None # Eliminar la columna temporal
-    print(f"Luego de cargar country al historial: {df_hist.shape}")
-    return df_hist_dedup
+    # Eliminar filas con índices duplicados, manteniendo solo la primera aparición
+    df_hist = df_hist[~df_hist.index.duplicated(keep='last')]
+    return df_hist
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
