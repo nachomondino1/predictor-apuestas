@@ -18,6 +18,7 @@ jobs:
       with:
         sparse-checkout: |
           automatize_predict
+          p6_deployment
         sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
