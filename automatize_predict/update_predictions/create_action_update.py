@@ -8,14 +8,13 @@ def create_schedule(df_next_matches, min_before_match=15):
     Obtengo fecha y hora y pais para el cual correr collect_predictions.py
     """
     min_utc_argentina = 0 # 3 * 60  # Argentina es UTC-3 --> En usa, extrajo con UTC 0....
-    min_delay_schedule = 0  # La action tarda hasta 5 minutos desde schedule time en correrse
 
     # Obtener fechas unicas y paises 
     df = df_next_matches.loc[:, ['date', 'id_country']]  # Selecciono algunas columnas 
     df = df.drop_duplicates()   # Obtener los registros únicos
 
     # Restar x minutos a cada hora
-    delta_time = min_before_match + min_delay_schedule - min_utc_argentina  # [minutos]
+    delta_time = min_before_match - min_utc_argentina  # [minutos]
     delta = pd.to_timedelta(delta_time, unit='m')
     df['date_mod'] = df['date'] - delta    # Restar el timedelta a cada valor de la columna 'Hora'
 
@@ -29,6 +28,7 @@ def generate_cron_jobs(df):
     cron_jobs = []
     for _, row in df.iterrows():
         dt = row['date_mod']
+        print(f"Fecha: {dt} --> min: {dt.minute} hora: {dt.hour} day: {dt.day} month: {dt.month}")
         cron_expression = f"{dt.minute} {dt.hour} {dt.day} {dt.month} *"
         cron_jobs.append((cron_expression, row['id_country']))
 
