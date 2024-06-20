@@ -53,4 +53,3 @@ jobs:
         git add .  # Agregar todos los cambios
         git commit -m "Create update_predictions.yml"
         git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
-
