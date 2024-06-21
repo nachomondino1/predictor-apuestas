@@ -25,16 +25,15 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_hist):
     df_hist = save_historial_predictions(df, df_hist)
 
     # Exporto datos
-    df.index.name = 'id_match'  # Es importante para la base de datos MySQL # df.set_index('id_match', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+    df.index.name = 'id_match'  # Es importante para la base de datos MySQL
     df.to_excel(f'p6_deployment/data/predicciones.xlsx', index=True)
     df_hist.to_excel(f'p6_deployment/data/historial_predicciones.xlsx', index=True)
 
-def save_historial_predictions(df, df_hist):
+def save_historial_predictions(df, df_hist):  # Lo hace bien!
     """
     Guarda predicciones en historial de predicciones
     """
     print(f"Antes de cargar historial: {df_hist.shape}")
-    
     # Concateno predicciones a historial
     df_hist = pd.concat([df_hist, df], axis=0)
 
