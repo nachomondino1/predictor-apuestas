@@ -119,7 +119,7 @@ on:
     # Actualizo el update_predictions.yml con workflow content
     with open(workflow_path, 'w') as file:
         file.write(workflow_content)
-        update_github_workflow(workflow_path)
+        update_github_workflow(workflow_path, token)
 
 def update_github_workflow(workflow_path, token):
     
