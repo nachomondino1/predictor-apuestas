@@ -38,7 +38,7 @@ def generate_cron_jobs(df):
 
     return cron_jobs
 
-def create_cronjob_action(cron_jobs, workflow_path, token):
+def create_cronjob_action(cron_jobs, workflow_path):
     
     # Schedule
     workflow_content = """name: Update predictions with line-ups
@@ -50,6 +50,7 @@ on:
         workflow_content += f"    - cron: \"{cron}\"\n"
 
     # Permissions
+    # workflow_content += "\npermissions: write-all\n"
     workflow_content += "\npermissions:\n  - contents: write\n"
 
     # Jobs
@@ -119,60 +120,11 @@ on:
     # Actualizo el update_predictions.yml con workflow content
     with open(workflow_path, 'w') as file:
         file.write(workflow_content)
-        update_github_workflow(workflow_path, token)
-
-def update_github_workflow(workflow_path, token):
-    
-    # Definicion de parametros
-    repo_owner = 'nachomondino1'
-    repo_name = 'predictor-apuestas'
-
-    # Lee el contenido del nuevo workflow desde un archivo o define el contenido aquí
-    with open(workflow_path, 'r') as file:
-        new_workflow_content = file.read()
-        
-    # URL para actualizar el contenido del archivo
-    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{workflow_path}'
-
-    # Obtener el sha del archivo existente
-    headers = {
-        'Authorization': f'token {token}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
-    response = requests.get(url, headers=headers)
-
-    if response.status_code != 200:
-        print(f'Error obteniendo el archivo: {response.status_code} - {response.text}')
-        return
-
-    response_json = response.json()
-    sha = response_json.get('sha')
-    
-    if not sha:
-        print('Error: No se encontró el SHA del archivo. Verifique la ruta del archivo y los permisos.')
-        print(response_json)
-        return
-
-    # Codificar el contenido en base64
-    new_workflow_content_encoded = base64.b64encode(new_workflow_content.encode('utf-8')).decode('utf-8')
-
-    # Actualizar el archivo
-    data = {
-        'message': 'Actualizando workflow',
-        'content': new_workflow_content_encoded,
-        'sha': sha
-    }
-    response = requests.put(url, headers=headers, data=json.dumps(data))
-    if response.status_code == 200:
-        print('Workflow actualizado con éxito.')
-    else:
-        print(f'Error actualizando workflow: {response.status_code} - {response.json()}')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
     # Defino argumentos
-    token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
     df_next_matches = pd.read_excel('p6_deployment/data/historial_predicciones.xlsx') # Levantar proximos partidos --> tengo que garantizar que sean los partidos de los proximos 15 dias.
     df_next_matches = df_next_matches[df_next_matches['date'].dt.date >= datetime.now().date()]
     workflow_path = '.github/workflows/update_predictions.yml'
@@ -184,4 +136,4 @@ if __name__ == "__main__":
     cron_jobs = generate_cron_jobs(df_schedules)
 
     # Actualizo workflow 'Collect Data' segun fechas
-    create_cronjob_action(cron_jobs, workflow_path, token)
+    create_cronjob_action(cron_jobs, workflow_path)
