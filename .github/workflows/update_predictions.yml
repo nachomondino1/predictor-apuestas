@@ -18,7 +18,6 @@ jobs:
     if: github.event.schedule == '15 23 22 6 *'
 
     steps:
-
       # Clono repo de producto en maquina ubuntu donde corre el workflow
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,7 +73,6 @@ jobs:
     if: github.event.schedule == '15 0 23 6 *'
 
     steps:
-
       # Clono repo de producto en maquina ubuntu donde corre el workflow
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -130,7 +128,6 @@ jobs:
     if: github.event.schedule == '15 1 23 6 *'
 
     steps:
-
       # Clono repo de producto en maquina ubuntu donde corre el workflow
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -186,7 +183,6 @@ jobs:
     if: github.event.schedule == '15 2 23 6 *'
 
     steps:
-
       # Clono repo de producto en maquina ubuntu donde corre el workflow
       - name: Checkout repository
         uses: actions/checkout@v4
