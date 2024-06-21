@@ -2,10 +2,6 @@ import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from datetime import datetime
-import requests
-import json
-import os
-import base64
 
 
 def create_schedule(df_next_matches, min_before_match=15):
