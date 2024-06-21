@@ -13,8 +13,8 @@ jobs:
 
     runs-on: ubuntu-latest
     
-    # Agrego permisos para poder hacer push
-    permissions:  # Job-level permissions configuration starts here
+    # Agrego permisos al job para poder hacer push
+    permissions: 
       contents: write # Permiso para pushear cambios a repo de Github
 
     steps:
