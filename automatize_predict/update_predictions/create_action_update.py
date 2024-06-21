@@ -50,7 +50,7 @@ on:
         workflow_content += f"    - cron: \"{cron}\"\n"
 
     # Permissions
-    workflow_content += "\npermissions: write-all\n"
+    workflow_content += "\npermissions:\n  - contents: write\n"
 
     # Jobs
     workflow_content += "\njobs:\n"
@@ -117,17 +117,22 @@ on:
 """
 
     # Actualizo el update_predictions.yml con workflow content
-    update_github_workflow(workflow_content, workflow_path)
-    # with open(workflow_path, 'w') as file:
-    #     file.write(workflow_content)
+    with open(workflow_path, 'w') as file:
+        file.write(workflow_content)
+        update_github_workflow(workflow_path)
 
-def update_github_workflow(new_workflow_content, workflow_path):
+def update_github_workflow(workflow_path):
     
     # Definicion de parametros
     repo_owner = 'nachomondino1'
     repo_name = 'predictor-apuestas'
-    token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
+    # token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
+    token = "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"
 
+    # Lee el contenido del nuevo workflow desde un archivo o define el contenido aquí
+    with open(workflow_path, 'r') as file:
+        new_workflow_content = file.read()
+        
     # URL para actualizar el contenido del archivo
     url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{workflow_path}'
 
