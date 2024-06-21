@@ -23,11 +23,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        # sparse-checkout: |
-        #   .github
-        #   automatize_predict
-        #   p6_deployment
-        # sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          .github
+          automatize_predict
+          p6_deployment
+        sparse-checkout-cone-mode: false
         ref: prod  # Branch
 
     # Instalo dependencias
@@ -50,7 +50,6 @@ jobs:
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add .  # Agregar todos los cambios
         git commit -m "Create update_predictions.yml"
-        # git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
-        git push origin prod
+        git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
       env:
         GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
