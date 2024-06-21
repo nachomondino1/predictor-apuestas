@@ -5,6 +5,8 @@ from datetime import datetime
 import requests
 import json
 import os
+import base64
+
 
 def create_schedule(df_next_matches, min_before_match=15):
     """
@@ -115,20 +117,19 @@ on:
 """
 
     # Actualizo el update_predictions.yml con workflow content
-    update_github_workflow(workflow_content)
+    update_github_workflow(workflow_content, workflow_path)
     # with open(workflow_path, 'w') as file:
     #     file.write(workflow_content)
 
-def update_github_workflow(new_workflow_content):
+def update_github_workflow(new_workflow_content, workflow_path):
     
     # Definicion de parametros
     repo_owner = 'nachomondino1'
     repo_name = 'predictor-apuestas'
-    workflow_file_path = '.github/workflows/update_predictions.yml'
     token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
 
     # URL para actualizar el contenido del archivo
-    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{workflow_file_path}'
+    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{workflow_path}'
 
     # Obtener el sha del archivo existente
     headers = {
@@ -136,11 +137,20 @@ def update_github_workflow(new_workflow_content):
         'Accept': 'application/vnd.github.v3+json'
     }
     response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        print(f'Error obteniendo el archivo: {response.status_code} - {response.text}')
+        return
+
     response_json = response.json()
-    sha = response_json['sha']
+    sha = response_json.get('sha')
+    
+    if not sha:
+        print('Error: No se encontró el SHA del archivo. Verifique la ruta del archivo y los permisos.')
+        print(response_json)
+        return
 
     # Codificar el contenido en base64
-    import base64
     new_workflow_content_encoded = base64.b64encode(new_workflow_content.encode('utf-8')).decode('utf-8')
 
     # Actualizar el archivo
@@ -153,7 +163,7 @@ def update_github_workflow(new_workflow_content):
     if response.status_code == 200:
         print('Workflow actualizado con éxito.')
     else:
-        print(f'Error actualizando workflow: {response.json()}')
+        print(f'Error actualizando workflow: {response.status_code} - {response.json()}')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
