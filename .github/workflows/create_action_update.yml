@@ -37,7 +37,7 @@ jobs:
         python-version: '3.x'
 
     - name: Install dependencies
-      run: pip install pandas openpyxl requests json base64 os
+      run: pip install pandas openpyxl requests base64
 
     # Ejecuto create_action_update.py
     - name: Create cronjob in next matches's schedule.
