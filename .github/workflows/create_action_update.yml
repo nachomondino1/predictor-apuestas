@@ -15,7 +15,7 @@ jobs:
     
     # Agrego permisos al job para poder hacer push
     permissions: 
-      contents: write # Permiso para pushear cambios a repo de Github
+      contents: write # Permiso para pushear cambios a repo de Github 
 
     steps:
 
