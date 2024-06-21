@@ -38,7 +38,7 @@ def generate_cron_jobs(df):
 
     return cron_jobs
 
-def create_cronjob_action(cron_jobs, workflow_path):
+def create_cronjob_action(cron_jobs, workflow_path, token):
     
     # Schedule
     workflow_content = """name: Update predictions with line-ups
@@ -121,13 +121,11 @@ on:
         file.write(workflow_content)
         update_github_workflow(workflow_path)
 
-def update_github_workflow(workflow_path):
+def update_github_workflow(workflow_path, token):
     
     # Definicion de parametros
     repo_owner = 'nachomondino1'
     repo_name = 'predictor-apuestas'
-    # token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
-    token = "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"
 
     # Lee el contenido del nuevo workflow desde un archivo o define el contenido aquí
     with open(workflow_path, 'r') as file:
@@ -174,7 +172,7 @@ def update_github_workflow(workflow_path):
 if __name__ == "__main__":
     
     # Defino argumentos
-    # minutos_a_restar = 15 #int(sys.argv[1]) # Definir la cantidad de minutos a restar
+    token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
     df_next_matches = pd.read_excel('p6_deployment/data/historial_predicciones.xlsx') # Levantar proximos partidos --> tengo que garantizar que sean los partidos de los proximos 15 dias.
     df_next_matches = df_next_matches[df_next_matches['date'].dt.date >= datetime.now().date()]
     workflow_path = '.github/workflows/update_predictions.yml'
@@ -186,4 +184,4 @@ if __name__ == "__main__":
     cron_jobs = generate_cron_jobs(df_schedules)
 
     # Actualizo workflow 'Collect Data' segun fechas
-    create_cronjob_action(cron_jobs, workflow_path)
+    create_cronjob_action(cron_jobs, workflow_path, token)

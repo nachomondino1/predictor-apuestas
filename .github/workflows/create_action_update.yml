@@ -41,7 +41,10 @@ jobs:
 
     # Ejecuto create_action_update.py
     - name: Create cronjob in next matches's schedule.
-      run: python automatize_predict/update_predictions/create_action_update.py
+      run: python automatize_predict/update_predictions/create_action_update.py --token ${{ secrets.TOKEN }}
+
+    - name: Check token scopes
+      run: "curl -I -H \"Authorization: token ${{ secrets.TOKEN }}\" https://api.github.com/users/Undin"
 
     # Git push (para actualizar update_predictions.yml)
     - name: Commit and push all changes
