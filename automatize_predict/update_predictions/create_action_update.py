@@ -2,7 +2,9 @@ import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from datetime import datetime
-
+import requests
+import json
+import os
 
 def create_schedule(df_next_matches, min_before_match=15):
     """
@@ -112,8 +114,46 @@ on:
           python automatize_predict/dispatch_event/dispatch_event.py
 """
 
-    with open(workflow_path, 'w') as file:
-        file.write(workflow_content)
+    # Actualizo el update_predictions.yml con workflow content
+    update_github_workflow(workflow_content)
+    # with open(workflow_path, 'w') as file:
+    #     file.write(workflow_content)
+
+def update_github_workflow(new_workflow_content):
+    
+    # Definicion de parametros
+    repo_owner = 'nachomondino1'
+    repo_name = 'predictor-apuestas'
+    workflow_file_path = '.github/workflows/update_predictions.yml'
+    token = os.getenv('GITHUB_TOKEN')  # Usa el valor del secreto GH_TOKEN
+
+    # URL para actualizar el contenido del archivo
+    url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{workflow_file_path}'
+
+    # Obtener el sha del archivo existente
+    headers = {
+        'Authorization': f'token {token}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    response = requests.get(url, headers=headers)
+    response_json = response.json()
+    sha = response_json['sha']
+
+    # Codificar el contenido en base64
+    import base64
+    new_workflow_content_encoded = base64.b64encode(new_workflow_content.encode('utf-8')).decode('utf-8')
+
+    # Actualizar el archivo
+    data = {
+        'message': 'Actualizando workflow',
+        'content': new_workflow_content_encoded,
+        'sha': sha
+    }
+    response = requests.put(url, headers=headers, data=json.dumps(data))
+    if response.status_code == 200:
+        print('Workflow actualizado con éxito.')
+    else:
+        print(f'Error actualizando workflow: {response.json()}')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
