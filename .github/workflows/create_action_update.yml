@@ -1,9 +1,9 @@
 name: Create action update_predictions.yml in schedule
 
 on:
-  push: # Prueba
-    branches:
-      - staging
+  # push: # Prueba
+  #   branches:
+  #     - staging
   schedule:
     - cron: "0 3 * * MON"  # Ejecutar Lunes a la madrugada (luego de get_predictios.yml)
 
@@ -13,9 +13,9 @@ jobs:
 
     runs-on: ubuntu-latest
     
-    # Agrego permisos para poder hacer push
-    permissions:  # Job-level permissions configuration starts here
-      contents: write # Permiso para pushear cambios a repo de Github
+    # Agrego permisos al job para poder hacer push
+    permissions: 
+      contents: write # Permiso para pushear cambios a repo de Github 
 
     steps:
 
@@ -39,18 +39,20 @@ jobs:
     - name: Install dependencies
       run: pip install pandas openpyxl
 
+    - name: Check token scopes
+      run: "curl -I -H \"Authorization: token ${{ secrets.TOKEN }}\" https://api.github.com/nachomondino1/predictor-apuestas"
+
     # Ejecuto create_action_update.py
     - name: Create cronjob in next matches's schedule.
       run: python automatize_predict/update_predictions/create_action_update.py
 
     # Git push (para actualizar update_predictions.yml)
     - name: Commit and push all changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add .  # Agregar todos los cambios
         git commit -m "Create update_predictions.yml"
-        # git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
-        git push origin prod
-      env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
+        git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod

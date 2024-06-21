@@ -10,6 +10,7 @@ from p2_data_understanding import describe_data
 from p3_data_preparation import format_data, select_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 from sklearn.preprocessing import StandardScaler
+import joblib
 ## Modeling
 from p4_modeling import generate_test_design, build_model, asses_model
 ### Generate test design
@@ -26,7 +27,6 @@ from sklearn.neural_network import MLPClassifier
 ### Assess model
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
-import joblib
 
 
 class DataUnderstanding:
@@ -253,45 +253,58 @@ class DataPreparation:
 
     def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
         """
-        Integra los datos de partidos y players en un solo dataframe.
+        Integra los datos de partidos y jugadores en un solo dataframe.
 
-        # Parameters:
-            df_match: Dataframe de los datos de los partidos.
-            df_match_player: Dataframe de los datos de los players en cada partido.
-            export: Booleano para indicar si se debe exportar el dataframe integrado. True para exportar y False para no exportar. (bool)
+        Parameters:
+            df_match (pd.DataFrame): Dataframe de los datos de los partidos.
+            df_match_player (pd.DataFrame): Dataframe de los datos de los jugadores en cada partido.
+            df_player_sofifa (pd.DataFrame): Dataframe de los datos de los jugadores en Sofifa.
+            df_player_fifa_sofifa (pd.DataFrame): Dataframe de los datos de los jugadores en Fifa-Sofifa.
+            df_teams_sofifa (pd.DataFrame): Dataframe de los datos de los equipos en Sofifa.
+            export (bool): Booleano para indicar si se debe exportar el dataframe integrado. True para exportar y False para no exportar.
         
-        # Returns:
-            Dataframe integrado. (DataFrame)
+        Returns:
+            pd.DataFrame: Dataframe integrado.
         """
         start = time.time()
         print("\nIntegrating data...")
 
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
-        # try:
-        #     df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
-        # except FileNotFoundError:
-        df_teams = create_df_teams(df_match)
-        df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
+        # Si ya hice el mapeo
+        try:
+            df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
+        
+        # Si aun no hice el mapeo
+        except FileNotFoundError:
+            # Matcheo equipos de Sofifa y Flashscore
+            df_teams = create_df_teams(df_match)
+            df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
 
-        if export:
-            df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
-            df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
+            if export:
+                df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
+                df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
 
+        # Integro datos de equipos a df_match usando el mapeo
         df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
 
        # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
         print("\nIntegrating player's data to df_match...")
-        # try:
-        #     df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
-        # except FileNotFoundError:
-        df_player = create_df_player(df_match_player)
-        df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
-
-        if export:
-            df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
-            df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
+        # Si ya hice el mapeo
+        try:
+            df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
         
+        # Si aun no hice el mapeo
+        except FileNotFoundError:
+            # Matcheo jugadores de Sofifa y Flashscore
+            df_player = create_df_player(df_match_player)
+            df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+
+            if export:
+                df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
+                df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
+        
+        # Integro datos de jugadores a df_match usando el mapeo
         df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..

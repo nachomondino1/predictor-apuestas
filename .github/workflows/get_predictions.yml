@@ -12,9 +12,9 @@ jobs:
   collect_predictions:
     runs-on: ubuntu-latest
     
-    # Agrego permisos para poder hacer push
-    permissions:                # Job-level permissions configuration starts here
-      contents: write           # 'write' access to repository contents
+    # Agrego permisos en job para poder hacer push
+    permissions: 
+      contents: write  # para poder hacer git push
 
     steps:
       - name: Checkout repository
@@ -42,7 +42,7 @@ jobs:
       - name: Run collect_predictions script
         run: |
           # python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
-          python automatize_predict/collect_predictions.py 3 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
+          python automatize_predict/collect_predictions.py 3 "[167]" '{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
 
       - name: Commit and push all changes
         env:
