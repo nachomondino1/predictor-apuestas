@@ -274,17 +274,18 @@ class DataPreparation:
         # Si ya hice el mapeo
         try:
             df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
-        
+            print("No vuelvo a mapear sino que levanto df_map ")
         # Si aun no hice el mapeo
         except FileNotFoundError:
             # Matcheo equipos de Sofifa y Flashscore
+            print("Mapeo equipos de Sofifa y Flashscore")
             df_teams = create_df_teams(df_match)
             df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
 
             if export:
                 df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
                 df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
-
+  
         # Integro datos de equipos a df_match usando el mapeo
         df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
 
@@ -293,17 +294,19 @@ class DataPreparation:
         # Si ya hice el mapeo
         try:
             df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
-        
+            print("No vuelvo a mapear sino que levanto df_map ")
+
         # Si aun no hice el mapeo
         except FileNotFoundError:
             # Matcheo jugadores de Sofifa y Flashscore
+            print("Mapeo jugadores de Sofifa y Flashscore")
             df_player = create_df_player(df_match_player)
             df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
 
             if export:
                 df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
                 df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
-        
+
         # Integro datos de jugadores a df_match usando el mapeo
         df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
@@ -937,6 +940,6 @@ if __name__ == "__main__":
 
     # Definicion de variables
     id_country = 167
-    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+    d_params = {'data_unders': True, 'data_prep': False, 'modeling': False}
 
     main(id_country, d_params, export=True)
