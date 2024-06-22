@@ -114,7 +114,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=1, l_ids_already_collected=l_ids_extracted, export=False)
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=2, l_ids_already_collected=l_ids_extracted, export=False)
             if _print:
                 print(f"Cantidad de partidos faltantes en df_match: {df_match_miss.shape[0]}")
 
@@ -516,7 +516,7 @@ def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to
     return df_new, df_copiado
 
 # Missing data
-def read_last_version_matches(country, _print: bool = True):
+def read_last_version_extracted_matches(country, _print: bool = True):
     # Esta bien levantar df_integrated aca tambien. para asegurarme que todos los missing estan en df_integrated tambien.
     # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
     try:
@@ -658,7 +658,7 @@ def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds,
     df_concat_match_odds.to_excel(f'{BASE_PATH}/df_match_odds.xlsx')
     print(f"Shape de df_match with missing: {len(df_concat_match)}")
 
-def concat_and_export_all_missing(df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH):
+def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH):
     """
     Guardo los nuevos partidos missing con los que ya tenia
     """
@@ -713,8 +713,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     print("\n", "#"*120, "\n", "MISSING DATA".center(120), "\n", "#"*120, "\n")
     if d_run['run_missing']: 
         
-        # Levanto datos
-        df_match, df_match_player, df_match_odds, df_integrated = read_last_version_matches(country) # Obtengo ultima version de df_match y df_match_player
+        # Levanto datos 
+        df_match, df_match_player, df_match_odds, df_integrated = read_last_version_extracted_matches(country) # Obtengo ultima version de df_match, df_match_player y df_match odds (con missing)
         df_player_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
         df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
@@ -729,7 +729,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
             if export:
                 # Guardo datos con los que entrenó el modelo y los missing
                 concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH=f"./p6_deployment/data/{country}/missing/old_updated")
-                concat_and_export_all_missing(df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH=f"./p6_deployment/data/{country}/missing/data_understanding/all")
+                concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, BASE_PATH=f"./p6_deployment/data/{country}/missing/data_understanding/all")
 
             # Preparo datos
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
@@ -904,9 +904,10 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    id_country = 167
-    n_days_max_next_matches = 7 # Numero de dias maximo desde hoy para extraer partidos
+    id_country = 148
+    n_days_max_next_matches = 2 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos
     main(d_run, id_country, n_days_max_next_matches, export=d_run['export'])

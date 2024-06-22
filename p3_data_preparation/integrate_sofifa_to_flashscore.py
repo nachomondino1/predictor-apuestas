@@ -296,19 +296,19 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                 for col_player in l_col_to_preprocess:
 
                     # Busco id del jugador en df_match_player
-                    # id_player_fs = df_match_player.loc[id_match, col_player]  # fallo en assess_model_in_prod de Argentina
                     try:
                         id_player_fs = df_match_player.loc[id_match, col_player].values[0]  # fallo en assess_model_in_prod de Argentina
                     except:
                         id_player_fs = df_match_player.loc[id_match, col_player]  # fallo en assess_model_in_prod de Argentina
                     if _print:
                         print(f"\t Id jugador Flashscore: {id_player_fs}")
+                        print("ES NAN? ", pd.isna(id_player_fs))
 
                     # Si el id_player no es nan
                     if not pd.isna(id_player_fs):  # hay mucho nan sobretodo columnas de jugadores ausentes (e.g. player_aus_vis_12)
 
-                        # Busco el mapeo del equipo con sofifa
-                        row_map = df_map_fs_so[df_map_fs_so['id_player_fs'] == id_player_fs]
+                        # Busco el mapeo con sofifa
+                        row_map = df_map_fs_so[df_map_fs_so['id_player_fs'].astype(str) == str(id_player_fs)]
 
                         if len(row_map) > 0:
 
@@ -319,6 +319,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                             df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'] == id_player_sofifa)]
                             df_player_filt = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
                             if _print:
+                                print(f"Cantidad de jugadores fs: {len(df_map_fs_so)}, Encontró jugador de fs: {len(row_map)}")
                                 print(f"\t\t Hizo match para este jugador! Id jugador en Sofifa: {id_player_sofifa}")       
                                 print(f"\t\t Shape df_player_filt (debe ser 1 o 2): {df_player_filt.shape[0]}")       
 

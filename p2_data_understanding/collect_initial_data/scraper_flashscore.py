@@ -6,7 +6,7 @@ from p2_data_understanding.collect_initial_data.web_scraping_selenium import Cra
 from tqdm import tqdm
 import warnings
 from datetime import datetime, timedelta
-
+import re
 
 class FlashscoreCrawler(Crawler):
     """
@@ -191,7 +191,7 @@ class FlashscoreCrawler(Crawler):
             team_home = tag_team_home.text
 
             if url_team_home is not None:
-                id_team_home = obtain_id_from_url(url_team_home)
+                id_team_home = extract_id_from_href(url_team_home)
                 d_row.update({"id_team_home": id_team_home, "team_home": team_home}) # "url_team": url_team_home
 
         if tag_team_away is not None:
@@ -199,7 +199,7 @@ class FlashscoreCrawler(Crawler):
             team_away = tag_team_away.text
 
             if url_team_away is not None:
-                id_team_away = obtain_id_from_url(url_team_away)
+                id_team_away = extract_id_from_href(url_team_away)
                 d_row.update({"id_team_away": id_team_away, "team_away": team_away}) #  "url_team": url_team_away
 
         if self._print:
@@ -221,7 +221,7 @@ class FlashscoreCrawler(Crawler):
         if self._print:
             print(f"Extracting goals: {d_row}")
         return d_row
-         
+    
     def extract_lineups(self):
         """
         Extrae de jugadores titulares, suplentes y ausentes de cada equipo.
@@ -252,8 +252,8 @@ class FlashscoreCrawler(Crawler):
                     l_urls_home = [tag.get_attribute('href') for tag in l_tags_player_home]
                     
                     # Obtengo id y name de dichas urls
-                    l_ids_home = [obtain_id_from_url(url) for url in l_urls_home]
-                    l_names_home = [obtain_name_from_url(url) for url in l_urls_home]
+                    l_ids_home = [extract_id_from_href(url) for url in l_urls_home]
+                    l_names_home = [extract_name_from_href(url) for url in l_urls_home]
 
                     # Guardo datos
                     for i, url in enumerate(l_urls_home):
@@ -262,8 +262,8 @@ class FlashscoreCrawler(Crawler):
                 if l_tags_player_away:
                     l_urls_away = [tag.get_attribute('href') for tag in l_tags_player_away]
 
-                    l_ids_away = [obtain_id_from_url(url) for url in l_urls_away]
-                    l_names_away = [obtain_name_from_url(url) for url in l_urls_away]
+                    l_ids_away = [extract_id_from_href(url) for url in l_urls_away]
+                    l_names_away = [extract_name_from_href(url) for url in l_urls_away]
 
                     for i, url in enumerate(l_urls_away):
                         d_row.update({f'id_player_{titularidad}_away_{i + 1}': l_ids_away[i], f'player_name_{titularidad}_away_{i + 1}': l_names_away[i]}) #  "player_url": url
@@ -291,15 +291,15 @@ class FlashscoreCrawler(Crawler):
             if coach_home_tag:
                 # Obtengo url de coach home
                 url_coach_home = coach_home_tag.get_attribute('href')
-                id_coach_home = obtain_id_from_url(url_coach_home)
-                coach_home = obtain_name_from_url(url_coach_home)
+                id_coach_home = extract_id_from_href(url_coach_home)
+                coach_home = extract_name_from_href(url_coach_home)
                 d_row.update({"id_coach_home": id_coach_home, "coach_home": coach_home})#  "url_coach": url_coach_home
 
             if coach_away__tag:
                 # Obtengo url de coach away
                 url_coach_away = coach_away__tag.get_attribute('href')
-                id_coach_away = obtain_id_from_url(url_coach_away)
-                coach_away = obtain_name_from_url(url_coach_away)
+                id_coach_away = extract_id_from_href(url_coach_away)
+                coach_away = extract_name_from_href(url_coach_away)
                 d_row.update({"id_coach_away": id_coach_away, "coach_away": coach_away}) #  "url_coach": url_coach_away
 
         if self._print:
@@ -380,8 +380,8 @@ class FlashscoreCrawler(Crawler):
                 l_urls_home = [tag.get_attribute('href') for tag in l_tags_player_home]
                 
                 # Obtengo id y name de dichas urls
-                l_ids_home = [obtain_id_from_url(url) for url in l_urls_home]
-                l_names_home = [obtain_name_from_url(url) for url in l_urls_home]
+                l_ids_home = [extract_id_from_href(url) for url in l_urls_home]
+                l_names_home = [extract_name_from_href(url) for url in l_urls_home]
 
                 # Guardo datos
                 for i, url in enumerate(l_urls_home):
@@ -390,8 +390,8 @@ class FlashscoreCrawler(Crawler):
             if l_tags_player_away:
                 l_urls_away = [tag.get_attribute('href') for tag in l_tags_player_away]
 
-                l_ids_away = [obtain_id_from_url(url) for url in l_urls_away]
-                l_names_away = [obtain_name_from_url(url) for url in l_urls_away]
+                l_ids_away = [extract_id_from_href(url) for url in l_urls_away]
+                l_names_away = [extract_name_from_href(url) for url in l_urls_away]
 
                 for i, url in enumerate(l_urls_away):
                     d_row.update({f'id_player_miss_away_{i + 1}': l_ids_away[i], f'player_name_miss_away_{i + 1}': l_names_away[i]}) #  "player_url": url
@@ -448,32 +448,38 @@ def clean_id(l_ids: list):
         l_ids_clean.append(id_match)
     return l_ids_clean
     
-def obtain_id_from_url(url: str):
+def extract_id_from_href(href: str) -> str:
     """
-    Obtengo id de la url ya sea para un jugador como para un equipo.
-    :param url: Url de equipo o jugador. (e.g. 'https://www.flashscore.com/team/west-ham/Cxq57r8g/') (String)
-    :return: Id contenido dentro de la url. (e.g. Cxq57r8g) (String) 
-    """
-    if isinstance(url, str):
-        url = url[:-1]  # elimino el ultimo "/"
-        pos_ini = url.rfind("/") + 1
-        id_team = url[pos_ini:]
-        return id_team
+    Extrae el identificador del atributo href.
 
-def obtain_name_from_url(url: str):
+    Parameters:
+        href (str): La cadena href del cual se extraerá el identificador.
+
+    Returns:
+        str: El identificador extraído o None si no se encuentra.
     """
-    Obtiene el nombre de la url ya sea de jugador o de entrenador.
-    :param url: Url de jugador o entrenador (e.g. 'https://www.flashscore.com/player/roerslev-rasmussen-mads/pp1zpsrr/'). (String)
-    :return: Nombre del jugador o dt contendio dentro de la url (e.g. roerslev-rasmussen-mads). (String)
+    pattern = r"/(team|player)/[^/]+/([^/]+)/?" # (e.g. "/player/raya-david/nkVV0IXb", "/player/raya-david/nkVV0IXb/", "/player/lionel-messi/erigoeriowgjwi", "/team/arsenal/asfjsiafjis/"
+    match = re.search(pattern, href)
+    if match:
+        return match.group(2)
+    return None
+
+def extract_name_from_href(href: str) -> str:
     """
-    if isinstance(url, str):
-        url= url[:-1]  # elimino el ultimo "/"
-        pos_fin = url.rfind("/")
-        url_rest = url[:pos_fin]
-        pos_ini = url_rest.rfind("/") + 1
-        name = url[pos_ini:pos_fin]
-        name = name.replace('-', ' ')
+    Extrae el nombre del equipo del atributo href.
+
+    Parameters:
+        href (str): La cadena href del cual se extraerá el nombre del equipo. (e.g. 'https://www.flashscore.com/player/roerslev-rasmussen-mads/pp1zpsrr/'). (String)
+
+    Returns:
+        str: El nombre del equipo extraído o None si no se encuentra. (e.g. roerslev-rasmussen-mads). (String)
+    """
+    pattern = r"/(team|player)/([^/]+)/[^/]+/?"
+    match = re.search(pattern, href)
+    if match:
+        name = match.group(2).replace('-', ' ')
         return name
+    return None
 
 def extract_data(id_country, country: str, id_competicion, competition: str, is_cup: int, n_seasons_max: int = 0, l_ids_already_collected: list = None, export: bool = True):
     """
