@@ -1,10 +1,10 @@
 name: Get predictions next 15 days
 
 on:
-  # push: # Para actualizar predicciones de USA por tener nuevo modelo
-  #   branches:
-  #     - staging
-  #     - prod
+  push: # Para actualizar predicciones de USA por tener nuevo modelo
+    branches:
+      - staging
+      - prod
   schedule:
     - cron: "0 0 * * MON"  # Ejecutar Lunes a la medianoche
 
@@ -21,6 +21,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: prod  # Branch
+
+      - name: Set timezone to Buenos Aires
+        run: |
+          echo "TZ='America/Argentina/Buenos_Aires'" >> /etc/environment
+          export TZ='America/Argentina/Buenos_Aires'
 
       - name: Set up Python
         uses: actions/setup-python@v5
