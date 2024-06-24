@@ -11,7 +11,10 @@ on:
 jobs:
   collect_predictions:
     runs-on: ubuntu-latest
-    
+
+    env:
+      TZ: America/Argentina/Buenos_Aires
+
     # Agrego permisos en job para poder hacer push
     permissions: 
       contents: write  # para poder hacer git push
@@ -22,11 +25,9 @@ jobs:
         with:
           ref: prod  # Branch
 
-      - name: Set timezone to Buenos Aires
-        run: |
-          echo "TZ='America/Argentina/Buenos_Aires'" >> /etc/environment
-          export TZ='America/Argentina/Buenos_Aires'
-
+      - name: Print current date and time
+        run: date
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -46,8 +47,8 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
-          # python automatize_predict/collect_predictions.py 3 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
+          # python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
+          python automatize_predict/collect_predictions.py 7 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
 
       - name: Commit and push all changes
         env:
