@@ -691,6 +691,7 @@ def extract_matches_result(country: str, competition: str, l_ids:list):
         # Extraigo todos los datos del partido
         d_row = {}
         d_row.update(crawler.extract_result()) # {'goals_home': 2, 'goals_away': 1}
+        d_row.update({'country': country, 'competition': competition})
 
         # Guardo datos del partido
         df = pd.concat([df, pd.DataFrame(d_row, index=[id_match])])
