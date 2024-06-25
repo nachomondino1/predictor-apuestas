@@ -3,6 +3,7 @@ name: Update results
 on:
   push: # Para actualizar predicciones de USA por tener nuevo modelo
     branches:
+      - ignacio/database/update_result_action
       - staging
       - prod
   schedule:
