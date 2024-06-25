@@ -663,7 +663,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
 def extract_matches_result(country: str, competition: str, l_ids:list):
 
     # DEFINCION DE PARAMETROS & VARIABLES
-    crawler = FlashscoreCrawler(headless=False)
+    crawler = FlashscoreCrawler(headless=True)
     df = pd.DataFrame()
 
     # Formateo variables para construir url
