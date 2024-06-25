@@ -645,7 +645,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
 
         # Extraigo datos del partido
         d_row_match, d_row_match_player, d_row_match_odds = crawler.extract_match_data(next_matches=True)
-        d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
+        d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year}) # 'competition': competition, 'country': country
 
         # GUARDADO DE DATOS EN DATAFRAME
         df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
@@ -660,7 +660,50 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds
 
-def prueba():
+def extract_matches_result(country: str, competition: str, l_ids:list):
+
+    # DEFINCION DE PARAMETROS & VARIABLES
+    crawler = FlashscoreCrawler(headless=True)
+    df = pd.DataFrame()
+
+    # Formateo variables para construir url
+    country_form = country.lower().replace(' ', "-")
+    competition_form = competition.lower().replace(" ", "-")  # formateo competition para las rutas de archivo y urls
+    url = f'https://www.flashscore.com/football/{country_form}/{competition_form}/'
+    crawler.driver.get(url)
+    print(f'URL competición: {url}')
+
+    # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
+    crawler.accept_cookies()
+
+    # Click en hoja "Results"
+    crawler.click_results_page()
+    crawler.click_show_more_matches() # Click en boton "Mostrar mas partidos" (para ver no solo la jornada actual sino todas las jornadas de la season)
+    progress_bar = tqdm(total=len(l_ids), ncols=80)  # Inicializo barra de progreso
+
+    # POR MATCH (c/u identificado con un id)
+    for id_match in l_ids:
+
+        # Ingreso a pagina de informacion del match
+        url_match = f'https://www.flashscore.com/match/{id_match}/#/match-summary'
+        crawler.driver.get(url_match)
+
+        # Extraigo todos los datos del partido
+        d_row = {}
+        d_row.update(crawler.extract_result()) # {'goals_home': 2, 'goals_away': 1}
+
+        # Guardo datos del partido
+        df = pd.concat([df, pd.DataFrame(d_row, index=[id_match])])
+        progress_bar.update(1)
+
+    # Finalizada la extraccion, cierro el web browser automático
+    progress_bar.close()
+    crawler.driver.close()
+    return df
+
+
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     # Selecciono country a extraer y obtengo las competencias y su categoria
     country = 'england'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     id_competicion = 481
@@ -683,7 +726,3 @@ def prueba():
     df_match_miss.to_excel('/Users/nachomondino/Desktop/df_match_miss.xlsx', index=True)
     df_match_player_miss.to_excel('/Users/nachomondino/Desktop/df_match_player_miss.xlsx', index=True)
     df_match_odds_miss.to_excel('/Users/nachomondino/Desktop/df_match_odds_miss.xlsx', index=True)
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    prueba()
