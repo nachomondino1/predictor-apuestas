@@ -52,6 +52,7 @@ def main():
 
     # Agrego columnas 'result' y 'score' a predicciones.xlsx
     df_concat = pd.concat([df_filt, df_results], axis=1)
+    df_concat.index.name = 'id_match'  # Es importante para la base de datos MySQL
     print(df_concat)
 
     # Exportar dataset results.xlsx
