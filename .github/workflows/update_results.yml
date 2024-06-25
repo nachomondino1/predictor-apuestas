@@ -27,12 +27,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # sparse-checkout: |
-          #   automatize_predict
-          #   p2_data_understanding/collect_initial_data/scraper_flashscore
-          #   p3_data_preparation/construct_data
-          #   p6_deployment/data/
-          # sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            automatize_predict
+            p2_data_understanding/collect_initial_data/scraper_flashscore
+            p3_data_preparation/construct_data
+            p6_deployment/data/
+          sparse-checkout-cone-mode: false
           ref: ignacio/database/update_result_action # Branch
 
       # Instalacion de dependencias 
