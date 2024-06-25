@@ -29,7 +29,7 @@ jobs:
         with:
           sparse-checkout: |
             automatize_predict
-            p2_data_understanding/collect_initial_data/scraper_flashscore
+            p2_data_understanding/collect_initial_data/scraper_flashscore.py
             p2_data_understanding/data/df_countries.xlsx
             p2_data_understanding/data/df_competencies.xlsx
             p3_data_preparation/construct_data
