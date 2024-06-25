@@ -58,19 +58,14 @@ class Crawler:
         if headless:
             options.add_argument("--headless")
 
-        # Inicializo chromedriver
-        service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
-        driver = webdriver.Chrome(service=Service(service), options=options)
-        print("Creacion de ChromeDriver con install()")
-       
-        # try:
-        #     service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
-        #     driver = webdriver.Chrome(service=Service(service), options=options)
-        #     print("Creacion de ChromeDriver con install()")
-        # except:
-        #     service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
-        #     driver = webdriver.Chrome(service=Service(service), options=options)
-        #     print("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
+        try:
+            service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
+            driver = webdriver.Chrome(service=Service(service), options=options)
+            print("Creacion de ChromeDriver con install()")
+        except:
+            service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
+            driver = webdriver.Chrome(service=Service(service), options=options)
+            print("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
 
         return driver
 
