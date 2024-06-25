@@ -34,8 +34,8 @@ print(f"Lista de ids a los que extraer resultado: {l_ids}")
 
 # Por competicion
 # Extraer el resultado y goles de dichos partidos
-# df_results = extract_matches_result(country, competition, l_ids)
-df_results = pd.read_excel('p6_deployment/data/results.xlsx', index_col=0)
+df_results = extract_matches_result(country, competition, l_ids)
+# df_results = pd.read_excel('p6_deployment/data/results.xlsx', index_col=0)
 print(df_results)
 
 df_results = determine_result(df_results, var_resp='result')
