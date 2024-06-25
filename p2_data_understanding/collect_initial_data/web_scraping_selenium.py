@@ -53,7 +53,6 @@ class Crawler:
         options.add_argument("--disable-gpu")
         options.add_argument("--incognito")
         options.add_argument("--disable-popup-blocking")
-        options.add_argument("--remote-debugging-port=0")
 
         if headless:
             options.add_argument("--headless")
