@@ -1,0 +1,26 @@
+Lo entreno con los mismos parametros que la ultima vez que entrene modelos para poder comparar los rdos (ver que efectivamente un mejor df_integrated mejora los rdos).
+ 
+ Hiperparametros:
+     d_params = {
+        'construct': {
+            'n_dias_ult_part': [30, 60],
+            'n_years_h2h': [3],
+            'segun_localia': [True, False]
+        },
+        'clean_data_2': {
+            'competencies_to_select': [d_comps['comp_sin_b']], # d_comps['comp_sin_b'] # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
+            'n_years_to_select': [3, 5, 10, None],
+        },
+        'select': {
+            'thr_corr': [0.7, 0.8, 0.9, None],
+            'thr_fs': [0.2, 0.1, None], 
+        },
+        'treat_nan': {
+            'fill_na': [None, 'ml'],
+        },
+        'modeling': {
+            'val_size': [0.125],
+            'test_size': [0.125], 
+            'bal_type': [None, 'under'], #  'over'
+            'k': [10] 
+        }

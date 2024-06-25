@@ -209,12 +209,12 @@ def main(l_modelos, d_params, export: bool = True):
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
     # best_model = select_best_model(df_iteration_prod)
 
-    # Concateno df_iteration y df_iteration_prod
+    # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
     df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)    
 
     if export:
-        df_iteration.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
+        df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
 
     return df_concat
 

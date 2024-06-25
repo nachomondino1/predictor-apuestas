@@ -200,11 +200,6 @@ def main(df_iteration, country, iteration_date, export: bool = True):
     # Exporto datos
     if export:
         df_iteration_prod.to_excel(f'{ruta_base}/df_iteration_prod.xlsx')
-        
-        # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
-        df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-        df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-        df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
     
     return df_iteration_prod
 
@@ -220,7 +215,8 @@ if __name__ == "__main__":
     df_iteration_prod = main(df_iteration, country, iteration_date)
     # df_iteration_prod = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_prod.xlsx', index_col=0)
 
-    # Concateno df_iteration y df_iteration_prod
-    # df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-    # df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-    # df_concat.to_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration_completo.xlsx', index=True)
+    # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
+    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+    df_concat.to_excel(f'/Users/nachomondino/Desktop/df_iteration_completo.xlsx', index=True)
+    

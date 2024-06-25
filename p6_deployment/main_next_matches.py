@@ -41,37 +41,36 @@ class DataUnderstandingNew():
                     # Si no existe, crear el directorio
                     os.makedirs(directorio)
 
-    def collect_initial_data_new(self, l_competencies, n_days: int = 7, _print: bool = True):
+    def collect_initial_data_new(self, l_competencies, df_comp_country: pd.DataFrame, n_days: int = 7, _print: bool = True):
         """
         Extraccion de datos de los partidos en los proximos dias en todas las competiciones del pais.
 
         # Parameters
-        n_days: Numero de dias desde hoy para recolectar proximos partidos
-        export:
-        _print: 
+            n_days: Numero de dias desde hoy para recolectar proximos partidos
+            export:
+            _print: 
 
         # Returns
-        dfs...
+            dfs...
         """
         print(" Collecting data... ")
         # Definicion de variables
         df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-        df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
-        if _print:
-            print(f' COUNTRY: {self.country} '.center(120, '#'))
-            print(f"Competiciones a extraer del pais {self.country}: {l_competencies}")
 
         # POR COMPETITION
         for id_competition in l_competencies:
             
-            df_comp_filt = df_comp_country[df_comp_country['id_competition'].astype(int) == int(id_competition)]
-            competition, is_cup = df_comp_filt['competition_flashscore'].values[0], df_comp_filt['is_cup'].values[0]
+            row_comp = df_comp_country[df_comp_country['id_competition'].astype(int) == int(id_competition)]
+            competition, is_cup = row_comp['competition_flashscore'].values[0], row_comp['is_cup'].values[0]
             if _print:
                 print(f" Competition: {competition} id_comp: {id_competition}".center(120, '+'))
 
             # Extraigo proximos partidos
             df_match_next, df_match_player_next, df_match_odds = extract_next_matches(self.id_country, self.country, id_competition, competition, is_cup, n_days=n_days)
+
+            # Agrego pais y competicion
+            df_match_next['country'] = self.country
+            df_match_next['competition'] = competition
 
             # Guarda datos de competition
             df_match_concat = pd.concat([df_match_concat, df_match_next], axis=0)
@@ -86,18 +85,13 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def collect_missing_data(self, df_match: pd.DataFrame, _print: bool = False):
+    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, _print: bool = False):
         """
         Extraccion de varias competencias de un mismo country.
         """
         print(" Collecting data... ")
         # Definicion de variables
         df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
-        df_comp_country = df_comp[df_comp['id_country'] == self.id_country]
-        if _print:
-            print(f' COUNTRY: {self.country} '.center(120, '#'))
-            print(f'Competencias de {self.country}: \n {df_comp_country}')
 
         # Solo extriago las competencias que tengo en los datos viejos
         l_ids_extracted = list(df_match.index) 
@@ -704,6 +698,10 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     # Determino id_country
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
+    print(f' COUNTRY: {country} '.center(120, '#'))
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_comp_country = df_comp[df_comp['id_country'] == id_country]
+    print(f'Competencias de {country}: \n {df_comp_country}')
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
@@ -720,7 +718,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match)
+        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country)
         print(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
         # Si hay partidos missing que no extraje aun
@@ -783,7 +781,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if d_run['data_unders']:
         # Extriago datos de los partidos en los proximos dias
-        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select, n_days=n_days_max_next_matches)
+        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select, df_comp_country=df_comp_country, n_days=n_days_max_next_matches)
         
         # SOFIFA
         df_player_sofifa = pd.read_excel(f"p3_data_preparation/data/{country}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
@@ -864,7 +862,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
         # Levanto datasets
         df_teams = pd.read_excel(f'p3_data_preparation/data/{country}/integrate_data/df_teams.xlsx', index_col=0)
-        df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']]
+        df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']]
 
         # Realizo predicciones sobre los nuevos partidos
         y_pred_prob = loaded_model.predict_proba(df)
@@ -880,6 +878,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
         df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
+        # df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -904,10 +903,10 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 if __name__ == "__main__":
 
     # Defino condiciones del analisis
-    id_country = 148
-    n_days_max_next_matches = 2 # Numero de dias maximo desde hoy para extraer partidos
+    id_country = 167
+    n_days_max_next_matches = 7 # Numero de dias maximo desde hoy para extraer partidos
     d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+    # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
 
     # Extraigo, preparo y predigo proximos partidos
     main(d_run, id_country, n_days_max_next_matches, export=d_run['export'])

@@ -645,7 +645,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
 
         # Extraigo datos del partido
         d_row_match, d_row_match_player, d_row_match_odds = crawler.extract_match_data(next_matches=True)
-        d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year})
+        d_row_match.update({'id_country': id_country, 'id_competition': id_competicion, 'is_cup': is_cup, 'season': season_year}) # 'competition': competition, 'country': country
 
         # GUARDADO DE DATOS EN DATAFRAME
         df_match = pd.concat([df_match, pd.DataFrame(d_row_match, index=[id_match])])
@@ -660,7 +660,8 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds
 
-def prueba():
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     # Selecciono country a extraer y obtengo las competencias y su categoria
     country = 'england'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     id_competicion = 481
@@ -683,7 +684,3 @@ def prueba():
     df_match_miss.to_excel('/Users/nachomondino/Desktop/df_match_miss.xlsx', index=True)
     df_match_player_miss.to_excel('/Users/nachomondino/Desktop/df_match_player_miss.xlsx', index=True)
     df_match_odds_miss.to_excel('/Users/nachomondino/Desktop/df_match_odds_miss.xlsx', index=True)
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    prueba()
