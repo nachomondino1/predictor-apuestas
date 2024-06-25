@@ -1,10 +1,10 @@
 name: Update results
 
 on:
-  # push: # Para actualizar predicciones de USA por tener nuevo modelo
-  #   branches:
-  #     - staging
-  #     - prod
+  push: # Para actualizar predicciones de USA por tener nuevo modelo
+    branches:
+      - staging
+      - prod
   schedule:
     - cron: "0 0 * * *"  # Ejecutar Lunes a la medianoche
 
