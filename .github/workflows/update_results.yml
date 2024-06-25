@@ -33,6 +33,7 @@ jobs:
             p2_data_understanding/data/df_countries.xlsx
             p2_data_understanding/data/df_competencies.xlsx
             p3_data_preparation/construct_data.py
+            p3_data_preparation/clean_data.py
             p6_deployment/data/historial_predicciones.xlsx
             p6_deployment/data/predicciones.xlsx
             requirements_mnm.txt
