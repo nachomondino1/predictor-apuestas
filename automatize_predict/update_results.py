@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_matches_result
 from p3_data_preparation.construct_data import determine_result
+from p4_modeling.asses_model import determine_winning_bets
 
 def main():
     """
@@ -42,16 +43,19 @@ def main():
             competition = row['competition_flashscore']
             print(f"id_country: {row['id_country']} Country: {country} Competition: {competition}")
             
-            # Extraer el resultado y goles de dichos partidos
+            # Extraer goles home y away en los partidos
             df_results_comp = extract_matches_result(country, competition, l_ids)  # df_results = pd.read_excel('p6_deployment/data/results.xlsx', index_col=0)
-            df_results_comp = determine_result(df_results_comp, var_resp='result')
-            print(df_results)
 
             # Guardo results de competencia
             df_results = pd.concat([df_results, df_results_comp], axis=0)
+            print(df_results)
 
-    # Agrego columnas 'result' y 'score' a predicciones.xlsx
+    # Agrego columnas 'goals_home' y 'goals_away' a predicciones.xlsx
     df_concat = pd.concat([df_filt, df_results], axis=1)
+
+    # Determino ganador y si acerté
+    df_concat = determine_result(df_concat, var_resp='result')
+    df_concat = determine_winning_bets(df_concat)     # Determino acierto o fallo
     df_concat.index.name = 'id_match'  # Es importante para la base de datos MySQL
     print(df_concat)
 

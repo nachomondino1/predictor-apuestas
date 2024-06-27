@@ -877,8 +877,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         func = lambda x: x if x is None else int(x)  # Para formatear m y b (Falla para españa) --> lo deberia implementar cdo levanto hiper
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
-        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
-        # df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
+        # df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
+        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
