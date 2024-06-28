@@ -6,8 +6,10 @@ on:
   #     - staging
   #     - prod
   schedule:
-    # - cron: "0 3 * * FRI"  # (durante prueba) Ejecutar todos los Viernes a la madrugada
-    - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
+    - cron: "0 5 * * SUN"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
+    - cron: "0 5 * * SAT"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
+    - cron: "0 3 * * FRI"  # (durante prueba) Ejecutar todos los Viernes a la madrugada
+    # - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
 
 jobs:
   collect_predictions:
