@@ -6,6 +6,7 @@ import numpy as np
 import datetime
 import re
 import os
+import json
 from dotenv import load_dotenv
 from main import DataPreparation
 ## Data understanding
@@ -906,18 +907,24 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    # Cargar las variables de entorno desde el archivo .env
-    load_dotenv() 
-    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+    load_dotenv()
+    env = os.getenv('ENVIRONMENT')
     _PRINT = os.getenv('_PRINT')
     _PRINT_SPECIFIC = os.getenv('_PRINT_SPECIFIC')
+  
+    if env == 'development':
+        # Definir condiciones del análisis
+        id_country = 167
+        n_days_max_next_matches = 2 # Número de días máximo desde hoy para extraer partidos
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}
+        directorio = os.getenv('BASE_DIR_LOCAL')
 
-    # Defino condiciones del analisis
-    id_country = 167
-    n_days_max_next_matches = 2 # Numero de dias maximo desde hoy para extraer partidos
-    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}
+    elif env == 'production':
+        # Definir argumentos por terminal
+        n_days = float(sys.argv[1])  # Número de días máximo desde hoy para extraer partidos (e.g. 7)
+        id_country = int(sys.argv[2])  # Id de país a extraer (e.g. 48)
+        d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario
+        directorio = "p6_deployment/data/predicciones.xlsx"
 
-    # Extraigo, preparo y predigo proximos partidos
-    df = main(d_run, id_country, n_days_max_next_matches, export=d_run['export'])
-    df.to_excel(f'{BASE_DIR_LOCAL}/df_predicciones_{id_country}.xlsx')
+    df = main(d_run, id_country, n_days, export=d_run['export'])
+    df.to_excel(directorio)
