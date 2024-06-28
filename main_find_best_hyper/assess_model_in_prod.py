@@ -205,6 +205,10 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Defino condiciones del analisis
     country = "spain"
@@ -218,5 +222,5 @@ if __name__ == "__main__":
     # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
     df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-    df_concat.to_excel(f'/Users/nachomondino/Desktop/df_iteration_completo.xlsx', index=True)
+    df_concat.to_excel(f'{BASE_DIR_LOCAL}/df_iteration_completo.xlsx', index=True)
     

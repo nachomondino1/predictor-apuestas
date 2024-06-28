@@ -1,11 +1,20 @@
-# Ignorar directorio de dependencias
+# Entornos virtaules
 frontEnv/
 backEnv/
+venv_mnm/
 
-# Ignorar un archivo específico en un directorio específico
-/Users/nachomondino/Documents/GitHub/predictor-apuestas/prueba.py
+# Variables entorno
+.env
 
-# Ignorar todos los archivos de una extensión específica  # *.xls;xlsx;csv
+# Script específicos
+prueba.py
+.idea/
+.vscode/
+.DS_Store
+*.pyc
+__pycache__/
+
+# Datos
 ## Data understanding
 data_seg/
 ## Modeling
@@ -16,15 +25,3 @@ assess_model_in_prod/
 old_iterations/
 old_assess/
 *.csv
-# Deployment
-# /p6_deployment/data/*/data_understanding/
-# /p6_deployment/data/*/data_preparation/
-# /p6_deployment/data/*/missing/data_understanding/*.xlsx
-# /p6_deployment/data/*/missing/data_preparation/*.xlsx
-
-# Ignorar carpetas pycache (pycache se utiliza para almacenar archivos de caché compilados (bytecode) que aceleran la carga de módulos en ejecuciones posteriores. )
-__pycache__/
-.idea/
-.vscode/
-.DS_Store
-*.pyc

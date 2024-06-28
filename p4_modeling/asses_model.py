@@ -472,8 +472,13 @@ def prueba():
     Para poder correr solamente el actual archivo y poder hacer pruebas especificas.
     """
     from random import randint
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
-    # df_predicciones = pd.read_excel('/Users/nachomondino/Desktop/prueba_pred.xlsx', index_col=0)
+
+    # df_predicciones = pd.read_excel(f'{BASE_DIR_LOCAL}/prueba_pred.xlsx', index_col=0)
     # df_predicciones = pd.read_excel('p4_modeling/data/england/modeling/df_predicciones.xlsx', index_col=0)
     df_predicciones = pd.read_excel('main_find_best_hyper/data/england/2024-04-22/assess_model_in_prod/modeling/1_df_pred_metrics.xlsx', index_col=0)
     # df_predicciones = pd.read_excel('main_find_best_hyper/data/england/2024-04-22/assess_antes_de_mover/assess_model_in_prod/modeling/8_df_predicciones_with_metrics.xlsx', index_col=0)
@@ -490,7 +495,7 @@ def prueba():
 
     shuffled_df = df_predicciones.sample(frac=1, random_state=140)  # Usa random_state para reproducibilidad
     df, d_roi = calculate_roi_by_betting_strategy(shuffled_df, _print=True)
-    df.to_excel("/Users/nachomondino/Desktop/df_pred_best.xlsx", index=True)
+    df.to_excel(f"{BASE_DIR_LOCAL}/df_pred_best.xlsx", index=True)
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
