@@ -44,7 +44,7 @@ def main():
             print(f"id_country: {row['id_country']} Country: {country} Competition: {competition}")
             
             # Extraer goles home y away en los partidos
-            df_results_comp = extract_matches_result(country, competition, l_ids)  # df_results = pd.read_excel('p6_deployment/data/results.xlsx', index_col=0)
+            df_results_comp = extract_matches_result(country, competition, l_ids)
 
             # Guardo results de competencia
             df_results = pd.concat([df_results, df_results_comp], axis=0)
