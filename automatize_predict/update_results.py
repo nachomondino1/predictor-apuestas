@@ -23,7 +23,7 @@ def main():
 
     # Seleccionar los partidos de ultimo/s dia/s
     fecha_hoy = datetime.datetime.now()
-    n_days_to_extract = 7  # 7 por pruebas sino es 1
+    n_days_to_extract = 7  # Si lo corres todos los dias, deberia ser 1 dia
     fecha_limite = fecha_hoy - datetime.timedelta(days=n_days_to_extract)
     df_filt = df[(df['date'] > fecha_limite) & (df['date'] <= fecha_hoy)]
     l_ids = df_filt.index
