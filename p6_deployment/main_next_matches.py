@@ -883,8 +883,11 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         func = lambda x: x if x is None else int(x)  # Para formatear m y b (Falla para españa) --> lo deberia implementar cdo levanto hiper
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
-        # df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
-        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
+
+        if env == 'development':
+            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
+        elif env == 'production':
+            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -915,7 +918,7 @@ if __name__ == "__main__":
     if env == 'development':
         # Definir condiciones del análisis
         id_country = 167
-        n_days_max_next_matches = 2 # Número de días máximo desde hoy para extraer partidos
+        n_days = 2
         d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
@@ -924,7 +927,7 @@ if __name__ == "__main__":
         n_days = float(sys.argv[1])  # Número de días máximo desde hoy para extraer partidos (e.g. 7)
         id_country = int(sys.argv[2])  # Id de país a extraer (e.g. 48)
         d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario
-        directorio = "p6_deployment/data/predicciones.xlsx"
+        directorio = "p6_deployment/data"
 
     df = main(d_run, id_country, n_days, export=d_run['export'])
-    df.to_excel(directorio)
+    df.to_excel(f"{directorio}/predicciones.xlsx")
