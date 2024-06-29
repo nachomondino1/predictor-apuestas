@@ -704,6 +704,11 @@ def extract_matches_result(country: str, competition: str, l_ids:list):
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+
     # Selecciono country a extraer y obtengo las competencias y su categoria
     country = 'england'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
     id_competicion = 481
@@ -716,13 +721,13 @@ if __name__ == "__main__":
 
     # Extraigo partidos
     # df_match, df_match_player, df_match_odds = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max, export=False)
-    # df_match.to_excel('/Users/nachomondino/Desktop/df_match.xlsx', index=True)
-    # df_match_player.to_excel('/Users/nachomondino/Desktop/df_match_player.xlsx', index=True)
-    # df_match_odds.to_excel('/Users/nachomondino/Desktop/df_match_odds.xlsx', index=True)
+    # df_match.to_excel(f'{BASE_DIR_LOCAL}/df_match.xlsx', index=True)
+    # df_match_player.to_excel(f'{BASE_DIR_LOCAL}/df_match_player.xlsx', index=True)
+    # df_match_odds.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds.xlsx', index=True)
 
     # Extraer partidos 
     df_match = pd.read_excel(f"p2_data_understanding/data/{country}/data_seg/per_season/df_match/premier-league_2023_2024.xlsx", index_col=0)
     df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
-    df_match_miss.to_excel('/Users/nachomondino/Desktop/df_match_miss.xlsx', index=True)
-    df_match_player_miss.to_excel('/Users/nachomondino/Desktop/df_match_player_miss.xlsx', index=True)
-    df_match_odds_miss.to_excel('/Users/nachomondino/Desktop/df_match_odds_miss.xlsx', index=True)
+    df_match_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_miss.xlsx', index=True)
+    df_match_player_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_player_miss.xlsx', index=True)
+    df_match_odds_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds_miss.xlsx', index=True)

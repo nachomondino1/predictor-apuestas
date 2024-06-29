@@ -43,10 +43,15 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
     # Obtener matriz triangular superior de correlacion (pues la matriz de correlacion es una matriz simetrica respecto de la diagonal)
     df_corr_tri_X = df_corr_X.where(np.triu(np.ones(df_corr_X.shape), k=1).astype(bool))
     if _print:
-        df_correlacion.to_excel('/Users/nachomondino/Desktop/df_correlacion.xlsx')
-        df_corr_X.to_excel('/Users/nachomondino/Desktop/df_corr_X.xlsx')
-        df_corr_y.to_excel('/Users/nachomondino/Desktop/df_corr_y.xlsx')
-        df_corr_tri_X.to_excel('/Users/nachomondino/Desktop/df_corr_tri_X.xlsx')
+        import os
+        from dotenv import load_dotenv
+        load_dotenv() # Cargar las variables de entorno desde el archivo .env
+        BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+
+        df_correlacion.to_excel(f'{BASE_DIR_LOCAL}/df_correlacion.xlsx')
+        df_corr_X.to_excel(f'{BASE_DIR_LOCAL}/df_corr_X.xlsx')
+        df_corr_y.to_excel(f'{BASE_DIR_LOCAL}/df_corr_y.xlsx')
+        df_corr_tri_X.to_excel(f'{BASE_DIR_LOCAL}/df_corr_tri_X.xlsx')
 
     # EL OBJETIVO ES NO ELIMINAR COLUMNAS POR CORRELACION CON UNA COLUMNA QUE YA DECIDI ELIMINAR...\
     l_cols = list(df_corr_tri_X.columns)
@@ -388,6 +393,10 @@ def determine_country_competitions(id_country):
 
 def prueba():
     from p3_data_preparation import format_data
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Definicion de variables
     var_resp = 'result'
@@ -416,15 +425,15 @@ def prueba():
     # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
     df, df_etiquetas = format_data.convert_columns_to_int(df)
     if export:     
-        df_etiquetas.to_excel(f'/Users/nachomondino/Desktop/df_etiquetas.xlsx', index=False)
-        df.to_excel(f'/Users/nachomondino/Desktop/df_etiquetado.xlsx', index=False)
+        df_etiquetas.to_excel(f'{BASE_DIR_LOCAL}/df_etiquetas.xlsx', index=False)
+        df.to_excel(f'{BASE_DIR_LOCAL}/df_etiquetado.xlsx', index=False)
 
     # Elimino variables altamente correlacionadas
     if thr_corr is not None:
         l_columnas_a_eliminar = delete_correlated_columns(df, var_resp, thr_corr)
         df = df.drop(l_columnas_a_eliminar, axis=1)
         print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
-        # df.to_excel(f'/Users/nachomondino/Desktop/df_eliminado_corr.xlsx')
+        # df.to_excel(f'{BASE_DIR_LOCAL}/df_eliminado_corr.xlsx')
 
     # Selecciono las variables mas importantes (feature selection)
     if thr_fs is not None:
@@ -442,7 +451,7 @@ def prueba():
     print(df.shape)
 
     if export:
-        df.to_excel('/Users/nachomondino/Desktop/df_selected_prueba.xlsx', index=False)
+        df.to_excel(f'{BASE_DIR_LOCAL}/df_selected_prueba.xlsx', index=False)
     
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

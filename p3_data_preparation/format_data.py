@@ -204,6 +204,11 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas):
 
 # Prueba
 def prueba():
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+
     # Levanto datasets
     country = 'argentina'
     df_match = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{country}/df_match.xlsx')
@@ -220,8 +225,8 @@ def prueba():
     df_player['fecha_nac'] = pd.to_datetime(df_player['fecha_nac'], format='%d-%m-%Y')
 
     # Exporto pruebas
-    df_match.to_excel('/Users/nachomondino/Desktop/df_match_formated.xlsx', index=False)
-    df_player.to_excel('/Users/nachomondino/Desktop/df_player_formated.xlsx', index=False)
+    df_match.to_excel(f'{BASE_DIR_LOCAL}/df_match_formated.xlsx', index=False)
+    df_player.to_excel(f'{BASE_DIR_LOCAL}/df_player_formated.xlsx', index=False)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

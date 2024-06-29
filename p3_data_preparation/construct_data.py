@@ -375,6 +375,11 @@ def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int
 
 # PRUEBA
 def prueba():
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+
     # Definicion de variables
     country = 'england'
     var_resp = 'result'
@@ -421,7 +426,7 @@ def prueba():
     end = time.time()
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
-    df.to_excel('/Users/nachomondino/Desktop/df_constructed_prueba.xlsx')
+    df.to_excel(f'{BASE_DIR_LOCAL}/df_constructed_prueba.xlsx')
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

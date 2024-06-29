@@ -378,6 +378,10 @@ def extract_id_from_url_team(url_team):
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Seleccionar pais  
     country = "USA"
@@ -400,19 +404,19 @@ if __name__ == "__main__":
 
         # Player
         df_player, df_player_fifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
-        df_player.to_excel(f'/Users/nachomondino/Desktop/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
-        df_player_fifa.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
+        df_player.to_excel(f'{BASE_DIR_LOCAL}/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
+        df_player_fifa.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
         
         df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
         df_player_fifa_concat = pd.concat([df_player_fifa_concat, df_player_fifa], axis=0)
 
         # Teams
         df_teams = extract_teams(id_country, country, row['competition_sofifa'])
-        df_teams.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
+        df_teams.to_excel(f'{BASE_DIR_LOCAL}/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
 
         df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
     
     # Exporto datos a Desktop
-    df_teams_concat.to_excel(f'/Users/nachomondino/Desktop/df_teams_{country}.xlsx', index=True)
-    df_player_concat.to_excel(f'/Users/nachomondino/Desktop/df_player_sofifa_{country}.xlsx', index=True)
-    df_player_fifa_concat.to_excel(f'/Users/nachomondino/Desktop/df_player_fifa_sofifa_{country}.xlsx', index=True)
+    df_teams_concat.to_excel(f'{BASE_DIR_LOCAL}/df_teams_{country}.xlsx', index=True)
+    df_player_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_sofifa_{country}.xlsx', index=True)
+    df_player_fifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_sofifa_{country}.xlsx', index=True)

@@ -399,6 +399,11 @@ def search_fecha_fifa(fecha_part):
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+
     start = time.time()
     print("\nIntegrando los datos...")
     country = 'spain'
@@ -421,15 +426,15 @@ if __name__ == "__main__":
     # print("\nIntegrating team's data to df_match...")
     # df_map_teams_fs_so = match_dataframes_by_str_column(df_teams, df_teams_sofifa, column_to_relation='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
     # df_match = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
-    # df_map_teams_fs_so.to_excel("/Users/nachomondino/Desktop/df_map_teams_fs_so.xlsx")
+    # df_map_teams_fs_so.to_excel(f"{BASE_DIR_LOCAL}/df_map_teams_fs_so.xlsx")
 
     # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
     print("\nIntegrating player's data to df_match...")
     df_map_players_fs_so = match_dataframes_by_str_column(df_player, df_player_sofifa, column_to_relation="player_name", column_to_integrate='id_player', thr_coincidence_min=90)
-    df_map_players_fs_so.to_excel('/Users/nachomondino/Desktop/df_map_players_fs_so.xlsx', index=True)
+    df_map_players_fs_so.to_excel(f'{BASE_DIR_LOCAL}/df_map_players_fs_so.xlsx', index=True)
     df = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa,  _print=True)
 
-    df.to_excel('/Users/nachomondino/Desktop/df_integrated_prueba.xlsx', index=True)
+    df.to_excel(f'{BASE_DIR_LOCAL}/df_integrated_prueba.xlsx', index=True)
 
     end = time.time()
     print(f"Integracion de datos en {(end - start) / 60:.1f} minutos")
