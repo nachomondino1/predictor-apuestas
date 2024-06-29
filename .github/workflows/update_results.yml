@@ -1,7 +1,7 @@
 name: Update results
 
 on:
-  push: # Para actualizar predicciones de USA por tener nuevo modelo
+  push: # Prueba
     branches:
       - staging
       - prod
