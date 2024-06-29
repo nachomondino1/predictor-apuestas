@@ -42,14 +42,14 @@ class DataUnderstandingNew():
                     # Si no existe, crear el directorio
                     os.makedirs(directorio)
 
-    def collect_initial_data_new(self, l_competencies, df_comp_country: pd.DataFrame, n_days: int = 7):
+    def collect_initial_data_new(self, l_competencies, df_comp_country: pd.DataFrame, n_days: int = 7, _print: bool = False):
         """
         Extraccion de datos de los partidos en los proximos dias en todas las competiciones del pais.
 
         # Parameters
             n_days: Numero de dias desde hoy para recolectar proximos partidos
             export:
-            _PRINT: 
+            _print: 
 
         # Returns
             dfs...
@@ -63,7 +63,7 @@ class DataUnderstandingNew():
             
             row_comp = df_comp_country[df_comp_country['id_competition'].astype(int) == int(id_competition)]
             competition, is_cup = row_comp['competition_flashscore'].values[0], row_comp['is_cup'].values[0]
-            if _PRINT:
+            if _print:
                 print(f" Competition: {competition} id_comp: {id_competition}".center(120, '+'))
 
             # Extraigo proximos partidos
@@ -86,7 +86,7 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame):
+    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, _print: bool = False):
         """
         Extraccion de varias competencias de un mismo country.
         """
@@ -105,12 +105,12 @@ class DataUnderstandingNew():
             # Obtengo nombre de competicion y is_cup
             df_comp_filt = df_comp_country[df_comp_country['id_competition'] == id_competition]  # Para extrar varios countryes?: df = df_comp[df_comp['country'].isin(l_countryes)]
             competition, is_cup = df_comp_filt['competition_flashscore'].values[0], df_comp_filt['is_cup'].values[0]
-            if _PRINT:
+            if _print:
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
             df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=2, l_ids_already_collected=l_ids_extracted, export=False)
-            if _PRINT:
+            if _print:
                 print(f"Cantidad de partidos faltantes en df_match: {df_match_miss.shape[0]}")
 
             # Concateno dfs
@@ -408,7 +408,7 @@ class DataPreparationNew(DataPreparation):
     
 
 # fill_data_not_available_yet()
-def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill): 
+def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill, _print: bool = False): 
     """
     Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
 
@@ -429,7 +429,7 @@ def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, col
         # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondiente
         if variable not in df_new.columns:
             df_new[variable] = np.nan
-        if _PRINT_SPECIFIC: 
+        if _print: 
             print(f"\nVariable a promediar: {variable}")
         col_sin_suffix = variable.replace("_home", "").replace("_away", "")
 
@@ -444,7 +444,7 @@ def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, col
                 # Busco promedio en ultimos partidos
                 df_matches_home_team = df[df['id_team_home'] == team]
                 df_matches_away_team = df[df['id_team_away'] == team]
-                if _PRINT_SPECIFIC:
+                if _print:
                     print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
                     print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
 
@@ -465,12 +465,12 @@ def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, col
                     df_new.loc[id_match, variable] = suma / total_partidos
                     df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
                     df_copiado_form.loc[id_match, variable] = suma / total_partidos
-                    if _PRINT_SPECIFIC:
+                    if _print:
                         print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
 
     return df_new, df_copiado_form
 
-def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list):
+def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list, _print: bool = False):
     """
     En los partidos nuevos, rellena los datos no disponibles con los datos de partidos anteriores.
     """  
@@ -482,7 +482,7 @@ def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to
         # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondient
         if var not in df_new.columns:
             df_new[var] = np.nan
-        if _PRINT_SPECIFIC:
+        if _print:
             print(f"\nVariable a promediar: {var}")
 
         # Por partido nuevo
@@ -511,7 +511,7 @@ def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to
     return df_new, df_copiado
 
 # Missing data
-def read_last_version_extracted_matches(country):
+def read_last_version_extracted_matches(country, _print: bool = True):
     # Esta bien levantar df_integrated aca tambien. para asegurarme que todos los missing estan en df_integrated tambien.
     # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
     try:
@@ -519,7 +519,7 @@ def read_last_version_extracted_matches(country):
         df_match_player = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_match_odds.xlsx', index_col=0)
         df_integrated = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_integrated.xlsx', index_col=0)
-        if _PRINT:
+        if _print:
             print('1) Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
 
     except FileNotFoundError:
@@ -527,7 +527,7 @@ def read_last_version_extracted_matches(country):
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
         df_integrated = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
-        if _PRINT:
+        if _print:
             print('2) Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
     print(df_match.shape, df_match_player.shape, df_match_odds.shape, df_integrated.shape)
     return df_match, df_match_player, df_match_odds, df_integrated
@@ -894,13 +894,6 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
         df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
 
-        # Formateo fecha y separo en "date" y 'time'
-        # df.rename(columns={'date': 'datetime'}, inplace=True) # Cambia el nombre de la columna 'date' a 'datetime'
-        # df['datetime'] = pd.to_datetime(df['datetime'])  # Convierte la columna 'datetime' a formato datetime
-        # df['date'] = df['datetime'].dt.date         # Crea la columna 'date' extrayendo solo la parte de la fecha
-        # df['time'] = df['datetime'].dt.time          # Crea la columna 'time' extrayendo solo la parte de la hora
-        # df.drop('datetime', axis=1, inplace=True)    # Elimina la columna original 'datetime' si ya no la necesitas
-
         if export:
             df.to_excel(f'./p6_deployment/data/{country}/predicciones.xlsx', index=True)
 
@@ -912,9 +905,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 if __name__ == "__main__":
     load_dotenv()
     env = os.getenv('ENVIRONMENT')
-    _PRINT = os.getenv('_PRINT')
-    _PRINT_SPECIFIC = os.getenv('_PRINT_SPECIFIC')
-  
+
     if env == 'development':
         # Definir condiciones del análisis
         id_country = 167
