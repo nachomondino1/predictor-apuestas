@@ -36,6 +36,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
       run: |
-        python github_actions/dispatch_event/dispatch_event.py
+        python automatize_predict/dispatch_event/dispatch_event.py
 
 
