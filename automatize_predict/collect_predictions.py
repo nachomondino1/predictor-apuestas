@@ -35,7 +35,7 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    # Defino argumentos
+    # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
     l_countries = ast.literal_eval(sys.argv[2])  # Lista de paises a los cuales extraer proximos partidos (e.g. [48, 55, 59, 77, 167])
     d_run = json.loads(sys.argv[3])  # Parametros de ejecucion (e.g. {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True})

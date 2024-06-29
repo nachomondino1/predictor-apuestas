@@ -20,6 +20,9 @@ import pickle
 import joblib
 from p4_modeling import asses_model
 
+load_dotenv()
+env = os.getenv('ENVIRONMENT')
+
 class DataUnderstandingNew():
 
     def __init__(self, id_country, country, export: bool = True):
@@ -903,8 +906,6 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    load_dotenv()
-    env = os.getenv('ENVIRONMENT')
 
     if env == 'development':
         # Definir condiciones del análisis

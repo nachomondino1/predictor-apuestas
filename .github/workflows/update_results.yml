@@ -65,7 +65,7 @@ jobs:
       # Run update_results script
       - name: Run update_results script
         run: |
-          python automatize_predict/update_results.py
+          python automatize_predict/update_results.py 7
 
       # Push to Github
       - name: Commit and push all changes
