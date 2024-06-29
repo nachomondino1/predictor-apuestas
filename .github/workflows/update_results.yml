@@ -1,10 +1,10 @@
 name: Update results
 
 on:
-  push: # Prueba
-    branches:
-      - staging
-      - prod
+  # push: # Prueba
+  #   branches:
+  #     - staging
+  #     - prod
   schedule:
     - cron: "0 5 * * SUN"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
     - cron: "0 5 * * SAT"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
