@@ -328,6 +328,11 @@ def replace_nan_with_zero(df, col1, col2):  # Si un equipo no tiene jug asusente
     return df
 
 def prueba():
+    import os
+    from dotenv import load_dotenv
+    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+
     country = 'England'
 
     # Levanto dataset
@@ -352,7 +357,7 @@ def prueba():
     # df['dif_sum_min_titular'] = scaler.fit_transform(df['dif_sum_min_titular'].values.reshape(-1, 1))
     # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
     
-    df.to_excel('/Users/nachomondino/Desktop/df_cleaned_prueba.xlsx', index=True)
+    df.to_excel(f'{BASE_DIR_LOCAL}/df_cleaned_prueba.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

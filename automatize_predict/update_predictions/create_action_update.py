@@ -60,6 +60,10 @@ on:
   {job_name}:
     runs-on: ubuntu-latest
 
+    env:
+      TZ: America/Argentina/Buenos_Aires
+      ENVIRONMENT: "production"
+
     # Asocio cron con job
     if: github.event.schedule == '{cron}'
 
