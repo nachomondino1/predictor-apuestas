@@ -642,7 +642,7 @@ def load_models(country, n_model, BASE_DIR, d):
     loaded_model = pickle.load(open(path_model, "rb"))
     return scaler, columns_scaled, loaded_model
     
-def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss):
+def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country):
     """
     Exporto datos de partidos con los que entreno el modelo y los partidos missing.
     """
@@ -659,7 +659,7 @@ def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds,
     df_concat_match_odds.to_excel(f'{BASE_PATH}/df_match_odds.xlsx')
     print(f"Shape de df_match with missing: {len(df_concat_match)}")
 
-def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss):
+def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country):
     """
     Guardo los nuevos partidos missing con los que ya tenia
     """
@@ -735,8 +735,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
             if export:
                 # Guardo datos con los que entrenó el modelo y los missing
-                concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss)
-                concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)
+                concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country)
+                concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
 
             # Preparo datos
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
@@ -911,7 +911,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         id_country = 167
         n_days = 2
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'production':

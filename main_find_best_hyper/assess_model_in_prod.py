@@ -211,8 +211,8 @@ if __name__ == "__main__":
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Defino condiciones del analisis
-    country = "spain"
-    iteration_date = '2024-05-06'
+    country = "usa"
+    iteration_date = '2024-06-24'
     df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
 
     # Evaluo modelos en produccion
