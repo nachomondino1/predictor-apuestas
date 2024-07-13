@@ -648,9 +648,9 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
     ## Select_data
     d['selected_columns'] = selected_columns
 
-    print("Hiperparametros cargados:")
+    logger.info("Hiperparametros cargados:")
     for key, value in d.items():
-        print(f'\t {key}: {value}')
+        logger.info(f'\t {key}: {value}')
     return d
 
 def load_modeling_hyperparameters(country, n_model, BASE_DIR):
@@ -667,18 +667,18 @@ def load_modeling_hyperparameters(country, n_model, BASE_DIR):
         row_hiper_bet_strat = pd.read_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx')
 
     # Guardo hiperparametros en diccionario
-    d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best']
-    d['curva'] = row_hiper_bet_strat['curva']
-    param1 = row_hiper_bet_strat['param1']
-    param2 = row_hiper_bet_strat['param2']
+    d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best.1']
+    d['curva'] = row_hiper_bet_strat['curva.1']
+    param1 = row_hiper_bet_strat['param1.1']
+    param2 = row_hiper_bet_strat['param2.1']
     d['curva_m'] = param1 if d['curva'] == 'linear' else None
     d['curva_b'] = param2 if d['curva'] == 'linear' else None
     d['curva_p1'] = eval(param1) if d['curva'] != 'linear' else None
     d['curva_p2'] = eval(param2) if d['curva'] != 'linear' else None
 
-    print("Hiperparametros cargados:")
+    logger.info("Hiperparametros cargados:")
     for key, value in d.items():
-        print(f'\t {key}: {value}')
+        logger.info(f'\t {key}: {value}')
     return d
 
 def load_models(country, n_model, BASE_DIR, d):
@@ -772,10 +772,11 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     # Levanto modelos, hiperparametros y demas
     n_model, iteration_date_dt = read_data_of_best_model(id_country)
     BASE_DIR = f"./main_find_best_hyper/data/{country}/{iteration_date_dt}"
-    print(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
+    logger.info(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR)
+    d_hiper_mod = load_modeling_hyperparameters(country, n_model, BASE_DIR)
     scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR, d_hiper)
     df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR, d_hiper)
     comp_to_select = eval(d_hiper['comp_to_select'])
@@ -903,13 +904,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df_c1 = pd.read_excel(f'./p6_deployment/data/{country}/data_preparation/fill_data/df_copiado_formaciones.xlsx', index_col=0)
         df_c2 = pd.read_excel(f'./p6_deployment/data/{country}/data_preparation/fill_data/df_copiado_ref_and_coaches.xlsx', index_col=0)
     
-
     #_____________________________________________________________ MODELING _____________________________________________________________ #
     print("\n MODELING \n".center(240, "#"))
     if d_run['modeling']:
-
-        # Cargo hiperparametros
-        d_hiper_mod = load_modeling_hyperparameters(country, n_model, BASE_DIR)
 
         # Levanto datasets
         df_teams = pd.read_excel(f'p3_data_preparation/data/{country}/integrate_data/df_teams.xlsx', index_col=0)
