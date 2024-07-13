@@ -1,9 +1,9 @@
 import pandas as pd
 from fuzzywuzzy import fuzz
-import warnings
 import time
 from tqdm import tqdm
 import datetime
+from set_up_logging import logger
 
 def create_df_teams(df: pd.DataFrame):
     """
@@ -184,9 +184,10 @@ def match_dataframes_by_str_column(df1, df2, column_to_match1, column_to_match2,
     progress_bar.close()
 
     if n_pos_matchs > 0:
-        print(f"De los {n_pos_matchs} strings en df1, hizo match para {n_matchs}, es decir para el {n_matchs/n_pos_matchs*100:.2f}% de ellos.")
+        logger.info(f"De los {n_pos_matchs} strings en df1, hizo match para {n_matchs}, es decir para el {n_matchs/n_pos_matchs*100:.2f}% de ellos.")
     else:
-        print("Warning! No se cuenta con las formaciones de ningun partido de df_match, por ende, df_match_player no tiene que integrar a df_match.")
+        logger.error("Warning! No se cuenta con las formaciones de ningun partido de df_match, por ende, df_match_player no tiene que integrar a df_match.")
+
     return df_map
 
 def calculate_coincidence(str1, str2):
@@ -259,7 +260,6 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     """
     print("\n Integrating players's data to df_match using mapping...")
     # Definicion de variables
-    warnings.filterwarnings('ignore')  # Ver el ignore, y solucionarlo en vez de ignorarlo...
     l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se lo proceso con sup.
     l_condicion = ['home', 'away']
     d_n_reg_min = {'start': 7, 'sub': 4, 'miss': 0}

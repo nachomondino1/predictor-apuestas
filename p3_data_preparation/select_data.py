@@ -2,7 +2,6 @@
 import sys
 sys.path.append('/Users/nachomondino/Documents/GitHub/predictor-apuestas')  # Fallaba el import de p4_modeling
 import pandas as pd
-import warnings
 from sklearn.model_selection import train_test_split
 from p3_data_preparation import clean_data
 from p4_modeling.build_model import select_best_hiperparameters
@@ -211,7 +210,6 @@ class FeatureSelection():
         :param graf: Boolean. True para graficar importancia por variable. (bool)
         :return: Dataframe. Importancia por variable. (Dataframe)
         """
-        # warnings.filterwarnings('ignore')
         # Definicion de variables
         n_features = 1  # Número deseado de características seleccionadas hasta que se eliminan las menos relevantes
 
@@ -402,7 +400,6 @@ def prueba():
     var_resp = 'result'
     country = 'england'
     export = False
-    warnings.filterwarnings('ignore')
 
     # Definicion de hiperparametros
     thr_corr = None  # Correlacion minima entre dos variables para indicar una alta correlacion [0-1] (siendo 1 correlacion maxima y 0 sin correlacion)

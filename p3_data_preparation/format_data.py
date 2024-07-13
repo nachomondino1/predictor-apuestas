@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
-import datetime
-import warnings
+from set_up_logging import logger
 
 # main.py
 def convert_ball_possession_to_int(df):
@@ -20,9 +19,8 @@ def convert_ball_possession_to_int(df):
     
         # Verifica si todos los elementos de la columna son de tipo float
         if not all(isinstance(value, float) for value in df["ball_possession_home"]):
-            # Si no todos los elementos son de tipo float, raise una advertencia
-            warnings.warn(f"Not all elements in the column '' are float.")
-    
+            logger.error(f"Not all elements in the column '' are float.")  # Si no todos los elementos son de tipo float, raise una advertencia
+            
     return df
 
 def convert_market_value_to_int(df):
@@ -52,8 +50,7 @@ def convert_market_value_to_int(df):
 
     # Verifica si todos los elementos de la columna son de tipo float
     if not all(isinstance(value, (float, np.floating)) for value in df['value']):
-        # Si no todos los elementos son de tipo float, raise una advertencia
-        warnings.warn(f"Not all elements in the column 'value' are float.")
+        logger.error(f"Not all elements in the column 'value' are float.")  # Si no todos los elementos son de tipo float, raise una advertencia        
 
     return df
 

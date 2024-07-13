@@ -6,7 +6,7 @@ from p4_modeling.build_model import select_best_hiperparameters
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
-import warnings
+from set_up_logging import logger
 import string
 import requests
 
@@ -204,8 +204,6 @@ def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_mi
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
     """
-    warnings.simplefilter("always")
-
     # Elimino filas con al menos un nan (tal como lo haria en Modeling)
     df_drop_na = delete_rows_nan(df, 0, _print=False)
     if _print:
@@ -280,11 +278,10 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
                 predicted_values_index = X_test.index
                 X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
             else:
-                text = f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. "
-                warnings.warn(text)
+                logger.error(f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. ")
         else:
-            text = f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'."
-            warnings.warn(text)
+            logger.error(f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'.")
+
     return X_filled
 
 def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"):

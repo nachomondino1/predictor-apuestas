@@ -12,7 +12,7 @@ from p3_data_preparation import construct_data
 import pickle
 import joblib
 from p4_modeling import asses_model
-import warnings
+from set_up_logging import logger
 
 
 def make_directories(ruta_base):  # Pasarle direcotio o l_directorios como argumento...
@@ -156,7 +156,7 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 
         print("\nShape Dataframe antes de Modeling(): ", df_treat.shape)
         if len(df_sel) != len(df_treat):
-            warnings.warn(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
+            logger.info(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
 
         #______________________________________________ MODELING ______________________________________________#
         print("MODELING".center(120, "-"))
