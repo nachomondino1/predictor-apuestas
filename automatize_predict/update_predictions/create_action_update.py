@@ -62,7 +62,7 @@ on:
 
     env:
       TZ: America/Argentina/Buenos_Aires
-      ENVIRONMENT: "production"
+      ENVIRONMENT: "prod"
 
     # Asocio cron con job
     if: github.event.schedule == '{cron}'

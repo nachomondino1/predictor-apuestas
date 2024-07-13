@@ -1,5 +1,5 @@
 import pandas as pd
-import warnings
+from set_up_logging import logger
 
 def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
     """
@@ -44,9 +44,8 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
 
         # Si hay duplicados
         if len(df_concat)-len(df_sin_duplicados) > 0:
-            text = f"Cuidado! Hay filas repetidas. Hay filas repetidas en {dataframe}. Nº de filas repetidas: {len(df_concat)-len(df_sin_duplicados)}"
-            warnings.warn(text)
-            print(df_sin_duplicados)
+            logger.info(f"Cuidado! Hay filas repetidas. Hay filas repetidas en {dataframe}. Nº de filas repetidas: {len(df_concat)-len(df_sin_duplicados)}")
+            logger.info(df_sin_duplicados)
 
         if export:
             df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/{dataframe}.xlsx', index=True)

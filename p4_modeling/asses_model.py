@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn import metrics
-import warnings
+from set_up_logging import logger
 
 def confusion_matrix(y_real, y_pred):
     """
@@ -99,7 +99,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
     # Elimino partidos con odds NaN
     df_sin_odds_nan = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])  # Con 'predicted_result' elimino tambien los partidos que no predijo el modelo, por si me llegan a pasar eso
     if len(df) != len(df_sin_odds_nan):
-        warnings.warn(f'Se eliminaron {len(df)-len(df_sin_odds_nan)} partidos de {len(df)} por tener odds=NaN')
+        logger.info(f'Se eliminaron {len(df)-len(df_sin_odds_nan)} partidos de {len(df)} por tener odds=NaN')
         df = df_sin_odds_nan.copy()
 
     # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
@@ -463,7 +463,7 @@ def determine_winning_bets(df: pd.DataFrame):
 
     # Imprimo warning si supuestamente acerté el 100% de partidos
     if len(df[df['acerte']==1]) == len(df):
-        warnings.warn(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
+        logger.error(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
 
     return df
 

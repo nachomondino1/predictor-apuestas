@@ -4,7 +4,6 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p2_data_understanding.collect_initial_data.web_scraping_selenium import Crawler
 from tqdm import tqdm
-import warnings
 from datetime import datetime, timedelta
 import re
 
@@ -372,8 +371,8 @@ class FlashscoreCrawler(Crawler):
         if tag_bajas:
 
             # Extraigo listado de jugadores
-            l_tags_player_home = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][1]//*[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
-            l_tags_player_away = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][2]//*[@class="lf__participantName"]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+            l_tags_player_home = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+            l_tags_player_away = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
 
             if l_tags_player_home:
                 # Obtengo urls de jugadores

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import datetime
+from set_up_logging import logger
 ## Data understanding
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
@@ -333,6 +334,7 @@ class DataPreparation:
         :return: Dataframe construido. (DataFrame)
         """
         start = time.time()
+        cant_errores = 0
         print("\nConstructing data...")
 
         # VARIABLE RESPUESTA
@@ -356,20 +358,32 @@ class DataPreparation:
         for var in stats_columns: # e.g. shots_on_goal
             print(f"Estadistica a promediar: {var}")
             
-            # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-            df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
-            df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+            try:
+                # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
+                df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
+                df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+                
+                # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+                not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
+                df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
+                df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
+
+                # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+                not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
+                df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
+                df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
             
-            # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-            not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
-            df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
-            df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
+            except KeyError:
+                cant_errores += 1
+                logger.error(f"Fallo la construccion de {var}. Si es una sola variable, puede que realmente no tenga valor en los ultimos partidos. En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos.")
+                
+                # Construyo las variables para evitar KeyError mas adelante
+                df[f'dif_mean_last_match_{var}'] = 0
+                df[f'dif_mean_last_match_{var}_against'] = 0
 
-            # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-            not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
-            df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
-            df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
-
+                if cant_errores > 1:
+                    raise ValueError("Fallo la construccion para mas de una variable.")
+                
         # Historica de jugadores
         df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia) # Variable para ponderar estadisticas
         df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
@@ -452,8 +466,8 @@ class DataPreparation:
             print(f"Columnas constantes eliminadas: {cols_constants}")
             if len(X.columns) != len(X_sin_col_mucho_nan.columns):
                 l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
-                text = f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}"
-                warnings.warn(text)
+                logger.info(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
+            
             print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
 
         # Escalado de datos
@@ -482,7 +496,6 @@ class DataPreparation:
         :param export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (bool)
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
-        warnings.filterwarnings('ignore')
         start = time.time()
         print("\nSelecting data...")
 

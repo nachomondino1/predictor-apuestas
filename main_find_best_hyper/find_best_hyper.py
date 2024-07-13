@@ -13,7 +13,6 @@ from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 import pickle
 import joblib
-import warnings
 import os
 import datetime
 import assess_model_in_prod
