@@ -4,6 +4,7 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 import datetime
+from set_up_logging import logger
 import re
 import os
 import json
@@ -20,8 +21,6 @@ import pickle
 import joblib
 from p4_modeling import asses_model
 
-load_dotenv()
-env = os.getenv('ENVIRONMENT')
 
 class DataUnderstandingNew():
 
@@ -81,8 +80,13 @@ class DataUnderstandingNew():
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_next], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
-        if len(df_match_concat) == 0:
-            raise ValueError("No hay próximos partidos para los cuales predecir su resultado.")
+        # if len(df_match_concat) == 0:
+        #     raise ValueError("No hay próximos partidos para los cuales predecir su resultado.")
+
+        # Verificaciones
+        for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
+            print(f"Verificacion de dataframe: ", end="")
+            self.verify_data_quality(df)
 
         # Exporto datasets
         if self.export:
@@ -124,6 +128,11 @@ class DataUnderstandingNew():
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_miss], axis=0)
             df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds_miss], axis=0)
             
+        # Verificaciones
+        for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
+            print(f"Verificacion de dataframe: ", end="")
+            self.verify_data_quality(df)
+
         # Exporto datasets
         if self.export:
             df_match_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_miss.xlsx', index=True)
@@ -131,6 +140,17 @@ class DataUnderstandingNew():
             df_match_odds_concat.to_excel(f'./p6_deployment/data/{self.country}/missing/data_understanding/df_match_odds_miss.xlsx', index=True)
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
+
+    def verify_data_quality(self, df):
+        """
+        Verificacion de que dataframe extraido tiene al menos una fila y columna.
+        """
+        if len(df) == 0:
+            raise ValueError("El dataframe no tiene registros")
+        elif len(df.columns) == 0:
+            raise ValueError("El dataframe no tiene columnas")
+        else:
+            print("Pasa verificacion")
 
     def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame):
 
@@ -409,8 +429,7 @@ class DataPreparationNew(DataPreparation):
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
         if len(df) != len(df_sin_dup):
-            text = f"Cuidado! De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN."
-            warnings.warn(text)
+            logger.info(f"Cuidado! De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
 
         if self.export: 
             df_sin_dup.to_excel(f'{self.BASE_DIR}/df_selected_nan.xlsx', index=True)
@@ -432,6 +451,7 @@ def filter_dataframe_by_date(df, initial_date, n_days):
     """
     # Determino fecha inical 
     limit_date = initial_date - datetime.timedelta(days=n_days) 
+    print(f"Fecha hoy: {datetime.datetime.now()}")
     print(f"Seleccion de ultimos partidos jugados: {limit_date} -- {n_days} days --> {initial_date}")
 
     # Filtro segun fechas inicial y final
@@ -441,6 +461,8 @@ def filter_dataframe_by_date(df, initial_date, n_days):
 
     if len(df_filt) == 0:
         raise ValueError("El DataFrame con el cual rellenar valores aun no disponibles está vacío")
+    
+    print("Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos: ", df_filt.shape)
     return df_filt
 
 # fill_data_not_available_yet()
@@ -855,7 +877,6 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
         initial_date = datetime.datetime.now() # uso mas dias por si justo no hay partidos dentro de "n_dias_ult_part"
         df_last_old_matches = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period) 
-        print("Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos: ", df_last_old_matches.shape)
 
         # Preparacion de datos
         df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
@@ -868,9 +889,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         df = dp.treat_nan_values_new(df)
 
-        print("\nShape Dataframe antes de Modeling(): ", df.shape)
+        logger.info(f"\nShape Dataframe antes de Modeling(): {df.shape}")
         if len(df_match) != len(df):
-            warnings.warn(f"\nWARNING! De los {len(df_match)} proximos partidos, quedan {len(df)} luego de la preparacion")
+            logger.error(f"\nDe los {len(df_match)} proximos partidos, quedan {len(df)} luego de la preparacion")
 
     elif not d_run['data_unders']:
         # Levanto dataset para prueba
@@ -908,9 +929,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
-        if env == 'development':
+        if env == 'dev':
             df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
-        elif env == 'production':
+        elif env == 'prod':
             df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -928,14 +949,18 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    if env == 'development':
+    # Cargo variables entorno
+    load_dotenv()
+    env = os.getenv('ENVIRONMENT')
+
+    if env == 'dev':
         # Definir condiciones del análisis
         id_country = 167
-        n_days = 7
+        n_days = 2
         d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
-    elif env == 'production':
+    elif env == 'prod':
         # Definir argumentos por terminal
         n_days = float(sys.argv[1])  # Número de días máximo desde hoy para extraer partidos (e.g. 7)
         id_country = int(sys.argv[2])  # Id de país a extraer (e.g. 48)
