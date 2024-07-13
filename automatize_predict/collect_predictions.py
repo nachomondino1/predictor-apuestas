@@ -1,5 +1,7 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
+import os
+from dotenv import load_dotenv
 import ast
 import json
 import pandas as pd
@@ -34,6 +36,10 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+
+    # Cargo variables entorno
+    load_dotenv()
+    env = os.getenv('ENVIRONMENT')
 
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
