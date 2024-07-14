@@ -146,11 +146,13 @@ class DataUnderstandingNew():
         Verificacion de que dataframe extraido tiene al menos una fila y columna.
         """
         if len(df) == 0:
+            logger.error("El dataframe no tiene registros")
             raise ValueError("El dataframe no tiene registros")
         elif len(df.columns) == 0:
+            logger.error("El dataframe no tiene columnas")
             raise ValueError("El dataframe no tiene columnas")
         else:
-            print("Pasa verificacion")
+            logger.info("El dataframe extraido tiene al menos 1 fila y 1 columna.")
 
     def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame):
 
@@ -429,7 +431,7 @@ class DataPreparationNew(DataPreparation):
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
         if len(df) != len(df_sin_dup):
-            logger.info(f"Cuidado! De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
+            logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
 
         if self.export: 
             df_sin_dup.to_excel(f'{self.BASE_DIR}/df_selected_nan.xlsx', index=True)
@@ -569,7 +571,7 @@ def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to
     return df_new, df_copiado
 
 # Missing data
-def read_last_version_extracted_matches(country, _print: bool = True):
+def read_last_version_extracted_matches(country):
     # Esta bien levantar df_integrated aca tambien. para asegurarme que todos los missing estan en df_integrated tambien.
     # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
     try:
@@ -577,17 +579,15 @@ def read_last_version_extracted_matches(country, _print: bool = True):
         df_match_player = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_match_odds.xlsx', index_col=0)
         df_integrated = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_integrated.xlsx', index_col=0)
-        if _print:
-            print('1) Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
+        logger.info('Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
 
     except FileNotFoundError:
         df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
         df_integrated = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
-        if _print:
-            print('2) Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
-    print(df_match.shape, df_match_player.shape, df_match_odds.shape, df_integrated.shape)
+        logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+    logger.info(f"Shapes: \t df_match: {df_match.shape} \t df_match_player:{df_match_player.shape} \t df_match_odds: {df_match_odds.shape} \t df_integrated: {df_integrated.shape}")
     return df_match, df_match_player, df_match_odds, df_integrated
 
 def load_df_etiquetas(country, n_model, BASE_DIR, d):
@@ -703,16 +703,23 @@ def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds,
     """
     BASE_PATH=f"./p6_deployment/data/{country}/missing/old_updated"
 
+    len_inicial = len(df_match)
+    len_inicial_miss = len(df_match_miss)
     # Concateno old (que puede tener ya algunos missing) y nuevos missing
     df_concat_match = pd.concat([df_match, df_match_miss], axis=0)
     df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
     df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
+    len_final = len(df_concat_match)
+
+    verif = (len_inicial + len_inicial_miss) == len_final
+    if not verif:
+        logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
 
     # Exporto datos
     df_concat_match.to_excel(f'{BASE_PATH}/df_match.xlsx')
     df_concat_match_player.to_excel(f'{BASE_PATH}/df_match_player.xlsx')
     df_concat_match_odds.to_excel(f'{BASE_PATH}/df_match_odds.xlsx')
-    print(f"Shape de df_match with missing: {len(df_concat_match)}")
+    logger.info(f"Shape de df_match concatenado con missing:: {len_inicial} --> {len_final}")
 
 def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country):
     """
@@ -725,6 +732,7 @@ def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_
         df_match_miss_comp = pd.read_excel(f'{BASE_PATH}/df_match_miss.xlsx', index_col=0)
         df_match_player_miss_comp = pd.read_excel(f'{BASE_PATH}/df_match_player_miss.xlsx', index_col=0)
         df_match_odds_miss_comp = pd.read_excel(f'{BASE_PATH}/df_match_odds_miss.xlsx', index_col=0)
+        len_inicial = len(df_match_miss_comp)
 
         df_match_miss_comp_ct = pd.concat([df_match_miss_comp, df_match_miss], axis=0)
         df_match_player_miss_comp_ct = pd.concat([df_match_player_miss_comp, df_match_player_miss], axis=0)
@@ -735,7 +743,14 @@ def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_
         df_match_miss_comp_ct = df_match_miss
         df_match_player_miss_comp_ct = df_match_player_miss
         df_match_odds_miss_comp_ct = df_match_odds_miss
-        pass
+        len_inicial = 0
+
+    len_inicial_miss = len(df_match_miss)
+    len_final = len(df_match_miss_comp_ct)
+    verif = (len_inicial + len_inicial_miss) == len_final
+    if not verif:
+        logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
+    logger.info(f"Shape de todos los partidos missing hasta hoy : {len_inicial} --> {len_final}")
 
     # Exporto datos
     df_match_miss_comp_ct.to_excel(f'{BASE_PATH}/df_match_miss.xlsx', index=True)
@@ -794,7 +809,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country)
-        print(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
+        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
         # Si hay partidos missing que no extraje aun
         if len(df_match_miss) > 0:
@@ -892,7 +907,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
         logger.info(f"\nShape Dataframe antes de Modeling(): {df.shape}")
         if len(df_match) != len(df):
-            logger.error(f"\nDe los {len(df_match)} proximos partidos, quedan {len(df)} luego de la preparacion")
+            logger.warning(f"\nDe los {len(df_match)} proximos partidos, quedan {len(df)} luego de la preparacion")
 
     elif not d_run['data_unders']:
         # Levanto dataset para prueba
@@ -954,7 +969,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         id_country = 167
         n_days = 2
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':

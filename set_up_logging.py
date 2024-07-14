@@ -34,4 +34,5 @@ logger.addHandler(debug_console_handler)
 
 # Ejemplo de uso del logger
 logger.info("Este es un mensaje de información")
+logger.warning("Este es un mensaje de warning")
 logger.error("Este es un mensaje de error")

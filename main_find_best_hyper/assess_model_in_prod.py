@@ -13,6 +13,8 @@ import pickle
 import joblib
 from p4_modeling import asses_model
 from set_up_logging import logger
+import os
+from dotenv import load_dotenv
 
 
 def make_directories(ruta_base):  # Pasarle direcotio o l_directorios como argumento...
@@ -156,7 +158,7 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 
         print("\nShape Dataframe antes de Modeling(): ", df_treat.shape)
         if len(df_sel) != len(df_treat):
-            logger.info(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
+            logger.warning(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
 
         #______________________________________________ MODELING ______________________________________________#
         print("MODELING".center(120, "-"))
@@ -200,9 +202,8 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv
-    load_dotenv() # Cargar las variables de entorno desde el archivo .env
+    # Cargar las variables de entorno desde el archivo .env
+    load_dotenv() 
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Defino condiciones del analisis
