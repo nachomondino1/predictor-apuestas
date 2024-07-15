@@ -8,7 +8,7 @@ from p3_data_preparation.select_data import determine_country_competitions
 import pickle
 import joblib
 
-def grid_train_models(country, ruta_base, d_params, l_modelos, export:bool = True):
+def main(country, ruta_base, d_params, l_modelos, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """

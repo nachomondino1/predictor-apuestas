@@ -52,7 +52,7 @@ def main(l_modelos, d_params, ruta_base, export: bool = True):
     Entrena modelos segun las combinaciones de hiperparametros deseadas. Luego los evalua en produccion y selecciona el mejor.
     """
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = train_models.grid_train_models(country, ruta_base, d_params, l_modelos, export=export)
+    df_iteration = train_models.main(country, ruta_base, d_params, l_modelos, export=export)
 
     # Preparo datos missing y evaluo modelos en produccion
     df_iteration_prod = assess_models_in_prod.main(df_iteration, country, date, ruta_base, export=export)
