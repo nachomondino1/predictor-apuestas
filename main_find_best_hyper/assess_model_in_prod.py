@@ -3,30 +3,14 @@ import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
-import datetime
-import os
+from set_up_logging import logger
 ## Data preparation
-from p6_deployment.main_next_matches import DataPreparationNew, filter_dataframe_by_date
 from p3_data_preparation import construct_data
+from p6_deployment.main_next_matches import DataPreparationNew, filter_dataframe_by_date
 # Modeling
 import pickle
 import joblib
 from p4_modeling import asses_model
-from set_up_logging import logger
-import os
-from dotenv import load_dotenv
-
-
-def make_directories(ruta_base):  # Pasarle direcotio o l_directorios como argumento...
-    l_directorios = [
-        f'{ruta_base}/assess_model_in_prod/data_preparation',
-        f'{ruta_base}/assess_model_in_prod/modeling',
-    ]
-
-    for directorio in l_directorios:
-        if not os.path.exists(directorio):
-            # Si no existe, crear el directorio
-            os.makedirs(directorio)
 
 # Data understanding
 def select_league_matches(df):
@@ -84,15 +68,12 @@ def load_models(n_model, ruta_base, d):
 
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date, export: bool = True):
+def main(df_iteration, country, iteration_date, ruta_base, export: bool = True):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
     # Definicion de variables
     df_iteration_prod = pd.DataFrame()
-    ruta_base = f"./main_find_best_hyper/data/{country}/{iteration_date}"  # Le agrego assess_model_in_prod
-    ruta_base_data_prep =f"./main_find_best_hyper/data/{country}/{iteration_date}/assess_model_in_prod/data_preparation" 
-    make_directories(ruta_base)  # Creo directorios 
 
     # Creo objeto de clase DataPreparationNew
     dp = DataPreparationNew(country=country, export=False)
@@ -131,7 +112,7 @@ def main(df_iteration, country, iteration_date, export: bool = True):
         print("DATA PREPARATION".center(120, "-"))
 
         # Levanto datos ya construidos
-        path_cons = f'{ruta_base_data_prep}/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx'
+        path_cons = f'{ruta_base}/assess_models_in_prod/data_preparation/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx'
         try:
             df_cons = pd.read_excel(path_cons, index_col=0)
             print("Evito construir datos dado que levanto dataframe ya construido")
@@ -195,27 +176,47 @@ def main(df_iteration, country, iteration_date, export: bool = True):
 
         # Exporto datos
         if export:
-            df_predicciones.to_excel(f'{ruta_base}/assess_model_in_prod/modeling/{row['n_iteration']}_df_pred_metrics.xlsx', index=True)
-            df_iteration_prod.to_excel(f'{ruta_base}/assess_model_in_prod/df_iteration_prod_seg.xlsx')
+            df_predicciones.to_excel(f'{ruta_base}/assess_models_in_prod/modeling/{row['n_iteration']}_df_pred_metrics.xlsx', index=True)
+            df_iteration_prod.to_excel(f'{ruta_base}/assess_models_in_prod/df_iteration_prod_seg_{iteration_date}.xlsx')
+
+    if export:
+        df_iteration_prod.to_excel(f'{ruta_base}/df_iteration_prod.xlsx')
 
     return df_iteration_prod
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    # Cargar las variables de entorno desde el archivo .env
-    load_dotenv() 
-    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+    # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
+    user_response = input(str("Al correr este programa, sobreescribira el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta 'old_assess_iterations'. Si quieres continuar presiona y:"))
+    if user_response == "y":
+        
+        # Cargar las variables de entorno desde el archivo .env
+        from dotenv import load_dotenv
+        import os
+        load_dotenv() 
+        BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
-    # Defino condiciones del analisis
-    country = "usa"
-    iteration_date = '2024-06-24'
-    df_iteration = pd.read_excel(f'main_find_best_hyper/data/{country}/{iteration_date}/df_iteration.xlsx')
+        # Defino condiciones del analisis
+        country = 'argentina' # "usa"
+        date = '2024-05-07' # '2024-06-24'
+        ruta_base = f"./main_find_best_hyper/data/{country}/{date}" 
+        df_iteration = pd.read_excel(f'{ruta_base}/df_iteration.xlsx')
 
-    # Evaluo modelos en produccion
-    df_iteration_prod = main(df_iteration, country, iteration_date)
+        # Creo directorios
+        l_directorios = [
+            f'{ruta_base}/assess_models_in_prod/data_preparation',
+            f'{ruta_base}/assess_models_in_prod/modeling'
+        ]
+        
+        for directorio in l_directorios:
+            if not os.path.exists(directorio):
+                # Si no existe, crear el directorio
+                os.makedirs(directorio)
 
-    # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
-    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-    df_concat.to_excel(f'{BASE_DIR_LOCAL}/df_iteration_completo.xlsx', index=True)
-    
+        # Evaluo modelos en produccion
+        df_iteration_prod = main(df_iteration, country, date, ruta_base)
+
+        # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
+        df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+        df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+        df_concat.to_excel(f'{BASE_DIR_LOCAL}/df_iteration_completo.xlsx', index=True)

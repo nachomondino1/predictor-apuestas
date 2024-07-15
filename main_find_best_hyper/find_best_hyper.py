@@ -1,23 +1,14 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
-from p3_data_preparation.select_data import determine_country_competitions
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
-from sklearn.tree import DecisionTreeClassifier
-from xgboost import XGBClassifier  # XGBoost
-from sklearn.linear_model import LogisticRegression  # Regresion Logistica
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.svm import SVC  # SVM
-from sklearn.neural_network import MLPClassifier
+from p3_data_preparation.select_data import determine_country_competitions
 import pickle
 import joblib
-import os
-import datetime
-import assess_model_in_prod
 
-def find_best_hiperparameters(country, ruta_base, d_params, l_modelos, export:bool = True):
+def grid_train_models(country, ruta_base, d_params, l_modelos, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
@@ -156,68 +147,16 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def make_directories(ruta_base):
-    
-    l_directorios = [
-        f'{ruta_base}/data_preparation',
-        f'{ruta_base}/modeling',
-        f'{ruta_base}/assess_model_in_prod/',
-    ]
-    
-    for directorio in l_directorios:
-        if not os.path.exists(directorio):
-            # Si no existe, crear el directorio
-            os.makedirs(directorio)
-
-def select_best_model(df):
-    """
-    Selecciona el mejor modelo
-    """
-
-    # Encontrar el índice del máximo valor en la columna "ROI"
-    indice_maximo = df['roi_por_partido'].idxmax()
-
-    # Seleccionar la fila correspondiente al índice máximo
-    fila_maximo = df.loc[indice_maximo]
-
-    # best_hyperparameters =
-    # pickle.dump(best_model, open(f"{ruta_base}/best_model.pkl", "wb"))
-    # df_best_model_hiper = pd.DataFrame.from_dict(hiper_best_model, orient='index', columns=['Valor'])
-    # df_best_model_hiper.to_csv(f"{ruta_base}/df_best_model_hiper.csv")
-
-    # Imprimir los hiperparámetros óptimos y la precisión correspondiente
-    # print("Mejores hiperparámetros:", best_hyperparameters)
-    # print("ROI obtenido:", best_roi_max)
-
-def main(l_modelos, d_params, export: bool = True):
-
-    # Definicion de variables
-    date_con_hora = datetime.datetime.now()
-    date = date_con_hora.date()
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
-    ruta_base = f"./main_find_best_hyper/data/{country}/{date}"
-    make_directories(ruta_base) # Creo directorios
-
-    # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos, export=export)
-
-    # Preparo datos missing y evaluo modelos en produccion
-    df_iteration_prod = assess_model_in_prod.main(df_iteration, country, date, export=export)
-
-    # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    # best_model = select_best_model(df_iteration_prod)
-
-    # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
-    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)    
-
-    if export:
-        df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
-
-    return df_concat
 
 if __name__ == '__main__':
+
+    # Importo librerias
+    from sklearn.tree import DecisionTreeClassifier
+    from xgboost import XGBClassifier  # XGBoost
+    from sklearn.linear_model import LogisticRegression  # Regresion Logistica
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+    from sklearn.svm import SVC  # SVM
+    from sklearn.neural_network import MLPClassifier
 
     # Parametros de corrida
     id_country = 167
@@ -250,4 +189,4 @@ if __name__ == '__main__':
         }
     }
 
-    df_iteration = main(l_modelos, d_params, export=True)
+    # df_iteration = find_best_hiperparameters(country, ruta_base, d_params, l_modelos, export=False):
