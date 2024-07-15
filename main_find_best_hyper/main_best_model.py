@@ -10,7 +10,7 @@ from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
-from main_find_best_hyper import find_best_hyper, assess_model_in_prod
+from main_find_best_hyper import assess_models_in_prod, train_models
 from p3_data_preparation.select_data import determine_country_competitions
 
 
@@ -52,10 +52,10 @@ def main(l_modelos, d_params, ruta_base, export: bool = True):
     Entrena modelos segun las combinaciones de hiperparametros deseadas. Luego los evalua en produccion y selecciona el mejor.
     """
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = find_best_hyper.grid_train_models(country, ruta_base, d_params, l_modelos, export=export)
+    df_iteration = train_models.grid_train_models(country, ruta_base, d_params, l_modelos, export=export)
 
     # Preparo datos missing y evaluo modelos en produccion
-    df_iteration_prod = assess_model_in_prod/modeling.main(df_iteration, country, date, ruta_base, export=export)
+    df_iteration_prod = assess_models_in_prod.main(df_iteration, country, date, ruta_base, export=export)
 
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
     # best_model = select_best_model(df_iteration_prod)
