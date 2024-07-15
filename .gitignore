@@ -21,7 +21,7 @@ data_seg/
 p4_modeling/data/
 # Main_find_best_hiper
 main_find_best_hyper/data/*/*/modeling/*.xlsx
-assess_model_in_prod/
-old_iterations/
-old_assess/
+assess_models_in_prod/
+old_train_iterations/
+old_assess_iterations/
 *.csv
