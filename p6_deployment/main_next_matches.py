@@ -9,17 +9,17 @@ import re
 import os
 import json
 from dotenv import load_dotenv
-from main import DataPreparation
 ## Data understanding
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
+from main import DataPreparation
 from p3_data_preparation import format_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
+from p4_modeling import asses_model
 import pickle
 import joblib
-from p4_modeling import asses_model
 
 
 class DataUnderstandingNew():
@@ -791,7 +791,6 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR)
-    d_hiper_mod = load_modeling_hyperparameters(country, n_model, BASE_DIR)
     scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR, d_hiper)
     df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR, d_hiper)
     comp_to_select = eval(d_hiper['comp_to_select'])
@@ -923,6 +922,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     print("\n MODELING \n".center(240, "#"))
     if d_run['modeling']:
 
+        # Levanto hiperparametros de modeling
+        d_hiper_mod = load_modeling_hyperparameters(country, n_model, BASE_DIR)
+
         # Levanto datasets
         df_teams = pd.read_excel(f'p3_data_preparation/data/{country}/integrate_data/df_teams.xlsx', index_col=0)
         df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']]
@@ -959,7 +961,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
+if __name__ == "__main__":    
 
     # Cargo variables entorno
     load_dotenv()
@@ -967,7 +969,7 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167
+        id_country = 6 # 167
         n_days = 2
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
