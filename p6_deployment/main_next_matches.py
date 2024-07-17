@@ -80,13 +80,12 @@ class DataUnderstandingNew():
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player_next], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
-        # if len(df_match_concat) == 0:
-        #     raise ValueError("No hay próximos partidos para los cuales predecir su resultado.")
-
         # Verificaciones
         for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
-            print(f"Verificacion de dataframe: ", end="")
             self.verify_data_quality(df)
+
+        if len(df_match_concat) == 0:
+            raise ValueError("No hay próximos partidos para los cuales predecir su resultado.")
 
         # Exporto datasets
         if self.export:
@@ -130,7 +129,6 @@ class DataUnderstandingNew():
             
         # Verificaciones
         for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
-            print(f"Verificacion de dataframe: ", end="")
             self.verify_data_quality(df)
 
         # Exporto datasets
@@ -146,11 +144,11 @@ class DataUnderstandingNew():
         Verificacion de que dataframe extraido tiene al menos una fila y columna.
         """
         if len(df) == 0:
-            logger.error("El dataframe no tiene registros")
-            raise ValueError("El dataframe no tiene registros")
+            logger.warning("El dataframe no tiene registros")
+            # raise ValueError("El dataframe no tiene registros")
         elif len(df.columns) == 0:
-            logger.error("El dataframe no tiene columnas")
-            raise ValueError("El dataframe no tiene columnas")
+            logger.warning("El dataframe no tiene columnas")
+            # raise ValueError("El dataframe no tiene columnas")
         else:
             logger.info("El dataframe extraido tiene al menos 1 fila y 1 columna.")
 
@@ -969,9 +967,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 6 # 167
+        id_country = 167
         n_days = 2
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
