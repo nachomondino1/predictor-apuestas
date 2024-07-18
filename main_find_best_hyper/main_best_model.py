@@ -19,7 +19,6 @@ def make_directories(ruta_base):
     l_directorios = [
         f'{ruta_base}/data_preparation',
         f'{ruta_base}/modeling',
-        f'{ruta_base}/assess_model_in_prod/modeling',
     ]
     
     for directorio in l_directorios:

@@ -4,6 +4,9 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 from set_up_logging import logger
+import shutil
+import os
+import datetime
 ## Data preparation
 from p3_data_preparation import construct_data
 from p6_deployment.main_next_matches import DataPreparationNew, filter_dataframe_by_date
@@ -11,6 +14,54 @@ from p6_deployment.main_next_matches import DataPreparationNew, filter_dataframe
 import pickle
 import joblib
 from p4_modeling import asses_model
+
+# Guardado de assess actual y creacion de directorio para nuevo assess
+def save_assess(ruta_base):
+    """
+    Muevo assess a old_assess_iterations para no sobreescribirlo con el nuevo assess.
+    """
+    date_con_hora = datetime.datetime.now()
+    date = date_con_hora.date()
+
+    l_dir_origen = [f'{ruta_base}/assess_models_in_prod', f'{ruta_base}/df_iteration_prod.xlsx', f'{ruta_base}/df_iteration_completo.xlsx']
+    directorio_destino = f'{ruta_base}/old_assess_iterations/{date}'
+
+    # Creo directorio de destino
+    crear_directorio(directorio_destino)
+
+    # Por directorio de orgigen
+    for direcorio in l_dir_origen:
+        # Muevo directorio a destino
+        mover_archivo(direcorio, directorio_destino)
+    
+def crear_directorio(ruta):
+    """
+    Crea directorio.
+    """
+    try:
+        # Verificar si el directorio no existe antes de crearlo
+        if not os.path.exists(ruta):
+            os.makedirs(ruta)
+            print(f"Directorio '{ruta}' creado correctamente.")
+        else:
+            print(f"El directorio '{ruta}' ya existe.")
+    except OSError as e:
+        print(f"Error al crear el directorio '{ruta}': {e}")
+
+def mover_archivo(origen, destino):
+    """
+    Mueve archivo o directorio de origen a destino.
+    """
+    try:
+        # Mover el archivo desde el origen al destino
+        shutil.move(origen, destino)
+        print(f"Archivo movido de {origen} a {destino} correctamente.")
+    except FileNotFoundError:
+        print(f"No se pudo encontrar el archivo {origen}.")
+    except PermissionError:
+        print(f"No tienes permisos para acceder o mover el archivo {origen}.")
+    except Exception as e:
+        print(f"Ocurrió un error al intentar mover el archivo: {e}")
 
 # Data understanding
 def select_league_matches(df):
@@ -72,11 +123,14 @@ def main(df_iteration, country, iteration_date, ruta_base, export: bool = True):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
+    # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
+    save_assess(ruta_base)      # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
+    crear_directorio(f'{ruta_base}/assess_models_in_prod/data_preparation')
+    crear_directorio(f'{ruta_base}/assess_models_in_prod/modeling')
+
     # Definicion de variables
     df_iteration_prod = pd.DataFrame()
-
-    # Creo objeto de clase DataPreparationNew
-    dp = DataPreparationNew(country=country, export=False)
+    dp = DataPreparationNew(country=country, export=False)  # Creo objeto de clase DataPreparationNew
 
     #______________________________________________ DATA UNDERSTANDING ______________________________________________#  # --> Levanto dfs missing de p6_deployment
     print("\n", "#"*120, "\n", "DATA UNDERSTANDING".center(120), "\n", "#"*120, "\n")
@@ -92,7 +146,7 @@ def main(df_iteration, country, iteration_date, ruta_base, export: bool = True):
 
     # Filtro por competencias. No quiero partidos de copas (e.g. FA cup) solo de la liga
     df_int_missing = select_league_matches(df_int_missing)
-   
+    
     # Construyo la variable "result"
     df_int = construct_data.determine_result(df_int_missing, 'result')  # Es necesaria? Creo que si porque en main_next_matches.py no le construyo result...
 
@@ -186,37 +240,18 @@ def main(df_iteration, country, iteration_date, ruta_base, export: bool = True):
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
-    user_response = input(str("Al correr este programa, sobreescribira el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta 'old_assess_iterations'. Si quieres continuar presiona y:"))
-    if user_response == "y":
-        
-        # Cargar las variables de entorno desde el archivo .env
-        from dotenv import load_dotenv
-        import os
-        load_dotenv() 
-        BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
+    logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino sera igual.")
 
-        # Defino condiciones del analisis
-        country = 'argentina' # "usa"
-        date = '2024-05-07' # '2024-06-24'
-        ruta_base = f"./main_find_best_hyper/data/{country}/{date}" 
-        df_iteration = pd.read_excel(f'{ruta_base}/df_iteration.xlsx')
+    # Defino condiciones del analisis
+    country = "usa"
+    date = '2024-06-24'
+    ruta_base = f"./main_find_best_hyper/data/{country}/{date}" 
+    df_iteration = pd.read_excel(f'{ruta_base}/df_iteration.xlsx')
 
-        # Creo directorios
-        l_directorios = [
-            f'{ruta_base}/assess_models_in_prod/data_preparation',
-            f'{ruta_base}/assess_models_in_prod/modeling'
-        ]
-        
-        for directorio in l_directorios:
-            if not os.path.exists(directorio):
-                # Si no existe, crear el directorio
-                os.makedirs(directorio)
+    # Evaluo modelos en produccion
+    df_iteration_prod = main(df_iteration, country, date, ruta_base)
 
-        # Evaluo modelos en produccion
-        df_iteration_prod = main(df_iteration, country, date, ruta_base)
-
-        # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
-        df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-        df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
-        df_concat.to_excel(f'{BASE_DIR_LOCAL}/df_iteration_completo.xlsx', index=True)
+    # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
+    df_iteration.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
+    df_concat = pd.concat([df_iteration, df_iteration_prod], axis=1)
+    df_concat.to_excel(f'{ruta_base}/df_iteration_completo.xlsx', index=True)
