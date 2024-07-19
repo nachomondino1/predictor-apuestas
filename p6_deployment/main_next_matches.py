@@ -458,11 +458,24 @@ def filter_dataframe_by_date(df, initial_date, n_days):
     df_filt = df[(df['date'] >= limit_date) & (df['date'] <= initial_date)]
     df_filt = df_filt.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
     print(f"Filas: {len(df)} --> {len(df_filt)}")
+    logger.info(f"Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos: {df_filt.shape}")
 
+    # Si no hay ultimos partidos
     if len(df_filt) == 0:
+        logger.error(f"No hay partidos en los ultimos {n_days} dias.")
+
+        # Y es el inicio de la temporada
+        if initial_date.month == 8:
+            # uso un n_days mas laxo
+            logger.warning(f"Dado que el mes actual es Agosto (inicio de temporada), amplio n_days de {n_days} a {n_days*3}" )
+            return filter_dataframe_by_date(df, initial_date, n_days*3)
         raise ValueError("El DataFrame con el cual rellenar valores aun no disponibles está vacío")
     
-    print("Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos: ", df_filt.shape)
+    # Si hay pocos ultimos partidos
+    elif len(df_filt) < 40:
+        logger.warning(f"Hay muy pocos ultimos partidos dentro del rango {n_days}. Amplio n_days de {n_days} a {n_days*3} para tener mas robustez en copiado de formaciones.")
+        return filter_dataframe_by_date(df, initial_date, n_days*3)
+
     return df_filt
 
 # fill_data_not_available_yet()
@@ -888,7 +901,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
         # Selecciono los ultimos partidos de los ya jugados
         n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
-        initial_date = datetime.datetime.now() # uso mas dias por si justo no hay partidos dentro de "n_dias_ult_part"
+        initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
         df_last_old_matches = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period) 
 
         # Preparacion de datos
