@@ -6,9 +6,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException
-import random
 from time import sleep
-
+from set_up_logging import logger
 
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
@@ -22,7 +21,7 @@ class Crawler:
         elif browser == "Safari":
             self.driver = self.initialize_safari_driver()
         else:
-            print("La libreria no posee ese browser")
+            logger.error("La libreria no posee ese browser")
 
     def inicialize_chrome_driver(self, headless: bool, path: str):
         """
@@ -61,11 +60,11 @@ class Crawler:
         try:
             service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
             driver = webdriver.Chrome(service=Service(service), options=options)
-            print("Creacion de ChromeDriver con install()")
+            logger.info("Creacion de ChromeDriver con install()")
         except:
             service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
             driver = webdriver.Chrome(service=Service(service), options=options)
-            print("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
+            logger.warning("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
 
         return driver
 
@@ -110,13 +109,13 @@ class Crawler:
                     return tag_res.text if text else tag_res.get_attribute(attribute) if attribute is not None else tag_res
                 except StaleElementReferenceException:
                     attempts += 1
-                    print(f"Se produjo una excepción StaleElementReferenceException. Intento {attempts}/{max_attempts}")
+                    logger.warning(f"Se produjo una excepción StaleElementReferenceException. Intento {attempts}/{max_attempts}")
                     sleep(1)
                 except TimeoutException:
                     break  # Salir del bucle si se alcanza el tiempo de espera máximo
 
         if print_fail:
-            print(f"Fallo la extraccion del campo. Probablemente no exista el xpath {xpath}")
+            logger.error(f"Fallo la extraccion del campo. Probablemente no exista el xpath {xpath}")
         return None
 
     def extract_tags(self, xpath, tag_inicial=None, sec_wait=10, print_fail=True):
@@ -133,7 +132,7 @@ class Crawler:
 
         except TimeoutException:
             if print_fail:
-                print(f"Fallo la extraccion de tags. Probablemente no exista el xpath {xpath}")
+                logger.error(f"Fallo la extraccion de tags. Probablemente no exista el xpath {xpath}")
             return []  # Si devuelvo None y el usuario itera sobre el return, dara el error: TypeError: 'NoneType' object is not iterable
 
     def click_boton(self, tag_boton, sec_wait: float = 10):
