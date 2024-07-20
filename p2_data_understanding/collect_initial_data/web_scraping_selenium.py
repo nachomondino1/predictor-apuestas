@@ -12,10 +12,10 @@ from set_up_logging import logger
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
 
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
+    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome", chrome_version=None):
         """Initialize attributes of the parent class."""
         if browser == "Chrome":
-            self.driver = self.inicialize_chrome_driver(headless, path)
+            self.driver = self.inicialize_chrome_driver(headless, path, chrome_version)
         elif browser == "Firefox":
             self.driver = self.initialize_firefox_driver(headless)
         elif browser == "Safari":
@@ -23,19 +23,20 @@ class Crawler:
         else:
             logger.error("La libreria no posee ese browser")
 
-    def inicialize_chrome_driver(self, headless: bool, path: str):
+    def inicialize_chrome_driver(self, headless: bool, path: str, chrome_version):
         """
-          Initialize a Chrome WebDriver.
+        Initialize a Chrome WebDriver.
 
-          Args:
-              headless (bool): True to prevent the web browser from opening, False otherwise.
-              path (str): Path to the Chrome WebDriver executable (.exe).
+        Args:
+            headless (bool): True to prevent the web browser from opening, False otherwise.
+            path (str): Path to the Chrome WebDriver executable (.exe).
 
-          Returns:
-              WebDriver: Chrome WebDriver instance.
-          """
+        Returns:
+            WebDriver: Chrome WebDriver instance.
+        """
         # Defino opciones del webdriver
         options = webdriver.ChromeOptions()
+        options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         options.add_argument("--window-size=1920,1080")  # nuevo
         # options.add_argument('--ignore-certificate-errors') # nuevo
         # options.add_argument('--allow-running-insecure-content') # nuevo
@@ -58,14 +59,19 @@ class Crawler:
             options.add_argument("--headless")
 
         try:
-            service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
+            # Si se especificó la version del chrome a utilizar
+            if chrome_version is not None:
+                service = ChromeDriverManager(driver_version=chrome_version).install()
+            else:
+                service = ChromeDriverManager().install()
+            
+            logger.info(f"ChromeDriver path: {service}")
             driver = webdriver.Chrome(service=Service(service), options=options)
             logger.info("Creacion de ChromeDriver con install()")
         except:
             service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
             driver = webdriver.Chrome(service=Service(service), options=options)
             logger.warning("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
-
         return driver
 
     def initialize_safari_driver(self):
