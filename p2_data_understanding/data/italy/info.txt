@@ -1,20 +1,25 @@
 ########################################### EXTRACCION FLASHSCORE ###########################################
-Fecha de extraccion: 4/4/2024 (4 de Abril de 2024)
+- Fecha de inicio: Viernes 19 de julio de 2024 19hs
+- Fecha fin: Sabado 20 de julio de 2024 18 hs
+
+- Actualizacion fecha: Sabado 20 de julio de 2024 11hs  (16 horas)—> Desde Serie A 2023/2024 hasta Serie A 2002/2003 (incluida). Son 22 temporadas de 380 partidos = 8360 partidos.
+- Cortes:
+    - Sab 20 de julio de 13 hasta 23 hs.
+
 Competiciones extraidas y cantidad de temporadas: 
     - 771 - Serie A: Max. Hasta Serie A 1989/1990
     - 772 - Super cup: Max. Hasta Supercopa 1990
     - 773 - Coppa Italia: Max. Hasta Copa Italia 1998/1999
-Cantidad de partidos: 14175
-
-Notas:
-    - No extraje 774 - Serie B
-
+    - 774 - Serie B: Max. 
+Cantidad de partidos: ...
 
 ########################################### EXTRACCION SOFIFA ###########################################
-Fecha de extraccion: 4/4/2024 (4 de Abril de 2024)
-Competiciones extraidas: 
-    - 774 - Serie A
-Cantidad de jugadores: 3804
+- Extracción de Sofifa de Italia (todas las comp). 
+    - Fecha de inicio: Sabado 20 de julio de 2024 16.20hs
+    - Fecha fin: Sabado 20 de julio de 2024 18 hs
 
-Notas:
-    - No extraje 774 - Serie B. Calculo que fue porque no la extraje para Flashscore.
+Competiciones extraidas: 
+    - 771 - Serie A
+    - 774 - Serie B
+Cantidad de jugadores: 8056
+
