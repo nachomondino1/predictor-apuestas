@@ -846,14 +846,21 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
             except FileNotFoundError:
                 df_integrated_missing_all = pd.DataFrame()  # Es importante para que se guarde por primera vez df_integrated_missing en /all 
 
-            df_integrated_missing_all = pd.concat([df_integrated_missing_all, df_integrated_missing], axis=0)  
+            df_integrated_missing_all = pd.concat([df_integrated_missing_all, df_integrated_missing], axis=0)
             if export:
                 df_integrated_missing_all.to_excel(f'./p6_deployment/data/{country}/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
     
+            # Verificacion de concatatenacion de nuevos partidos missing con partidos ya jugados
+            if len(df_integrated_updated) != (len(df_match_miss) + len(df_integrated)):
+                logger.info(f"\nShape of df_integrated_with_missing (siempre es un poco menor a df_match_with_missing pero no se por qué): {df_integrated_updated.shape}")  # Calculo que debe ser por la eliminacion de partidos con goles="-" que hice de df_integrated en main.py
+                logger.info(df_integrated_updated.head(3))
+                logger.error("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
+                raise ValueError("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
+        
         else:
             print("Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos.")
             df_integrated_updated = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_integrated.xlsx', index_col=0)
-        
+
     else:
         try:
             df_integrated_updated = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_integrated.xlsx', index_col=0)
@@ -861,10 +868,6 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
             df_integrated_updated = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
             print("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
    
-    # Imprimo tamaño de df_integrated_updated 
-    print(f"\nShape of df_integrated_with_missing (siempre es un poco menor a df_match_with_missing pero no se por qué): {df_integrated_updated.shape}")  # Calculo que debe ser por la eliminacion de partidos con goles="-" que hice de df_integrated en main.py
-    print(df_integrated_updated.head(3))
-
     # _____________________________________________________________ DATA UNDERSTANDING _____________________________________________________________ #
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if d_run['data_unders']:
@@ -982,7 +985,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         id_country = 167
         n_days = 2
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
