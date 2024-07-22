@@ -48,7 +48,6 @@ class Crawler:
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-dev-tools")
         options.add_argument("--disable-browser-side-navigation")
         options.add_argument("--disable-gpu")
         options.add_argument("--incognito")
@@ -64,14 +63,15 @@ class Crawler:
                 service = ChromeDriverManager(driver_version=chrome_version).install()
             else:
                 service = ChromeDriverManager().install()
+            logger.info(f"ChromeDriver path (para ver versión): {service}")
             
-            logger.info(f"ChromeDriver path: {service}")
             driver = webdriver.Chrome(service=Service(service), options=options)
-            logger.info("Creacion de ChromeDriver con install()")
         except:
+            logger.error("Falló la creacion del ChromeDriver usando .install(). Se intentará usar el chrome driver ejecutable local.")
+
             service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
             driver = webdriver.Chrome(service=Service(service), options=options)
-            logger.warning("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
+            logger.info("Chrome Driver creado desde archivo ejectuable")
         return driver
 
     def initialize_safari_driver(self):
