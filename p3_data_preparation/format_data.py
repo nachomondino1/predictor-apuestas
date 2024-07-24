@@ -7,6 +7,7 @@ from set_up_logging import logger
 def convert_ball_possession_to_int(df):
     """
     Transformo posesion de string a float
+    
     :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
     ejemplo '65%'.
     :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
@@ -56,30 +57,30 @@ def convert_market_value_to_int(df):
 
 def convert_goals_to_int(df):
     """
-    Elimina las filas que hacen que goals_home y goals_away no sea integer como debe. Puede ser por NaN o por string "-".
-    :param df:
-    :return:
+    Elimina las filas que hacen que goals_home y goals_away no sean integers como deben ser. 
+    Puede ser por NaN o por string "-".
+    
+    :param df: DataFrame con las columnas 'goals_home' y 'goals_away'
+    :return: DataFrame con las filas inválidas eliminadas y las columnas convertidas a integers
     """
-    l_filas_a_borrar = []
-
-    # Por partido
-    for i, row in df.iterrows():
-        try:
-            int(row['goals_home'])
-            int(row['goals_away'])
-        # Si los goles no pueden ser transofrmados a integer
-        except:
-            # Guardo indice para eliminar la fila
-            l_filas_a_borrar.append(i)
-
-    # Elimino filas del dataframe
-    print(f"Cantidad de partidos eliminados por no tener goles integer: {len(l_filas_a_borrar)/len(df)*100:.1f}%")
-    df = df.drop(l_filas_a_borrar)
-
-    # Convierto columnas goles a integer
+    # Convertir las columnas a numéricas, forzando errores a NaN
+    df['goals_home'] = pd.to_numeric(df['goals_home'], errors='coerce')
+    df['goals_away'] = pd.to_numeric(df['goals_away'], errors='coerce')
+    
+    # Contar y eliminar filas con NaN
+    initial_count = len(df)
+    df = df.dropna(subset=['goals_home', 'goals_away'])
+    final_count = len(df)
+    
+    # Convertir las columnas a integers
     df['goals_home'] = df['goals_home'].astype(int)
     df['goals_away'] = df['goals_away'].astype(int)
-    print(f"Verificacion de dtype de goles (deberia ser int):", df[f"goals_home"].dtype, df[f"goals_away"].dtype)
+    
+    # Imprimir estadísticas
+    removed_count = initial_count - final_count
+    if removed_count > 0:
+        logger.warning(f"Cantidad de partidos eliminados por no tener goles integer: {removed_count / initial_count * 100:.1f}%")
+        
     return df
 
 def convert_capacity_to_int(df):

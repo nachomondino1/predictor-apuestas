@@ -1,6 +1,6 @@
 # Importo librerias
 import pandas as pd
-
+from set_up_logging import logger
 
 def getting_to_know_data(df):
     """
@@ -9,7 +9,7 @@ def getting_to_know_data(df):
     :return: funcion sin retorno
     """
     # Data frame's dimensionality
-    print("\nDataframe shape: ", df.shape)
+    logger.info("\nDataframe shape: ", df.shape)
 
     # See firsts 2 Dataframe's rows
     print("\nPrimeras 2 filas del dataframe:")
@@ -34,24 +34,31 @@ def verificar_unicidad_registros(df):
     df_dup = df.index[indices_duplicados]
 
     if len(df_dup) > 0:
-        print(f"\t El índice tiene valores duplicados.") # Indices duplicados: {list(indices_duplicados)}")
+        logger.warning(f"\t El índice tiene valores duplicados.") # Indices duplicados: {list(indices_duplicados)}")
     else:
-        print("\tEl índice no tiene valores duplicados.")
+        logger.info("\tEl índice no tiene valores duplicados.")
 
-def check_ids_in_both_dataframes(df1, df2, column: str = None):
+def check_ids_in_both_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, column: str = None) -> None:
+    """
+    Verifica si todos los índices de df1 están presentes en df2.
 
-    if column is None:
-        todos_en_df2 = df1.index.isin(df2.index).all()
+    Args:
+        df1 (pd.DataFrame): Primer DataFrame.
+        df2 (pd.DataFrame): Segundo DataFrame.
+        column (str, optional): Nombre de la columna en df2 para comparar con el índice de df1. Si es None, se comparan los índices de ambos DataFrames.
+
+    Returns:
+        None
+    """
+    reference = df2.index if column is None else df2[column]
+    all_in_df2 = df1.index.isin(reference).all()
+
+    if all_in_df2:
+        logger.info("\tTodos los valores del índice de df1 están en el índice de df2.")
     else:
-        todos_en_df2 = df1.index.isin(df2[column]).all()
+        logger.error("\tAl menos un valor del índice de df1 no está en el índice de df2.")
 
-    if todos_en_df2:
-        print("\tTodos los valores del índice de df1 están en el índice de df2.")
-    else:
-        print("\tAl menos un valor del índice de df1 no está en el índice de df2.")
-
-def prueba():
-
+if __name__ == "__main__":
     country = "England"
 
     # Levanto datasets
@@ -68,6 +75,3 @@ def prueba():
 
     # Verifico consistencia en campos que relacionan entidades
     check_ids_in_both_dataframes(df_match, df_match_player)  # si lo hago al reves si hay, pues no tod@ partido tiene datos de jugadores: verificar_relacion_entidades(df_player_part, df_match)
-
-if __name__ == "__main__":
-    prueba()
