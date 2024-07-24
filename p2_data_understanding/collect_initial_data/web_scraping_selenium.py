@@ -2,6 +2,7 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys 
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -191,13 +192,23 @@ class Crawler:
         tag_boton = self.extract_tag(xpath=xpath_boton)
         self.click_boton(tag_boton)
 
+    def fill_form(self, xpath_input, text):
+        # Busco tag input para el usuario y escribo el usuario
+        input_tag = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_input)))
+        input_tag.send_keys(text)
+
+        # Si no hay opciones que elegir
+        # input_tag.send_keys(Keys.ENTER)
+
+        # Si hay opciones que elegir
+        # ...
+
     def login_website(self, user, password, xpath_user, xpath_pass, xpath_boton_login, xpath_boton_validate_user=None):
         """
         Login website
         """
         # Busco tag input para el usuario y escribo el usuario
-        user_input = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_user)))
-        user_input.send_keys(user)
+        self.fill_form(xpath_user, user)
 
         # Si hay que validar el usuario
         if xpath_boton_validate_user is not None:
@@ -207,8 +218,7 @@ class Crawler:
             self.click_boton(tag_boton)
 
         # Busco tag input para la pass y escribo la pass
-        pass_input = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_pass)))
-        pass_input.send_keys(password)
+        self.fill_form(xpath_pass, password)
 
         # Localizo el boton "Iniciar sesion" y lo clickeo
         tag_boton = self.extract_tag(xpath=xpath_boton_login)
