@@ -59,20 +59,16 @@ class Crawler:
             options.add_argument("--headless")
 
         try:
-            # Si se especificó la version del chrome a utilizar
-            if chrome_version is not None:
-                service = ChromeDriverManager(driver_version=chrome_version).install()
-            else:
-                service = ChromeDriverManager().install()
-            logger.info(f"ChromeDriver path (para ver versión): {service}")
-            
-            driver = webdriver.Chrome(service=Service(service), options=options)
-        except:
-            logger.error("Falló la creacion del ChromeDriver usando .install(). Se intentará usar el chrome driver ejecutable local.")
+            # Usando .install()
+            service_path = ChromeDriverManager(driver_version=chrome_version).install() if chrome_version else ChromeDriverManager().install()
+            logger.info(f"ChromeDriver path (para ver versión): {service_path}")      
+        except Exception as e:
+            # Desde archivo ejecutable
+            logger.error(f"Falló la creación del ChromeDriver usando .install(). Se intentará usar el ChromeDriver ejecutable local. Error: {e}")
+            logger.warning("Chrome Driver creado desde archivo ejectuable")
+            service_path = '/Users/nachomondino/Documents/chromedriver' if path is None else path # Ultima actualizacion: 3 Mayo 2024
 
-            service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
-            driver = webdriver.Chrome(service=Service(service), options=options)
-            logger.info("Chrome Driver creado desde archivo ejectuable")
+        driver = webdriver.Chrome(service=Service(service_path), options=options)
         return driver
 
     def initialize_safari_driver(self):
@@ -192,13 +188,14 @@ class Crawler:
         tag_boton = self.extract_tag(xpath=xpath_boton)
         self.click_boton(tag_boton)
 
-    def fill_form(self, xpath_input, text):
+    def fill_form(self, xpath_input, text, enter=True):
         # Busco tag input para el usuario y escribo el usuario
         input_tag = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_input)))
         input_tag.send_keys(text)
 
         # Si no hay opciones que elegir
-        # input_tag.send_keys(Keys.ENTER)
+        if enter:
+            input_tag.send_keys(Keys.ENTER)
 
         # Si hay opciones que elegir
         # ...
@@ -208,7 +205,7 @@ class Crawler:
         Login website
         """
         # Busco tag input para el usuario y escribo el usuario
-        self.fill_form(xpath_user, user)
+        self.fill_form(xpath_user, user, enter=False)
 
         # Si hay que validar el usuario
         if xpath_boton_validate_user is not None:
@@ -218,7 +215,7 @@ class Crawler:
             self.click_boton(tag_boton)
 
         # Busco tag input para la pass y escribo la pass
-        self.fill_form(xpath_pass, password)
+        self.fill_form(xpath_pass, password, enter=False)
 
         # Localizo el boton "Iniciar sesion" y lo clickeo
         tag_boton = self.extract_tag(xpath=xpath_boton_login)
