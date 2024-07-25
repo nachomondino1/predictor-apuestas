@@ -1,25 +1,44 @@
 ########################################### EXTRACCION FLASHSCORE ###########################################
-- Fecha de inicio: Viernes 19 de julio de 2024 19hs
-- Fecha fin: Sabado 20 de julio de 2024 18 hs
-
-- Actualizacion fecha: Sabado 20 de julio de 2024 11hs  (16 horas)—> Desde Serie A 2023/2024 hasta Serie A 2002/2003 (incluida). Son 22 temporadas de 380 partidos = 8360 partidos.
-- Cortes:
-    - Sab 20 de julio de 13 hasta 23 hs.
+    - Fecha de inicio: Viernes 19 de julio de 2024 19 hs.
+    - Actualizacion fecha: Sabado 20 de julio de 2024 11hs  (16 horas)—> Desde Serie A 2023/2024 hasta Serie A 2002/2003 (incluida). Son 22 temporadas de 380 partidos = 8360 partidos.
+    - Corte Keyboard para arreglar problema de incompatibilidad de versiones: Sabado 20 de julio de 2024 13 hs hasta 23 hs
+    - Corte por internet: Domingo 21 de julio de 2024 00 hs hasta 11 hs
+    - Corte por DevTools: Lunes 22 de Julio de 2024  durante la noche… Hasta Serie A 1992/1993.
+    - Fecha fin: Miercoles 24 de julio de 2024 9 hs
+    - Duracion Total: 110 horas. (es decir, 4,5 dias)
 
 Competiciones extraidas y cantidad de temporadas: 
-    - 771 - Serie A: Max. Hasta Serie A 1989/1990
-    - 772 - Super cup: Max. Hasta Supercopa 1990
-    - 773 - Coppa Italia: Max. Hasta Copa Italia 1998/1999
-    - 774 - Serie B: Max. 
-Cantidad de partidos: ...
+    - 771 - Serie A: 
+        Max. Hasta Serie A 1989/1990
+        Cantidad de partidos: 12122
+    - 772 - Super cup: 
+        Max. Hasta Supercopa 1990
+        Cantidad de partidos: 36
+    - 773 - Coppa Italia: 
+        Max. Hasta Copa Italia 1998/1999
+        Cantidad de partidos: 2020
+    - 774 - Serie B: 
+        Max. 
+        Cantidad de partidos: 12853
+
+    Cantidad de partidos: 27031
+
+Nota: 
+- Elimine los ultimos 100 partidos jugados en Serie A de df_match desde el 15/3/2024 al 2/6/2024. Esto es para tener partidos missing para evaluar en assess_models.
+- Al extraerlo probe a extraer missing y efectivamente no habia partidos missing.
+
 
 ########################################### EXTRACCION SOFIFA ###########################################
 - Extracción de Sofifa de Italia (todas las comp). 
     - Fecha de inicio: Sabado 20 de julio de 2024 16.20hs
     - Fecha fin: Sabado 20 de julio de 2024 18 hs
+    - Duracion: 1.8 horas
 
 Competiciones extraidas: 
     - 771 - Serie A
+        Cantidad de jugadores: 3757
     - 774 - Serie B
-Cantidad de jugadores: 8056
+        Cantidad de jugadores: 4300
+    Cantidad de jugadores: 8056
+
 

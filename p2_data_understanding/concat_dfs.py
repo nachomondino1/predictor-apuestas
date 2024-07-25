@@ -94,9 +94,9 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
 
 if __name__ == "__main__":
     # Definicion de variables
-    country = "germany"
+    country = "italy"
     export = True
-    competicion, temporada = True, False
+    competicion, temporada = False, True
     
     # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./p2_data_understanding/data/df_countries.xlsx')
@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     # Concateno temporadas de una misma competition del country
     if temporada:
-        l_dataframes = ["df_player"]  #  ["df_player"]
-        l_filenames = ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]
+        l_dataframes = ["df_match", "df_match_player", 'df_match_odds']  # ["df_player"]
+        l_filenames =  ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]   # l_files = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
         competition = "premier_league"
         concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export)
