@@ -9,7 +9,7 @@ def getting_to_know_data(df):
     :return: funcion sin retorno
     """
     # Data frame's dimensionality
-    logger.info("\nDataframe shape: ", df.shape)
+    logger.info(f"\nDataframe shape: {df.shape}")
 
     # See firsts 2 Dataframe's rows
     print("\nPrimeras 2 filas del dataframe:")

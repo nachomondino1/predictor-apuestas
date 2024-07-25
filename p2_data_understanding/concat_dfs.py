@@ -1,3 +1,5 @@
+import sys
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from set_up_logging import logger
 
@@ -20,9 +22,12 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
 
         # Por competition del country
         for i, row in df_comp_pais.iterrows():
+            d_comps = {'laliga': 'la-liga', 'laliga2': 'la-liga-2'}
 
             competicion_form = row['competition_flashscore'].lower().replace(" ", "-")  # competicion_form = row['competition_sofifa'].lower().replace(" ", "-")
-            print(f" Competition: {row['competition_flashscore']} ".center(120, "-"))
+            if competicion_form in d_comps.keys():
+                competicion_form = d_comps[competicion_form]
+            print(f" Competition: {row['competition_flashscore']} --> form {competicion_form} ".center(120, "-"))
 
             # Levanto su dataframe
             try:
@@ -91,17 +96,16 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
         if export:
             df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
-
 if __name__ == "__main__":
     # Definicion de variables
-    country = "italy"
-    export = True
-    competicion, temporada = False, True
+    id_country = 148
+    export = False
+    competicion, temporada = True, False
     
     # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
-    print(id_country)
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    print(country)
 
     # Concateno competiciones del country
     if competicion:
