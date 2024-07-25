@@ -775,7 +775,8 @@ def read_data_of_best_model(id_country):
     n_model = int(row_country['n_model'].values[0])
     iteration_date_str = row_country['iteration_date'].values[0]
     iteration_date_dt = pd.to_datetime(iteration_date_str, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
-    return n_model, iteration_date_dt
+    m_to_use = row_country['m_to_use'].values[0]
+    return n_model, iteration_date_dt, m_to_use
 
 
 ########################################################################## MAIN #######################################################################
@@ -796,7 +797,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     dp = DataPreparationNew(country=country, export=export) # Creo objeto de clase DataPreparation
 
     # Levanto modelos, hiperparametros y demas
-    n_model, iteration_date_dt = read_data_of_best_model(id_country)
+    n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
     BASE_DIR = f"./main_find_best_hyper/data/{country}/{iteration_date_dt}"
     logger.info(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
@@ -960,7 +961,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         if env == 'dev':
             df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
         elif env == 'prod':
-            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=5, b=0) # Uso un m bajo para los clientes
+            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -983,9 +984,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167
-        n_days = 2
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        id_country = 77
+        n_days = 25
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
