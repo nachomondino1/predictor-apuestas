@@ -9,14 +9,18 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException
 from time import sleep
 from set_up_logging import logger
+import platform
+import subprocess
+import platform
+    
 
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
 
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome", chrome_version=None):
+    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
         """Initialize attributes of the parent class."""
         if browser == "Chrome":
-            self.driver = self.inicialize_chrome_driver(headless, path, chrome_version)
+            self.driver = self.inicialize_chrome_driver(headless, path)
         elif browser == "Firefox":
             self.driver = self.initialize_firefox_driver(headless)
         elif browser == "Safari":
@@ -24,7 +28,39 @@ class Crawler:
         else:
             logger.error("La libreria no posee ese browser")
 
-    def inicialize_chrome_driver(self, headless: bool, path: str, chrome_version):
+    def get_chrome_version(self):
+
+        system = platform.system()
+        try:
+            if system == "Windows":
+                import winreg
+                reg_path = r"SOFTWARE\Google\Chrome\BLBeacon"
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path)
+                version, _ = winreg.QueryValueEx(key, "version")
+                return version
+            elif system == "Darwin":
+                process = subprocess.run(
+                    ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "--version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                version = process.stdout.decode().strip().split()[-1]
+                return version
+            elif system == "Linux":
+                process = subprocess.run(
+                    ["google-chrome", "--version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                version = process.stdout.decode().strip().split()[-1]
+                return version
+            else:
+                raise Exception("Unsupported OS")
+        except Exception as e:
+            logger.error(f"Error obtaining Chrome version: {e}")
+            return None
+
+    def inicialize_chrome_driver(self, headless: bool, path: str):
         """
         Initialize a Chrome WebDriver.
 
@@ -37,12 +73,8 @@ class Crawler:
         """
         # Defino opciones del webdriver
         options = webdriver.ChromeOptions()
-        options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        options.add_argument("--window-size=1920,1080")  # nuevo
-        # options.add_argument('--ignore-certificate-errors') # nuevo
-        # options.add_argument('--allow-running-insecure-content') # nuevo
-        # options.add_argument("--proxy-server='direct://'") # nuevo
-        # options.add_argument("--proxy-bypass-list=*") # nuevo
+        # options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        options.add_argument("--window-size=1920,1080")
         options.add_argument("start-maximized")
         options.add_argument("enable-automation")
         options.add_argument("--no-sandbox")
@@ -58,17 +90,22 @@ class Crawler:
         if headless:
             options.add_argument("--headless")
 
-        try:
-            # Usando .install()
-            service_path = ChromeDriverManager(driver_version=chrome_version).install() if chrome_version else ChromeDriverManager().install()
-            logger.info(f"ChromeDriver path (para ver versión): {service_path}")      
-        except Exception as e:
-            # Desde archivo ejecutable
-            logger.error(f"Falló la creación del ChromeDriver usando .install(). Se intentará usar el ChromeDriver ejecutable local. Error: {e}")
-            logger.warning("Chrome Driver creado desde archivo ejectuable")
-            service_path = '/Users/nachomondino/Documents/chromedriver' if path is None else path # Ultima actualizacion: 3 Mayo 2024
+        chrome_version = self.get_chrome_version()
 
-        driver = webdriver.Chrome(service=Service(service_path), options=options)
+        if chrome_version:
+            logger.info(f"Detected Google Chrome version: {chrome_version}")
+            try:
+                chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
+                driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
+            except Exception as e:
+                logger.error(f"Failed to download ChromeDriver for version {chrome_version}: {e}")
+                return None
+
+        else:
+            logger.warning("Using latest ChromeDriver as fallback")
+            chrome_driver = ChromeDriverManager().install()
+            driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
+
         return driver
 
     def initialize_safari_driver(self):

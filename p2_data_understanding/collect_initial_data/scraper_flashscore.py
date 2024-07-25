@@ -15,8 +15,8 @@ class FlashscoreCrawler(Crawler):
     normal, scraper de fields especificos poro falla y scraper de proximos partidos...
     Contiene todo los xpath.
     """
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome", chrome_version=None, _print: bool = False):
-        super().__init__(headless, path, browser, chrome_version)
+    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome", _print: bool = False):
+        super().__init__(headless, path, browser)
         self.child_driver = self.driver
         self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
         self.SEC_WAIT_MED = 1.5  # Espera para elementos que casi siempre estan
