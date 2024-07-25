@@ -9,6 +9,8 @@ Competiciones extraidas y cantidad de temporadas:
     - 594	Super Cup: Max. Hasta 1990. Con el parate del 1996 al 2008.
 Cantidad de partidos: 23667
 
+Nota: Elimine 81 partidos jugados desde 1/3/24 a 5/5/24 para tener 100 partidos missing y poder tener mas robustez en seleccion de modelo. Df_match paso de 23667 a 23585.
+
 ########################################### EXTRACCION SOFIFA ###########################################
 Fecha de extraccion: 5/5/2024 (5 de Mayo de 2024)
 Competiciones extraidas: 
