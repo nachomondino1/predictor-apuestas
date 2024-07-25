@@ -60,7 +60,7 @@ class DataUnderstanding:
         """
         Collecting data from Flashscore and Sofifa
         """
-        print(" Collecting data... ")
+        logger.info(" Collecting data... ")
         # Defino variables
         df_match_concat, df_match_player_concat,df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
         df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()  # Sofifa
@@ -119,7 +119,7 @@ class DataUnderstanding:
         """
         Descripcion basica de los datos recolectados como shape, datatypes, cantidad de NaN por columna, etcetera.
         """
-        print(" Describing data... ")
+        logger.info(" Describing data... ")
 
         print("\n DF_MATCH \n".center(240, "-"))
         describe_data.getting_to_know_data(df_match)
@@ -168,7 +168,7 @@ class DataPreparation:
         :return: Dataframe formateado. (DataFrame)
         """
         start = time.time()
-        print("\nFormatting data...")
+        logger.info("\nFormatting data...")
 
         # Dataframe match
         ## Date
@@ -205,7 +205,7 @@ class DataPreparation:
         Limpieza inicial de los dataframes
         """
         start = time.time()
-        print("\nCleanning data...")
+        logger.info("\nCleanning data...")
 
         # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
         print("\nEliminacion de estadisticas irrelevantes")
@@ -228,6 +228,13 @@ class DataPreparation:
         df_match = clean_data.clean_teams_names(df_match)  # una vez que ya aplique el lower()
 
         ## SOFIFA
+        # Elimino jugadores duplicados por haber jugado mas de una competicion del pais
+        len_inic = len(df_player_sofifa)
+        df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
+        len_final = len(df_player_sofifa)
+        dif = len_inic - len_final
+        if dif > 0:
+            logger.warning(f"Se eliminaron {dif} jugadores de los {len_inic} de Sofifa que habia.")
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
         ## Dataframe teams sofifa (df_teams_sofifa)
@@ -268,7 +275,7 @@ class DataPreparation:
             pd.DataFrame: Dataframe integrado.
         """
         start = time.time()
-        print("\nIntegrating data...")
+        logger.info("\nIntegrating data...")
 
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
@@ -335,7 +342,7 @@ class DataPreparation:
         """
         start = time.time()
         cant_errores = 0
-        print("\nConstructing data...")
+        logger.info("\nConstructing data...")
 
         # VARIABLE RESPUESTA
         df = construct_data.determine_result(df, self.var_resp)
@@ -497,7 +504,7 @@ class DataPreparation:
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
         start = time.time()
-        print("\nSelecting data...")
+        logger.info("\nSelecting data...")
 
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
@@ -615,7 +622,7 @@ class Modeling:
         # Returns
         Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
-        warnings.filterwarnings('ignore') # no son mias, son de openpyxl
+        # warnings.filterwarnings('ignore') # no son mias, son de openpyxl
         print("\nSeparating data in train, val and test...")
 
         # Si rellené NaN values
@@ -707,7 +714,7 @@ class Modeling:
         :param timeout: Cantidad de segundos de espera maxima para entrenar un modelo. (int)
         :return: Mejor modelo. (sklearn.ensemble?)
         """
-        warnings.filterwarnings("ignore")
+        # warnings.filterwarnings("ignore")
         print("\nTraining model...")
         
         # Find best hiperparameters
@@ -952,7 +959,7 @@ def main(id_country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion de variables
-    id_country = 167
-    d_params = {'data_unders': True, 'data_prep': False, 'modeling': False}
+    id_country = 59
+    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)
