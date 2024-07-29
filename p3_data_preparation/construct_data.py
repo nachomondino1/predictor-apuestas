@@ -76,7 +76,7 @@ def determine_points(df: pd.DataFrame):
     return df
 
 ## Teams
-def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _print: bool = False):
+def h2h_by_date(df: pd.DataFrame, n_years: int, _print: bool = False):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
@@ -89,19 +89,22 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
     # Definicion de variables
     start = time.time()
 
+    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
+    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+
     if n_years == -1:
         n_years = (max(df['date']) - min(df['date'])).days / 365
         n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
     n_days =  365 * n_years
-    h2h_col_name = f'h2h_{n_years}_segun_loc' if segun_localia else f'h2h_{n_years}'
+    h2h_col_name = f'h2h_{n_years}'
+    print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    # Determino equipos a calcular el historial
+    # Determinar equipos a calcular el historial
     frecuencias = df['id_team_home'].value_counts()
-    l_equipos = frecuencias[frecuencias > int(0.001*len(df))].index.tolist()  # l_equipos = df['id_team_home'].unique()
-    print(f"Integer {int(0.001*len(df))} ; Cantidad de equipos: {len(l_equipos)}")
-
-    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
-    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+    threshold = int(0.001 * len(df))
+    l_equipos = frecuencias[frecuencias > threshold].index.tolist()
+    if _print:
+        print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
 
     # Por equipo 1
     for i in range(len(l_equipos)):
@@ -112,15 +115,75 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
             eq2 = l_equipos[j]
 
             # Determino df_historial para eq1 y eq2
-            df_historial = df[((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | (df['id_team_home'] == eq2) & (df['id_team_away'] == eq1)]
-            l_dfs = [df_historial] if not segun_localia else [df_historial[df_historial['id_team_home'] == eq1], df_historial[df_historial['id_team_home'] == eq2]]
-            if _print:
-                print(f"\n Equipo 1: {eq1} Equipo 2: {eq2}. \n".center(120, "-"))
-                print("\nDF_HISTORIAL: \n", df_historial.loc[:, ['date', 'id_team_home', 'id_team_away', 'result']])
+            df_hist = df[((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | (df['id_team_home'] == eq2) & (df['id_team_away'] == eq1)]
 
+            # Por partido entre equipos
+            for idx, row in df_hist.iterrows():
+
+                # Selecciono los ultimos matchs
+                limit_date = row['date'] - timedelta(days=n_days)
+                df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
+                
+                # Por ultimos matchs
+                h2h = 0
+                for _, fila in df_hist_filt.iterrows():
+                    if fila['result'] == 1:
+                        h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
+                    elif fila['result'] == 2:
+                        h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+
+                # Guardo h2h
+                if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
+                    df.loc[idx, h2h_col_name] = h2h
+
+    end = time.time()
+    print(f"Construccion de historiales in {(end - start) / 60:.1f} minutes")
+    return df
+
+def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, _print: bool = False):
+    """
+    Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
+
+    :param df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
+    :param n_years: Integer. Número de años a tener en cuenta para determine el h2h entre dos equipos.
+    :return: DataFrame pasado por parámetro con nueva columna, 'h2h_date', que permite determine a cuál de los dos
+    equipos de un match le favorece más el h2h entre ellos.
+    """
+    print("\n Constructing Head to Head...")
+    # Definicion de variables
+    start = time.time()
+
+    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
+    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+
+    if n_years == -1:
+        n_years = (max(df['date']) - min(df['date'])).days / 365
+        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
+    n_days =  365 * n_years
+    h2h_col_name = f'h2h_{n_years}_segun_loc'
+    print(f"Historial a construir: {h2h_col_name} para {n_years}")
+
+    # Determinar equipos a calcular el historial
+    frecuencias = df['id_team_home'].value_counts()
+    threshold = int(0.001 * len(df))
+    l_equipos = frecuencias[frecuencias > threshold].index.tolist()
+    if _print:
+        print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
+    
+    # Por equipo 1
+    for i in range(len(l_equipos)):
+        eq1 = l_equipos[i]
+
+        # Por equipo 2
+        for j in range(i+1, len(l_equipos)):
+            eq2 = l_equipos[j]
+
+            # Determino df_historial para eq1 y eq2
+            df_historial = df[((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | (df['id_team_home'] == eq2) & (df['id_team_away'] == eq1)]
+            l_dfs = [df_historial[df_historial['id_team_home'] == eq1], df_historial[df_historial['id_team_home'] == eq2]]
+
+            # Segun localia
             for df_hist in l_dfs:
-                if _print and segun_localia:
-                    print("\nDF_HISTORIAL LOCALIA: \n", df_hist.loc[:, ['date', 'id_team_home', 'id_team_away', 'result']])
 
                 # Por partido entre equipos
                 for idx, row in df_hist.iterrows():
@@ -128,10 +191,6 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
                     # Selecciono los ultimos matchs
                     limit_date = row['date'] - timedelta(days=n_days)
                     df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
-                    if _print:
-                        print(f"\nPartido al cual construir historial: 'id_match': {idx} 'Date': {row['date']} 'team_home': {row['id_team_home']} 'team_away': {row['id_team_away']} ")
-                        print("Nºpartidos para construir historial: ", len(df_hist_filt))
-                        print(df_hist_filt.loc[:, ['date', 'id_team_home', 'id_team_away', 'result']])
 
                     # Por ultimos matchs
                     h2h = 0
@@ -140,14 +199,10 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, segun_localia: bool = False, _pr
                             h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
                         elif fila['result'] == 2:
                             h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
-                        if _print:
-                            print(i, h2h)
 
                     # Guardo h2h
                     if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
                         df.loc[idx, h2h_col_name] = h2h
-                        if _print:
-                            print(f"Historial a agregar: {h2h/len(df_hist_filt)}")
 
     end = time.time()
     print(f"Construccion de historiales in {(end - start) / 60:.1f} minutes")
@@ -318,63 +373,8 @@ def calculate_dif_col_players(df: pd.DataFrame, _print: bool = False):
             df = df.drop([columna_home, columna_away], axis=1)
     return df
 
-# MAIN_NEXT_MATCHES.PY
-def h2h_by_date_new_matches(df_new: pd.DataFrame, df: pd.DataFrame, n_years: int, segun_localia: bool): # Me gustaria juntarla con h2h de main.py
-    """
-    Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
-
-    :param df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
-    :param n_years: Integer. Número de años a tener en cuenta para determine el h2h entre dos equipos.
-    :return: DataFrame pasado por parámetro con nueva columna, 'h2h_date', que permite determine a cuál de los dos
-    equipos de un match le favorece más el h2h entre ellos.
-    """
-    # Definicion de variables
-     # Definicion de variables
-    if n_years == -1:
-        n_years = (max(df['date']) - min(df['date'])).days / 365
-        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
-    n_days =  365 * n_years
-    h2h_col_name = f'h2h_{n_years}_segun_loc' if segun_localia else f'h2h_{n_years}'
-
-    # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
-    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
-
-    # Por partido nuevo
-    for i, row in df_new.iterrows():
-
-        # Obtener equipos
-        eq1, eq2 = row['id_team_home'], row['id_team_away']
-        limit_date = row['date'] - timedelta(days=n_days)
-        h2h = 0
-
-        # Determino df_historial para eq1 y eq2
-        df_historial = df[((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | (df['id_team_home'] == eq2) & (df['id_team_away'] == eq1)]
-        l_dfs = [df_historial] if not segun_localia else [df_historial[df_historial['id_team_home'] == eq1], df_historial[df_historial['id_team_home'] == eq2]]
-
-        for df_hist in l_dfs:
-
-            # Filtrar df_old con partidos de estos equipos en ultimos n años
-            # filter1 = ((df['id_team_home'] == eq1) & (df['id_team_away'] == eq2)) | ((df['id_team_home'] == eq2) & (df['id_team_away'] == eq1))
-            filter2 = (df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])
-            df_hist_filt = df_hist[filter2]  # df_hist_filt = df[filter1 & filter2]
-
-            # Por ultimos matchs
-            for idx, fila in df_hist_filt.iterrows():
-
-                if fila['result'] == 1:
-                    h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
-
-                elif fila['result'] == 2:
-                    h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
-
-            # Guardo h2h
-            if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
-                df_new.loc[i, h2h_col_name] = h2h
-
-    return df_new
-
-# PRUEBA
-def prueba():
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
@@ -427,7 +427,3 @@ def prueba():
     print(f"Construccion de datos en {(end - start) / 60:.1f} minutos")
 
     df.to_excel(f'{BASE_DIR_LOCAL}/df_constructed_prueba.xlsx')
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    prueba()

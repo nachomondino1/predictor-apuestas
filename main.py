@@ -352,10 +352,10 @@ class DataPreparation:
         df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
         df = construct_data.determine_points(df)
         if not without_h2h:
-            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=True)
-            df = construct_data.h2h_by_date(df, n_years=-1, segun_localia=False)
-            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=True)
-            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, segun_localia=False)
+            df = construct_data.h2h_by_date(df, n_years=-1)
+            df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+            df = construct_data.h2h_by_date_by_localia(df, n_years=-1)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
+            df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
         # Determino cuales son las variables stats automaticamente
         stats_columns = construct_data.determine_stats_columns(df)

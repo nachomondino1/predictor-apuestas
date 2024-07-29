@@ -321,19 +321,25 @@ class DataPreparationNew(DataPreparation):
         print("\nConstructing new data...")
         start = time.time()
 
-        # Construyo historial entre si
-        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # en el old para poder calcular historial
-        df_next_matches = construct_data.h2h_by_date_new_matches(df_next_matches, df_old_matches, n_years=-1, segun_localia=True)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
-        df_next_matches = construct_data.h2h_by_date_new_matches(df_next_matches, df_old_matches, n_years=-1, segun_localia=False)
-        df_next_matches = construct_data.h2h_by_date_new_matches(df_next_matches, df_old_matches, n_years=n_years_h2h, segun_localia=True)
-        df_next_matches = construct_data.h2h_by_date_new_matches(df_next_matches, df_old_matches, n_years=n_years_h2h, segun_localia=False)
+        # 1) Construyo historial entre si
+        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
+        n_years = (max(df_old_matches['date']) - min(df_old_matches['date'])).days / 365  # Determino n_years solo con partidos ya jugados
+        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
+        ## Construyo historiales
+        df_concat = pd.concat([df_next_matches, df_old_matches], axis=0)
+        df = construct_data.h2h_by_date(df_concat, n_years=n_years)
+        df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years)
+        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
+        ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
+        columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
+        df = df[columnas_deseadas]
+        df_next_matches = df[df.index.isin(df_next_matches.index)]
 
-        # Concateno df_next_matches y df filtrado y construyo
-        df_concat = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-        df_constructed = self.construct_data(df_concat, n_days, n_years_h2h, segun_localia=segun_localia, without_h2h=True, export=False)
-
-        # Separo datos construidos entre los proximos partidos y los ya jugados
-        df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]
+        # 2) Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
+        df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
+        df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, without_h2h=True, export=False)
+        df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -986,7 +992,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         id_country = 77
         n_days = 25
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
