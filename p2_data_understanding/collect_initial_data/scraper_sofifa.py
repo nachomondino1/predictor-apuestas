@@ -14,8 +14,8 @@ class SofifaCrawler(Crawler):
     Contiene todo los xpath.
     """
     
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome", chrome_version = None):
-        super().__init__(headless, path, browser, chrome_version)
+    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
+        super().__init__(headless, path, browser)
         self.child_driver = self.driver
         self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
         self.SEC_WAIT_MAX = 5  # Espera para elementos que casi siempre estan
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Seleccionar pais  
-    id_country = 77
+    id_country = 148
 
     # Levanto dataframes
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
@@ -402,12 +402,12 @@ if __name__ == "__main__":
 
         # Extraigo datos de players de Sofifa 
         ## Player
-        df_player_sofifa, df_player_fifa_sofifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
-        df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
-        df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
+        # df_player_sofifa, df_player_fifa_sofifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
+        # df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
+        # df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
 
-        df_player_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
-        df_player_fifa_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
+        # df_player_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
+        # df_player_fifa_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
         
         ## Teams
         df_teams = extract_teams(id_country, country, row['competition_sofifa'])
@@ -432,6 +432,6 @@ if __name__ == "__main__":
         '''
 
     # Exporto datos a Desktop
-    df_player_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_sofifa_{country}.xlsx', index=True)
-    df_player_fifa_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_sofifa_{country}.xlsx', index=True)
+    # df_player_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_sofifa_{country}.xlsx', index=True)
+    # df_player_fifa_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_sofifa_{country}.xlsx', index=True)
     df_teams_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_teams_{country}.xlsx', index=True)

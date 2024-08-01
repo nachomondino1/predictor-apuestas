@@ -29,7 +29,9 @@ class Crawler:
             logger.error("La libreria no posee ese browser")
 
     def get_chrome_version(self):
-
+        """
+        Detecta la version de mi Google Chrome. Esto es para poder crear el chrome driver con la misma version para evitar el problema de incompatibilidad de versiones.
+        """
         system = platform.system()
         try:
             if system == "Windows":

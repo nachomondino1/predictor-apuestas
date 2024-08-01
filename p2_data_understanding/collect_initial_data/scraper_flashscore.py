@@ -114,8 +114,6 @@ class FlashscoreCrawler(Crawler):
 
         # EXTRACCION DE CAMPOS
         ## Extraigo campos de hoja "summary"
-        if self._print:
-            print("Obtengo datos de hoja 'Summary'...")
         ### Match information
         d_row_match.update(self.extract_match_information())
         ### Goals
@@ -125,8 +123,6 @@ class FlashscoreCrawler(Crawler):
         d_row_match.update(self.extract_teams())
 
         ## Si tiene hoja "stats", extraigo campos
-        if self._print:
-            print("Obtengo datos de hoja 'Stats'...")
         if not next_matches:
             boton_stats = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Stats"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
             if super().click_boton(boton_stats) is not False:
@@ -137,8 +133,6 @@ class FlashscoreCrawler(Crawler):
             d_row_match_odds.update(self.extract_odds())
         
         ## Si tiene hoja "Formations", extraigo campos
-        if self._print:
-            print("Obtengo datos de hoja 'Lineups'...")
         boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
         if super().click_boton(boton_formations) is not False:
             ### Alineaciones titulares, suplentes y ausentes

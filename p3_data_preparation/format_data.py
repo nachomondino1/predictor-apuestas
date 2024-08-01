@@ -170,7 +170,7 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas):
     # Determino columnas a codificar de string a integer
     l_columnas_a_codificar = df_etiquetas['variable'].unique()
     print("Columnas a codificar: ", l_columnas_a_codificar)
-   
+    
     # Por columna a codificar
     for columna in l_columnas_a_codificar:
         
@@ -200,8 +200,9 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas):
     
     return df, df_etiquetas
 
-# Prueba
-def prueba():
+
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
@@ -225,7 +226,3 @@ def prueba():
     # Exporto pruebas
     df_match.to_excel(f'{BASE_DIR_LOCAL}/df_match_formated.xlsx', index=False)
     df_player.to_excel(f'{BASE_DIR_LOCAL}/df_player_formated.xlsx', index=False)
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    prueba()
