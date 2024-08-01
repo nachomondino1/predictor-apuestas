@@ -4,17 +4,25 @@ Fecha de inicio de extraccion: 21.30 hs del 5/5/2024 (5 de Mayo de 2024)
 Fecha de fin de extraccion: 17 hs del 8/5/2024 (8 de Mayo de 2024)
 Competiciones extraidas y cantidad de temporadas: 
     - 591	Bundesliga: Max. Hasta 1989/1990
+        Cantidad de partidos: 10797
     - 592	2. Bundesliga: Max. Hasta 1989/1990
+        Cantidad de partidos: 11271
     - 593	DFB Pokal: Max. Hasta 1998/1999
+        Cantidad de partidos: 1573
     - 594	Super Cup: Max. Hasta 1990. Con el parate del 1996 al 2008.
-Cantidad de partidos: 23667
+        Cantidad de partidos: 25
+    Cantidad de partidos: 23667
+
+Nota: Elimine 81 partidos jugados desde 1/3/24 a 5/5/24 para tener 100 partidos missing y poder tener mas robustez en seleccion de modelo. Df_match paso de 23667 a 23585.
 
 ########################################### EXTRACCION SOFIFA ###########################################
 Fecha de extraccion: 5/5/2024 (5 de Mayo de 2024)
 Competiciones extraidas: 
     - 591	Bundesliga: Max.
+        Cantidad de jugadores:
     - 592	2. Bundesliga: Max.
-Cantidad de jugadores: 5497
+        Cantidad de jugadores:
+    Cantidad de jugadores: 5497
 
 Interrupciones por internet: 
     - Durante la noche del 5/5 al 6/5

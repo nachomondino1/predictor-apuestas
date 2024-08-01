@@ -42,11 +42,18 @@ if __name__ == "__main__":
     env = os.getenv('ENVIRONMENT')
 
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
-    n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
-    l_countries = ast.literal_eval(sys.argv[2])  # Lista de paises a los cuales extraer proximos partidos (e.g. [48, 55, 59, 77, 167])
-    d_run = json.loads(sys.argv[3])  # Parametros de ejecucion (e.g. {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True})
+    if env == 'dev':
+        # Definir condiciones del análisis
+        n_days = 20
+        l_countries = [48, 55, 59, 77, 148]
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+
+    elif env == 'prod':
+        n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+        l_countries = ast.literal_eval(sys.argv[2])  # Lista de paises a los cuales extraer proximos partidos (e.g. [48, 55, 59, 77, 167])
+        d_run = json.loads(sys.argv[3])  # Parametros de ejecucion (e.g. {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True})
 
     # Levanto historial_predicciones.xlsx
     df_historial_predicciones = pd.read_excel(f'p6_deployment/data/historial_predicciones.xlsx', index_col=0)
 
-    collect_predictions(d_run, l_countries, n_days, df_historial_predicciones)    
+    collect_predictions(d_run, l_countries, n_days, df_historial_predicciones)

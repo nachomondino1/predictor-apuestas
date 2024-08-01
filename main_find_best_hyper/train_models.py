@@ -147,7 +147,6 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-
 if __name__ == '__main__':
 
     # Importo librerias

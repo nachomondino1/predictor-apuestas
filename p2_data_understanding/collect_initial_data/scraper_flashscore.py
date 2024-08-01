@@ -6,6 +6,8 @@ from p2_data_understanding.collect_initial_data.web_scraping_selenium import Cra
 from tqdm import tqdm
 from datetime import datetime, timedelta
 import re
+from set_up_logging import logger
+
 
 class FlashscoreCrawler(Crawler):
     """
@@ -112,8 +114,6 @@ class FlashscoreCrawler(Crawler):
 
         # EXTRACCION DE CAMPOS
         ## Extraigo campos de hoja "summary"
-        if self._print:
-            print("Obtengo datos de hoja 'Summary'...")
         ### Match information
         d_row_match.update(self.extract_match_information())
         ### Goals
@@ -123,8 +123,6 @@ class FlashscoreCrawler(Crawler):
         d_row_match.update(self.extract_teams())
 
         ## Si tiene hoja "stats", extraigo campos
-        if self._print:
-            print("Obtengo datos de hoja 'Stats'...")
         if not next_matches:
             boton_stats = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Stats"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
             if super().click_boton(boton_stats) is not False:
@@ -135,8 +133,6 @@ class FlashscoreCrawler(Crawler):
             d_row_match_odds.update(self.extract_odds())
         
         ## Si tiene hoja "Formations", extraigo campos
-        if self._print:
-            print("Obtengo datos de hoja 'Lineups'...")
         boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
         if super().click_boton(boton_formations) is not False:
             ### Alineaciones titulares, suplentes y ausentes
@@ -545,7 +541,7 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
             l_ids = crawler.extract_id_matches()
             if l_ids_already_collected is not None:
                 l_ids_filt = [id_match for id_match in l_ids if id_match not in l_ids_already_collected]
-                print(f"De los {len(l_ids)} partidos de la temporada, se recolectan solo los {len(l_ids_filt)} que faltan ")
+                logger.warning(f"De los {len(l_ids)} partidos de la temporada, se recolectan solo los {len(l_ids_filt)} que faltan")
                 l_ids = l_ids_filt
 
             print(f"Partidos recolectados de la season {season_year} (e.g. en premier league deberian ser 380): {len(l_ids)}")
@@ -708,25 +704,44 @@ if __name__ == "__main__":
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
-    # Selecciono country a extraer y obtengo las competencias y su categoria
-    country = 'england'  # Ver si creo un df y hago un ciclo para recorrer ≠ paises o que
-    id_competicion = 481
-    competition = 'Premier League'
-    is_cup = 0
-    n_seasons_max = 1
+    # Parametros de corrida
+    id_country = 77
 
+    # Levanto dataframes
     df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
+    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
 
-    # Extraigo partidos
-    # df_match, df_match_player, df_match_odds = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max, export=False)
-    # df_match.to_excel(f'{BASE_DIR_LOCAL}/df_match.xlsx', index=True)
-    # df_match_player.to_excel(f'{BASE_DIR_LOCAL}/df_match_player.xlsx', index=True)
-    # df_match_odds.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds.xlsx', index=True)
+    # Defino variables
+    df_match_concat, df_match_player_concat,df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+    print(f' COUNTRY: {country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
-    # Extraer partidos 
-    df_match = pd.read_excel(f"p2_data_understanding/data/{country}/data_seg/per_season/df_match/premier-league_2023_2024.xlsx", index_col=0)
-    df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
-    df_match_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_miss.xlsx', index=True)
-    df_match_player_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_player_miss.xlsx', index=True)
-    df_match_odds_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds_miss.xlsx', index=True)
+    # POR COMPETITION
+    for i, row in df_comp_country.iterrows():
+        print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
+
+        # if row['id_competition'] == 774:
+
+        # Extraigo partidos de Flashscore (df_match y df_match_player)
+        df_match, df_match_player, df_match_odds = extract_data(id_country, country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=True)
+        
+        # Guardo datos
+        df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
+        df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
+        df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
+        
+        # Exporto datos
+        # df_match_concat.to_excel(f'./p2_data_understanding/data/{country}/data_seg/df_match.xlsx', index=True)
+        # df_match_player_concat.to_excel(f'./p2_data_understanding/data/{country}/data_seg/df_match_player.xlsx', index=True)
+        # df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{country}/data_seg/df_match_odds.xlsx', index=True)       
+        df_match_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match.xlsx', index=True)
+        df_match_player_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match_player.xlsx', index=True)
+        df_match_odds_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds.xlsx', index=True)
+
+    # Extraer partidos missing
+    # df_match = pd.read_excel(f"p2_data_understanding/data/{country}/data_seg/per_season/df_match/premier-league_2023_2024.xlsx", index_col=0)
+    # df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
+    # df_match_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_miss.xlsx', index=True)
+    # df_match_player_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_player_miss.xlsx', index=True)
+    # df_match_odds_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds_miss.xlsx', index=True)

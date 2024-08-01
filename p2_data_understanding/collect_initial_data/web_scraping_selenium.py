@@ -2,13 +2,17 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys 
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException
-import random
 from time import sleep
-
+from set_up_logging import logger
+import platform
+import subprocess
+import platform
+    
 
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
@@ -22,33 +26,63 @@ class Crawler:
         elif browser == "Safari":
             self.driver = self.initialize_safari_driver()
         else:
-            print("La libreria no posee ese browser")
+            logger.error("La libreria no posee ese browser")
+
+    def get_chrome_version(self):
+        """
+        Detecta la version de mi Google Chrome. Esto es para poder crear el chrome driver con la misma version para evitar el problema de incompatibilidad de versiones.
+        """
+        system = platform.system()
+        try:
+            if system == "Windows":
+                import winreg
+                reg_path = r"SOFTWARE\Google\Chrome\BLBeacon"
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path)
+                version, _ = winreg.QueryValueEx(key, "version")
+                return version
+            elif system == "Darwin":
+                process = subprocess.run(
+                    ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "--version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                version = process.stdout.decode().strip().split()[-1]
+                return version
+            elif system == "Linux":
+                process = subprocess.run(
+                    ["google-chrome", "--version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                version = process.stdout.decode().strip().split()[-1]
+                return version
+            else:
+                raise Exception("Unsupported OS")
+        except Exception as e:
+            logger.error(f"Error obtaining Chrome version: {e}")
+            return None
 
     def inicialize_chrome_driver(self, headless: bool, path: str):
         """
-          Initialize a Chrome WebDriver.
+        Initialize a Chrome WebDriver.
 
-          Args:
-              headless (bool): True to prevent the web browser from opening, False otherwise.
-              path (str): Path to the Chrome WebDriver executable (.exe).
+        Args:
+            headless (bool): True to prevent the web browser from opening, False otherwise.
+            path (str): Path to the Chrome WebDriver executable (.exe).
 
-          Returns:
-              WebDriver: Chrome WebDriver instance.
-          """
+        Returns:
+            WebDriver: Chrome WebDriver instance.
+        """
         # Defino opciones del webdriver
         options = webdriver.ChromeOptions()
-        options.add_argument("--window-size=1920,1080")  # nuevo
-        # options.add_argument('--ignore-certificate-errors') # nuevo
-        # options.add_argument('--allow-running-insecure-content') # nuevo
-        # options.add_argument("--proxy-server='direct://'") # nuevo
-        # options.add_argument("--proxy-bypass-list=*") # nuevo
+        # options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        options.add_argument("--window-size=1920,1080")
         options.add_argument("start-maximized")
         options.add_argument("enable-automation")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-dev-tools")
         options.add_argument("--disable-browser-side-navigation")
         options.add_argument("--disable-gpu")
         options.add_argument("--incognito")
@@ -58,14 +92,21 @@ class Crawler:
         if headless:
             options.add_argument("--headless")
 
-        try:
-            service = ChromeDriverManager().install()  # ChromeDriverManager(driver_version=chrome_version).install())
-            driver = webdriver.Chrome(service=Service(service), options=options)
-            print("Creacion de ChromeDriver con install()")
-        except:
-            service = '/Users/nachomondino/Documents/chromedriver' if path is None else path  # Ultima actualizacion: 3 Mayo 2024
-            driver = webdriver.Chrome(service=Service(service), options=options)
-            print("Falló la creacion del ChromeDriver usando .install(), por lo que, recurro a crearlo desde archivo ejectuable")
+        chrome_version = self.get_chrome_version()
+
+        if chrome_version:
+            logger.info(f"Detected Google Chrome version: {chrome_version}")
+            try:
+                chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
+                driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
+            except Exception as e:
+                logger.error(f"Failed to download ChromeDriver for version {chrome_version}: {e}")
+                return None
+
+        else:
+            logger.warning("Using latest ChromeDriver as fallback")
+            chrome_driver = ChromeDriverManager().install()
+            driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
 
         return driver
 
@@ -110,13 +151,13 @@ class Crawler:
                     return tag_res.text if text else tag_res.get_attribute(attribute) if attribute is not None else tag_res
                 except StaleElementReferenceException:
                     attempts += 1
-                    print(f"Se produjo una excepción StaleElementReferenceException. Intento {attempts}/{max_attempts}")
+                    logger.warning(f"Se produjo una excepción StaleElementReferenceException. Intento {attempts}/{max_attempts}")
                     sleep(1)
                 except TimeoutException:
                     break  # Salir del bucle si se alcanza el tiempo de espera máximo
 
         if print_fail:
-            print(f"Fallo la extraccion del campo. Probablemente no exista el xpath {xpath}")
+            logger.error(f"Fallo la extraccion del campo. Probablemente no exista el xpath {xpath}")
         return None
 
     def extract_tags(self, xpath, tag_inicial=None, sec_wait=10, print_fail=True):
@@ -133,7 +174,7 @@ class Crawler:
 
         except TimeoutException:
             if print_fail:
-                print(f"Fallo la extraccion de tags. Probablemente no exista el xpath {xpath}")
+                logger.error(f"Fallo la extraccion de tags. Probablemente no exista el xpath {xpath}")
             return []  # Si devuelvo None y el usuario itera sobre el return, dara el error: TypeError: 'NoneType' object is not iterable
 
     def click_boton(self, tag_boton, sec_wait: float = 10):
@@ -186,13 +227,24 @@ class Crawler:
         tag_boton = self.extract_tag(xpath=xpath_boton)
         self.click_boton(tag_boton)
 
+    def fill_form(self, xpath_input, text, enter=True):
+        # Busco tag input para el usuario y escribo el usuario
+        input_tag = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_input)))
+        input_tag.send_keys(text)
+
+        # Si no hay opciones que elegir
+        if enter:
+            input_tag.send_keys(Keys.ENTER)
+
+        # Si hay opciones que elegir
+        # ...
+
     def login_website(self, user, password, xpath_user, xpath_pass, xpath_boton_login, xpath_boton_validate_user=None):
         """
         Login website
         """
         # Busco tag input para el usuario y escribo el usuario
-        user_input = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_user)))
-        user_input.send_keys(user)
+        self.fill_form(xpath_user, user, enter=False)
 
         # Si hay que validar el usuario
         if xpath_boton_validate_user is not None:
@@ -202,8 +254,7 @@ class Crawler:
             self.click_boton(tag_boton)
 
         # Busco tag input para la pass y escribo la pass
-        pass_input = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_pass)))
-        pass_input.send_keys(password)
+        self.fill_form(xpath_pass, password, enter=False)
 
         # Localizo el boton "Iniciar sesion" y lo clickeo
         tag_boton = self.extract_tag(xpath=xpath_boton_login)

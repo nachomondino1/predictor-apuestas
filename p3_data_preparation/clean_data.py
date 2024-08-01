@@ -127,11 +127,10 @@ def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
 
     Returns:
         DataFrame: El DataFrame con las columnas especificadas eliminadas.
-    """
-    print("Dimensiones originales del DataFrame:", df.shape)
-    
+    """  
     # Determino cuales son las estadisticas a eliminar
     stats_to_drop = list(set(stats_columns).difference(set(relevant_stats_columns)))
+    n_cols_inic = len(df.columns)
 
     # Eliminar las columnas especificadas
     for stat in stats_to_drop:
@@ -140,7 +139,11 @@ def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
         columns_to_remove = [col for col in l_stat if col in df.columns]
         df = df.drop(columns_to_remove, axis=1)
 
-    print("Dimensiones del DataFrame después de eliminar columnas:", df.shape)
+    n_cols_fin = len(df.columns)
+    n_removed_cols = n_cols_inic - n_cols_fin
+    if n_removed_cols > 0:
+        logger.warning(f"Eliminacion de columnas irrelevantes: {n_cols_inic} --> {n_cols_fin}")
+
     return df
 
 # 3) Tratamiento de NaN values
@@ -159,7 +162,7 @@ def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False)
     # Elimino rows segun umbral
     df_filtrado = df.drop(rows_to_delete)  # Elimina las rows con valores NaN
     if _print:
-        print(f"De las {len(df)} rows, se delete {len(rows_to_delete)/len(df)*100:.0f}%, quedan {len(df) - len(rows_to_delete)} rows.")
+        logger.warning(f"De las {len(df)} rows, se delete {len(rows_to_delete)/len(df)*100:.0f}%, quedan {len(df) - len(rows_to_delete)} rows.")
     return df_filtrado
 
 def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False):
@@ -179,7 +182,7 @@ def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = Fal
     # Elimina las columns identificadas del DataFrame
     df_sin_nan = df.drop(columns_delete, axis=1)
     if _print:
-        print(f"De las {len(df.columns)} columns, se eliminaron {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
+        logger.warning(f"De las {len(df.columns)} columns, se eliminaron {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
     return df_sin_nan
 
 def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funciona perfecto

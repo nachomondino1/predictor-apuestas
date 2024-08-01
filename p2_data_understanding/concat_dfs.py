@@ -1,3 +1,5 @@
+import sys
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from set_up_logging import logger
 
@@ -20,9 +22,12 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
 
         # Por competition del country
         for i, row in df_comp_pais.iterrows():
+            # d_comps = {'laliga': 'la-liga', 'laliga2': 'la-liga-2'}
 
             competicion_form = row['competition_flashscore'].lower().replace(" ", "-")  # competicion_form = row['competition_sofifa'].lower().replace(" ", "-")
-            print(f" Competition: {row['competition_flashscore']} ".center(120, "-"))
+            # if competicion_form in d_comps.keys():
+                # competicion_form = d_comps[competicion_form]
+            print(f" Competition: {row['competition_flashscore']} --> form {competicion_form} ".center(120, "-"))
 
             # Levanto su dataframe
             try:
@@ -91,26 +96,25 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
         if export:
             df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
-
 if __name__ == "__main__":
     # Definicion de variables
-    country = "germany"
+    id_country = 148
     export = True
     competicion, temporada = True, False
     
     # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./p2_data_understanding/data/df_countries.xlsx')
-    id_country = df_countries[df_countries['country_name'] == country.capitalize()]['id_country'].values[0]
-    print(id_country)
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    print(country)
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes =  ['df_player_sofifa', 'df_player_fifa_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
+        l_dataframes =  ['df_teams_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
         concat_dfs_per_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country
     if temporada:
-        l_dataframes = ["df_player"]  #  ["df_player"]
-        l_filenames = ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]
+        l_dataframes = ["df_match", "df_match_player", 'df_match_odds']  # ["df_player"]
+        l_filenames =  ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]   # l_files = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
         competition = "premier_league"
         concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export)

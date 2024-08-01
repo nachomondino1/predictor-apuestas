@@ -467,22 +467,17 @@ def determine_winning_bets(df: pd.DataFrame):
 
     return df
 
-def prueba():
-    """
-    Para poder correr solamente el actual archivo y poder hacer pruebas especificas.
-    """
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     from random import randint
     import os
     from dotenv import load_dotenv
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
-
-    # df_predicciones = pd.read_excel(f'{BASE_DIR_LOCAL}/prueba_pred.xlsx', index_col=0)
+    # Levanto dataframe con predicciones de un modelo ejemplo
     # df_predicciones = pd.read_excel('p4_modeling/data/england/modeling/df_predicciones.xlsx', index_col=0)
     df_predicciones = pd.read_excel('main_find_best_hyper/data/england/2024-04-22/assess_model_in_prod/modeling/1_df_pred_metrics.xlsx', index_col=0)
-    # df_predicciones = pd.read_excel('main_find_best_hyper/data/england/2024-04-22/assess_antes_de_mover/assess_model_in_prod/modeling/8_df_predicciones_with_metrics.xlsx', index_col=0)
-
     print(df_predicciones.head(5))
     
     l_cols = ['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet']
@@ -492,12 +487,8 @@ def prueba():
         except:
             pass
     # df_predicciones = df_predicciones.drop(['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet'], axis=1)
-
     shuffled_df = df_predicciones.sample(frac=1, random_state=140)  # Usa random_state para reproducibilidad
+
+    # Evaluo predicciones
     df, d_roi = calculate_roi_by_betting_strategy(shuffled_df, _print=True)
     df.to_excel(f"{BASE_DIR_LOCAL}/df_pred_best.xlsx", index=True)
-
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    prueba()
