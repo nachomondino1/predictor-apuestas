@@ -28,7 +28,7 @@ def determine_result(df: pd.DataFrame, var_resp: str):
     df[var_resp] = pd.Series(np.select(condiciones, valores, default=0), index=df.index)
     return df
 
-def determine_number_matches_last_days(df: pd.DataFrame, n_days, _print: bool = False):
+def determine_number_matches_last_days(df: pd.DataFrame, n_days):
 
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
@@ -50,6 +50,8 @@ def determine_number_matches_last_days(df: pd.DataFrame, n_days, _print: bool = 
 
             if len(df_match_team_filt) > 0:
                 df.loc[id_match, f'n_matches_last_days_{home_or_away}'] = len(df_match_team_filt)
+            else:
+                df.loc[id_match, f'n_matches_last_days_{home_or_away}'] = np.nan
 
     return df
 

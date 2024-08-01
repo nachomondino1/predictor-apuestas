@@ -290,11 +290,11 @@ class DataPreparationNew(DataPreparation):
 
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos
         l_player_cols = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
-        df_next_matches, df_copiado_formaciones = fillna_with_mean_in_last_matches(df_next_matches, df_last_old_matches, cols_to_fill=l_player_cols)            
+        df_next_matches, df_copiado_formaciones = self.fillna_with_mean_in_last_matches(df_next_matches, df_last_old_matches, cols_to_fill=l_player_cols)            
             
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
         l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away']
-        df_next_matches, df_copiado = fillna_with_last_match_value(df_next_matches, df_last_old_matches, cols_to_fill=l_var_to_copy) 
+        df_next_matches, df_copiado = self.fillna_with_last_match_value(df_next_matches, df_last_old_matches, cols_to_fill=l_var_to_copy) 
 
         if self.export:
             df_copiado_formaciones.to_excel(f"{self.BASE_DIR}/fill_data/df_copiado_formaciones.xlsx", index=True)
@@ -302,8 +302,109 @@ class DataPreparationNew(DataPreparation):
             df_next_matches.to_excel(f"{self.BASE_DIR}/df_filled.xlsx", index=True)
 
         return df_next_matches, df_copiado_formaciones, df_copiado
+    
+    def fillna_with_mean_in_last_matches(self, df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill, _print: bool = False): 
+        """
+        Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
 
-    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: int, n_years_h2h: int, segun_localia: bool):
+        # Parameters
+            df_new: Dataframe con los proximos partidos. (DataFrame)
+            df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
+            cols_to_fill: Columnas a reemplazar valores NaN. (list)
+
+        # Returns
+            Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
+        """
+        print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+        df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_new.index)
+        
+        # Por variable mean_player 
+        for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
+
+            # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondiente
+            if variable not in df_new.columns:
+                df_new[variable] = np.nan
+            if _print: 
+                print(f"\nVariable a promediar: {variable}")
+            col_sin_suffix = variable.replace("_home", "").replace("_away", "")
+
+            # Por partido nuevo
+            for id_match, row in df_new.iterrows():
+
+                # Si el valor es nan en el partido
+                if pd.isna(row[variable]):
+
+                    team = row['id_team_home'] if "_home" in variable else row['id_team_away']
+
+                    # Busco promedio en ultimos partidos
+                    df_matches_home_team = df[df['id_team_home'] == team]
+                    df_matches_away_team = df[df['id_team_away'] == team]
+                    if _print:
+                        print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
+                        print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
+
+                    # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                    values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
+                    values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
+
+                    # Remover los valores NaN
+                    values_home_clean = values_home[~np.isnan(values_home)]
+                    values_away_clean = values_away[~np.isnan(values_away)]
+
+                    # Calcular el número total de partidos
+                    total_partidos = (len(values_home_clean) + len(values_away_clean))
+                    suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
+
+                    # Si hay al menos un valor que promediar, guardo promedio
+                    if total_partidos > 0:
+                        df_new.loc[id_match, variable] = suma / total_partidos
+                        df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
+                        df_copiado_form.loc[id_match, variable] = suma / total_partidos
+                        if _print:
+                            print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
+
+        return df_new, df_copiado_form
+
+    def fillna_with_last_match_value(self, df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list):
+        """
+        En los partidos nuevos, rellena los datos no disponibles con los datos de partidos anteriores.
+        """  
+        print(f"Remplazando NaN por valor en ultimo partido en {cols_to_fill}...")
+        df_copiado = pd.DataFrame(columns=['copiado_avoid_nan'], index=df_new.index)
+
+        for var in cols_to_fill:
+
+            # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondient
+            # print(f"\nVariable a promediar: {var}")
+            if var not in df_new.columns:
+                df_new[var] = np.nan
+
+            # Por partido nuevo
+            for id_match, row in df_new.iterrows():
+
+                # Si el valor actual es NaN
+                if (pd.isna(row[var])):
+
+                    team = row['id_team_home'] if "_home" in var else row['id_team_away']
+                    df_match_team = df.loc[(df['id_team_home'] == team) | (df['id_team_away'] == team)] # el referee lo copia del partido de un solo equipo
+
+                    # Busco el partido anterior del team  --> podria hacer ciclo para que busque hasta que encuentre un valor no nan...
+                    for i, row_prev_match in df_match_team.iterrows():
+
+                        home_or_away_prev_match = "home" if row_prev_match['id_team_home'] == team else "away"
+                        variable_prev_match = var if var in cols_to_fill else f"{var}_{home_or_away_prev_match}"
+
+                        # Si el valor en el partido anterior no es NaN
+                        if not (pd.isna(row_prev_match[variable_prev_match])):
+                            # Guardo valor del partido anterior y dejo de revisar partidos del equipo puesto que ya rellene el valor
+                            df_new.loc[id_match, var] = row_prev_match[variable_prev_match]
+                            df_copiado.loc[id_match, 'copiado_avoid_nan'] = 1
+                            df_copiado.loc[id_match, var] = row_prev_match[variable_prev_match]
+                            break
+
+        return df_new, df_copiado
+
+    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: int, n_years_h2h: int, segun_localia: bool, columns_used: list):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -318,38 +419,61 @@ class DataPreparationNew(DataPreparation):
         # Returns
             Dataframe con proximos partidos construido utilizando los partidos ya jugados. (DataFrame)
         """
-        print("\nConstructing new data...")
+        print("Constructing new data...")
         start = time.time()
 
-        # 1) Construyo historial entre si
-        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
-        n_years = (max(df_old_matches['date']) - min(df_old_matches['date'])).days / 365  # Determino n_years solo con partidos ya jugados
-        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
-        ## Construyo historiales
-        df_concat = pd.concat([df_next_matches, df_old_matches], axis=0)
-        df = construct_data.h2h_by_date(df_concat, n_years=n_years)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
-        ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
-        columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        df = df[columnas_deseadas]
-        df_next_matches = df[df.index.isin(df_next_matches.index)]
+        # 1) Construyo historial entre si  (podria evitar construirlas si no estan en columns_used...)
+        df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)
+      
+        # Si hay "ultimos partidos"
+        if len(df_last_old_matches) > 0:
+            # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
+            df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
+            df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, with_h2h=False, export=False)
+            df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados
 
-        # 2) Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
-        df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-        df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, without_h2h=True, export=False)
-        df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados
+        # Si no hay "ultimos partidos", 
+        else:
+            # evito construir variables historicas
+            logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")
+            df_next_matches = self.construct_data(df_next_matches, n_days, n_years_h2h, segun_localia=segun_localia, with_historic=False, export=False)
+
+            # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con 0
+            for columna in columns_used: 
+                if columna not in df_next_matches.columns:
+                    df_next_matches[columna] = np.nan  # no le des valor 0 porque sino las predicciones son 33-33-33.
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
-
+        
         if self.export:
             df_last_old_matches.to_excel(f'{self.BASE_DIR}/construct_data/df_matches_to_construct_historic_values.xlsx', index=True)
             df_next_matches.to_excel(f'{self.BASE_DIR}/df_constructed.xlsx', index=True)
 
         return df_next_matches
 
+    def construct_h2h_next_matches(self, df_next_matches, df_old_matches, n_years_h2h, columns_used):
+        """
+        Construccion de variables historiales para proximos partidos.
+        Mejora a hacer: podria evitar la construccion de las variables si no estan en columns_used...
+        """
+        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
+        n_years = (max(df_old_matches['date']) - min(df_old_matches['date'])).days / 365  # Determino n_years solo con partidos ya jugados
+        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
+
+        ## Construyo historiales
+        df_concat = pd.concat([df_next_matches, df_old_matches], axis=0)
+        df = construct_data.h2h_by_date(df_concat, n_years=n_years)
+        df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years)
+        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
+
+        ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
+        columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
+        df = df[columnas_deseadas]
+        df_next_matches = df[df.index.isin(df_next_matches.index)]
+        return df_next_matches
+        
     def tag_string_data_to_integer_new(self, df: pd.DataFrame, df_etiquetas_loaded):
         """
         Utilizando las mismas etiquetas que cuando se entreno el modelo para el pais, convierto columnas string a integer
@@ -370,22 +494,16 @@ class DataPreparationNew(DataPreparation):
         """
         Filtrado por competencias y escalado de datos.
         """
-
         # Para evitar ciertas competencias
         df = df[df['id_competition'].isin(comp_to_select)]
 
-        # Separo en X e y
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp] # Separo en X e y
-
         # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
-        X = X.loc[:, columns_used]
+        df = df.loc[:, columns_used]
 
         # Transforma los nuevos datos de predicción utilizando el StandardScaler cargado
-        X_scaled = scaler_loaded.transform(X)
-        X_scaled_df = pd.DataFrame(X_scaled, columns=columns_used, index=X.index)
-
-        df = pd.concat([X_scaled_df, y], axis=1)
-        return df
+        X_scaled = scaler_loaded.transform(df)
+        X_scaled_df = pd.DataFrame(X_scaled, columns=columns_used, index=df.index)
+        return X_scaled_df
 
     def select_data_new(self, df: pd.DataFrame, l_columns: list):
         """
@@ -398,15 +516,9 @@ class DataPreparationNew(DataPreparation):
         # Returns
             Dataframe con las variables seleccionadas. (DataFrame)
         """
-        start = time.time()
         print("\n Selecting data...")
-
         # Selecciono las variables que necesita el modelo
         df = df[l_columns]
-
-        end = time.time()
-        print(f"Las siguientes {len(l_columns)} columnas son las seleccionadas: {list(l_columns)}")
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if self.export:
             df.to_excel(f'{self.BASE_DIR}/df_selected.xlsx', index=True)
@@ -415,7 +527,7 @@ class DataPreparationNew(DataPreparation):
     def treat_nan_values_new(self, df: pd.DataFrame):
         """
         Remoción de valores NaN
-       
+
         # Parameters:
             df: Dataframe al cual remover NaN values. (DataFrame)
         
@@ -423,14 +535,18 @@ class DataPreparationNew(DataPreparation):
             df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
         """
         # Rellenar NaN en algunas columnas espeecificas
-        columnas_h2h = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        columnas_player_miss = [col for col in df.columns if '_miss' in col]  # columnas_player_miss = ['dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss']
+        h2h_columns = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
         historic_columns =  [col for col in df.columns if 'mean_last_match' in col]  # El tema es que no tiene que rellenar normalmente y al hacerlo podria tapar un "error"
-        columns_to_fill = [col for col in (columnas_h2h + columnas_player_miss + historic_columns) if col in df.columns]
+        player_miss_columns = [col for col in df.columns if '_miss' in col]  # columnas_player_miss = ['dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss']
+        columns_to_fill = [col for col in (h2h_columns + historic_columns +player_miss_columns) if col in df.columns]  
+        
         if columns_to_fill:
             df_copy = df.copy()
             df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
-            df = df_copy  # df[columns_to_fill] = df[columns_to_fill].fillna(0)  # SettingWithCopyWarning
+            df = df_copy
+
+        # Si solo un equipo tiene NaN en las columnas de jugadores
+        df = self.fill_player_columns_with_min_value(df)
 
         # Elimino partidos con al menos un NaN value
         df_sin_dup = df.dropna()
@@ -442,8 +558,32 @@ class DataPreparationNew(DataPreparation):
 
         return df_sin_dup
     
+    def fill_player_columns_with_min_value(self, df):
+        """
+        Si uno de los dos equipos tiene NaN en las columnas de jugadores, entonces relleno los valores con el valor minimo de la columna.
+        Es ultimo recurso. Sobretodo para Spain que tiene NaN en equipos recien ascendidos como el Leganes.
+        """
+        # Identificar las columnas de jugadores
+        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  
 
-def filter_dataframe_by_date(df, initial_date, n_days):
+        # Calcular el porcentaje de valores no NaN en cada fila
+        df['non_nan_percent'] = df[player_columns].notna().mean(axis=1)
+
+        # Identificar las filas que cumplen con el criterio (al menos el 45% de valores no NaN en player_columns)
+        rows_to_fill = df['non_nan_percent'] >= 0.45  # Un equipo tiene que tener valor (50%)
+
+        # Rellenar los NaN en las filas seleccionadas con el valor mínimo de la columna correspondiente
+        for col in player_columns:
+            # min_value = df[col].min()
+            mean_value = df[col].mean()
+            df.loc[rows_to_fill, col] = df.loc[rows_to_fill, col].fillna(mean_value)
+
+        # Eliminar la columna auxiliar
+        df.drop(columns=['non_nan_percent'], inplace=True)
+        return df
+    
+
+def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, flex: bool = False):
     """
     Filtrar registros de dataframe por fecha segun columna 'date'.
 
@@ -466,126 +606,27 @@ def filter_dataframe_by_date(df, initial_date, n_days):
     print(f"Filas: {len(df)} --> {len(df_filt)}")
     logger.info(f"Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos: {df_filt.shape}")
 
-    # Si no hay ultimos partidos
-    if len(df_filt) == 0:
-        logger.error(f"No hay partidos en los ultimos {n_days} dias.")
+    if flex:
+        n_days_flex = 120
+        months_to_check = [7, 8, 1]
 
-        # Y es el inicio de la temporada
-        if initial_date.month == 8:
-            # uso un n_days mas laxo
-            logger.warning(f"Dado que el mes actual es Agosto (inicio de temporada), amplio n_days de {n_days} a {n_days*3}" )
-            return filter_dataframe_by_date(df, initial_date, n_days*3)
-        raise ValueError("El DataFrame con el cual rellenar valores aun no disponibles está vacío")
-    
-    # Si hay pocos ultimos partidos
-    elif len(df_filt) < 40:
-        logger.warning(f"Hay muy pocos ultimos partidos dentro del rango {n_days}. Amplio n_days de {n_days} a {n_days*3} para tener mas robustez en copiado de formaciones.")
-        return filter_dataframe_by_date(df, initial_date, n_days*3)
+        # Si no hay ultimos partidos
+        if len(df_filt) == 0:
+            logger.error(f"No hay partidos en los ultimos {n_days} dias.")
+
+            # Y es el inicio de la temporada
+            if initial_date.month in months_to_check:
+                # uso un n_days mas laxo
+                logger.warning(f"Dado que el mes actual es Agosto (inicio de temporada), amplio n_days de {n_days} a {n_days_flex}" )
+                return filter_dataframe_by_date(df, initial_date, n_days_flex)
+            raise ValueError("El DataFrame con el cual rellenar valores aun no disponibles está vacío")
+        
+        # Si hay pocos ultimos partidos
+        elif len(df_filt) < 40:  # 4 fechas de 10 partidos, o sea, 1 mes
+            logger.warning(f"Hay muy pocos ultimos partidos dentro del rango {n_days}. Amplio n_days de {n_days} a {n_days_flex} para tener mas robustez en copiado de formaciones.")
+            return filter_dataframe_by_date(df, initial_date, n_days_flex)
 
     return df_filt
-
-# fill_data_not_available_yet()
-def fillna_with_mean_in_last_matches(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill, _print: bool = False): 
-    """
-    Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
-
-    # Parameters
-        df_new: Dataframe con los proximos partidos. (DataFrame)
-        df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
-        cols_to_fill: Columnas a reemplazar valores NaN. (list)
-
-    # Returns
-        Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
-    """
-    print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
-    df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_new.index)
-    
-    # Por variable mean_player 
-    for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
-
-        # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondiente
-        if variable not in df_new.columns:
-            df_new[variable] = np.nan
-        if _print: 
-            print(f"\nVariable a promediar: {variable}")
-        col_sin_suffix = variable.replace("_home", "").replace("_away", "")
-
-        # Por partido nuevo
-        for id_match, row in df_new.iterrows():
-
-            # Si el valor es nan en el partido
-            if pd.isna(row[variable]):
-
-                team = row['id_team_home'] if "_home" in variable else row['id_team_away']
-
-                # Busco promedio en ultimos partidos
-                df_matches_home_team = df[df['id_team_home'] == team]
-                df_matches_away_team = df[df['id_team_away'] == team]
-                if _print:
-                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
-                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
-
-                # Obtener los valores de la variable para los partidos en casa y fuera de casa
-                values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
-                values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
-
-                # Remover los valores NaN
-                values_home_clean = values_home[~np.isnan(values_home)]
-                values_away_clean = values_away[~np.isnan(values_away)]
-
-                # Calcular el número total de partidos
-                total_partidos = (len(values_home_clean) + len(values_away_clean))
-                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
-
-                # Si hay al menos un valor que promediar, guardo promedio
-                if total_partidos > 0:
-                    df_new.loc[id_match, variable] = suma / total_partidos
-                    df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
-                    df_copiado_form.loc[id_match, variable] = suma / total_partidos
-                    if _print:
-                        print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
-
-    return df_new, df_copiado_form
-
-def fillna_with_last_match_value(df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list, _print: bool = False):
-    """
-    En los partidos nuevos, rellena los datos no disponibles con los datos de partidos anteriores.
-    """  
-    print(f"Remplazando NaN por valor en ultimo partido en {cols_to_fill}...")
-    df_copiado = pd.DataFrame(columns=['copiado_avoid_nan'], index=df_new.index)
-
-    for var in cols_to_fill:
-
-        # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondient
-        if var not in df_new.columns:
-            df_new[var] = np.nan
-        if _print:
-            print(f"\nVariable a promediar: {var}")
-
-        # Por partido nuevo
-        for id_match, row in df_new.iterrows():
-
-            # Si el valor actual es NaN
-            if (pd.isna(row[var])):
-
-                team = row['id_team_home'] if "_home" in var else row['id_team_away']
-                df_match_team = df.loc[(df['id_team_home'] == team) | (df['id_team_away'] == team)] # el referee lo copia del partido de un solo equipo
-
-                # Busco el partido anterior del team  --> podria hacer ciclo para que busque hasta que encuentre un valor no nan...
-                for i, row_prev_match in df_match_team.iterrows():
-
-                    home_or_away_prev_match = "home" if row_prev_match['id_team_home'] == team else "away"
-                    variable_prev_match = var if var in cols_to_fill else f"{var}_{home_or_away_prev_match}"
-
-                    # Si el valor en el partido anterior no es NaN
-                    if not (pd.isna(row_prev_match[variable_prev_match])):
-                        # Guardo valor del partido anterior y dejo de revisar partidos del equipo puesto que ya rellene el valor
-                        df_new.loc[id_match, var] = row_prev_match[variable_prev_match]
-                        df_copiado.loc[id_match, 'copiado_avoid_nan'] = 1
-                        df_copiado.loc[id_match, var] = row_prev_match[variable_prev_match]
-                        break
-
-    return df_new, df_copiado
 
 # Missing data
 def read_last_version_extracted_matches(country):
@@ -812,6 +853,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR, d_hiper)
     df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR, d_hiper)
     comp_to_select = eval(d_hiper['comp_to_select'])
+    # compt_to_extract = df_comp_country[df_comp_country['is_public'] == 1].values[0]
+    # print(f"COMPETENCIAS A EXTRAER: {compt_to_extract}")
     print(f'Competencias de {country}: \n {df_comp_country}')
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
@@ -865,7 +908,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
                 raise ValueError("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
         
         else:
-            print("Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos.")
+            logger.warning("Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos.")
             df_integrated_updated = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_integrated.xlsx', index_col=0)
 
     else:
@@ -873,7 +916,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
             df_integrated_updated = pd.read_excel(f'./p6_deployment/data/{country}/missing/old_updated/df_integrated.xlsx', index_col=0)
         except FileNotFoundError:
             df_integrated_updated = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
-            print("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
+            logger.warning("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
    
     # _____________________________________________________________ DATA UNDERSTANDING _____________________________________________________________ #
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
@@ -912,14 +955,17 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         # Selecciono los ultimos partidos de los ya jugados
         n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
         initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
-        df_last_old_matches = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period) 
+        logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
+        df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period, flex=True) 
+        logger.info("Seleccion de ultimos partidos para construccion de variables...")
+        df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period, flex=False) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
         # Preparacion de datos
         df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
         df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
         df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
-        df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches)
-        df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'])
+        df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
+        df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled)
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas)
         df = dp.clean_data_2_new(df, scaler, columns_scaled, comp_to_select)
         df = dp.select_data_new(df, d_hiper['selected_columns'])
@@ -959,15 +1005,18 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
         df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
 
-        # Determino estrategia de apuuesta
+        # Determino estrategia de apuesta
         func = lambda x: x if x is None else int(x)  # Para formatear m y b (Falla para españa) --> lo deberia implementar cdo levanto hiper
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
-        if env == 'dev':
-            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
-        elif env == 'prod':
-            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
+        # Cargo variables entorno
+        # load_dotenv()
+        # env = os.getenv('ENVIRONMENT')
+        # if env == 'dev':
+        #     df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=func(d_hiper_mod['curva_m']), b=func(d_hiper_mod['curva_b']), p1=d_hiper_mod['curva_p1'], p2=d_hiper_mod['curva_p2'])
+        # elif env == 'prod':
+        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -990,8 +1039,8 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 77
-        n_days = 25
+        id_country = 148
+        n_days = 20
         d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 

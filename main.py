@@ -331,7 +331,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, n_days: int, n_years_h2h: int, segun_localia: bool, without_h2h: bool = False, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_days: int, n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -341,59 +341,63 @@ class DataPreparation:
         :return: Dataframe construido. (DataFrame)
         """
         start = time.time()
-        cant_errores = 0
-        logger.info("\nConstructing data...")
+        logger.info("Constructing data...")
 
-        # VARIABLE RESPUESTA
-        df = construct_data.determine_result(df, self.var_resp)
-        df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        # Si quiero construir variables historicas
+        if with_historic:
+
+            # VARIABLE RESPUESTA (no son historicas estan filtradas)
+            df = construct_data.determine_result(df, self.var_resp)
+            df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
         
-        # VARIABLES HISTORICAS
-        df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
-        df = construct_data.determine_points(df)
-        if not without_h2h:
-            df = construct_data.h2h_by_date(df, n_years=-1)
-            df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-            df = construct_data.h2h_by_date_by_localia(df, n_years=-1)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
-            df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
+            # VARIABLES HISTORICAS
+            df = construct_data.determine_number_matches_last_days(df, n_days=n_days) # numero de partidos jugados en ultimos n days
+            df = construct_data.determine_points(df)
 
-        # Determino cuales son las variables stats automaticamente
-        stats_columns = construct_data.determine_stats_columns(df)
-        print(f"Stats a promediar en ultimos partidos: {stats_columns}")
+            if with_h2h:
+                df = construct_data.h2h_by_date(df, n_years=-1)
+                df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+                df = construct_data.h2h_by_date_by_localia(df, n_years=-1)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
+                df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
-        # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
-        for var in stats_columns: # e.g. shots_on_goal
-            print(f"Estadistica a promediar: {var}")
-            
+            # Determino cuales son las variables stats automaticamente
+            stats_columns = construct_data.determine_stats_columns(df)
+            print(f"Stats a promediar en ultimos partidos: {stats_columns}")
+
+            # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
+            for var in stats_columns: # e.g. shots_on_goal
+                print(f"Estadistica a promediar: {var}")
+                
+                try:
+                    # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
+                    df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
+                    df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+                    
+                    # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+                    not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
+                    df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
+                    df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
+
+                    # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
+                    not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
+                    df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
+                    df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
+                
+                except KeyError:
+                    logger.warning(f"Fallo la construccion de {var}. Posibles causas: 1) Deberia ser porque hay muy pocos ultimos partidos. 2) En algun caso particular, si es una sola variable, puede que realmente no tenga valor en los ultimos partidos (En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos)")
+                    
+                    # Construyo las variables para evitar KeyError mas adelante
+                    df[f'dif_mean_last_match_{var}'] = np.nan  # relleno con nan y no con 0
+                    df[f'dif_mean_last_match_{var}_against'] = np.nan # relleno con nan y no con 0
+
+            # Historica de jugadores
             try:
-                # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-                df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
-                df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
-                
-                # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-                not_none_condition = (df[f'mean_last_match_{var}_home'].notnull()) & (df[f'mean_last_match_{var}_away'].notnull())
-                df[f'dif_mean_last_match_{var}'] = np.where(not_none_condition, df[f'mean_last_match_{var}_home'] - df[f'mean_last_match_{var}_away'], np.nan)
-                df = df.drop(columns=[f'mean_last_match_{var}_home', f'mean_last_match_{var}_away'], axis=1)
-
-                # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-                not_none_condition_2 = (df[f'mean_last_match_{var}_home_against'].notnull()) & (df[f'mean_last_match_{var}_away_against'].notnull())
-                df[f'dif_mean_last_match_{var}_against'] = np.where(not_none_condition_2, df[f'mean_last_match_{var}_home_against'] - df[f'mean_last_match_{var}_away_against'], np.nan)
-                df = df.drop(columns=[f'mean_last_match_{var}_home_against', f'mean_last_match_{var}_away_against'], axis=1)
-            
+                df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia) # Variable para ponderar estadisticas
+                df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1) # no las uso pero las creo por usar determine_mean_in_last_matches()
             except KeyError:
-                cant_errores += 1
-                logger.error(f"Fallo la construccion de {var}. Si es una sola variable, puede que realmente no tenga valor en los ultimos partidos. En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos.")
-                
                 # Construyo las variables para evitar KeyError mas adelante
-                df[f'dif_mean_last_match_{var}'] = 0
-                df[f'dif_mean_last_match_{var}_against'] = 0
-
-                if cant_errores > 1:
-                    raise ValueError("Fallo la construccion para mas de una variable.")
-                
-        # Historica de jugadores
-        df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia) # Variable para ponderar estadisticas
-        df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
+                df[f'mean_last_match_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
+                df[f'mean_last_match_mean_rat_player_start_away_against'] = np.nan # relleno con nan y no con 0
 
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
@@ -959,7 +963,7 @@ def main(id_country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion de variables
-    id_country = 59
+    id_country = 148
     d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)
