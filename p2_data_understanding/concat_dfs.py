@@ -22,11 +22,11 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
 
         # Por competition del country
         for i, row in df_comp_pais.iterrows():
-            d_comps = {'laliga': 'la-liga', 'laliga2': 'la-liga-2'}
+            # d_comps = {'laliga': 'la-liga', 'laliga2': 'la-liga-2'}
 
             competicion_form = row['competition_flashscore'].lower().replace(" ", "-")  # competicion_form = row['competition_sofifa'].lower().replace(" ", "-")
-            if competicion_form in d_comps.keys():
-                competicion_form = d_comps[competicion_form]
+            # if competicion_form in d_comps.keys():
+                # competicion_form = d_comps[competicion_form]
             print(f" Competition: {row['competition_flashscore']} --> form {competicion_form} ".center(120, "-"))
 
             # Levanto su dataframe
@@ -99,7 +99,7 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
 if __name__ == "__main__":
     # Definicion de variables
     id_country = 148
-    export = False
+    export = True
     competicion, temporada = True, False
     
     # Levento df_countries y obtengo id
@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes =  ['df_player_sofifa', 'df_player_fifa_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
+        l_dataframes =  ['df_teams_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
         concat_dfs_per_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country

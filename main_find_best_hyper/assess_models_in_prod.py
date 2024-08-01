@@ -243,8 +243,8 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino sera igual.")
 
     # Defino condiciones del analisis
-    country = "usa"
-    date = '2024-06-24'
+    country = "germany" # ""
+    date = '2024-05-09'
     ruta_base = f"./main_find_best_hyper/data/{country}/{date}" 
     df_iteration = pd.read_excel(f'{ruta_base}/df_iteration.xlsx')
 

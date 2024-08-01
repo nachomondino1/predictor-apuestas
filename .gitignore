@@ -19,8 +19,8 @@ __pycache__/
 ## Data understanding
 data_seg/
 ## Data preparation
+--old/
 --integrate_data/
---integrate_data (sin serie B)/
 ## Modeling
 p4_modeling/data/
 # Main_find_best_hiper

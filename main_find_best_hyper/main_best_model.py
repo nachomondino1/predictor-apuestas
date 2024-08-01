@@ -68,7 +68,7 @@ def main(l_modelos, d_params, ruta_base, export: bool = True):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 6
+    id_country = 148
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b']], # d_comps['comp_sin_b'] # d_comps['comp_solo_liga'],  # Italy y Spain no tienen la b en df_match
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']],
             'n_years_to_select': [3, 5, 10, None],
         },
         'select': {

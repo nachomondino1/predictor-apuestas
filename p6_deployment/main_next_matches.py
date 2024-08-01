@@ -95,7 +95,7 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, _print: bool = False):
+    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 1, _print: bool = False):
         """
         Extraccion de varias competencias de un mismo country.
         """
@@ -118,7 +118,7 @@ class DataUnderstandingNew():
                 print(f" Competition: {competition} ".center(120, '+'))
 
             # Actualizo df_match y df_match_player con los partidos faltantes
-            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=2, l_ids_already_collected=l_ids_extracted, export=False)
+            df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(self.id_country, self.country, id_competition, competition, is_cup, n_seasons_max=n_seasons_max, l_ids_already_collected=l_ids_extracted, export=False)
             if _print:
                 print(f"Cantidad de partidos faltantes en df_match: {df_match_miss.shape[0]}")
 
@@ -597,14 +597,13 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, flex: 
     """
     # Determino fecha inical 
     limit_date = initial_date - datetime.timedelta(days=n_days) 
-    print(f"Fecha hoy: {datetime.datetime.now()}")
-    print(f"Seleccion de ultimos partidos jugados: {limit_date} -- {n_days} days --> {initial_date}")
+    # print(f"Fecha hoy: {datetime.datetime.now()}")
+    # print(f"Seleccion de ultimos partidos jugados: {limit_date} -- {n_days} days --> {initial_date}")
 
     # Filtro segun fechas inicial y final
     df_filt = df[(df['date'] >= limit_date) & (df['date'] <= initial_date)]
     df_filt = df_filt.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
-    print(f"Filas: {len(df)} --> {len(df_filt)}")
-    logger.info(f"Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos: {df_filt.shape}")
+    logger.info(f"Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos:  {len(df)} --> {len(df_filt)}")
 
     if flex:
         n_days_flex = 120
@@ -1039,7 +1038,7 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 148
+        id_country = 77
         n_days = 20
         d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
