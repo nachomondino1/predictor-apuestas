@@ -48,8 +48,8 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          # python automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148, 167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
-          python automatize_predict/collect_predictions.py 15 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
+          python p6_deployment/automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
+          # python p6_deployment/automatize_predict/collect_predictions.py 15 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
 
       - name: Commit and push all changes
         env:
@@ -65,4 +65,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
+          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py

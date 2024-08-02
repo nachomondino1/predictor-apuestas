@@ -44,7 +44,7 @@ jobs:
 
     # Ejecuto create_action_update.py
     - name: Create cronjob in next matches's schedule.
-      run: python automatize_predict/update_predictions/create_action_update.py
+      run: python p6_deployment/automatize_predict/update_predictions/create_action_update.py
 
     # Git push (para actualizar update_predictions.yml)
     - name: Commit and push all changes

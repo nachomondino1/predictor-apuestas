@@ -33,12 +33,12 @@ jobs:
             automatize_predict
             p2_data_understanding/collect_initial_data
             p2_data_understanding/data/df_countries.xlsx
-            p2_data_understanding/data/df_competencies.xlsx
+            data/df_competencies.xlsx
             p3_data_preparation/construct_data.py
             p3_data_preparation/clean_data.py
             p4_modeling
-            p6_deployment/data/historial_predicciones.xlsx
-            p6_deployment/data/predicciones.xlsx
+            data/historial_predicciones.xlsx
+            data/predicciones.xlsx
             requirements_mnm.txt
           sparse-checkout-cone-mode: false
           ref: prod # Branch
@@ -65,7 +65,7 @@ jobs:
       # Run update_results script
       - name: Run update_results script
         run: |
-          python automatize_predict/update_results.py 7
+          python p6_deployment/automatize_predict/update_results.py 7
 
       # Push to Github
       - name: Commit and push all changes
@@ -83,4 +83,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
-          python automatize_predict/dispatch_event/dispatch_event.py
+          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py

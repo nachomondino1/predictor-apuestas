@@ -291,13 +291,13 @@ def extract_players(id_country, country, id_competition, league, export:bool = T
 
         # Exporto datos del fifa (Por seguridad)
         if export:
-            df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_sofifa/{fifa}_{league_form}.xlsx', index=True)
-            df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league_form}.xlsx', index=False)
+            df_player.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_season/df_player_sofifa/{fifa}_{league_form}.xlsx', index=True)
+            df_player_fifa.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league_form}.xlsx', index=False)
 
     # Exporto dataset final
     if export:
-        df_player.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_sofifa/{league_form}.xlsx', index=True)
-        df_player_fifa.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/df_player_fifa_sofifa/{league_form}.xlsx', index=False)
+        df_player.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/df_player_sofifa/{league_form}.xlsx', index=True)
+        df_player_fifa.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/df_player_fifa_sofifa/{league_form}.xlsx', index=False)
 
     # Cierro webdriver
     crawler.driver.close()
@@ -387,8 +387,8 @@ if __name__ == "__main__":
     id_country = 148
 
     # Levanto dataframes
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_countries = pd.read_excel('./data/df_countries.xlsx')
+    df_comp = pd.read_excel('./data/df_competencies.xlsx')
 
     # Defino variables
     df_teams_sofifa_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
