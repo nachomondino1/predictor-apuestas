@@ -9,7 +9,7 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
     :return: Dataframe. Contiene todas las competiciones de un country (DataFrame)
     """
     # Levanto competiciones del country
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_comp = pd.read_excel('./data/df_competencies.xlsx')
     df_comp_pais = df_comp[df_comp['id_country'] == id_country]
     print("Competiciones del country:\n", df_comp_pais)
 
@@ -53,7 +53,7 @@ def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
             logger.info(df_sin_duplicados)
 
         if export:
-            df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/{dataframe}.xlsx', index=True)
+            df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/{dataframe}.xlsx', index=True)
 
 def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export=True):
     """
@@ -66,7 +66,7 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
 
         print(f"\nDataframe: {dataframe}")
         df_concat = pd.DataFrame()
-        ruta_base = f'./p2_data_understanding/data/{country}/data_seg/per_season/{dataframe}'
+        ruta_base = f'./data/{country}/p2_data_understanding/data_seg/per_season/{dataframe}'
 
         # Por dataframe a concatenar
         for filename in l_filenames:
@@ -94,7 +94,7 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
         print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
 
         if export:
-            df_sin_duplicados.to_excel(f'./p2_data_understanding/data/{country}/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
+            df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
 if __name__ == "__main__":
     # Definicion de variables
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     competicion, temporada = True, False
     
     # Levento df_countries y obtengo id
-    df_countries = pd.read_excel(f'./p2_data_understanding/data/df_countries.xlsx')
+    df_countries = pd.read_excel(f'./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
     print(country)
 

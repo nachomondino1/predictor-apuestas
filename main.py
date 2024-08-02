@@ -38,7 +38,7 @@ class DataUnderstanding:
         self.make_directories()
 
     def make_directories(self):
-        ruta_base = f'./p2_data_understanding/data/{self.country}/data_seg'
+        ruta_base = f'./data/{self.country}/p2_data_understanding/data_seg'
         l_directorios = [f'{ruta_base}/per_season/df_match/',
                         f'{ruta_base}/per_season/df_match_player/',
                         f'{ruta_base}/per_season/df_match_odds/',                    
@@ -66,7 +66,7 @@ class DataUnderstanding:
         df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()  # Sofifa
 
         # Selecciono competencias del country
-        df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+        df_comp = pd.read_excel('./data/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == self.id_country)]
         print(f' COUNTRY: {self.country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
@@ -82,9 +82,9 @@ class DataUnderstanding:
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
             if export:
-                df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match.xlsx', index=True)
-                df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_player.xlsx', index=True)
-                df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_match_odds.xlsx', index=True)
+                df_match_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_match.xlsx', index=True)
+                df_match_player_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_match_player.xlsx', index=True)
+                df_match_odds_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_match_odds.xlsx', index=True)
                 
             # Si la competition es una liga
             if row['is_cup'] == 0:
@@ -95,23 +95,23 @@ class DataUnderstanding:
                 df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
                 df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
                 if export:
-                    df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_sofifa.xlsx', index=True)
-                    df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_player_fifa_sofifa.xlsx', index=True)
+                    df_player_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_player_sofifa.xlsx', index=True)
+                    df_player_fifa_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_player_fifa_sofifa.xlsx', index=True)
                
                 ## Teams
                 df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
                 df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
                 if export:
-                    df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/data_seg/df_teams_sofifa.xlsx', index=True)
+                    df_teams_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_teams_sofifa.xlsx', index=True)
        
         # Exporto datasets con competiciones del country
         if export:
-            df_match_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match.xlsx', index=True)
-            df_match_player_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_player.xlsx', index=True)
-            df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index=True)
-            df_player_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_sofifa.xlsx', index=True)
-            df_player_fifa_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_player_fifa_sofifa.xlsx', index=True)
-            df_teams_sofifa_concat.to_excel(f'./p2_data_understanding/data/{self.country}/df_teams_sofifa.xlsx', index=True)
+            df_match_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_match.xlsx', index=True)
+            df_match_player_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_match_player.xlsx', index=True)
+            df_match_odds_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index=True)
+            df_player_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_player_sofifa.xlsx', index=True)
+            df_player_fifa_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_player_fifa_sofifa.xlsx', index=True)
+            df_teams_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_teams_sofifa.xlsx', index=True)
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat
 
@@ -149,8 +149,8 @@ class DataPreparation:
 
     def make_directories(self):
         l_directorios = [
-            f'./p3_data_preparation/data/{self.country}/clean_data',
-            f'./p3_data_preparation/data/{self.country}/integrate_data',
+            f'./data/{self.country}/p3_data_preparation/clean_data',
+            f'./data/{self.country}/p3_data_preparation/integrate_data',
         ]
 
         for directorio in l_directorios:
@@ -194,9 +194,9 @@ class DataPreparation:
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_match.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_formated.xlsx', index=True)
-            df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/df_match_player_formated.xlsx', index=True)
-            df_player_fifa_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/df_player_fifa_sofifa_formated.xlsx', index=True)
+            df_match.to_excel(f'./data/{self.country}/p3_data_preparation/df_match_formated.xlsx', index=True)
+            df_match_player.to_excel(f'./data/{self.country}/p3_data_preparation/df_match_player_formated.xlsx', index=True)
+            df_player_fifa_sofifa.to_excel(f'./data/{self.country}/p3_data_preparation/df_player_fifa_sofifa_formated.xlsx', index=True)
 
         return df_match, df_match_player, df_player_fifa_sofifa
 
@@ -251,11 +251,11 @@ class DataPreparation:
         print(f"Clean data in {(end - start) / 60:.1f} minutes")
 
         if export:
-            df_match.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_match_cleaned.xlsx', index=True)
-            df_match_player.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_match_player_cleaned.xlsx', index=True)
-            df_player_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_sofifa_cleaned.xlsx', index=True)
-            df_player_fifa_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
-            df_teams_sofifa.to_excel(f'./p3_data_preparation/data/{self.country}/clean_data/df_teams_sofifa_cleaned.xlsx', index=True)
+            df_match.to_excel(f'./data/{self.country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx', index=True)
+            df_match_player.to_excel(f'./data/{self.country}/p3_data_preparation/clean_data/df_match_player_cleaned.xlsx', index=True)
+            df_player_sofifa.to_excel(f'./data/{self.country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index=True)
+            df_player_fifa_sofifa.to_excel(f'./data/{self.country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
+            df_teams_sofifa.to_excel(f'./data/{self.country}/p3_data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx', index=True)
     
         return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
 
@@ -281,7 +281,7 @@ class DataPreparation:
         print("\nIntegrating team's data to df_match...")
         # Si ya hice el mapeo
         try:
-            df_map_teams_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx')
+            df_map_teams_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx')
             print("No vuelvo a mapear sino que levanto df_map ")
         # Si aun no hice el mapeo
         except FileNotFoundError:
@@ -291,8 +291,8 @@ class DataPreparation:
             df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
 
             if export:
-                df_teams.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_teams.xlsx", index=True)
-                df_map_teams_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_teams_fs_so.xlsx")
+                df_teams.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx", index=True)
+                df_map_teams_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx")
   
         # Integro datos de equipos a df_match usando el mapeo
         df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
@@ -301,7 +301,7 @@ class DataPreparation:
         print("\nIntegrating player's data to df_match...")
         # Si ya hice el mapeo
         try:
-            df_map_players_fs_so = pd.read_excel(f'p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx')
+            df_map_players_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
             print("No vuelvo a mapear sino que levanto df_map ")
 
         # Si aun no hice el mapeo
@@ -312,8 +312,8 @@ class DataPreparation:
             df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
 
             if export:
-                df_player.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_player.xlsx", index=True)
-                df_map_players_fs_so.to_excel(f"./p3_data_preparation/data/{self.country}/integrate_data/df_map_players_fs_so.xlsx")
+                df_player.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player.xlsx", index=True)
+                df_map_players_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx")
 
         # Integro datos de jugadores a df_match usando el mapeo
         df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
@@ -327,7 +327,7 @@ class DataPreparation:
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         
         if export:
-            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_integrated.xlsx', index=True)
+            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_integrated.xlsx', index=True)
 
         return df
 
@@ -411,7 +411,7 @@ class DataPreparation:
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         
         if export:
-            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed.xlsx', index=True)
+            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_constructed.xlsx', index=True)
 
         return df
 
@@ -426,8 +426,8 @@ class DataPreparation:
         df, df_etiquetas = format_data.convert_columns_to_int(df)
 
         if export:
-            df_etiquetas.to_excel(f'./p3_data_preparation/data/{self.country}/df_etiquetas.xlsx', index=False)
-            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_etiquetado.xlsx', index=True)
+            df_etiquetas.to_excel(f'./data/{self.country}/p3_data_preparation/df_etiquetas.xlsx', index=False)
+            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
     def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, _print: bool = True, export: bool = True):
@@ -494,8 +494,8 @@ class DataPreparation:
         df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
 
         if export: 
-            joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./p3_data_preparation/data/{self.country}/scaler_model.pkl")       
-            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_constructed_clean.xlsx', index=True)
+            joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./data/{self.country}/p3_data_preparation/scaler_model.pkl")       
+            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_constructed_clean.xlsx', index=True)
 
         return df, scaler, X_sin_col_mucho_nan.columns
     
@@ -530,7 +530,7 @@ class DataPreparation:
         print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_selected.xlsx', index=True)
+            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected.xlsx', index=True)
         return df
     
     def treat_nan_values(self, df: pd.DataFrame , fill_na: str = None, percentil_nan: int = 75, export: bool = True, _print: bool = True):
@@ -566,7 +566,7 @@ class DataPreparation:
             df_rellenado = pd.DataFrame(index=X.index)
             df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
             if export:
-                df_rellenado.to_excel(f'./p3_data_preparation/data/{self.country}/df_rellenado.xlsx', index=True)
+                df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/df_rellenado.xlsx', index=True)
 
             # Relleno nan de las columnas con mucho NaN
             X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
@@ -582,7 +582,7 @@ class DataPreparation:
         df = pd.concat([X, y], axis=1)
 
         if export:
-            df.to_excel(f'./p3_data_preparation/data/{self.country}/df_selected_nan.xlsx', index=True)
+            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
       
         return df
 
@@ -598,13 +598,13 @@ class Modeling:
         self.var_resp = var_resp
         self.var_pred = var_pred
         self.country = country.lower()
-        self.make_directories()
+        # self.make_directories()
 
     def make_directories(self):
 
         l_directorios = [
-            f'./p4_modeling/data/{self.country}/generate_test_design',
-            f'./p4_modeling/data/{self.country}/modeling',
+            f'./data/{self.country}/p4_modeling/generate_test_design',
+            f'./data/{self.country}/p4_modeling/modeling',
         ]
 
         for directorio in l_directorios:
@@ -697,12 +697,12 @@ class Modeling:
 
         print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
         if export:
-            X_train.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/X_train.xlsx', index=True)
-            X_val.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/X_val.xlsx', index=True)
-            X_test.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/X_test.xlsx', index=True)
-            y_train.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/y_train.xlsx', index=True)
-            y_val.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/y_val.xlsx', index=True)
-            y_test.to_excel(f'./p4_modeling/data/{self.country}/generate_test_design/y_test.xlsx', index=True)
+            X_train.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_train.xlsx', index=True)
+            X_val.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_val.xlsx', index=True)
+            X_test.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_test.xlsx', index=True)
+            y_train.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/y_train.xlsx', index=True)
+            y_val.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/y_val.xlsx', index=True)
+            y_test.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/y_test.xlsx', index=True)
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -739,9 +739,9 @@ class Modeling:
         print(f"\nAccuracy promedio de validación cruzada: {cv_accuracy:.1f}%")
 
         if export:
-            pickle.dump(model_best_params, open(f"./p4_modeling/data/{self.country}/modelo.pkl", "wb"))
+            pickle.dump(model_best_params, open(f"./data/{self.country}/p4_modeling/modelo.pkl", "wb"))
             df_hiperparametros = pd.DataFrame.from_dict(d_hiper_model, orient='index', columns=['Valor'])
-            df_hiperparametros.to_csv(f"./p4_modeling/data/{self.country}/modeling/hiperparametros.csv")
+            df_hiperparametros.to_csv(f"./data/{self.country}/p4_modeling/modeling/hiperparametros.csv")
 
         return model_best_params, d_hiper_model, cv_accuracy
 
@@ -760,7 +760,7 @@ class Modeling:
         """
         print("\nEvaluating trained model with test sets...")
         # Levanto df_match_odds (solo los partidos en X_test)
-        df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{self.country}/df_match_odds.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
         df_match_odds = df_match_odds[df_match_odds.index.isin(X_test.index)]  # Selecciono los partidos que estan en df_test
         df_match_odds = df_match_odds.reindex(X_test.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
         self.var_pred_bm = 'bookmaker_result'  
@@ -799,8 +799,8 @@ class Modeling:
             print(d_metrics)
 
         if export:
-            df_conf_mat.to_excel(f'./p4_modeling/data/{self.country}/modeling/df_conf_matrix.xlsx')
-            df_predicciones.to_excel(f'./p4_modeling/data/{self.country}/modeling/df_predicciones.xlsx')
+            df_conf_mat.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_conf_matrix.xlsx')
+            df_predicciones.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_predicciones.xlsx')
 
         return df_predicciones, d_metrics
     
@@ -846,7 +846,7 @@ def main(id_country, d_run, export: bool = True):
     # Definicion de variables
     data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
+    df_countries = pd.read_excel('./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
     
     # Creo instancias de clases
@@ -865,12 +865,12 @@ def main(id_country, d_run, export: bool = True):
 
     elif data_prep:
         # Levanto datos ya extraidos
-        df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_odds.xlsx', index_col=0)
-        df_player_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_sofifa.xlsx', index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player_fifa_sofifa.xlsx') #  index_col=0 --> si lo uso falla la integracion porque pone 'id_player' como index
-        df_teams_sofifa = pd.read_excel(f'./p2_data_understanding/data/{country}/df_teams_sofifa.xlsx', index_col=0)
+        df_match = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
+        df_match_player = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_player.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
+        df_player_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0)
+        df_player_fifa_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx') #  index_col=0 --> si lo uso falla la integracion porque pone 'id_player' como index
+        df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
 
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
@@ -885,7 +885,7 @@ def main(id_country, d_run, export: bool = True):
         fill_na = None
         df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [n_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
         
-        # df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx', index_col=0)
+        # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_constructed.xlsx', index_col=0)
         # print(df.head(2))
 
         # Preparo el dataset para el analisis
@@ -899,11 +899,11 @@ def main(id_country, d_run, export: bool = True):
         df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         
         if export:
-            df_hiper_prep.to_excel(f'./p3_data_preparation/data/{country}/df_hiper_prep.xlsx', index=False)
+            df_hiper_prep.to_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx', index=False)
 
     elif not data_unders:
         # Levanto dataset para prueba
-        df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_selected_nan.xlsx', index_col=0)
+        df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_selected_nan.xlsx', index_col=0)
         print(df.head(3), df.shape)
 
     #------------------------------------------- MODELING -------------------------------------------#
@@ -956,8 +956,8 @@ def main(id_country, d_run, export: bool = True):
         df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
 
         if export:
-            df_hiper_mod.to_excel(f'./p4_modeling/data/{country}/modeling/df_hiper_mod.xlsx', index=True)
-            pickle.dump(model, open(f"./p4_modeling/data/{country}/modeling/modelo.pkl", "wb"))
+            df_hiper_mod.to_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx', index=True)
+            pickle.dump(model, open(f"./data/{country}/p4_modeling/modeling/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

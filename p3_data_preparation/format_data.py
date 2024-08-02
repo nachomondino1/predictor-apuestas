@@ -210,8 +210,8 @@ if __name__ == "__main__":
 
     # Levanto datasets
     country = 'argentina'
-    df_match = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{country}/df_match.xlsx')
-    df_player = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/p2_data_understanding/data/{country}/df_player.xlsx", index_col=0)
+    df_match = pd.read_excel(f'/Users/nachomondino/Documents/GitHub/predictor-apuestas/data/{country}/p2_data_understanding/df_match.xlsx')
+    df_player = pd.read_excel(f"/Users/nachomondino/Documents/GitHub/predictor-apuestas/data/{country}/p2_data_understanding/df_player.xlsx", index_col=0)
 
     # Entidad partido WhoScored: fecha, resultados de medio tiempo y final
     df_match['fecha'] = pd.to_datetime(df_match['fecha'] + ' ' + df_match['hora'], format='%a, %d-%b-%y %H:%M')

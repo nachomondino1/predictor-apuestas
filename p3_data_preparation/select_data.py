@@ -370,7 +370,7 @@ def determine_country_competitions(id_country):
     """
 
     # Levanto competencias
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_comp = pd.read_excel('./data/df_competencies.xlsx')
 
     # Selecciono las del pais
     df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
@@ -407,7 +407,7 @@ def prueba():
     export = False
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_constructed.xlsx', index_col=0)
+    df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_constructed.xlsx', index_col=0)
     print(df.head())
 
     # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)

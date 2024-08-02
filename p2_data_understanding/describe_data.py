@@ -62,9 +62,9 @@ if __name__ == "__main__":
     country = "England"
 
     # Levanto datasets
-    df_match = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match.xlsx')  #     df_match = pd.read_excel(f'./p3_data_preparation/data/{country}/df_match_formated.xlsx')
-    df_match_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_match_player.xlsx')
-    df_player = pd.read_excel(f'./p2_data_understanding/data/{country}/df_player.xlsx', index_col=0)  #     df_player = pd.read_excel(f'./p3_data_preparation/data/{country}/df_player_formated.xlsx', index_col=0)
+    df_match = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match.xlsx')  #     df_match = pd.read_excel(f'./data/{country}/p3_data_preparation/df_match_formated.xlsx')
+    df_match_player = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_player.xlsx')
+    df_player = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player.xlsx', index_col=0)  #     df_player = pd.read_excel(f'./data/{country}/p3_data_preparation/df_player_formated.xlsx', index_col=0)
 
     getting_to_know_data(df_match)
     getting_to_know_data(df_match_player)

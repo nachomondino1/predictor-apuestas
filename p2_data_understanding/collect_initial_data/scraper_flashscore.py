@@ -708,8 +708,8 @@ if __name__ == "__main__":
     id_country = 77
 
     # Levanto dataframes
-    df_countries = pd.read_excel('./p2_data_understanding/data/df_countries.xlsx')
-    df_comp = pd.read_excel('./p2_data_understanding/data/df_competencies.xlsx')
+    df_countries = pd.read_excel('./data/df_countries.xlsx')
+    df_comp = pd.read_excel('./data/df_competencies.xlsx')
 
     # Defino variables
     df_match_concat, df_match_player_concat,df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
@@ -732,15 +732,15 @@ if __name__ == "__main__":
         df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
         
         # Exporto datos
-        # df_match_concat.to_excel(f'./p2_data_understanding/data/{country}/data_seg/df_match.xlsx', index=True)
-        # df_match_player_concat.to_excel(f'./p2_data_understanding/data/{country}/data_seg/df_match_player.xlsx', index=True)
-        # df_match_odds_concat.to_excel(f'./p2_data_understanding/data/{country}/data_seg/df_match_odds.xlsx', index=True)       
+        # df_match_concat.to_excel(f'./data/{country}/p2_data_understanding/data_seg/df_match.xlsx', index=True)
+        # df_match_player_concat.to_excel(f'./data/{country}/p2_data_understanding/data_seg/df_match_player.xlsx', index=True)
+        # df_match_odds_concat.to_excel(f'./data/{country}/p2_data_understanding/data_seg/df_match_odds.xlsx', index=True)       
         df_match_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match.xlsx', index=True)
         df_match_player_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match_player.xlsx', index=True)
         df_match_odds_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds.xlsx', index=True)
 
     # Extraer partidos missing
-    # df_match = pd.read_excel(f"p2_data_understanding/data/{country}/data_seg/per_season/df_match/premier-league_2023_2024.xlsx", index_col=0)
+    # df_match = pd.read_excel(f"data/{country}/p2_data_understanding/data_seg/per_season/df_match/premier-league_2023_2024.xlsx", index_col=0)
     # df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
     # df_match_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_miss.xlsx', index=True)
     # df_match_player_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_player_miss.xlsx', index=True)
