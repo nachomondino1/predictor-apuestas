@@ -17,11 +17,15 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
     # Por country
     for id_country in l_countries:
 
-        # Extraigo, preparo y predigo proximos partidos
-        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
+        try:
+            # Extraigo, preparo y predigo proximos partidos
+            df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
 
-        # Concatenar df_countries....
-        df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+            # Concatenar df_countries....
+            df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+
+        except Exception as e:
+            print(f"Fallo la prediccion para {id_country} por {e}")
 
     # Guardo predicciones en historial_predicciones
     print(f"Antes de cargar historial: {df_historial_predicciones.shape}")

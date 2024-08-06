@@ -48,7 +48,8 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
+          # python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
+          python p6_deployment/automatize_predict/collect_predictions.py 15 '[55, 148]' '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
 
       - name: Commit and push all changes
         env:
