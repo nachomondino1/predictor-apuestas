@@ -4,7 +4,6 @@ on:
   push: # Para actualizar predicciones de USA por tener nuevo modelo
     branches:
       - staging
-      - prod
   # schedule:
   #   - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
 
@@ -26,32 +25,26 @@ jobs:
         with:
           ref: staging  # Inicializo staging para tener los cambios de scripts sin tener que hacer merge pull request de staging a prod ante cada cambio
 
-      - name: Print current date and time
-        run: date
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Set up cache for pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
+      - name: Set up environment and install dependencies
         run: |
+          echo "Current date and time: $(date)"
+          python_version="3.x"
+
+          echo "Setting up Python $python_version"
+          actions/setup-python@v5 - python-version $python_version
+
+          echo "Setting up cache for pip"
+          actions/cache@v4 - path ~/.cache/pip - key ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }} - restore-keys ${{ runner.os }}-pip-
+
+          echo "Installing dependencies"
           pip install -r p6_deployment/requirements_mnm.txt
-
-      - name: Install Google Chrome
-        run: |
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+   
+      # - name: Install Google Chrome
+      #   run: |
+      #     wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+      #     sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+      #     sudo apt-get update
+      #     sudo apt-get install -y google-chrome-stable
 
       # - name: List directory contents
       #   run: |
@@ -61,8 +54,8 @@ jobs:
         run: |
           python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": false}'
           # python p6_deployment/automatize_predict/collect_predictions.py 15 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
-        env:
-          PATH: /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin:/usr/lib/chromium-browser/chromium-browser:/usr/lib/chromium-browser:/opt/google/chrome
+        # env:
+        #   PATH: /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin:/usr/lib/chromium-browser/chromium-browser:/usr/lib/chromium-browser:/opt/google/chrome
       
           # - name: Commit and push all changes
       #   env:
