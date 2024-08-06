@@ -92,23 +92,30 @@ class Crawler:
         if headless:
             options.add_argument("--headless")
 
-        chrome_version = self.get_chrome_version()
 
-        if chrome_version:
-            logger.info(f"Detected Google Chrome version: {chrome_version}")
-            try:
-                chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
-                driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-            except Exception as e:
-                logger.error(f"Failed to download ChromeDriver for version {chrome_version}: {e}")
-                return None
-
-        else:
-            logger.warning("Using latest ChromeDriver as fallback")
+        try:
+            # Intentar instalar la última versión del ChromeDriver
             chrome_driver = ChromeDriverManager().install()
             driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-
-        return driver
+            logger.info("ChromeDriver initialized with the latest version")
+            return driver
+        
+        except Exception as e:
+            logger.error(f"Failed to download the latest ChromeDriver: {e}")
+            try:
+                # Obtener la versión de Chrome instalada
+                chrome_version = self.get_chrome_version()
+                if chrome_version:
+                    logger.info(f"Detected Google Chrome version: {chrome_version}")
+                    chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
+                    driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
+                    logger.info(f"ChromeDriver initialized with version {chrome_version}")
+                    return driver
+                else:
+                    logger.error("Failed to detect Google Chrome version")
+            except Exception as e:
+                logger.error(f"Failed to download ChromeDriver for detected version: {e}")
+        return None
 
     def initialize_safari_driver(self):
         driver = webdriver.Safari()
