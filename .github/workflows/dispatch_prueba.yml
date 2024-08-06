@@ -1,4 +1,4 @@
-name: Dispatch de prueba
+name: Test dispatch
 
 on:
   push:

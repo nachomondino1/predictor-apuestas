@@ -1,4 +1,4 @@
-name: Get predictions next 15 days
+name: Test get predictions next 15 days
 
 on:
   push: # Para actualizar predicciones de USA por tener nuevo modelo
