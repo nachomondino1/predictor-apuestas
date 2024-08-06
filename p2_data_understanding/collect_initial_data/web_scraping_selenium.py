@@ -75,7 +75,6 @@ class Crawler:
         """
         # Defino opciones del webdriver
         options = webdriver.ChromeOptions()
-        # options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         options.add_argument("--window-size=1920,1080")
         options.add_argument("start-maximized")
         options.add_argument("enable-automation")
@@ -91,7 +90,6 @@ class Crawler:
 
         if headless:
             options.add_argument("--headless")
-
 
         try:
             # Intentar instalar la última versión del ChromeDriver
@@ -115,7 +113,7 @@ class Crawler:
                     logger.error("Failed to detect Google Chrome version")
             except Exception as e:
                 logger.error(f"Failed to download ChromeDriver for detected version: {e}")
-        return None
+                raise ValueError
 
     def initialize_safari_driver(self):
         driver = webdriver.Safari()
