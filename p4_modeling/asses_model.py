@@ -456,6 +456,10 @@ def determine_winning_bets(df: pd.DataFrame):
             if (row['result'] == 0) or (row['result'] == 1):
                 df.loc[id_match, 'acerte'] = 1
         
+        # Si fallo la prediccion
+        elif row['result_to_bet'] == -100:
+            pass
+
         # Si el resultado a apostar es doble oportunidad sin Draw
         else:
             if (row['result'] == 1) or (row['result'] == 2):
@@ -463,7 +467,7 @@ def determine_winning_bets(df: pd.DataFrame):
 
     # Imprimo warning si supuestamente acerté el 100% de partidos
     if len(df[df['acerte']==1]) == len(df):
-        logger.error(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
+        logger.warning(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
 
     return df
 
