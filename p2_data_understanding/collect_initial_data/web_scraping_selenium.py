@@ -1,6 +1,7 @@
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
+from webdriver_manager.core.os_manager import OperationSystemManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys 
 from selenium.webdriver.chrome.service import Service
@@ -17,10 +18,10 @@ import platform
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
 
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
+    def __init__(self, headless: bool = True, browser: str = "Chrome"):
         """Initialize attributes of the parent class."""
         if browser == "Chrome":
-            self.driver = self.inicialize_chrome_driver(headless, path)
+            self.driver = self.inicialize_chrome_driver(headless)
         elif browser == "Firefox":
             self.driver = self.initialize_firefox_driver(headless)
         elif browser == "Safari":
@@ -62,7 +63,7 @@ class Crawler:
             logger.error(f"Error obtaining Chrome version: {e}")
             return None
 
-    def inicialize_chrome_driver(self, headless: bool, path: str):
+    def inicialize_chrome_driver(self, headless: bool):
         """
         Initialize a Chrome WebDriver.
 
@@ -75,7 +76,6 @@ class Crawler:
         """
         # Defino opciones del webdriver
         options = webdriver.ChromeOptions()
-        # options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         options.add_argument("--window-size=1920,1080")
         options.add_argument("start-maximized")
         options.add_argument("enable-automation")
@@ -92,23 +92,32 @@ class Crawler:
         if headless:
             options.add_argument("--headless")
 
-        chrome_version = self.get_chrome_version()
+        try:
+            # os_manager = OperationSystemManager(os_type="linux64")
+            # chrome_driver = ChromeDriverManager(os_system_manager=os_manager).install()
 
-        if chrome_version:
-            logger.info(f"Detected Google Chrome version: {chrome_version}")
-            try:
-                chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
-                driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-            except Exception as e:
-                logger.error(f"Failed to download ChromeDriver for version {chrome_version}: {e}")
-                return None
-
-        else:
-            logger.warning("Using latest ChromeDriver as fallback")
+            # Intentar instalar la última versión del ChromeDriver
             chrome_driver = ChromeDriverManager().install()
             driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-
-        return driver
+            logger.info("ChromeDriver initialized with the latest version")
+            return driver
+        
+        except Exception as e:
+            logger.error(f"Failed to download the latest ChromeDriver: {e}")
+            try:
+                # Obtener la versión de Chrome instalada
+                chrome_version = self.get_chrome_version()
+                if chrome_version:
+                    logger.info(f"Detected Google Chrome version: {chrome_version}")
+                    chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
+                    driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
+                    logger.info(f"ChromeDriver initialized with version {chrome_version}")
+                    return driver
+                else:
+                    logger.error("Failed to detect Google Chrome version")
+            except Exception as e:
+                logger.error(f"Failed to download ChromeDriver for detected version: {e}")
+                raise ValueError
 
     def initialize_safari_driver(self):
         driver = webdriver.Safari()

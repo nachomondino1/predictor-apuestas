@@ -1,6 +1,9 @@
 name: Get predictions next 15 days
 
 on:
+  push:
+    branches:
+      - prod
   schedule:
     - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
 
@@ -34,17 +37,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_mnm.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
-          pip install -r requirements_mnm.txt
+          pip install -r p6_deployment/requirements_mnm.txt
 
       - name: Run collect_predictions script
         run: |
-          python p6_deployment/automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
+          python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": false}'
 
       - name: Commit and push all changes
         env:

@@ -1,12 +1,9 @@
-name: Test get predictions next 15 days
+name: Test for get predictions next 15 days
 
 on:
-  push: # Para actualizar predicciones de USA por tener nuevo modelo
+  push:
     branches:
       - staging
-      - prod
-  # schedule:
-  #   - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
 
 jobs:
   collect_predictions:
@@ -24,7 +21,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: prod  # Branch
+          ref: staging  # Inicializo staging para tener los cambios de scripts sin tener que hacer merge pull request de staging a prod ante cada cambio
 
       - name: Print current date and time
         run: date
@@ -33,40 +30,36 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-
+  
       - name: Set up cache for pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_mnm.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }}   # /requirements.txt
           restore-keys: |
             ${{ runner.os }}-pip-
-
-      - name: Install dependencies
+  
+      - name: Install Python dependencies  # requirements.txt
         run: |
-          pip install -r requirements_mnm.txt
-
-      - name: List directory contents
-        run: |
-          ls -R
+          pip install -r p6_deployment/requirements_mnm.txt
 
       - name: Run collect_predictions script
         run: |
-          python p6_deployment/automatize_predict/collect_predictions.py 15 "[48, 55, 59, 77, 148]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": False}'
+          python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": false}'
           # python p6_deployment/automatize_predict/collect_predictions.py 15 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
 
-      - name: Commit and push all changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add .  # Agregar todos los cambios
-          git commit -m "Get predictions next 15 days"
-          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+      # - name: Commit and push all changes
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
+      #   run: |
+      #     git config --global user.name 'github-actions[bot]'
+      #     git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      #     git add .  # Agregar todos los cambios
+      #     git commit -m "Get predictions next 15 days"
+      #     git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:staging
 
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
-        run: |
-          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
+      # - name: Dispatch event to second repository
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      #   run: |
+      #     python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
