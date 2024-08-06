@@ -31,10 +31,10 @@ jobs:
         with:
           python-version: '3.x'
   
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libnss3 libgconf-2-4 google-chrome-stable
+      # - name: Install dependencies
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y libnss3 libgconf-2-4 google-chrome-stable
 
       - name: Set up cache for pip
         uses: actions/cache@v4
@@ -63,8 +63,8 @@ jobs:
       #     git commit -m "Get predictions next 15 days"
       #     git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:staging
 
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
-        run: |
-          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
+      # - name: Dispatch event to second repository
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      #   run: |
+      #     python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
