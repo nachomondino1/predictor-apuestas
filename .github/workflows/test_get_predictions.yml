@@ -33,7 +33,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
- 
+
       - name: Set up cache for pip
         uses: actions/cache@v4
         with:
@@ -45,6 +45,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements_mnm.txt
+
+      - name: List directory contents
+        run: |
+          ls -R
 
       - name: Run collect_predictions script
         run: |
