@@ -337,7 +337,7 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
     return df
 
 ## Player
-def calculate_dif_col_players(df: pd.DataFrame, _print: bool = False):
+def calculate_dif_col_players(df: pd.DataFrame):
     """
     Calcula la diferencia entre home y away
 
@@ -351,28 +351,29 @@ def calculate_dif_col_players(df: pd.DataFrame, _print: bool = False):
     pattern = r'_player_[a-z_\(\)%]+_(home|away)' # Patrón regex para encontrar columnas relevantes
     relevant_columns = df.filter(regex=pattern, axis=1).columns
     l_var_sin_suffix = list({re.sub(r'_(home|away)$', '', col) for col in relevant_columns})
-    if _print:
-        print(f"Variables jugadores a calcular diferencia entre local y visitante: {l_var_sin_suffix}")
+    # print(f"Variables jugadores a calcular diferencia entre local y visitante: {l_var_sin_suffix}")
     
+    # Por columna de jugadores
     for var in l_var_sin_suffix:
         columna_home, columna_away = f'{var}_home', f'{var}_away'
 
         if  "_against" not in var:  # Temporalmente. Porque falla sin con la columna player que es against.
-            if _print:
-                print(f"\nVariable: {var}")
-                print(f"Columna home: {columna_home} ; Columna away: {columna_away}")
+            # print(f"\nVariable: {var}")
+            # print(f"Columna home: {columna_home} ; Columna away: {columna_away}")
             
             if (('sum_' in var) or ('n_player' in var)) and ('_miss' in var):  # Si quiero reemplazar tambien las 'mean' --> if ('_miss' in var):
                 df = replace_nan_with_zero(df, columna_home, columna_away)  # Reemplazo sum_rat_player_miss=nan por sum_rat_player_miss=0 cdo uno de los dos equipos no tiene jugadores ausentes y el otro si
-                if _print:
-                    print("\t Reemplazo NaN values por cero.")
+                # print("\t Reemplazo NaN values por cero.")
 
-            # Calculo diferencia entre home y away cuando ambos equipos no tienen NaN
-            not_none_condition = (df[columna_home].notnull()) & (df[columna_away].notnull())
-            df[f'dif_{var}'] = np.where(not_none_condition, df[columna_home] - df[columna_away], np.nan)
+            try:
+                # Calculo diferencia entre home y away cuando ambos equipos no tienen NaN
+                not_none_condition = (df[columna_home].notnull()) & (df[columna_away].notnull())
+                df[f'dif_{var}'] = np.where(not_none_condition, df[columna_home] - df[columna_away], np.nan)
 
-            # Elimino variables utilizadas para calcular la diferencia
-            df = df.drop([columna_home, columna_away], axis=1)
+                # Elimino variables utilizadas para calcular la diferencia
+                df = df.drop([columna_home, columna_away], axis=1)
+            except KeyError:
+                pass
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
