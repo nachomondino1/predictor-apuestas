@@ -917,7 +917,11 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         except FileNotFoundError:
             df_integrated_updated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
             logger.warning("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
-   
+    
+    # Si solo quiero missing
+    if d_run['run_missing'] and not d_run['data_unders'] and not d_run['data_prep'] and not d_run['modeling']:
+        return df_match_miss
+    
     # _____________________________________________________________ DATA UNDERSTANDING _____________________________________________________________ #
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if d_run['data_unders']:
@@ -1041,7 +1045,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         id_country = 6
         n_days = 7
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':

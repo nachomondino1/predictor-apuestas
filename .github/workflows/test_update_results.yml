@@ -1,15 +1,9 @@
 name: Test update results
 
 on:
-  push: # Prueba
+  push:
     branches:
       - staging
-      - prod
-  # schedule:
-  #   - cron: "0 5 * * SUN"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
-  #   - cron: "0 5 * * SAT"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
-  #   - cron: "0 3 * * FRI"  # (durante prueba) Ejecutar todos los Viernes a la madrugada
-    # - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
 
 jobs:
   collect_predictions:
@@ -30,16 +24,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            automatize_predict
-            p2_data_understanding/collect_initial_data
-            p2_data_understanding/data/df_countries.xlsx
+            data/df_countries.xlsx
             data/df_competencies.xlsx
+            data/historial_predicciones.xlsx
+            data/predicciones.xlsx
+            p2_data_understanding/collect_initial_data
             p3_data_preparation/construct_data.py
             p3_data_preparation/clean_data.py
             p4_modeling
-            data/historial_predicciones.xlsx
-            data/predicciones.xlsx
-            requirements_mnm.txt
+            p6_deployment/automatize_predict
+            p6_deployment/requirements_mnm.txt
           sparse-checkout-cone-mode: false
           ref: prod # Branch
 
@@ -53,14 +47,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_mnm.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements_mnm.txt
+          pip install -r p6_deployment/requirements_mnm.txt
 
       # Run update_results script
       - name: Run update_results script
