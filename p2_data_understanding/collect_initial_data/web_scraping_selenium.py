@@ -17,10 +17,10 @@ import platform
 class Crawler:
     """ It contains all the actions that the bot can perform from accepting cookies to clicking on the next one. """
 
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
+    def __init__(self, headless: bool = True, browser: str = "Chrome"):
         """Initialize attributes of the parent class."""
         if browser == "Chrome":
-            self.driver = self.inicialize_chrome_driver(headless, path)
+            self.driver = self.inicialize_chrome_driver(headless)
         elif browser == "Firefox":
             self.driver = self.initialize_firefox_driver(headless)
         elif browser == "Safari":
@@ -62,7 +62,7 @@ class Crawler:
             logger.error(f"Error obtaining Chrome version: {e}")
             return None
 
-    def inicialize_chrome_driver(self, headless: bool, path: str):
+    def inicialize_chrome_driver(self, headless: bool):
         """
         Initialize a Chrome WebDriver.
 

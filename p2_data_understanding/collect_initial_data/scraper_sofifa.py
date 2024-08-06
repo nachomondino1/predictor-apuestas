@@ -14,8 +14,8 @@ class SofifaCrawler(Crawler):
     Contiene todo los xpath.
     """
     
-    def __init__(self, headless: bool = True, path: str = None, browser: str = "Chrome"):
-        super().__init__(headless, path, browser)
+    def __init__(self, headless: bool = True, browser: str = "Chrome"):
+        super().__init__(headless, browser)
         self.child_driver = self.driver
         self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
         self.SEC_WAIT_MAX = 5  # Espera para elementos que casi siempre estan
