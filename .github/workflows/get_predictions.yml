@@ -1,6 +1,9 @@
 name: Get predictions next 15 days
 
 on:
+  push:
+    branches:
+      - prod
   schedule:
     - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
 
@@ -38,7 +41,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install -r p6_deployment/requirements_mnm.txt
 

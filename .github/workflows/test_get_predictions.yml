@@ -31,11 +31,6 @@ jobs:
         with:
           python-version: '3.x'
   
-      # - name: Install dependencies
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y libnss3 libgconf-2-4 google-chrome-stable
-
       - name: Set up cache for pip
         uses: actions/cache@v4
         with:
