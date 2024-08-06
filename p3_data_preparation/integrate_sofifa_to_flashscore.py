@@ -409,12 +409,12 @@ if __name__ == "__main__":
     country = 'spain'
 
     # Levanto datasets para pruebas
-    df_match = pd.read_excel(f"./p3_data_preparation/data/{country}/clean_data/df_match_cleaned.xlsx", index_col=0)
-    df_match_player = pd.read_excel(f"./p3_data_preparation/data/{country}/clean_data/df_match_player_cleaned.xlsx",  index_col=0)
-    df_player = pd.read_excel(f"./p3_data_preparation/data/{country}/clean_data/df_player_cleaned.xlsx", index_col=0)
-    df_player_sofifa = pd.read_excel(f"./p3_data_preparation/data/{country}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0) 
-    df_player_fifa_sofifa = pd.read_excel(f"./p3_data_preparation/data/{country}/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
-    df_teams_sofifa = pd.read_excel(f"./p3_data_preparation/data/{country}/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)  
+    df_match = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)
+    df_match_player = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_match_player_cleaned.xlsx",  index_col=0)
+    df_player = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_player_cleaned.xlsx", index_col=0)
+    df_player_sofifa = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0) 
+    df_player_fifa_sofifa = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
+    df_teams_sofifa = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)  
     print(f"df_match: \n{df_match.head(1)} \n\ndf_match_player: \n{df_match_player.head(1)} \n\n df_player: \n{df_player.head(1)}")
 
     df_match = df_match.head(100)

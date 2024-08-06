@@ -1,0 +1,86 @@
+name: Test update results
+
+on:
+  push: # Prueba
+    branches:
+      - staging
+      - prod
+  # schedule:
+  #   - cron: "0 5 * * SUN"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
+  #   - cron: "0 5 * * SAT"  # (durante prueba) Ejecutar todos los Sabados a la madrugada
+  #   - cron: "0 3 * * FRI"  # (durante prueba) Ejecutar todos los Viernes a la madrugada
+    # - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
+
+jobs:
+  collect_predictions:
+    runs-on: ubuntu-latest
+
+    env:
+      TZ: America/Argentina/Buenos_Aires
+
+    # Agrego permisos en job para poder hacer push
+    permissions: 
+      contents: write  # para poder hacer git push
+
+    steps:
+      - name: Print current date and time
+        run: date
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            automatize_predict
+            p2_data_understanding/collect_initial_data
+            p2_data_understanding/data/df_countries.xlsx
+            data/df_competencies.xlsx
+            p3_data_preparation/construct_data.py
+            p3_data_preparation/clean_data.py
+            p4_modeling
+            data/historial_predicciones.xlsx
+            data/predicciones.xlsx
+            requirements_mnm.txt
+          sparse-checkout-cone-mode: false
+          ref: prod # Branch
+
+      # Instalacion de dependencias 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+ 
+      - name: Set up cache for pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_mnm.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_mnm.txt
+
+      # Run update_results script
+      - name: Run update_results script
+        run: |
+          python p6_deployment/automatize_predict/update_results.py 7
+
+      # Push to Github
+      - name: Commit and push all changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }} # Set the environment variable GITHUB_TOKEN if needed for push authentication
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .  # Agregar todos los cambios
+          git commit -m "Update results of bets"
+          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+
+      # Dispath to transfer
+      - name: Dispatch event to second repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py

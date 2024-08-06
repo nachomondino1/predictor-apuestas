@@ -14,17 +14,15 @@ prueba.py
 *.pyc
 __pycache__/
 
-# Datos
+# Data
 *.csv
-## Data understanding
 data_seg/
+old/
+
 ## Data preparation
---old/
 --integrate_data/
-## Modeling
-p4_modeling/data/
 # Main_find_best_hiper
-main_find_best_hyper/data/*/*/modeling/*.xlsx
+data/*/p4_modeling/*/data_seg/*.xlsx
 assess_models_in_prod/
 old_train_iterations/
 old_assess_iterations/

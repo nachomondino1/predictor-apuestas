@@ -336,7 +336,7 @@ def prueba():
     country = 'England'
 
     # Levanto dataset
-    df = pd.read_excel(f'p2_data_understanding/data/{country}/df_match.xlsx', index_col=0)
+    df = pd.read_excel(f'data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
     print(df.head(2))
 
     # Eliminacion de NaN values

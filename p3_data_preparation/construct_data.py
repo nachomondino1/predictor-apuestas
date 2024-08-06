@@ -390,7 +390,7 @@ if __name__ == "__main__":
     segun_localia = True
 
     # Levanto dataset
-    df = pd.read_excel(f'./p3_data_preparation/data/{country}/df_integrated.xlsx', index_col=0)
+    df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
     df = df.sort_values(by='date', ascending=False)
     # df = df.head(5000)
     print(df.head())

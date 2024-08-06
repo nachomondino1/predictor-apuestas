@@ -1,0 +1,42 @@
+name: Test dispatch
+
+on:
+  push:
+    branches:
+      - staging
+      - prod  # Asegúrate de que esta acción escuche los eventos de push en 'prod'
+    paths:
+      - data/predicciones.xlsx
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+
+    steps:
+    
+    - name: Checkout this repository
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          data/predicciones.xlsx
+          p6_deployment/automatize_predict/dispatch_event
+        sparse-checkout-cone-mode: false
+        ref: prod  # Branch
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies # Por ejemplo, requests
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests  # -r p6_deployment/automatize_predict/dispatch_event/requirements.txt
+
+    - name: Dispatch event to second repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      run: |
+        python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
+
+
