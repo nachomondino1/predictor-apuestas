@@ -89,15 +89,15 @@ class Crawler:
         options.add_argument("--disable-popup-blocking")
         options.add_argument("--remote-debugging-port=9222")
 
-        # if headless:
-        options.add_argument("--headless")
+        if headless:
+            options.add_argument("--headless")
 
         try:
-            os_manager = OperationSystemManager(os_type="linux64")
-            chrome_driver = ChromeDriverManager(os_system_manager=os_manager).install()
+            # os_manager = OperationSystemManager(os_type="linux64")
+            # chrome_driver = ChromeDriverManager(os_system_manager=os_manager).install()
 
             # Intentar instalar la última versión del ChromeDriver
-            # chrome_driver = ChromeDriverManager().install()
+            chrome_driver = ChromeDriverManager().install()
             driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
             logger.info("ChromeDriver initialized with the latest version")
             return driver

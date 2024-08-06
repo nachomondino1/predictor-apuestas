@@ -1,11 +1,9 @@
 name: Test for get predictions next 15 days
 
 on:
-  push: # Para actualizar predicciones de USA por tener nuevo modelo
+  push:
     branches:
       - staging
-  # schedule:
-  #   - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
 
 jobs:
   collect_predictions:
@@ -42,17 +40,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}  # /p6_deployment/requirements_mnm.txt'
           restore-keys: |
             ${{ runner.os }}-pip-
   
-      - name: Install Python dependencies
+      - name: Install Python dependencies # p6_deployment/requirements_mnm.txt
         run: |
-          pip install -r p6_deployment/requirements_mnm.txt
+          pip install -r requirements.txt
 
       - name: Run collect_predictions script
-        env:
-          WDM_LOG_LEVEL: DEBUG
         run: |
           python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": false, "data_unders": true, "data_prep": true, "modeling": true, "export": false}'
           # python p6_deployment/automatize_predict/collect_predictions.py 15 "[167]" '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}' # De prueba
