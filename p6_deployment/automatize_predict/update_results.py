@@ -25,23 +25,22 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     """
     # Definicion de variables
     df_results = pd.DataFrame()
-    l_ids = df.index
-    l_countries = df['id_country'].unique()
-    print(f"Lista de ids a los que extraer resultado: {l_ids}")
 
     # Por competicion
     for idx, row in df_comp_public.iterrows():
         competition = row['competition_flashscore']
+        l_ids_country = df[df['id_country'] == row['id_country']].index
+        print(f"\nID_COUNTRY: {row['id_country']} COMPETITION: {competition}")
+        print(f"Cantidad de partidos de {row['id_country']} a los que extraer resultado: {len(l_ids_country)}")
 
         # Si hay partidos del pais al cual obtener resultados
-        if row['id_country'] in l_countries:
+        if len(l_ids_country) > 0:
 
             # Definicion de variables
             country = df_countries[df_countries['id_country']==row['id_country']]['country_name'].values[0]
-            print(f"id_country: {row['id_country']} Country: {country} Competition: {competition}")
             
             # Extraer goles home y away en los partidos desde Flashscore
-            df_results_competition = extract_matches_result(country, competition, l_ids)
+            df_results_competition = extract_matches_result(country, competition, l_ids_country)
 
             # Guardo results de competencia
             df_results = pd.concat([df_results, df_results_competition], axis=0)
@@ -52,25 +51,22 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
 
     # Determino ganador y si acerté
     df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
-    df_pred_with_result = determine_winning_bets(df_pred_with_result)     # Determino acierto o fallo
+    df_pred_with_result = determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
     df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
-    print(df_pred_with_result)
     return df_pred_with_result
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Parametros de ejecución
-    n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+    # n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+    n_days = 100
 
     # Levanto datasets
     df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones
-    df_countries = pd.read_excel('p2_data_understanding/data/df_countries.xlsx')  # Para garantizar que tengo todas las predicciones
-
-    # Determino competencias a extraer
-    df_comp = pd.read_excel('data/df_competencies.xlsx')  # Para garantizar que tengo todas las predicciones
-    df_comp_public = df_comp[df_comp['is_public'] == 1]
-    print(df_comp_public)
+    df_countries = pd.read_excel('data/df_countries.xlsx')
+    df_comp = pd.read_excel('data/df_competencies.xlsx')
+    df_comp_public = df_comp[df_comp['is_public'] == 1]  # Determino competencias a extraer
 
     # Selecciono los partidos de los ultimos <n_days>
     df_last_matches = determine_last_matches(df_historial_predicciones, n_days)
@@ -79,4 +75,4 @@ if __name__ == "__main__":
     df = collect_results(df_last_matches, df_countries, df_comp_public)
 
     # Exportar dataset
-    df.to_excel('data/predicciones.xlsx')
+    df.to_excel('data/predicciones_prueba.xlsx')

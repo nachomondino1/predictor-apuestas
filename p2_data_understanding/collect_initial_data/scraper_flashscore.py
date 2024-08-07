@@ -7,7 +7,7 @@ from tqdm import tqdm
 from datetime import datetime, timedelta
 import re
 from set_up_logging import logger
-
+from time import sleep
 
 class FlashscoreCrawler(Crawler):
     """
@@ -682,11 +682,12 @@ def extract_matches_result(country: str, competition: str, l_ids:list):
         # Ingreso a pagina de informacion del match
         url_match = f'https://www.flashscore.com/match/{id_match}/#/match-summary'
         crawler.driver.get(url_match)
+        sleep(1)
 
         # Extraigo todos los datos del partido
         d_row = {}
         d_row.update(crawler.extract_result()) # {'goals_home': 2, 'goals_away': 1}
-
+            
         # Guardo datos del partido
         df = pd.concat([df, pd.DataFrame(d_row, index=[id_match])])
         progress_bar.update(1)

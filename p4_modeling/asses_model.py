@@ -201,7 +201,7 @@ def calculate_dif_proba_in_predicted_result(df: pd.DataFrame, _print: bool = Fal
 
     return df
 
-def determine_result_to_bet(df: pd.DataFrame, thr_prob_min, _print: bool = False):
+def determine_result_to_bet(df: pd.DataFrame, thr_prob_min):
     """
     Determina el/los resultado/s a apostar (no necesariamente coincide con el resultado predicho).
     
@@ -212,46 +212,44 @@ def determine_result_to_bet(df: pd.DataFrame, thr_prob_min, _print: bool = False
     # Returns:
         Dataframe pasado como parametro con resultado a apostar, la cuota a apostar, la estrategia utiilizada y la probabilidad del resultado al que se apuesta. (DataFrame)
     """
-
     # Por partido
     for id_match, row in df.iterrows():
-        if _print:
-            print(f"\nPartido: {id_match}")
-            print(f"MI MODELO: Predicted_result: {row['predicted_result']}. Probabilidades modelo: Local:{row['prob_class_1']:.2f} Empate: {row['prob_class_0']:.2f} Visitante: {row['prob_class_2']:.2f}")
-            print(f"BOOKIE: Probabilidades Bookie: Local:{row['prob_home_bm']:.2f} Empate: {row['prob_draw_bm']:.2f} Visitante: {row['prob_away_bm']:.2f}")
-            print(f"Diferencia de probabilidad sobre resultado predicho entre MI MODELO y BOOKIE: {row['dif_prob_mod_bm']}")
+        # print(f"\nPartido: {id_match}")
+        # print(f"MI MODELO: Predicted_result: {row['predicted_result']}. Probabilidades modelo: Local:{row['prob_class_1']:.2f} Empate: {row['prob_class_0']:.2f} Visitante: {row['prob_class_2']:.2f}")
+        # print(f"BOOKIE: Probabilidades Bookie: Local:{row['prob_home_bm']:.2f} Empate: {row['prob_draw_bm']:.2f} Visitante: {row['prob_away_bm']:.2f}")
+        # print(f"Diferencia de probabilidad sobre resultado predicho entre MI MODELO y BOOKIE: {row['dif_prob_mod_bm']}")
 
-        # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
-        if row['dif_prob_mod_bm'] >= thr_prob_min:
+        # Si el partido fue predicho
+        if isinstance(row['predicted_result'], int):
 
-            # Apuesto al resultado predicho
-            result_to_bet = row['predicted_result']
-            dif_prob_result_to_bet = row['dif_prob_mod_bm']
-            prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
-            odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
-            strategy = f"dif_prob_mod_bm > {thr_prob_min}"
-            if _print:
-                print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MAYOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
+            # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
+            if row['dif_prob_mod_bm'] >= thr_prob_min:
 
-        # Si el modelo esta MENOS seguro del resultado predicho que la casa de apuestas
-        else:
-            # Apuesto doble oportunidad sin el resultado predicho
-            result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -100)
-            dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
-            prob_result_to_bet = 1 - max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
-            odd_to_bet = calculate_odd_double_chance(row, result_to_bet)
-            strategy = f"dif_prob_mod_bm < {thr_prob_min}"
-            if _print:
-                print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MENOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
-    
-        # Guardo el resultado a apostar
-        df.loc[id_match, 'result_to_bet'] = result_to_bet
-        df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
-        df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
-        df.loc[id_match, 'odd_to_bet'] = odd_to_bet
-        df.loc[id_match, 'strategy'] = strategy
-        if _print:
-            print(result_to_bet, dif_prob_result_to_bet)
+                # Apuesto al resultado predicho
+                result_to_bet = row['predicted_result']
+                dif_prob_result_to_bet = row['dif_prob_mod_bm']
+                prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
+                odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
+                strategy = f"dif_prob_mod_bm > {thr_prob_min}"
+                # print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MAYOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
+
+            # Si el modelo esta MENOS seguro del resultado predicho que la casa de apuestas
+            else:
+                # Apuesto doble oportunidad sin el resultado predicho
+                result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
+                dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
+                prob_result_to_bet = 1 - max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
+                odd_to_bet = calculate_odd_double_chance(row, result_to_bet)
+                strategy = f"dif_prob_mod_bm < {thr_prob_min}"
+                # print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MENOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
+        
+            # Guardo el resultado a apostar
+            df.loc[id_match, 'result_to_bet'] = result_to_bet
+            df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
+            df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
+            df.loc[id_match, 'odd_to_bet'] = odd_to_bet
+            df.loc[id_match, 'strategy'] = strategy
+            # print(result_to_bet, dif_prob_result_to_bet)
 
     return df
 
@@ -279,7 +277,7 @@ def calculate_odd_double_chance(row, result_to_bet):
         odd_to_bet = odds_home * proporcion
 
     # Si el resultado a apostar es doble oportunidad sin Draw
-    elif result_to_bet == -100:
+    elif result_to_bet == -0:
         proporcion = odds_away / (odds_away + odds_home)
         odd_to_bet = odds_home * proporcion
 
@@ -456,14 +454,14 @@ def determine_winning_bets(df: pd.DataFrame):
             if (row['result'] == 0) or (row['result'] == 1):
                 df.loc[id_match, 'acerte'] = 1
         
-        # Si fallo la prediccion
-        elif row['result_to_bet'] == -100:
-            pass
-
         # Si el resultado a apostar es doble oportunidad sin Draw
-        else:
-            if (row['result'] == 1) or (row['result'] == 2):
+        elif row['result_to_bet'] == -0:
+            if (row['result'] == 2) or (row['result'] == 1):
                 df.loc[id_match, 'acerte'] = 1
+
+        # Si fallo la prediccion
+        else:
+            df.loc[id_match, 'acerte'] = np.nan
 
     # Imprimo warning si supuestamente acerté el 100% de partidos
     if len(df[df['acerte']==1]) == len(df):
