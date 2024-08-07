@@ -31,8 +31,8 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     for idx, row in df_comp_public.iterrows():
         competition = row['competition_flashscore']
         l_ids_country = df[df['id_country'] == row['id_country']].index
-        print(f"\nID_COUNTRY: {row['id_country']} COMPETITION: {competition}")
-        print(f"Cantidad de partidos de {row['id_country']} a los que extraer resultado: {len(l_ids_country)}")
+        logger.info(f"\nID_COUNTRY: {row['id_country']} COMPETITION: {competition}")
+        logger.info(f"Cantidad de partidos a los que extraer resultado: {len(l_ids_country)}")
 
         # Si hay partidos del pais al cual obtener resultados
         if len(l_ids_country) > 0:
