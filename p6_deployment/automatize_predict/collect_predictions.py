@@ -26,19 +26,23 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
         df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
 
         # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
-        df_predicciones.to_excel(f'data/test_predicciones.xlsx', index=True)
-        df_historial_predicciones.to_excel(f'data/test_historial_predicciones.xlsx', index=True)
+        df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
+        df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
 
     # Guardo predicciones en historial_predicciones
-    print(f"Antes de cargar historial: {df_historial_predicciones.shape}")
+    largo_inic = len(df_historial_predicciones)
     df_historial_predicciones = pd.concat([df_historial_predicciones, df_predicciones], axis=0)
     df_historial_predicciones = df_historial_predicciones[~df_historial_predicciones.index.duplicated(keep='last')]  # Eliminar filas con índices duplicados, manteniendo la ultima aparición (la + actualizada)
-    print(f"Despues de cargar historial: {df_historial_predicciones.shape}")
+    largo_fin = len(df_historial_predicciones)
+    if largo_inic == largo_fin:
+        logger.warning(f"No se han agregado partidos en historial_predicciones.xlsx. Sigue teniendo {largo_inic}")
+    elif largo_fin > largo_inic:
+        logger.critical(f"Se han agregado {largo_fin - largo_inic} partidos en historial_predicciones.xlsx. {largo_inic} --> {largo_fin}")
 
     # Exporto datos
     df_predicciones.index.name = 'id_match'  # Es importante para la base de datos MySQL
-    df_predicciones.to_excel(f'data/test_predicciones.xlsx', index=True)
-    df_historial_predicciones.to_excel(f'data/test_historial_predicciones.xlsx', index=True)
+    df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
+    df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
