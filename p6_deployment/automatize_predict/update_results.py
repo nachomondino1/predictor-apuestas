@@ -31,11 +31,11 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     for idx, row in df_comp_public.iterrows():
         competition = row['competition_flashscore']
         l_ids_country = df[df['id_country'] == row['id_country']].index
-        logger.info(f"\nID_COUNTRY: {row['id_country']} COMPETITION: {competition}")
-        logger.info(f"Cantidad de partidos a los que extraer resultado: {len(l_ids_country)}")
-
+        logger.info(f"ID_COUNTRY: {row['id_country']} COMPETITION: {competition}")
+        
         # Si hay partidos del pais al cual obtener resultados
         if len(l_ids_country) > 0:
+            logger.info(f"Cantidad de partidos a los que extraer resultado: {len(l_ids_country)}")
 
             # Definicion de variables
             country = df_countries[df_countries['id_country']==row['id_country']]['country_name'].values[0]
@@ -45,7 +45,10 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
 
             # Guardo results de competencia
             df_results = pd.concat([df_results, df_results_competition], axis=0)
-            print(df_results)
+            logger.info(df_results)
+
+        else:
+            logger.warning(f"No hay partidos de la liga a los cuales extraer el resultado.")
 
     # Si hay algun partido:
     if len(df_results) > 0:
