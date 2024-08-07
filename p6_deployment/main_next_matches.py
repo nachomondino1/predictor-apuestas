@@ -459,7 +459,6 @@ class DataPreparationNew(DataPreparation):
         """
         # Determine years to construct h2h
         df_integrated = pd.read_excel(f'data/{self.country}/p3_data_preparation/df_integrated.xlsx', index_col=0)  # no puedo usar df_old_matches porque tiene missing y la date se estira... (intente usar df_match pero falla n_years)
-        logger.info(df_integrated.head(5))
         n_years = (max(df_integrated['date']) - min(df_integrated['date'])).days / 365  # Determino n_years solo con partidos ya jugados
         n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
 
@@ -851,7 +850,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
-    logger.info(f"\n\nCOUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
+    logger.info(f"COUNTRY: {country.upper()}")
+    logger.info(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR_mod)
@@ -976,7 +976,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         df = dp.treat_nan_values_new(df)
 
-        logger.info(f"\nShape Dataframe antes de Modeling(): {df.shape}")
+        logger.info(f"Shape Dataframe antes de Modeling(): {df.shape}")
         if len(df_match) != len(df):
             logger.warning(f"\nDe los {len(df_match)} proximos partidos, quedan {len(df)} luego de la preparacion")
 
@@ -1033,7 +1033,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         logger.critical("LA PREDICCION FUE UN EXITO!")
 
     end = time.time()
-    logger.info(f"Main_next_matches en {(end - start)/60:.1f} minutos")
+    logger.info(f"Main_next_matches en {(end - start)/60:.1f} minutos \n\n")
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

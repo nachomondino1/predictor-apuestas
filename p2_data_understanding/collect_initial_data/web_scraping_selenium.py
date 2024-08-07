@@ -96,7 +96,7 @@ class Crawler:
             # Intentar instalar la última versión del ChromeDriver
             chrome_driver = ChromeDriverManager().install()
             driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-            logger.info("ChromeDriver initialized with the latest version")
+            logger.critical("ChromeDriver initialized with the latest version")
             return driver
         
         except Exception as e:
