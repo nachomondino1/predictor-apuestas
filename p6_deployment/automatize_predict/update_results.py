@@ -1,5 +1,6 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from set_up_logging import logger
 import pandas as pd
 import datetime
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_matches_result
@@ -46,16 +47,23 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
             df_results = pd.concat([df_results, df_results_competition], axis=0)
             print(df_results)
 
-    # Agrego columnas 'goals_home' y 'goals_away' a predicciones.xlsx
-    df_pred_with_goals = pd.concat([df, df_results], axis=1)
+    # Si hay algun partido:
+    if len(df_results) > 0:
 
-    # Determino ganador y si acerté
-    df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
-    df_pred_with_result = determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
-    df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
+        # Agrego columnas 'goals_home' y 'goals_away' a predicciones.xlsx
+        df_pred_with_goals = pd.concat([df, df_results], axis=1)
 
-    # Exportar dataset
-    df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
+        # Determino ganador y si acerté
+        df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
+        df_pred_with_result = determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
+        df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
+
+        # Exportar dataset
+        df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
+        logger.critical(f"Se recolecto el resultado de {len(df_pred_with_result)} partidos.")
+
+    else:
+        logger.warning("Se evitó el update de resultados puesto que no se detectaron partidos jugados ayer")
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
