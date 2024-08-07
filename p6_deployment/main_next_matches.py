@@ -457,9 +457,14 @@ class DataPreparationNew(DataPreparation):
         Construccion de variables historiales para proximos partidos.
         Mejora a hacer: podria evitar la construccion de las variables si no estan en columns_used...
         """
-        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
-        n_years = (max(df_old_matches['date']) - min(df_old_matches['date'])).days / 365  # Determino n_years solo con partidos ya jugados
+        # Determine years to construct h2h
+        df_integrated = pd.read_excel(f'data/{self.country}/p3_data_preparation/df_integrated.xlsx', index_col=0)  # no puedo usar df_old_matches porque tiene missing y la date se estira... (intente usar df_match pero falla n_years)
+        logger.info(df_integrated.head(5))
+        n_years = (max(df_integrated['date']) - min(df_integrated['date'])).days / 365  # Determino n_years solo con partidos ya jugados
         n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
+
+        # Construyo columna "result" para poder calcular h2h
+        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
 
         ## Construyo historiales
         df_concat = pd.concat([df_next_matches, df_old_matches], axis=0)
@@ -917,7 +922,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         except FileNotFoundError:
             df_integrated_updated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
             logger.warning("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
-   
+    
     # _____________________________________________________________ DATA UNDERSTANDING _____________________________________________________________ #
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if d_run['data_unders']:
