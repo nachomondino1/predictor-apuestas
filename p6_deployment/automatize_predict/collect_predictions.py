@@ -6,6 +6,8 @@ import ast
 import json
 import pandas as pd
 from p6_deployment import main_next_matches
+from set_up_logging import logger
+
 
 def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historial_predicciones:pd.DataFrame):
     """
@@ -17,15 +19,15 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
     # Por country
     for id_country in l_countries:
 
-        try:
-            # Extraigo, preparo y predigo proximos partidos
-            df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
+        # Extraigo, preparo y predigo proximos partidos
+        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
 
-            # Concatenar df_countries....
-            df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+        # Concatenar df_countries....
+        df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
 
-        except Exception as e:
-            print(f"Fallo la prediccion para {id_country} por {e}")
+        # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
+        df_predicciones.to_excel(f'data/test_predicciones.xlsx', index=True)
+        df_historial_predicciones.to_excel(f'data/test_historial_predicciones.xlsx', index=True)
 
     # Guardo predicciones en historial_predicciones
     print(f"Antes de cargar historial: {df_historial_predicciones.shape}")
@@ -35,8 +37,8 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
 
     # Exporto datos
     df_predicciones.index.name = 'id_match'  # Es importante para la base de datos MySQL
-    df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-    df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+    df_predicciones.to_excel(f'data/test_predicciones.xlsx', index=True)
+    df_historial_predicciones.to_excel(f'data/test_historial_predicciones.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
