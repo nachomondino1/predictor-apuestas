@@ -4,7 +4,6 @@ on:
   push: # Prueba
     branches:
       - staging
-      - prod
 
 jobs:
   collect_predictions:
@@ -36,7 +35,7 @@ jobs:
             p6_deployment/automatize_predict
             p6_deployment/requirements_mnm.txt
           sparse-checkout-cone-mode: false
-          ref: prod # Branch
+          ref: staging
 
       # Instalacion de dependencias 
       - name: Set up Python
@@ -60,7 +59,7 @@ jobs:
       # Run update_results script
       - name: Run update_results script
         run: |
-          python p6_deployment/automatize_predict/update_results.py 7
+          python p6_deployment/automatize_predict/update_results.py 2  # Con 1 seria suficiente puesto que lo corro todos los dias. Pero pongo dos por holgura
 
       # Push to Github
       - name: Commit and push all changes
@@ -71,11 +70,11 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .  # Agregar todos los cambios
           git commit -m "Update results of bets"
-          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:staging
 
       # Dispath to transfer
-      - name: Dispatch event to second repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
-        run: |
-          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
+      # - name: Dispatch event to second repository
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      #   run: |
+      #     python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py

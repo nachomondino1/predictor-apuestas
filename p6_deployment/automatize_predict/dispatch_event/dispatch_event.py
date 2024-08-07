@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+from set_up_logging import logger
 
 # Configura tus variables
 TARGET_OWNER = "mondineta"  # Cambia esto al nombre de tu usuario u organización en GitHub
@@ -27,7 +28,7 @@ response = requests.post(url, headers=headers, data=json.dumps(payload))
 
 # Comprobar la respuesta
 if response.status_code == 204:
-    print("Evento despachado con éxito")
+    logger.critical("Evento despachado con éxito")
 else:
-    print(f"Error al despachar el evento: {response.status_code}")
-    print(response.json())
+    logger.error(f"Error al despachar el evento: {response.status_code}")
+    logger.error(response.json())

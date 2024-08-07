@@ -55,14 +55,13 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
 
     # Exportar dataset
-    df_pred_with_result.to_excel('data/predicciones.xlsx') # Es historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS.
+    df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Parametros de ejecución
     n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
-    # n_days = 100
 
     # Levanto datasets
     df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  
