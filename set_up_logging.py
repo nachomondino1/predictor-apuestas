@@ -17,6 +17,7 @@ class ColoredFormatter(logging.Formatter):
         logging.INFO: "\x1b[34m",  # Azul
         logging.ERROR: "\x1b[31m",  # Rojo
         logging.WARNING: "\x1b[33m",  # Amarillo (si deseas agregar color para los mensajes de advertencia)
+        logging.CRITICAL: "\x1b[32m"  # Verde. Lo uso para mensajes de exito!
     }
     RESET = "\x1b[0m"
 
@@ -36,3 +37,4 @@ logger.addHandler(debug_console_handler)
 logger.info("Este es un mensaje de información")
 logger.warning("Este es un mensaje de warning")
 logger.error("Este es un mensaje de error")
+logger.critical("Este es un mensaje de exito")

@@ -608,7 +608,7 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, flex: 
     # Filtro segun fechas inicial y final
     df_filt = df[(df['date'] >= limit_date) & (df['date'] <= initial_date)]
     df_filt = df_filt.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
-    logger.info(f"Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos:  {len(df)} --> {len(df_filt)}")
+    logger.info(f"Seleccion de ultimos partidos:  {len(df)} --> {len(df_filt)}")
 
     if flex:
         n_days_flex = 120
@@ -851,7 +851,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
-    logger.info(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
+    logger.info(f"\n\nCOUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR_mod)
@@ -1030,9 +1030,10 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
+        logger.critical("LA PREDICCION FUE UN EXITO!")
 
     end = time.time()
-    print(f"Main_next_matches en {(end - start)/60:.1f} minutos")
+    logger.info(f"Main_next_matches en {(end - start)/60:.1f} minutos")
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
