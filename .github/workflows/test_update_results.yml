@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
+            set_up_logging.py
             data/df_countries.xlsx
             data/df_competencies.xlsx
             data/historial_predicciones.xlsx

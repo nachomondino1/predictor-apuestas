@@ -4,7 +4,6 @@ from set_up_logging import logger
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
-from webdriver_manager.core.os_manager import OperationSystemManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys 
 from selenium.webdriver.chrome.service import Service
