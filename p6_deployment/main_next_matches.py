@@ -457,9 +457,13 @@ class DataPreparationNew(DataPreparation):
         Construccion de variables historiales para proximos partidos.
         Mejora a hacer: podria evitar la construccion de las variables si no estan en columns_used...
         """
-        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
-        n_years = (max(df_old_matches['date']) - min(df_old_matches['date'])).days / 365  # Determino n_years solo con partidos ya jugados
+        # Determine years to construct h2h
+        df_integrated = pd.read_excel(f'data/{self.country}/p3_data_preparation/df_integrated.xlsx', index_col=0)  # no puedo usar df_old_matches porque tiene missing y la date se estira... (intente usar df_match pero falla n_years)
+        n_years = (max(df_integrated['date']) - min(df_integrated['date'])).days / 365  # Determino n_years solo con partidos ya jugados
         n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
+
+        # Construyo columna "result" para poder calcular h2h
+        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
 
         ## Construyo historiales
         df_concat = pd.concat([df_next_matches, df_old_matches], axis=0)
@@ -603,7 +607,7 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, flex: 
     # Filtro segun fechas inicial y final
     df_filt = df[(df['date'] >= limit_date) & (df['date'] <= initial_date)]
     df_filt = df_filt.sort_values(by='date', ascending=False) # Ordeno por fecha ascendente
-    logger.info(f"Shape de partidos ya jugados con los cuales rellenar y construir datos en los proximos partidos:  {len(df)} --> {len(df_filt)}")
+    logger.info(f"Seleccion de ultimos partidos:  {len(df)} --> {len(df_filt)}")
 
     if flex:
         n_days_flex = 120
@@ -846,7 +850,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
-    logger.info(f"COUNTRY: {country} --> n_model: {n_model} ; iteration_date: {iteration_date_dt}")
+    logger.info(f"COUNTRY: {country.upper()}")
+    logger.info(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
     # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
     d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR_mod)
@@ -917,7 +922,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         except FileNotFoundError:
             df_integrated_updated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
             logger.warning("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
-   
+    
     # _____________________________________________________________ DATA UNDERSTANDING _____________________________________________________________ #
     print("\n DATA UNDERSTANDING \n".center(240, "#"))
     if d_run['data_unders']:
@@ -971,7 +976,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         df = dp.treat_nan_values_new(df)
 
-        logger.info(f"\nShape Dataframe antes de Modeling(): {df.shape}")
+        logger.info(f"Shape Dataframe antes de Modeling(): {df.shape}")
         if len(df_match) != len(df):
             logger.warning(f"\nDe los {len(df_match)} proximos partidos, quedan {len(df)} luego de la preparacion")
 
@@ -1025,9 +1030,10 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
+        logger.critical("LA PREDICCION FUE UN EXITO!")
 
     end = time.time()
-    print(f"Main_next_matches en {(end - start)/60:.1f} minutos")
+    logger.info(f"Main_next_matches en {(end - start)/60:.1f} minutos \n\n")
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

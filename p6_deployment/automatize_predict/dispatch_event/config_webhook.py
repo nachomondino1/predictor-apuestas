@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+from set_up_logging import logger
 
 # Configura tus variables
 OWNER = "nachomondino1"  # Cambia esto al nombre de tu usuario u organización en GitHub
@@ -36,7 +37,7 @@ response = requests.post(url, headers=headers, data=json.dumps(payload))
 
 # Comprobar la respuesta
 if response.status_code == 201:
-    print("Webhook creado con éxito")
+    logger.critical("Webhook creado con éxito")
 else:
-    print(f"Error al crear el webhook: {response.status_code}")
-    print(response.json())
+    logger.error(f"Error al crear el webhook: {response.status_code}")
+    logger.error(response.json())

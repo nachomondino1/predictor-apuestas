@@ -398,7 +398,7 @@ class DataPreparation:
                 # Construyo las variables para evitar KeyError mas adelante
                 df[f'mean_last_match_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
                 df[f'mean_last_match_mean_rat_player_start_away_against'] = np.nan # relleno con nan y no con 0
-
+                
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
 

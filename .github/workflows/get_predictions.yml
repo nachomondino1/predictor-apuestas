@@ -1,9 +1,6 @@
 name: Get predictions next 15 days
 
 on:
-  push:
-    branches:
-      - prod
   schedule:
     - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
 
@@ -47,7 +44,7 @@ jobs:
 
       - name: Run collect_predictions script
         run: |
-          python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": false}'
+          python p6_deployment/automatize_predict/collect_predictions.py 15 '[48, 55, 59, 77, 148]' '{"run_missing": true, "data_unders": true, "data_prep": true, "modeling": true, "export": true}'
 
       - name: Commit and push all changes
         env:
