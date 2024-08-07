@@ -6,7 +6,7 @@ on:
       - staging
 
 jobs:
-  collect_predictions:
+  collect_results:
     runs-on: ubuntu-latest
 
     env:

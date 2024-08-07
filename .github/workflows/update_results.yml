@@ -5,7 +5,7 @@ on:
     - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
 
 jobs:
-  collect_predictions:
+  collect_results:
     runs-on: ubuntu-latest
 
     env:
