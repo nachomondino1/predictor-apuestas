@@ -7,7 +7,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException, NoSuchWindowException
 from time import sleep
 from set_up_logging import logger
 import platform
@@ -93,9 +93,6 @@ class Crawler:
             options.add_argument("--headless")
 
         try:
-            # os_manager = OperationSystemManager(os_type="linux64")
-            # chrome_driver = ChromeDriverManager(os_system_manager=os_manager).install()
-
             # Intentar instalar la última versión del ChromeDriver
             chrome_driver = ChromeDriverManager().install()
             driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
@@ -162,6 +159,9 @@ class Crawler:
                     attempts += 1
                     logger.warning(f"Se produjo una excepción StaleElementReferenceException. Intento {attempts}/{max_attempts}")
                     sleep(1)
+                except NoSuchWindowException:
+                    logger.warning(f'Selenium está intentando interactuar con una ventana del navegador que ya se ha cerrado')
+                    break
                 except TimeoutException:
                     break  # Salir del bucle si se alcanza el tiempo de espera máximo
 
