@@ -53,17 +53,19 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
     df_pred_with_result = determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
     df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
-    return df_pred_with_result
+
+    # Exportar dataset
+    df_pred_with_result.to_excel('data/predicciones.xlsx') # Es historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS.
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Parametros de ejecución
-    # n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
-    n_days = 100
+    n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+    # n_days = 100
 
     # Levanto datasets
-    df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones
+    df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  
     df_countries = pd.read_excel('data/df_countries.xlsx')
     df_comp = pd.read_excel('data/df_competencies.xlsx')
     df_comp_public = df_comp[df_comp['is_public'] == 1]  # Determino competencias a extraer
@@ -72,7 +74,4 @@ if __name__ == "__main__":
     df_last_matches = determine_last_matches(df_historial_predicciones, n_days)
 
     # Agrego columnas 'goals_home', 'goals_away', 'result' y 'acerte'
-    df = collect_results(df_last_matches, df_countries, df_comp_public)
-
-    # Exportar dataset
-    df.to_excel('data/predicciones_prueba.xlsx')
+    collect_results(df_last_matches, df_countries, df_comp_public)
