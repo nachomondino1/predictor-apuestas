@@ -1,7 +1,9 @@
+import sys
+sys.path.append('.')  # Fallaba el import de main
+from set_up_logging import logger
 import requests
 import json
 import os
-from set_up_logging import logger
 
 # Configura tus variables
 TARGET_OWNER = "mondineta"  # Cambia esto al nombre de tu usuario u organización en GitHub

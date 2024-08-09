@@ -2,41 +2,43 @@
 import pandas as pd
 from set_up_logging import logger
 
-def getting_to_know_data(df):
+def getting_to_know_data(df, print_all: bool = True):
     """
     Describe dataframe pasado como parametro
     :param df: Dataframe
     :return: funcion sin retorno
     """
-    # Data frame's dimensionality
-    logger.info(f"\nDataframe shape: {df.shape}")
-
-    # See firsts 2 Dataframe's rows
-    print("\nPrimeras 2 filas del dataframe:")
+    # Display de Dataframes
     pd.set_option("display.precision", 2)  # mostrar maximo dos decimales
     if len(df.columns) < 50:
         pd.set_option("display.max.columns", None)  # para ver todas las columnas del df y no que las colapse
-    print(df.head(2))  # y .tail es para ver las ultimas filas
+
+    # Data frame's dimensionality
+    logger.info(f"\nDataframe shape: {df.shape}")
 
     # Displaying Data Types
-    print("\nDataframe info:")
+    logger.info("\nDataframe info:")
     df.info()
 
-    # Showing Basics Statistics
-    if len(df.columns) > 0:
+    # See firsts 2 Dataframe's rows and statistics
+    if print_all and len(df.columns) > 0:
+        print("\nPrimeras 2 filas del dataframe:")
+        print(df.head(2))  # y .tail es para ver las ultimas filas
+
+        # Showing Basics Statistics
         print("\nDataframe basic statistics:")
         print(df.describe(include='all'))  # basic descriptive statistics for all numeric columns
 
 def verificar_unicidad_registros(df):
 
-    print(f"\nAnalisis de unicidad de registros...")
+    logger.info(f"\nAnalisis de unicidad de registros...")
     indices_duplicados = df.index.duplicated()
     df_dup = df.index[indices_duplicados]
 
     if len(df_dup) > 0:
         logger.warning(f"\t El índice tiene valores duplicados.") # Indices duplicados: {list(indices_duplicados)}")
-    else:
-        logger.info("\tEl índice no tiene valores duplicados.")
+    # else:
+    #     logger.info("\tEl índice no tiene valores duplicados.")
 
 def check_ids_in_both_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, column: str = None) -> None:
     """
