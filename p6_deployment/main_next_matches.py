@@ -155,14 +155,14 @@ class DataUnderstandingNew():
     def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame):
 
         logger.info("\n\n" + "Describing data... ")
-        logger.info("\n DF_MATCH \n".center(240, "-"))
+        logger.info("DF_MATCH")
         describe_data.getting_to_know_data(df_match, print_all=False)
         describe_data.verificar_unicidad_registros(df_match) # Verifico unicidad de registros segun campos id
 
-        logger.info("\n DF_MATCH_PLAYER \n".center(240, "-"))
+        logger.info("DF_MATCH_PLAYER")
         describe_data.getting_to_know_data(df_match_player, print_all=False)
 
-        logger.info("\n DF_MATCH_ODDS \n".center(240, "-"))
+        logger.info("DF_MATCH_ODDS")
         describe_data.getting_to_know_data(df_match_odds, print_all=False)
 
 class DataPreparationNew(DataPreparation):
@@ -832,7 +832,6 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
     df_comp = pd.read_excel('./data/df_competencies.xlsx')
     df_comp_country = df_comp[df_comp['id_country'] == id_country]
-    print(f'Competencias de {country}: \n {df_comp_country}')
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
@@ -852,6 +851,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     comp_to_select = eval(d_hiper['comp_to_select'])
     # comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
     comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para ARG y USA
+    logger.info(f'Competencias de {country}: \n {df_comp_country}')
     logger.info(f"Competencias publicas del pais: {comp_public}")
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
