@@ -54,7 +54,7 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 20
+        n_days = 15
         l_countries = [48, 55, 59, 77, 148]
         d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
