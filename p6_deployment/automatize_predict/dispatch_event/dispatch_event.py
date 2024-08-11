@@ -10,6 +10,7 @@ TARGET_OWNER = "mondineta"  # Cambia esto al nombre de tu usuario u organizació
 TARGET_REPO = "landing"  # Cambia esto al nombre del segundo repositorio
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')  # Obtener el token de acceso personal de las variables de entorno
 
+
 # URL de la API de GitHub para despachar el evento
 url = f"https://api.github.com/repos/{TARGET_OWNER}/{TARGET_REPO}/dispatches"
 
