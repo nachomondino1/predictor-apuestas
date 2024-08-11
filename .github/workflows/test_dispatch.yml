@@ -5,8 +5,8 @@ on:
     branches:
       - staging
       - prod  # Asegúrate de que esta acción escuche los eventos de push en 'prod'
-    paths:
-      - data/predicciones.xlsx
+    # paths:
+    #   - data/predicciones.xlsx
 
 jobs:
   dispatch:
