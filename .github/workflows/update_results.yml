@@ -2,8 +2,8 @@ name: Update results
 
 on:
   schedule:
-    # - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
-    - cron: "19 20 * * *"  # Ejecutar todos los dias a la medianoche
+    - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
+    - cron: "0 19 * * *"  # Ejecutar todos los dias a la medianoche
 
 jobs:
   collect_results:
