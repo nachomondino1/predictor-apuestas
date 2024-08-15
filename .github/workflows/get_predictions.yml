@@ -2,7 +2,7 @@ name: Get predictions next 15 days
 
 on:
   schedule:
-    - cron: "0 0 * * FRI"  # Ejecutar Lunes a la medianoche
+    - cron: "0 0 * * MON"  # Ejecutar Lunes a la medianoche
 
 jobs:
   collect_predictions:
