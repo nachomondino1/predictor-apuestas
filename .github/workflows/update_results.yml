@@ -3,8 +3,9 @@ name: Update results
 on:
   schedule:
     # - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
-    - cron: "30 18 * * *"  # Ejecutar todos los dias a la medianoche
-    - cron: "0 16 * * *"  # Ejecutar todos los dias a la medianoche
+    - cron: "45 21 * * *"  # Ejecutar todos los dias a la medianoche  # La action a las 18.30hs, se corrio a las 15.30 hs de ARG
+    # - cron: "30 21 * * *"  # Ejecutar todos los dias a la medianoche  # La action a las 18.30hs, se corrio a las 15.30 hs de ARG
+    - cron: "0 16 * * *"  # Ejecutar todos los dias a la medianoche # La action a las 16hs, se corrio a las 13 hs de ARG
 
 jobs:
   collect_results:
