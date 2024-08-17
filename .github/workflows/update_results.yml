@@ -7,9 +7,9 @@ on:
     - cron: "30 18 * * *"  # Se corre a las 15.30 hs de ARG (partidos que arrancan a las 13.30hs)
     - cron: "0 16 * * *"  # Se corre a las 13 hs de ARG (partidos que arrancan a las 11hs)
     - cron: "0 14 * * *"  # Se corre a las 11 hs de ARG (partidos que arrancan a las 8.30hs)
-  push: # Para hacer que se ejecute la action
-    branches:
-      - staging
+  # push: # Para hacer que se ejecute la action
+  #   branches:
+  #     - staging
 
 jobs:
   collect_results:
