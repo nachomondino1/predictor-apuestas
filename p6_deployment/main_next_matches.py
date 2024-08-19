@@ -84,9 +84,6 @@ class DataUnderstandingNew():
         for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
             self.verify_data_quality(df)
 
-        if len(df_match_concat) == 0:
-            raise ValueError("No hay próximos partidos para los cuales predecir su resultado.")
-
         # Exporto datasets
         if self.export:
             df_match_concat.to_excel(f'./data/{self.country}/p6_deployment/data_understanding/df_match_next.xlsx', index=True)
@@ -507,8 +504,11 @@ class DataPreparationNew(DataPreparation):
         df = df.loc[:, columns_used]
 
         # Transforma los nuevos datos de predicción utilizando el StandardScaler cargado
-        X_scaled = scaler_loaded.transform(df)
-        X_scaled_df = pd.DataFrame(X_scaled, columns=columns_used, index=df.index)
+        try: 
+            X_scaled = scaler_loaded.transform(df)
+            X_scaled_df = pd.DataFrame(X_scaled, columns=columns_used, index=df.index)
+        except ValueError: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
+            return pd.DataFrame()
         return X_scaled_df
 
     def select_data_new(self, df: pd.DataFrame, l_columns: list):
@@ -921,6 +921,12 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     if d_run['data_unders']:
         # Extriago datos de los partidos en los proximos dias
         df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select, df_comp_country=df_comp_country, n_days=n_days_max_next_matches)
+
+        # Si no hay proximos partidos
+        if len(df_match) == 0:
+            # Evito preparacion y modelado
+            logger.warning("No hay próximos partidos para los cuales predecir su resultado.")
+            return pd.DataFrame()
         
         # SOFIFA
         df_player_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
@@ -970,6 +976,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled)
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas)
         df = dp.clean_data_2_new(df, scaler, columns_scaled, comp_public) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
+        if len(df) == 0:
+            logger.warning("Se evito seguir la preparacion luego de clean_data puesto que no hay partidos para la competencia.")
+            return df
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         df, df_fill = dp.treat_nan_values_new(df)
 
