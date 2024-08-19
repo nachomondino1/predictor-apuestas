@@ -1,14 +1,39 @@
 name: Update results
 
 on:
-  schedule: # Se ejecutan en horario UTC 0 y con 15' de retraso...
-    # - cron: "0 0 * * *"  # Ejecutar todos los dias a la medianoche
-    - cron: "15 21 * * *"  # Se corre a las 18.15 de arg  (partidos que arrancan a las 16.30hs) 
-    - cron: "45 20 * * *"  # Se corre a las 17.45 de arg  (partidos que arrancan a las 16.00hs) 
-    - cron: "15 18 * * *"  # Se corre a las 15.15 hs de ARG (partidos que arrancan a las 13.30 hs) 
-    # - cron: "45 15 * * *"  # Se corre a las 13 hs de ARG (partidos que arrancan a las 11hs) -->
-    # - cron: "45 14 * * *"  # Se corre a las 12 hs de ARG (partidos que arrancan a las 10hs) --> DOMINGO
-    # - cron: "45 13 * * *"  # Se corre a las 11 hs de ARG (partidos que arrancan a las 8.30hs) --> SABADO PREMIER
+  schedule: # Se ejecutan en horario UTC 0 (arg es -3) y con 15' de retraso...
+
+    # Todos los dias a la medianoche
+    - cron: "0 0 * * *" 
+    
+    # Viernes (16:00 hs, 18:00 hs, 18:30 hs)
+    - cron: "0 19 * * 5" # 16 ARG (partidos de las 14 hs)
+    - cron: "0 21 * * 5" # 18 ARG (partidos de las 16 hs)
+    - cron: "30 21 * * 5" # 18.30 ARG (partidos de las 16.30 hs)
+
+    # Sabado (10:30 hs, 12:30 hs, 13:00 hs, 14:00 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
+    - cron: "30 13 * * 6"
+    - cron: "30 15 * * 6"
+    - cron: "0 16 * * 6"
+    - cron: "0 17 * * 6"
+    - cron: "30 18 * * 6"
+    - cron: "0 19 * * 6"
+    - cron: "0 21 * * 6"
+    - cron: "30 21 * * 6"
+
+    # Domingo (12:00 hs, 12:30 hs, 14:00 hs, 14:30 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
+    - cron: "30 15 * * 0"
+    - cron: "0 17 * * 0"
+    - cron: "30 18 * * 0"
+    - cron: "0 19 * * 0"
+    - cron: "0 21 * * 0"
+    - cron: "30 21 * * 0"
+  
+    # Lunes (15:30 hs, 17:45 hs, 18:30 hs)
+    - cron: "30 18 * * 1"
+    - cron: "45 20 * * 1"
+    - cron: "30 21 * * 1"
+
   # push: # Para hacer que se ejecute la action
   #   branches:
   #     - staging
