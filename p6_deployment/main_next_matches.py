@@ -849,8 +849,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR_dp, d_hiper)
     scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d_hiper)
     comp_to_select = eval(d_hiper['comp_to_select'])
-    # comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
-    comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para ARG y USA
+    comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
+    # comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para incluir ARG y USA
     logger.info(f'Competencias de {country}: \n {df_comp_country}')
     logger.info(f"Competencias publicas del pais: {comp_public}")
 
@@ -920,7 +920,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     logger.info("\n" + "+"*120 + "\n" + "DATA UNDERSTANDING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['data_unders']:
         # Extriago datos de los partidos en los proximos dias
-        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_to_select, df_comp_country=df_comp_country, n_days=n_days_max_next_matches)
+        df_match, df_match_player, df_match_odds = du.collect_initial_data_new(l_competencies=comp_public, df_comp_country=df_comp_country, n_days=n_days_max_next_matches)
 
         # Si no hay proximos partidos
         if len(df_match) == 0:
@@ -1052,9 +1052,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 48
+        id_country = 6
         n_days = 10
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':

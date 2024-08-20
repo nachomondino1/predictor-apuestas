@@ -2,7 +2,6 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-import os
 import datetime
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier  # XGBoost
@@ -12,16 +11,7 @@ from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 from p3_data_preparation.select_data import determine_country_competitions
 from p4_modeling import assess_models_in_prod, train_models
-import shutil
-from set_up_logging import logger
-
-
-def make_directories(l_directorios):
-    
-    for directorio in l_directorios:
-        if not os.path.exists(directorio):
-            # Si no existe, crear el directorio
-            os.makedirs(directorio)
+import directories
 
 # Guardado de assess actual y creacion de directorio para nuevo assess
 def save_old_assess():
@@ -30,23 +20,8 @@ def save_old_assess():
     """
     directorio_origen = f"./data/{country}/p4_modeling/"
     directorio_destino = f"./data/{country}/old/"
-    make_directories([directorio_destino])
-    mover_archivo(directorio_origen, directorio_destino)
-    
-def mover_archivo(origen, destino):
-    """
-    Mueve archivo o directorio de origen a destino.
-    """
-    try:
-        # Mover el archivo desde el origen al destino
-        shutil.move(origen, destino)
-        print(f"Archivo movido de {origen} a {destino} correctamente.")
-    except FileNotFoundError:
-        logger.error(f"No se pudo encontrar el archivo {origen}.")
-    except PermissionError:
-        logger.error(f"No tienes permisos para acceder o mover el archivo {origen}.")
-    except Exception as e:
-        logger.error(f"Ocurrió un error al intentar mover el archivo: {e}")
+    directories.make_directories([directorio_destino])
+    directories.mover_archivo(directorio_origen, directorio_destino)
 
 def select_best_model(df):
     """
@@ -80,7 +55,7 @@ def main(l_modelos, d_params, export: bool = True):
     ruta_base_mod_seg = f"./data/{country}/p4_modeling/{date}/data_seg" 
     ruta_assess = f'{ruta_base_mod}/assess_models_in_prod/data_preparation'
     ruta_assess_2 = f'{ruta_base_mod}/assess_models_in_prod/modeling'
-    make_directories(l_directorios=[ruta_base_dp, ruta_base_mod_seg, ruta_assess, ruta_assess_2])
+    directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_mod_seg, ruta_assess, ruta_assess_2])
     
     # Preparao datos, entreno modelos y evaluo en df_test
     df_iteration = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, export=export)
@@ -104,33 +79,6 @@ if __name__ == "__main__":
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression()]
-    d_params = {
-        'construct': {
-            'n_dias_ult_part': [30],
-            'n_years_h2h': [3],
-            'segun_localia': [False]
-        },
-        'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']],
-            'n_years_to_select': [3, None],
-        },
-        'select': {
-            'thr_corr': [None],
-            'thr_fs': [None], 
-        },
-        'treat_nan': {
-            'fill_na': [None],
-        },
-        'modeling': {
-            'val_size': [0.125],
-            'test_size': [0.125], 
-            'bal_type': [None], #  'over'
-            'k': [5] 
-        }
-    }
-    
-    '''
     l_modelos = [LogisticRegression(), SVC()]  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     d_params = {
         'construct': {
@@ -156,7 +104,6 @@ if __name__ == "__main__":
             'k': [10] 
         }
     }
-    '''
 
     # Creo directorios segun pais y fecha de corrida
     ## Determino fecha de hoy

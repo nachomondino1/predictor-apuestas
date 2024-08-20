@@ -1,9 +1,9 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from set_up_logging import logger
 import pandas as pd
 import numpy as np
-from set_up_logging import logger
 ## Data preparation
 from p3_data_preparation import construct_data
 from p6_deployment.main_next_matches import DataPreparationNew, filter_dataframe_by_date
@@ -11,8 +11,32 @@ from p6_deployment.main_next_matches import DataPreparationNew, filter_dataframe
 import pickle
 import joblib
 from p4_modeling import asses_model
+import directories
+import datetime
 
 # Data understanding
+def save_assess(ruta_base):
+    """
+    Muevo assess a old_assess_iterations para no sobreescribirlo con el nuevo assess.
+    """
+    date_con_hora = datetime.datetime.now()
+    date = date_con_hora.date()
+
+    l_dir_origen = [f'{ruta_base}/assess_models_in_prod', f'{ruta_base}/df_iteration_prod.xlsx', f'{ruta_base}/df_iteration.xlsx']
+    directorio_destino = f'{ruta_base}/old_assess_iterations/{date}'
+
+    # Creo directorio de destino
+    directories.make_directories(l_directorios=directorio_destino)
+
+    # Por directorio de origen
+    for direc in l_dir_origen:
+        # Muevo directorio a destino
+        directories.mover_archivo(direc, directorio_destino)
+
+    # Creo directorios de proximo assess
+    l_dirs = [f'{ruta_base}/assess_models_in_prod/data_preparation', f'{ruta_base}/assess_models_in_prod/modeling']
+    directories.make_directories(l_directorios=l_dirs)
+
 def select_league_matches(df):
     """
     Filtra partidos seleccionado solo aquellos que son de liga (eliminando partidos de copa)
@@ -21,7 +45,7 @@ def select_league_matches(df):
     df_comp = pd.read_excel('data/df_competencies.xlsx')
 
     # Selecciono solo las ligas del pais
-    l_leagues = list(df_comp[df_comp['is_cup']==0]['id_competition'].values) 
+    l_leagues = list(df_comp[(df_comp['is_cup']==0) & (df_comp['is_second_division']==0)]['id_competition'].values) 
     print("Ligas: ", l_leagues)
 
     df = df[df['id_competition'].isin(l_leagues)]
@@ -67,10 +91,13 @@ def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
     return tager_loaded, scaler, columns_scaled,loaded_model
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True):
+def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones=False):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
+    # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
+    save_assess(ruta_base_mod)   # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
+
     # Definicion de variables
     df_iteration_prod = pd.DataFrame()
     dp = DataPreparationNew(country=country, export=False)  # Creo objeto de clase DataPreparationNew
@@ -121,18 +148,28 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
             df_old_int = df_old_int.sort_values(by='date', ascending=False)  # Ordeno por fecha ascendente. Funciona? Es entendida como datetime la columna? Si.
 
             # Selecciono los ultimos partidos de los ya jugados
+            logger.info("Seleccion de ultimos partidos para construccion de variables...")
             n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
-            df_last_old_matches = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=n_days_period) 
+            df_last_old_matches_construct = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=n_days_period) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
+
+            if relleno_formaciones:
+                # Selecciono los ultimos partidos de los ya jugados
+                logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
+                df_last_old_matches_fill = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=150) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
+
+                # Relleno formaciones
+                df_fill, df_c1, df_c2 = dp.fill_data_not_available_yet(df_int, df_last_old_matches_fill)
+                df_int = df_fill
 
             # Construyo datos usando partidos viejos
-            df_cons = dp.construct_data_new(df_next_matches=df_int, df_last_old_matches=df_last_old_matches, df_old_matches=df_old_int, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled)
+            df_cons = dp.construct_data_new(df_next_matches=df_int, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_old_int, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled)
             df_cons.to_excel(path_cons, index=True)
         
         # Sigo preparando datos
         df_tag = dp.tag_string_data_to_integer_new(df_cons, tager)
         df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'])
         df_sel = dp.select_data_new(df_clean, d_hiper['selected_columns'])
-        df_treat = dp.treat_nan_values_new(df_sel)
+        df_treat, df_emer = dp.treat_nan_values_new(df_sel)
 
         print("\nShape Dataframe antes de Modeling(): ", df_treat.shape)
         if len(df_sel) != len(df_treat):
@@ -152,7 +189,10 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 
         # Concateno conjunto de datos
         df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
-        df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba], axis=1)
+        try:
+            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_c1['copiado_formaciones'], df_emer['emergency_fill']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
+        except:
+            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba], axis=1)
         df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
@@ -183,18 +223,20 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino sera igual.")
+    logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Defino condiciones del analisis
-    country = "germany" # ""
-    date = '2024-05-09'
-    ruta_base = f"./data/{country}/main_find_best_hyper/{date}" 
-    df_iteration_train = pd.read_excel(f'{ruta_base}/df_iteration_train.xlsx')
+    country = "france"
+    date = '2024-05-07'
+
+    ruta_base_dp = f"./data/{country}/p3_data_preparation/{date}"
+    ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
+    df_iteration_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
 
     # Evaluo modelos en produccion
-    df_iteration_prod = main(df_iteration_train, country, date, ruta_base)
+    df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True)
 
     # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
     df_iteration_train.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df_concat = pd.concat([df_iteration_train, df_iteration_prod], axis=1)
-    df_concat.to_excel(f'{ruta_base}/df_iteration.xlsx', index=True)
+    df_concat.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=True)
