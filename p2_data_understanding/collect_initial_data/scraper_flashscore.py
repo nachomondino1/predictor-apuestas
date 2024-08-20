@@ -414,21 +414,27 @@ class FlashscoreCrawler(Crawler):
 
             # Si el partido tiene div con fecha
             if fecha_str is not None:
-                
+
                 # Formateo fecha de str a datetime (agregandole el año pues sino toma 1900)
                 fecha_str = f"{anio_actual}.{fecha_str}"
-                fecha_objeto = datetime.strptime(fecha_str, "%Y.%d.%m. %H:%M")
-                # print("Fecha convertida:", fecha_objeto)
-            
-                # Si el partido es dentro de los proximos dias
-                if fecha_objeto <= fecha_umbral:
-                    l_items_filt.append(item)
-                else:
-                    # Dejo de extraer partidos puesto que luego del primer partido que es posterior a fecha_umbral, todos lo son (estan ordenados por fecha en Flashscore)
-                    break
+                
+                try:
+                    # Intento convertir la fecha usando el formato especificado
+                    fecha_objeto = datetime.strptime(fecha_str, "%Y.%d.%m. %H:%M")
+                    
+                    # Si el partido es dentro de los proximos días
+                    if fecha_objeto <= fecha_umbral:
+                        l_items_filt.append(item)
+                    else:
+                        # Dejo de extraer partidos puesto que luego del primer partido que es posterior a fecha_umbral, todos lo son (estan ordenados por fecha en Flashscore)
+                        break
+                except ValueError as e:
+                    # Si hay un error en la conversión, imprimo el mensaje de error
+                    print(f"Error al convertir la fecha: {e}")
+
             else:
                 print("El partido no tiene div con class 'event_time', por ende, no pude obtener fecha_str", fecha_str)
-
+    
         return l_items_filt
 
 def clean_id(l_ids: list):
