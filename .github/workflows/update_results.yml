@@ -9,7 +9,7 @@ on:
     # Viernes (16:00 hs, 18:00 hs, 18:30 hs)
     - cron: "0 19 * * 5" # 16 ARG (partidos de las 14 hs)
     - cron: "0 21 * * 5" # 18 ARG (partidos de las 16 hs)
-    - cron: "30 21 * * 5" # 18.30 ARG (partidos de las 16.30 hs)
+    - cron: "45 21 * * 5" # 18.45 ARG (partidos de las 16.30 hs)
 
     # Sabado (10:30 hs, 12:30 hs, 13:00 hs, 14:00 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
     - cron: "30 13 * * 6"
@@ -34,9 +34,9 @@ on:
     - cron: "45 20 * * 1"
     - cron: "30 21 * * 1"
 
-  # push: # Para hacer que se ejecute la action
-  #   branches:
-  #     - staging
+  push: # Para hacer que se ejecute la action
+    branches:
+      - staging
 
 jobs:
   collect_results:
