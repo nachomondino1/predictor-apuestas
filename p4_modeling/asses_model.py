@@ -89,7 +89,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1, _pr
         Diccionario con ROI para las distintas estrategias de apuesta. (dict)
     """
     # Hiperparametros
-    l_thr_dif_prob = [-0.5, -0.3, -0.2, -0.15, -0.1, -0.05, 0]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+    l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
     d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, -5], [50, 0], [70, 0], [80, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]}  
     
     # Definicion de variables
@@ -239,7 +239,7 @@ def determine_result_to_bet(df: pd.DataFrame, thr_prob_min):
             odd_to_bet = calculate_odd_double_chance(row, result_to_bet)
             strategy = f"dif_prob_mod_bm < {thr_prob_min}"
             # print(f"La diferencia de probabilidad entre mi modelo y la casa de apuesta sobre el resultado predicho por mi modelo es MENOR al 0%. Resultado a apostar: {result_to_bet} con probabilidad {prob_result_to_bet}")
-    
+
         # Guardo el resultado a apostar
         df.loc[id_match, 'result_to_bet'] = result_to_bet
         df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
@@ -323,8 +323,16 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
 
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
-        
-        df['multiplier'] = df['prob_result_to_bet'] * m + b  #  df['multiplier'] = (df['prob_result_to_bet'] * df['odd_to_bet']) * m + b
+
+        # Forma nuevo 2 y nuevo 3
+        df['multiplier'] = (df['prob_result_to_bet'] + df['dif_prob_result_to_bet']) * m + b
+
+        # Ajusta el multiplier para que sea menor a 100
+        df['multiplier'] = np.where(
+            df['multiplier'] > 90,
+            df['prob_result_to_bet'] * m + b,
+            df['multiplier']
+        )
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass
@@ -339,9 +347,17 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
 
         # Calcular b a partir de su logaritmo
         b = np.exp(log_b)     
-
-        df['multiplier'] = a * (b ** df['prob_result_to_bet'])
         
+        # Forma nuevo 2 y nuevo 3
+        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + df['dif_prob_result_to_bet']))
+
+        # Ajusta el multiplier para que sea menor a 100
+        df['multiplier'] = np.where(
+            df['multiplier'] > 90,
+            a * (b ** df['prob_result_to_bet']),
+            df['multiplier']
+        )
+
     return df
 
 def calculate_roi(df: pd.DataFrame, _print: bool = False):
