@@ -329,6 +329,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
 
         # Forma nuevo 2 y nuevo 3
         df['multiplier'] = (df['prob_result_to_bet'] + df['dif_prob_limited']) * m + b
+        df = df.drop(columns=['dif_prob_limited'])
 
         # Ajusta el multiplier para que sea menor a 100
         df['multiplier'] = np.where(
