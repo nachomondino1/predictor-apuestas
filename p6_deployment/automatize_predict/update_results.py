@@ -1,6 +1,8 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 from set_up_logging import logger
+import os
+from dotenv import load_dotenv
 import pandas as pd
 import datetime
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_matches_result
@@ -71,8 +73,16 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
+    # Cargo variables entorno
+    load_dotenv()
+    env = os.getenv('ENVIRONMENT')
+
     # Parametros de ejecución
-    n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+    if env == 'dev':
+        n_days = 1
+    
+    elif env == 'prod':
+        n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
 
     # Levanto datasets
     df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  
