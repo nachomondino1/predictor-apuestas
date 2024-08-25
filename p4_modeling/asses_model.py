@@ -324,12 +324,8 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
 
-        # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
-        df['dif_prob_limited'] = np.clip(df['dif_prob_result_to_bet'], -0.15, 0.15)
-
-        # Forma nuevo 2 y nuevo 3
-        df['multiplier'] = (df['prob_result_to_bet'] + df['dif_prob_limited']) * m + b
-        df = df.drop(columns=['dif_prob_limited'])
+        # Calculo multiplier
+        df['multiplier'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.35, 0.10)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
 
         # Ajusta el multiplier para que sea menor a 100
         df['multiplier'] = np.where(
@@ -350,13 +346,10 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         a, log_b = np.linalg.solve(A, b)
 
         # Calcular b a partir de su logaritmo
-        b = np.exp(log_b)     
-        
-        # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
-        df['dif_prob_limited'] = np.clip(df['dif_prob_mod_bm'], -0.35, 0.10)  # dif_prob_result_to_bet
+        b = np.exp(log_b)   
 
-        # Forma nuevo 2 y nuevo 3
-        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + df['dif_prob_limited']))
+        # Calculo multiplier
+        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.35, 0.10)))
 
         # Ajusta el multiplier para que sea menor a 100
         df['multiplier'] = np.where(
