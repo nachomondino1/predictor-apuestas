@@ -34,9 +34,9 @@ on:
     - cron: "45 20 * * 1"
     - cron: "30 21 * * 1"
 
-  # push: # Para hacer que se ejecute la action
-  #   branches:
-  #     - staging
+  push: # Para hacer que se ejecute la action
+    branches:
+      - staging
 
 jobs:
   collect_results:
@@ -44,6 +44,7 @@ jobs:
 
     env:
       TZ: America/Argentina/Buenos_Aires
+      ENVIRONMENT: "prod"
 
     # Agrego permisos en job para poder hacer push
     permissions: 
