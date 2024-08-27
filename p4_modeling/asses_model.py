@@ -92,17 +92,16 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
     """
     # Definicion de variables
     l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-    d_rectas = {"equal": [[(0, 0), (1, 0)]], 'linear': [[10, 0], [20, 0], [30, 0], [50, -5], [50, 0], [70, 0], [80, 0]], 'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]}  
+    d_rectas = {
+        "equal": [[(0, 0), (1, 0)]],
+        'linear': [[5, 0], [10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [80, 0]],
+        'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
+    }
     best_roi, roi_max = -100000, -100000
 
-    # Elimino partidos con odds NaN y sin predicciones
-    df_sin_odds_nan = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])  # Con 'predicted_result' elimino tambien los partidos que no predijo el modelo, por si me llegan a pasar eso
-    if len(df) != len(df_sin_odds_nan):
-        logger.info(f'Se eliminaron {len(df)-len(df_sin_odds_nan)} partidos de {len(df)} por tener odds=NaN o no haber sido predicho')
-        df = df_sin_odds_nan.copy()
-
-    # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
-    df = calculate_dif_proba_in_predicted_result(df)
+    # Eliminate rows with NaN odds or missing predictions
+    df = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])
+    df = calculate_dif_proba_in_predicted_result(df)  # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
 
     # Por combinacion de hiperparametros 
     for prob in l_thr_dif_prob:
@@ -115,7 +114,6 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
 
         # Por recta con la cual variar el stake
         for key, value in d_rectas.items():
-
             for a1, a2 in value:
 
                 m = a1 if key == 'linear' else None  # m, b = a1, a2 if key == 'linear' else None, None
@@ -127,7 +125,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
                 df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
 
                 # Calculo roi stake a apostar segun curva
-                df_no_se, d_rois, = calculate_roi(df_aux, _print=False)
+                df_no_se, d_rois, = calculate_roi(df_aux)
                 roi = d_rois['roi_por_partido']                    
                 d[f'roi_stake_{key}_{a1}_{a2}'] = roi
 
@@ -248,7 +246,6 @@ def calculate_odd_double_chance(row, result_to_bet):
         odd_to_bet = odds_home * proporcion
 
     return odd_to_bet
-
 
 def determine_winning_bets(df: pd.DataFrame):
     """
@@ -390,52 +387,65 @@ def calculate_roi(df: pd.DataFrame):
         ROI del modelo. (float)
     """
     # Definicion de variables
-    dinero_tras_apuestas_ini = 100 # CUIDADO! NO ES sum(df['stake_mod'])
-    dinero_tras_apuestas = 100
+    bank_inicial = 100 # CUIDADO! NO ES sum(df['stake_mod'])
+    bank_final = bank_inicial
     n_apuestas = len(df)
     d_rois = {}
     l_rois_partido = [50, 100, 150, 200, 250, 300, 400, 500]
     cont = 0
-    df_correct = df[df['acerte'] == 1]   # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
+    # df_correct = df[df['acerte'] == 1]   # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
 
-    # Por partido acertado
-    for idx, row in df.iterrows():
-        cont += 1
+    # Obtengo dias unicos de partidos
+    df['date_only'] = pd.to_datetime(df['date']).dt.date # Suponiendo que tienes un DataFrame con una columna de fecha y hora llamada 'date'
+    unique_dates = df['date_only'].unique()  # Luego puedes obtener las fechas únicas sin la hora
+
+    # Por fecha
+    for date in unique_dates:
+
+        # Filtro partidos por fecha
+        df_date = df[df['date_only'] == date]
         
-        # Defino stake a apostar 
-        stake_a_apostar =  dinero_tras_apuestas * row['stake_to_bet'] / 100  # Stake como porcentaje del bank
-        df.loc[idx, 'stake_to_bet_%bank'] = stake_a_apostar
+        # Determino el bank inicial
+        bank_inicial_dia = bank_final
+        # Raise error si perdi todo el dinero de las apuestas
+        if bank_inicial_dia <= 0:
+            logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
+            break
 
-        if row['acerte'] == 1:
-            # Calculo ingresos por acertar el resultado
-            ingresos = stake_a_apostar * row['odd_to_bet']
+        # Por partido
+        for idx, row in df_date.iterrows():
+            cont += 1
+
+            # Defino stake a apostar en pesos (a partir del stake como porcentaje del bank)
+            stake_a_apostar =  bank_inicial_dia * row['stake_to_bet'] / 100
+            df.loc[idx, 'bank_inicial'] = bank_inicial_dia
+            df.loc[idx, 'stake_to_bet_en_$'] = stake_a_apostar
+
+            # Determino ganancias / perdidas 
+            ingresos = stake_a_apostar * row['odd_to_bet'] if row['acerte'] == 1 else 0
             ganancia = ingresos - stake_a_apostar
-            dinero_tras_apuestas += ganancia
+            bank_final += ganancia
             df.loc[idx, 'G/P'] = ganancia
+            df.loc[idx, 'bank_final'] = bank_final
 
-        else:
-            dinero_tras_apuestas -= stake_a_apostar
-            df.loc[idx, 'G/P'] = -1 * stake_a_apostar
+            # Guardo ROI en partidos especificados
+            if cont in l_rois_partido:
+                roi_partido = (bank_final - bank_inicial) / bank_inicial * 100
+                d_rois[f'roi_{cont}'] = roi_partido / cont
+                df.loc[idx, 'roi_partido'] = roi_partido / cont
 
-        if cont in l_rois_partido:
-            roi_partido = (dinero_tras_apuestas - dinero_tras_apuestas_ini) / dinero_tras_apuestas_ini * 100
-            d_rois[f'roi_{cont}'] = roi_partido / cont
-            df.loc[idx, 'roi_partido'] = roi_partido / cont
-
-        df.loc[idx, 'dinero_tras_apuestas'] = dinero_tras_apuestas
-
-        # Si perdi todo el dinero de las apuestas --> ESTO NUNCA DEBERIA SUCEDER AL USAR STAKE COMO % DEL BANK...
-        if dinero_tras_apuestas <= 0:
-            dinero_tras_apuestas = 0
-            raise ValueError("El dinero tras apuestas se hizo negativo y esto no es posible.")
+            # Raise error si perdi todo el dinero de las apuestas
+            if bank_final <= 0:
+                logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
+                break
 
     # Calculo el ROI
-    roi = (dinero_tras_apuestas - dinero_tras_apuestas_ini) / dinero_tras_apuestas_ini * 100
+    roi = (bank_final - bank_inicial) / bank_inicial * 100
     roi_por_partido = roi / n_apuestas  # No quiero el ROI mas alto sino el ROI / partido mas alto
     d_rois['roi'] = roi
     d_rois['roi_por_partido'] = roi_por_partido
-    cuota_media_ganada = sum(df_correct['odd_to_bet'] / len(df_correct))
-    cuota_media_apostada = sum(df['odd_to_bet'] / len(df))  # --> no tengo la cuota apostada en cada partido... la eestoy calculando en el ciclo for...
+    # cuota_media_ganada = sum(df_correct['odd_to_bet'] / len(df_correct))
+    # cuota_media_apostada = sum(df['odd_to_bet'] / len(df))  # --> no tengo la cuota apostada en cada partido... la eestoy calculando en el ciclo for...
 
     return df, d_rois
 
