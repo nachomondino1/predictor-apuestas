@@ -197,7 +197,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
         # Evaluo predicciones del modelo
-        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, _print=False)
+        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
         print("Metricas: ", d_roi)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -225,10 +225,23 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
-    # Defino condiciones del analisis
-    country = "france"
-    date = '2024-05-07'
+    # Seleccionar pais
+    id_country = 167
 
+    # Defino condiciones del analisis
+    d = {
+        6: ["argentina", "2024-05-07"],
+        48: ["england", '2024-05-07'], 
+        55: ["france", "2024-05-07"], 
+        59: ["germany", "2024-07-25"],
+        77: ["italy", "2024-07-25"], 
+        148: ["spain", "2024-07-31"], 
+        167: ["usa", "2024-06-24"]
+    }
+    country, date = d[id_country]
+    logger.info(f"Country: {country}, Date: {date}")
+
+    # Defino rutas
     ruta_base_dp = f"./data/{country}/p3_data_preparation/{date}"
     ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
     df_iteration_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
@@ -240,3 +253,4 @@ if __name__ == "__main__":
     df_iteration_train.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df_concat = pd.concat([df_iteration_train, df_iteration_prod], axis=1)
     df_concat.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=True)
+    
