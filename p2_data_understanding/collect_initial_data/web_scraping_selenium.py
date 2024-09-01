@@ -76,6 +76,7 @@ class Crawler:
         """
         # Defino opciones del webdriver
         options = webdriver.ChromeOptions()
+        # options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"  # google_chrome_path cl
         options.add_argument("--window-size=1920,1080")
         options.add_argument("start-maximized")
         options.add_argument("enable-automation")
@@ -93,16 +94,17 @@ class Crawler:
             options.add_argument("--headless")
 
         try:
-            # Intentar instalar la última versión del ChromeDriver
+            # 1) Inicializar ChromeDriver con la última versión disponible 
             chrome_driver = ChromeDriverManager().install()
             driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
             logger.critical("ChromeDriver initialized with the latest version")
             return driver
         
         except Exception as e:
-            logger.error(f"Failed to download the latest ChromeDriver: {e}")
+            logger.error(f"Failed to inicialize the ChromeDriver with the latest version.")   # logger.error(f"Failed to inicialize the ChromeDriver with the latest version: {e}")
+
             try:
-                # Obtener la versión de Chrome instalada
+                # 2) Inicializar ChromeDriver con la versión de Google Chorme en mi compu
                 chrome_version = self.get_chrome_version()
                 if chrome_version:
                     logger.info(f"Detected Google Chrome version: {chrome_version}")
@@ -112,9 +114,19 @@ class Crawler:
                     return driver
                 else:
                     logger.error("Failed to detect Google Chrome version")
+                
             except Exception as e:
-                logger.error(f"Failed to download ChromeDriver for detected version: {e}")
-                raise ValueError
+                logger.error(f"Failed to inicialize the chromedriver with the same version of yout Google Chrome.")  # logger.error(f"Failed to inicialize the chromedriver with the same version of yout Google Chrome: {e}")
+
+                try:
+                    # 3) Inicializar ChromeDriver desde archivo ejecutable (actualizar versión desde https://googlechromelabs.github.io/chrome-for-testing/)
+                    chrome_driver_path = '/Users/nachomondino/Documents/chromedriver' # Ultima actualizacion: 31 Agosto 2024
+                    return webdriver.Chrome(service=Service(chrome_driver_path), options=options)  # Es none si retorno la variable "driver" con el chorme driver desde ejecutable
+                
+                except Exception as e:
+                    logger.error(f"Failed to inicialize the chromedriver from executable")
+                    logger.error(f"All ways to inicialize webdriver have failed.")
+                    raise ValueError
 
     def initialize_safari_driver(self):
         driver = webdriver.Safari()
