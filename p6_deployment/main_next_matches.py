@@ -827,6 +827,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     """
     start = time.time()
 
+    # Parametros
+    n_days_fill_data = 60  # Usaba 150 pero era muy largo para el inicio de la temporada y le daba demasiado peso a la formacion de la temporada anterior. 
+
     # Determino country
     df_countries = pd.read_excel('./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
@@ -962,7 +965,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
         ## Para fill_data
         logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
-        df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=150) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
+        df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
         ## Para construct_data
         logger.info("Seleccion de ultimos partidos para construccion de variables...")
         n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
@@ -1052,7 +1055,7 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 6
+        id_country = 148
         n_days = 10
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
