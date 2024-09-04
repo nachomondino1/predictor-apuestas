@@ -126,6 +126,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
 
                 # Calculo roi stake a apostar segun curva
                 df_no_se, d_rois, = calculate_roi(df_aux)
+                # df_no_se, d_rois, = calculate_roi_sin_date(df_aux) # Cuando entreno modelos pues no tienen columna date.
                 roi = d_rois['roi_por_partido']                    
                 d[f'roi_stake_{key}_{a1}_{a2}'] = roi
 
@@ -374,6 +375,60 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
     return df
 
 # Metricas
+def calculate_roi_sin_date(df: pd.DataFrame):
+    """
+    Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos.
+
+    # Parameters:
+        df: Dataframe (DataFrame)
+        stake_base: Stake base sobre el cual aplicar el multiplicador para obtener el stake variable. (int)
+        _print: True para imprimir por pantalla el procesamiento de la funcion, en caso contrario, False. (bool)
+
+    # Returns
+        ROI del modelo. (float)
+    """
+    # Definicion de variables
+    bank_inicial = 100 # CUIDADO! NO ES sum(df['stake_mod'])
+    bank_final = bank_inicial
+    n_apuestas = len(df)
+    d_rois = {}
+    l_rois_partido = [50, 100, 150, 200, 250, 300, 400, 500]
+    cont = 0
+
+    # Por partido
+    for idx, row in df.iterrows():
+        cont += 1
+
+        # Defino stake a apostar en pesos (a partir del stake como porcentaje del bank)
+        stake_a_apostar =  bank_final * row['stake_to_bet'] / 100
+        df.loc[idx, 'bank_inicial'] = bank_final
+        df.loc[idx, 'stake_to_bet_en_$'] = stake_a_apostar
+
+        # Determino ganancias / perdidas 
+        ingresos = stake_a_apostar * row['odd_to_bet'] if row['acerte'] == 1 else 0
+        ganancia = ingresos - stake_a_apostar
+        bank_final += ganancia
+        df.loc[idx, 'G/P'] = ganancia
+        df.loc[idx, 'bank_final'] = bank_final
+
+        # Guardo ROI en partidos especificados
+        if cont in l_rois_partido:
+            roi_partido = (bank_final - bank_inicial) / bank_inicial * 100
+            d_rois[f'roi_{cont}'] = roi_partido / cont
+            df.loc[idx, 'roi_partido'] = roi_partido / cont
+
+        # Raise error si perdi todo el dinero de las apuestas
+        if bank_final <= 0:
+            logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
+            break
+
+    # Calculo el ROI
+    roi = (bank_final - bank_inicial) / bank_inicial * 100
+    roi_por_partido = roi / n_apuestas  # No quiero el ROI mas alto sino el ROI / partido mas alto
+    d_rois['roi'] = roi
+    d_rois['roi_por_partido'] = roi_por_partido
+    return df, d_rois
+
 def calculate_roi(df: pd.DataFrame):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos.
