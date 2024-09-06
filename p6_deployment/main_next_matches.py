@@ -92,7 +92,7 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 1, _print: bool = False):
+    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 2, _print: bool = False):
         """
         Extraccion de varias competencias de un mismo country.
         """
@@ -721,8 +721,8 @@ def load_modeling_hyperparameters(country, n_model, BASE_DIR):
     # Guardo hiperparametros en diccionario
     d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best.1']
     d['curva'] = row_hiper_bet_strat['curva.1']
-    param1 = row_hiper_bet_strat['param1.1']
-    param2 = row_hiper_bet_strat['param2.1']
+    param1 = int(row_hiper_bet_strat['param1.1'])
+    param2 = int(row_hiper_bet_strat['param2.1'])
     d['curva_m'] = param1 if d['curva'] == 'linear' else None
     d['curva_b'] = param2 if d['curva'] == 'linear' else None
     d['curva_p1'] = eval(param1) if d['curva'] != 'linear' else None
@@ -1029,8 +1029,12 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
-        # Cargo variables entorno
-        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
+        # Vario el stake segun curva especifica
+        if env == 'dev':
+            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=d_hiper_mod['curva_m'], b=d_hiper_mod['curva_b']) # Uso un m bajo para los clientes
+            logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
+        elif env == 'prod':
+            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -1062,7 +1066,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         id_country = 167
         n_days = 10
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':

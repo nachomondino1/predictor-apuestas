@@ -78,7 +78,7 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     return df_match_odds
 
 # Nosotros
-def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
+def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stake_base: int = 1):
     """
     Determine the ROI for different betting strategies.
 
@@ -91,12 +91,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
         Diccionario con ROI para las distintas estrategias de apuesta. (dict)
     """
     # Definicion de variables
-    l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-    d_rectas = {
-        "equal": [[(0, 0), (1, 0)]],
-        'linear': [[5, 0], [10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [80, 0]],
-        'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
-    }
+    l_thr_dif_prob, d_rectas = define_hiperparameters(strategy)
     best_roi, roi_max = -100000, -100000
 
     # Eliminate rows with NaN odds or missing predictions
@@ -125,8 +120,11 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
                 df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
 
                 # Calculo roi stake a apostar segun curva
-                df_no_se, d_rois, = calculate_roi(df_aux)
-                # df_no_se, d_rois, = calculate_roi_sin_date(df_aux) # Cuando entreno modelos pues no tienen columna date.
+                if 'date' in df_aux.columns:
+                    df_no_se, d_rois, = calculate_roi(df_aux)
+                else: # Cuando entreno modelos pues no tienen columna date.
+                    df_no_se, d_rois, = calculate_roi_sin_date(df_aux) 
+                    
                 roi = d_rois['roi_por_partido']                    
                 d[f'roi_stake_{key}_{a1}_{a2}'] = roi
 
@@ -149,6 +147,27 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, stake_base: int = 1):
                 best_d_rois.update(d_best)
 
     return best_df_pred, best_d_rois
+
+def define_hiperparameters(strategy):
+    """
+    Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
+    """
+    if strategy=="general":
+        l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+        d_rectas = {
+            "equal": [[(0, 0), (1, 0)]],
+            'linear': [[5, 0], [10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [80, 0]],
+            'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
+        }
+    
+    elif strategy=="reality":
+        l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+        d_rectas = {
+            "equal": [[(0, 0), (1, 0)]],
+            'linear': [[5, 0], [10, 0], [15, 0],[25, 0]],
+            'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
+        }
+    return l_thr_dif_prob, d_rectas
 
 def calculate_dif_proba_in_predicted_result(df: pd.DataFrame):
     """
@@ -448,6 +467,7 @@ def calculate_roi(df: pd.DataFrame):
     d_rois = {}
     l_rois_partido = [50, 100, 150, 200, 250, 300, 400, 500]
     cont = 0
+    exit_loops = False
     # df_correct = df[df['acerte'] == 1]   # Filtrar el dataframe solo a las filas donde el modelo predijo correctamente
 
     # Obtengo dias unicos de partidos
@@ -457,19 +477,20 @@ def calculate_roi(df: pd.DataFrame):
     # Por fecha
     for date in unique_dates:
 
+        if exit_loops:
+            break
+
         # Filtro partidos por fecha
         df_date = df[df['date_only'] == date]
         
         # Determino el bank inicial
         bank_inicial_dia = bank_final
-        # Raise error si perdi todo el dinero de las apuestas
-        if bank_inicial_dia <= 0:
-            logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
-            break
+        sum_stakes_dia = 0
 
         # Por partido
         for idx, row in df_date.iterrows():
             cont += 1
+            sum_stakes_dia += row['stake_to_bet']
 
             # Defino stake a apostar en pesos (a partir del stake como porcentaje del bank)
             stake_a_apostar =  bank_inicial_dia * row['stake_to_bet'] / 100
@@ -492,8 +513,18 @@ def calculate_roi(df: pd.DataFrame):
             # Raise error si perdi todo el dinero de las apuestas
             if bank_final <= 0:
                 logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
+                exit_loops = True
                 break
-
+            
+            '''
+            # Raise error si apuesta mas del 100% del bank en un dia dado
+            if sum_stakes_dia > 100:
+                bank_final = -100
+                exit_loops = True
+                logger.warning("El stake to bet superó el 100% del bank para un mismo dia. ")
+                break
+            '''
+            
     # Calculo el ROI
     roi = (bank_final - bank_inicial) / bank_inicial * 100
     roi_por_partido = roi / n_apuestas  # No quiero el ROI mas alto sino el ROI / partido mas alto

@@ -7,20 +7,27 @@ from dotenv import load_dotenv
 
 def concat_integrate_dfs(l_countries):
 
-    df = pd.DataFrame()
+    df, df_player_sofifa, df_player_fifa_sofifa = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     # Por pais
     for id_country, country in l_countries.items():
 
-        # Levanto su df_integrated.xlsx
-        ruta_to_int_country = f'data/{country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx'
-        df_int_country = pd.read_excel(ruta_to_int_country, index_col=0)
-        print(df_int_country)
+        # Levanto su df_integrated
+        df_player_sofifa_cleaned_country = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
+        df_player_fifa_sofifa_cleaned_country = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+        df_int_country = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
+        # print(df_int_country)
         print(f"\n\nNº de filas: {len(df_int_country)}")
 
         # Concateno
         df = pd.concat([df, df_int_country], axis=0)
+        df_player_sofifa = pd.concat([df_player_sofifa, df_player_sofifa_cleaned_country], axis=0)
+        df_player_fifa_sofifa =  pd.concat([df_player_fifa_sofifa, df_player_fifa_sofifa_cleaned_country], axis=0)
         print(f"\n\nNº de filas concat: {len(df)}")
+
+    # Elimino duplicados
+    df_player_sofifa = df_player_sofifa.drop_duplicates()
+    df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates()
 
     # Elimino duplicados (x traspasos de jugadores ppalmente) (28588 --> 29198)
     # Paso 1: Calcular el porcentaje de NaN por fila
@@ -35,7 +42,7 @@ def concat_integrate_dfs(l_countries):
     # Opcional: Eliminar la columna auxiliar 'nan_percentage'
     df_sin_dup = df_sin_dup.drop(columns=['nan_percentage'])
     # print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
-    return df, df_sin_dup
+    return df_sin_dup, df_player_sofifa, df_player_fifa_sofifa
 
 def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
     """
@@ -131,9 +138,6 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
             df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
 if __name__ == "__main__":
-    load_dotenv() # Cargar las variables de entorno desde el archivo .env
-    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
-    env = os.getenv('ENVIRONMENT')
 
     # Definicion de variables
     id_country = 148
@@ -148,15 +152,13 @@ if __name__ == "__main__":
 
     # Integracion
     if integracion:
-        df, df_sin_dup = concat_integrate_dfs(d_countries)
+        df_map, df_player_sofifa, df_player_fifa_sofifa = concat_integrate_dfs(d_countries)
 
-        # Exporto datos 
-        if env == 'dev':
-            df.to_excel(f'{BASE_DIR_LOCAL}/df_integrated_all_con_dup.xlsx')
-            df_sin_dup.to_excel(f'{BASE_DIR_LOCAL}/df_integrated_all.xlsx')
+        # Exporto datos
+        df_map.to_excel('data/df_map_players_fs_so.xlsx')
+        df_player_sofifa.to_excel('data/df_player_sofifa.xlsx')
+        df_player_fifa_sofifa.to_excel('data/df_player_fifa_sofifa.xlsx')
 
-        elif env == "prod":
-            df_sin_dup.to_excel('data/df_map_players_fs_so.xlsx')
     
     # Concateno competiciones del country
     if competicion:

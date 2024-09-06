@@ -301,8 +301,15 @@ class DataPreparation:
         print("\nIntegrating player's data to df_match...")
         # Si ya hice el mapeo
         try:
-            df_map_players_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
-            print("No vuelvo a mapear sino que levanto df_map ")
+            # df_map_players_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
+            df_map_players_fs_so = pd.read_excel(f'data/df_map_players_fs_so.xlsx', index_col=0)
+            logger.info("No vuelvo a mapear sino que levanto df_map ")
+
+            # Reemplazo los df_player de Sofifa del pais por los completos
+            df_player_sofifa = pd.read_excel(f'data/df_player_sofifa.xlsx', index_col=0)
+            df_player_fifa_sofifa = pd.read_excel(f'data/df_player_fifa_sofifa.xlsx', index_col=0)
+            
+            logger.critical("Integración usando el df_map completo!")
 
         # Si aun no hice el mapeo
         except FileNotFoundError:
@@ -892,11 +899,11 @@ def main(id_country, d_run, export: bool = True):
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-        df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
-        df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
-        df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
-        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-        df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
+        # df = dp.construct_data(df, n_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
+        # df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
+        # df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
+        # df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
+        # df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
         
         if export:
             df_hiper_prep.to_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx', index=False)
@@ -963,7 +970,7 @@ def main(id_country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion de variables
-    id_country = 148
+    id_country = 55
     d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)

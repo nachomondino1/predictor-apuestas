@@ -197,7 +197,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
         # Evaluo predicciones del modelo
-        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
+        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy="reality")
         print("Metricas: ", d_roi)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 167
+    id_country = 77
 
     # Defino condiciones del analisis
     d = {
@@ -234,8 +234,10 @@ if __name__ == "__main__":
         48: ["england", '2024-05-07'], 
         55: ["france", "2024-05-07"], 
         59: ["germany", "2024-07-25"],
-        77: ["italy", "2024-07-25"], 
-        148: ["spain", "2024-07-31"], 
+        # 77: ["italy", "2024-07-25"], 
+        77: ["italy", "2024-09-04"], 
+        # 148: ["spain", "2024-07-31"], 
+        148: ["spain", "2024-09-05"],
         167: ["usa", "2024-06-24"]
     }
     country, date = d[id_country]
