@@ -1,2 +1,0 @@
-Podria correr un find_best para buscar un mejor modelo dado los malos resultados comparado a los otros paises.
-Sin embargo, creo que no es cuestión de un nuevo find_best creo sino de mejor hiperparametros y estrategia de apuesta.

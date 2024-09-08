@@ -120,10 +120,10 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stak
                 df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
 
                 # Calculo roi stake a apostar segun curva
-                if 'date' in df_aux.columns:
-                    df_no_se, d_rois, = calculate_roi(df_aux)
-                else: # Cuando entreno modelos pues no tienen columna date.
-                    df_no_se, d_rois, = calculate_roi_sin_date(df_aux) 
+                if strategy == 'reality' or strategy=='experiment':
+                    df_no_se, d_rois, = calculate_reality_roi(df_aux)
+                else: 
+                    df_no_se, d_rois, = calculate_roi(df_aux) 
                     
                 roi = d_rois['roi_por_partido']                    
                 d[f'roi_stake_{key}_{a1}_{a2}'] = roi
@@ -152,14 +152,22 @@ def define_hiperparameters(strategy):
     """
     Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
     """
-    if strategy=="general":
+    if strategy=="experiment":
         l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
         d_rectas = {
             "equal": [[(0, 0), (1, 0)]],
             'linear': [[5, 0], [10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [80, 0]],
             'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
         }
-    
+
+    elif strategy=="general":
+        l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+        d_rectas = {
+            "equal": [[(0, 0), (1, 0)]],
+            'linear': [[10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0], [90, 0]],
+            # 'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
+        }
+
     elif strategy=="reality":
         l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
         d_rectas = {
@@ -167,6 +175,7 @@ def define_hiperparameters(strategy):
             'linear': [[5, 0], [10, 0], [15, 0],[25, 0]],
             'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
         }
+    
     return l_thr_dif_prob, d_rectas
 
 def calculate_dif_proba_in_predicted_result(df: pd.DataFrame):
@@ -394,9 +403,9 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
     return df
 
 # Metricas
-def calculate_roi_sin_date(df: pd.DataFrame):
+def calculate_roi(df: pd.DataFrame):
     """
-    Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos.
+    Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
 
     # Parameters:
         df: Dataframe (DataFrame)
@@ -448,9 +457,9 @@ def calculate_roi_sin_date(df: pd.DataFrame):
     d_rois['roi_por_partido'] = roi_por_partido
     return df, d_rois
 
-def calculate_roi(df: pd.DataFrame):
+def calculate_reality_roi(df: pd.DataFrame):
     """
-    Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos.
+    Calcula ROI simulando la forma de apostar de la realidad, de manera de saber que ROI esperar en la realidad.
 
     # Parameters:
         df: Dataframe (DataFrame)
