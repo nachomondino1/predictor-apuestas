@@ -2,6 +2,47 @@ import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from set_up_logging import logger
+import os
+from dotenv import load_dotenv
+
+def concat_integrate_dfs(l_countries):
+
+    df, df_player_sofifa, df_player_fifa_sofifa = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    # Por pais
+    for id_country, country in l_countries.items():
+
+        # Levanto su df_integrated
+        df_player_sofifa_cleaned_country = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
+        df_player_fifa_sofifa_cleaned_country = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+        df_int_country = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
+        # print(df_int_country)
+        print(f"\n\nNº de filas: {len(df_int_country)}")
+
+        # Concateno
+        df = pd.concat([df, df_int_country], axis=0)
+        df_player_sofifa = pd.concat([df_player_sofifa, df_player_sofifa_cleaned_country], axis=0)
+        df_player_fifa_sofifa =  pd.concat([df_player_fifa_sofifa, df_player_fifa_sofifa_cleaned_country], axis=0)
+        print(f"\n\nNº de filas concat: {len(df)}")
+
+    # Elimino duplicados
+    df_player_sofifa = df_player_sofifa.drop_duplicates()
+    df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates()
+
+    # Elimino duplicados (x traspasos de jugadores ppalmente) (28588 --> 29198)
+    # Paso 1: Calcular el porcentaje de NaN por fila
+    df['nan_percentage'] = df.isna().mean(axis=1)
+
+    # Paso 2: Ordenar el DataFrame basado en el porcentaje de NaN (de menor a mayor)
+    df_sorted = df.sort_values(by='nan_percentage')
+
+    # Paso 3: Eliminar duplicados y quedarte con los que tienen menos NaN
+    df_sin_dup = df_sorted.drop_duplicates(subset=['id_player_fs'])
+
+    # Opcional: Eliminar la columna auxiliar 'nan_percentage'
+    df_sin_dup = df_sin_dup.drop(columns=['nan_percentage'])
+    # print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
+    return df_sin_dup, df_player_sofifa, df_player_fifa_sofifa
 
 def concat_dfs_per_competition(id_country, country, l_dataframes, export=True):
     """
@@ -97,16 +138,28 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
             df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
 
 if __name__ == "__main__":
+
     # Definicion de variables
     id_country = 148
     export = True
-    competicion, temporada = True, False
-    
+    competicion, temporada, integracion = False, False, True
+    d_countries = {6: 'argentina', 48: 'england', 55: 'france', 59: 'germany', 77: 'italy', 148: 'spain', 167: 'usa'}
+
     # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
     print(country)
 
+    # Integracion
+    if integracion:
+        df_map, df_player_sofifa, df_player_fifa_sofifa = concat_integrate_dfs(d_countries)
+
+        # Exporto datos
+        df_map.to_excel('data/df_map_players_fs_so.xlsx')
+        df_player_sofifa.to_excel('data/df_player_sofifa.xlsx')
+        df_player_fifa_sofifa.to_excel('data/df_player_fifa_sofifa.xlsx')
+
+    
     # Concateno competiciones del country
     if competicion:
         l_dataframes =  ['df_teams_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
@@ -117,4 +170,4 @@ if __name__ == "__main__":
         l_dataframes = ["df_match", "df_match_player", 'df_match_odds']  # ["df_player"]
         l_filenames =  ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]   # l_files = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
         competition = "premier_league"
-        concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export)
+        concat_dfs_per_season(country, competition, l_dataframes, l_filenames, export)  

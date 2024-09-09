@@ -75,11 +75,11 @@ def main(l_modelos, d_params, export: bool = True):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 6
+    id_country = 167
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), SVC()]  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
+    l_modelos = [LogisticRegression()]  # SVC()  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     d_params = {
         'construct': {
             'n_dias_ult_part': [30, 60],
@@ -91,16 +91,16 @@ if __name__ == "__main__":
             'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
-            'thr_corr': [0.7, 0.8, 0.9, None],
-            'thr_fs': [0.2, 0.1, None], 
+            'thr_corr': [0.7, 0.8, 0.9, None], 
+            'thr_fs': [0.3, 0.2, 0.1, None], 
         },
         'treat_nan': {
-            'fill_na': [None, 'ml'],
+            'fill_na': [None, 'ml'], 
         },
         'modeling': {
             'val_size': [0.125],
-            'test_size': [0.125], 
-            'bal_type': [None, 'under'], #  'over'
+            'test_size': [0.10], 
+            'bal_type': [None, 'under', 'over'], 
             'k': [10] 
         }
     }

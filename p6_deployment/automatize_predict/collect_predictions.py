@@ -23,15 +23,16 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
         df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
-        df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
-        df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
+        if len(df_predicciones_country) > 0:
+            df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
+            df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
 
-        # Concatenar df_countries....
-        df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+            # Concatenar df_countries....
+            df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
 
-        # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
-        df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-        df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+            # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
+            df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
+            df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
 
     # Guardo predicciones en historial_predicciones
     largo_inic = len(df_historial_predicciones)

@@ -92,7 +92,7 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 1, _print: bool = False):
+    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 2, _print: bool = False):
         """
         Extraccion de varias competencias de un mismo country.
         """
@@ -721,8 +721,8 @@ def load_modeling_hyperparameters(country, n_model, BASE_DIR):
     # Guardo hiperparametros en diccionario
     d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best.1']
     d['curva'] = row_hiper_bet_strat['curva.1']
-    param1 = row_hiper_bet_strat['param1.1']
-    param2 = row_hiper_bet_strat['param2.1']
+    param1 = int(row_hiper_bet_strat['param1.1'])
+    param2 = int(row_hiper_bet_strat['param2.1'])
     d['curva_m'] = param1 if d['curva'] == 'linear' else None
     d['curva_b'] = param2 if d['curva'] == 'linear' else None
     d['curva_p1'] = eval(param1) if d['curva'] != 'linear' else None
@@ -844,23 +844,24 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     dp = DataPreparationNew(country=country, export=export) # Creo objeto de clase DataPreparation
 
     # Levanto modelos, hiperparametros y demas
-    n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
-    BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
-    BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
-    logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
-    logger.info(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
+    if d_run['data_unders']:
+        n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
+        BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
+        BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
+        logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
+        logger.info(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
-    # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
-    d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR_mod)
-    df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR_dp, d_hiper)
-    scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d_hiper)
-    if env == 'dev':
-        # comp_to_select = eval(d_hiper['comp_to_select'])
-        comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para incluir ARG y USA
-    elif env == 'prod':
-        comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
-    logger.info(f'Competencias de {country}: \n {df_comp_country}')
-    logger.info(f"Competencias publicas del pais: {comp_public}")
+        # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
+        d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR_mod)
+        df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR_dp, d_hiper)
+        scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d_hiper)
+        if env == 'dev':
+            # comp_to_select = eval(d_hiper['comp_to_select'])
+            comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para incluir ARG y USA
+        elif env == 'prod':
+            comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
+        logger.info(f'Competencias de {country}: \n {df_comp_country}')
+        logger.info(f"Competencias publicas del pais: {comp_public}")
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MISSING DATA".center(120) + "\n" + "+"*120 + "\n")
@@ -1029,7 +1030,11 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
-        # Cargo variables entorno
+        # Vario el stake segun curva especifica
+        # if env == 'dev':
+        #     df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=d_hiper_mod['curva_m'], b=d_hiper_mod['curva_b']) # Uso un m bajo para los clientes
+        #     logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
+        # elif env == 'prod':
         df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -1060,9 +1065,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167
+        id_country = 77
         n_days = 10
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
