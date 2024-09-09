@@ -1031,11 +1031,11 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
         # Vario el stake segun curva especifica
-        if env == 'dev':
-            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=d_hiper_mod['curva_m'], b=d_hiper_mod['curva_b']) # Uso un m bajo para los clientes
-            logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
-        elif env == 'prod':
-            df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
+        # if env == 'dev':
+        #     df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=d_hiper_mod['curva_m'], b=d_hiper_mod['curva_b']) # Uso un m bajo para los clientes
+        #     logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
+        # elif env == 'prod':
+        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
