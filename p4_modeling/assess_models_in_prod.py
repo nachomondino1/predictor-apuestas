@@ -91,7 +91,7 @@ def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
     return tager_loaded, scaler, columns_scaled,loaded_model
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True):
+def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, strategy = 'general'):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
@@ -199,7 +199,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
         # Evaluo predicciones del modelo
-        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy="experiment") # Cuando termine el exp, poner 'general' # Si queres saber el ROI de la realidad, usar 'reality'
+        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy=strategy)
         print("Metricas: ", d_roi)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -228,9 +228,10 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 48
+    id_country = 167
 
     # Defino condiciones del analisis
+    bet_strategy = 'reality' # general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-09-07'], 
@@ -250,7 +251,7 @@ if __name__ == "__main__":
     df_iteration_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
 
     # Evaluo modelos en produccion
-    df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True)
+    df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, strategy=bet_strategy)
 
     # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
     df_iteration_train.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
