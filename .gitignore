@@ -21,6 +21,7 @@ old/
 
 ## Data preparation
 --integrate_data/
+--modeling/
 # Main_find_best_hiper
 data/*/p4_modeling/*/data_seg/*.xlsx
 assess_models_in_prod/

@@ -22,12 +22,17 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
         # Extraigo, preparo y predigo proximos partidos
         df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
 
-        # Concatenar df_countries....
-        df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+        # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
+        if len(df_predicciones_country) > 0:
+            df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
+            df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
 
-        # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
-        df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-        df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+            # Concatenar df_countries....
+            df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+
+            # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
+            df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
+            df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
 
     # Guardo predicciones en historial_predicciones
     largo_inic = len(df_historial_predicciones)
@@ -56,7 +61,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         n_days = 15
         l_countries = [48, 55, 59, 77, 148]
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)

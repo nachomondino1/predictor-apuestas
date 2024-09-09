@@ -91,10 +91,12 @@ def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
     return tager_loaded, scaler, columns_scaled,loaded_model
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones=False):
+def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, strategy = 'general'):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
+    n_days_to_fill = 150
+
     # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
     save_assess(ruta_base_mod)   # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
 
@@ -155,7 +157,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
             if relleno_formaciones:
                 # Selecciono los ultimos partidos de los ya jugados
                 logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
-                df_last_old_matches_fill = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=150) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
+                df_last_old_matches_fill = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=n_days_to_fill) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
 
                 # Relleno formaciones
                 df_fill, df_c1, df_c2 = dp.fill_data_not_available_yet(df_int, df_last_old_matches_fill)
@@ -189,15 +191,15 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 
         # Concateno conjunto de datos
         df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
-        try:
-            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_c1['copiado_formaciones'], df_emer['emergency_fill']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
-        except:
-            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba], axis=1)
+        if relleno_formaciones:
+            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_c1['copiado_formaciones'], df_emer['emergency_fill']], axis=1)
+        else:
+            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_emer['emergency_fill']], axis=1)
         df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
         # Evaluo predicciones del modelo
-        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
+        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy=strategy)
         print("Metricas: ", d_roi)
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
@@ -229,14 +231,16 @@ if __name__ == "__main__":
     id_country = 167
 
     # Defino condiciones del analisis
+    bet_strategy = 'reality' # general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
-        48: ["england", '2024-05-07'], 
-        55: ["france", "2024-05-07"], 
-        59: ["germany", "2024-07-25"],
+        48: ["england", '2024-09-07'], 
+        55: ["france", "2024-09-06"], 
+        59: ["germany", "2024-09-07"],
         77: ["italy", "2024-07-25"], 
         148: ["spain", "2024-07-31"], 
-        167: ["usa", "2024-06-24"]
+        167: ["usa", "2024-09-07"]
+
     }
     country, date = d[id_country]
     logger.info(f"Country: {country}, Date: {date}")
@@ -247,10 +251,9 @@ if __name__ == "__main__":
     df_iteration_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
 
     # Evaluo modelos en produccion
-    df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True)
+    df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, strategy=bet_strategy)
 
     # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
     df_iteration_train.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
     df_concat = pd.concat([df_iteration_train, df_iteration_prod], axis=1)
     df_concat.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=True)
-    
