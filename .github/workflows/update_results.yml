@@ -94,7 +94,7 @@ jobs:
       # Run update_results script
       - name: Run update_results script
         run: |
-          python p6_deployment/automatize_predict/update_results.py 1 # Con 1 seria suficiente puesto que lo corro todos los dias. Pero pongo dos por holgura
+          python p6_deployment/automatize_predict/update_results.py 1
 
       # Push to Github
       - name: Commit and push all changes
