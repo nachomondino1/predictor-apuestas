@@ -34,28 +34,23 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         competition = row['competition_flashscore']
         l_ids_country = df[df['id_country'] == row['id_country']].index
         logger.info(f"ID_COUNTRY: {row['id_country']} COMPETITION: {competition}")
-        
-        # Si hay partidos del pais al cual obtener resultados
-        if len(l_ids_country) > 0:
-            logger.info(f"Cantidad de partidos a los que extraer resultado: {len(l_ids_country)}")
+        logger.info(f"Cantidad de partidos a los que extraer resultado: {len(l_ids_country)}")
 
-            # Definicion de variables
-            country = df_countries[df_countries['id_country']==row['id_country']]['country_name'].values[0]
-            
-            # Extraer goles home y away en los partidos desde Flashscore
-            df_results_competition = extract_matches_result(country, competition, l_ids_country)
+        # Definicion de variables
+        country = df_countries[df_countries['id_country']==row['id_country']]['country_name'].values[0]
+        
+        # Extraer goles home y away en los partidos desde Flashscore
+        df_results_competition = extract_matches_result(country, competition, l_ids_country)
+
+        if len(df_results_competition) > 0:
 
             # Elimino partidos con goals_home y goals_away None (A PRUEBA, NO SE SI FUNCIONA)
             df_results_competition = df_results_competition.dropna(subset=["goals_home"])
 
             # Guardo results de competencia
-            if len(df_results_competition) > 0:
-                df_results = pd.concat([df_results, df_results_competition], axis=0)
-                logger.info(df_results)
-
-        else:
-            logger.warning(f"No hay partidos de la liga a los cuales extraer el resultado.")
-
+            df_results = pd.concat([df_results, df_results_competition], axis=0)
+            logger.info(df_results)
+        
     # Si hay algun partido:
     if len(df_results) > 0:
 
@@ -68,7 +63,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
 
         # Exportar dataset
-        # df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
+        df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
         logger.critical(f"Se recolecto el resultado de {len(df_results)} partidos.")
 
     else:
