@@ -92,7 +92,7 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 2, _print: bool = False):
+    def collect_missing_data(self, df_match: pd.DataFrame, df_comp_country: pd.DataFrame, n_seasons_max: int = 1, _print: bool = False):
         """
         Extraccion de varias competencias de un mismo country.
         """
@@ -1065,9 +1065,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 77
+        id_country = 167
         n_days = 10
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
