@@ -89,7 +89,7 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
                             # print(f"Dejo de probar si {col1} tiene correlacion con otras columnas puesto que ya fue eliminada por alta correlacion con {col2}")
                             break
 
-    return list(columnas_eliminar)
+    return list(columnas_eliminar), df_corr_tri_X
 
 class FeatureSelection():
 
@@ -362,7 +362,7 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     if graf:
         fs.graficar_importancia_atrib(X=df_normalized['suma_de_imp_norm'], y=df_normalized.index)
     
-    return l_important_features
+    return l_important_features, df_normalized
 
 def determine_country_competitions(id_country):
     """
