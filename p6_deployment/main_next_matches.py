@@ -106,8 +106,9 @@ class DataUnderstandingNew():
         print("Competencias extraidas: ", l_competencies)
 
         # POR COMPETITION (solo las que hay en df_match)
-        for id_competition in l_competencies:
-            
+        # for id_competition in l_competencies:
+        for id_competition in [481]:
+
             # Obtengo nombre de competicion y is_cup
             df_comp_filt = df_comp_country[df_comp_country['id_competition'] == id_competition]  # Para extrar varios countryes?: df = df_comp[df_comp['country'].isin(l_countryes)]
             competition, is_cup = df_comp_filt['competition_flashscore'].values[0], df_comp_filt['is_cup'].values[0]
@@ -829,6 +830,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     # Cargo variables entorno (x las dudas para collect_predictions.py)
     load_dotenv()
     env = os.getenv('ENVIRONMENT')
+    logger.info(f"Environment: {env}")
 
     # Parametros
     n_days_fill_data = 60  # Usaba 150 pero era muy largo para el inicio de la temporada y le daba demasiado peso a la formacion de la temporada anterior. 
@@ -838,6 +840,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
     df_comp = pd.read_excel('./data/df_competencies.xlsx')
     df_comp_country = df_comp[df_comp['id_country'] == id_country]
+    logger.info(f"Country: {country}; id_country: {id_country}")
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
@@ -874,7 +877,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country)
+        # df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=1)
+        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=2)
 
         # Si hay partidos missing que no extraje aun
         if len(df_match_miss) > 0:
@@ -1065,9 +1069,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167
-        n_days = 10
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        id_country = 48
+        n_days = 2
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
