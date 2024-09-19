@@ -106,8 +106,7 @@ class DataUnderstandingNew():
         print("Competencias extraidas: ", l_competencies)
 
         # POR COMPETITION (solo las que hay en df_match)
-        # for id_competition in l_competencies:
-        for id_competition in [481]:
+        for id_competition in l_competencies:
 
             # Obtengo nombre de competicion y is_cup
             df_comp_filt = df_comp_country[df_comp_country['id_competition'] == id_competition]  # Para extrar varios countryes?: df = df_comp[df_comp['country'].isin(l_countryes)]
@@ -421,7 +420,7 @@ class DataPreparationNew(DataPreparation):
         start = time.time()
 
         # 1) Construyo historial entre si  (podria evitar construirlas si no estan en columns_used...)
-        df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)
+        # df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)
 
         # Si hay "ultimos partidos"
         if len(df_last_old_matches) > 0:
@@ -498,17 +497,26 @@ class DataPreparationNew(DataPreparation):
         Filtrado por competencias y escalado de datos.
         """
         logger.info("\n\n" + "Cleaning data 2...")
+
+        # Reemplazo infinitos
+        df = clean_data.replace_infinite(df)
+
         # Para evitar ciertas competencias
+        n_reg_inic, n_col_inic= len(df), len(df.columns)
         df = df[df['id_competition'].isin(comp_to_select)]
+        logger.info(f"Filas luego de filtrar x competencia: {n_reg_inic} --> {len(df)}")
 
         # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
         df = df.loc[:, columns_used]
+        logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
 
         # Transforma los nuevos datos de predicción utilizando el StandardScaler cargado
         try: 
             X_scaled = scaler_loaded.transform(df)
             X_scaled_df = pd.DataFrame(X_scaled, columns=columns_used, index=df.index)
-        except ValueError: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
+            logger.critical("El escalado fue un exito!")
+        except ValueError as e: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
+            logger.error(f"El escalado tuvo un error: {e}")
             return pd.DataFrame()
         return X_scaled_df
 
@@ -524,8 +532,11 @@ class DataPreparationNew(DataPreparation):
             Dataframe con las variables seleccionadas. (DataFrame)
         """
         logger.info("\n\n" + "Selecting data...")
+        
         # Selecciono las variables que necesita el modelo
+        n_col_inic = len(df.columns)
         df = df[l_columns]
+        logger.info(f"Columnas luego de filtrar x mas importantes: {n_col_inic} --> {len(df.columns)}")
 
         if self.export:
             df.to_excel(f'{self.BASE_DIR}/df_selected.xlsx', index=True)
@@ -545,9 +556,9 @@ class DataPreparationNew(DataPreparation):
 
         # Rellenar NaN en algunas columnas espeecificas
         h2h_columns = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        historic_columns =  [col for col in df.columns if 'mean_last_match' in col]  # El tema es que no tiene que rellenar normalmente y al hacerlo podria tapar un "error"
+        historic_columns = [col for col in df.columns if re.match(r'^mean_last_\d+_matches', col)]
         player_miss_columns = [col for col in df.columns if '_miss' in col]  # columnas_player_miss = ['dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss']
-        columns_to_fill = [col for col in (h2h_columns + historic_columns +player_miss_columns) if col in df.columns]  
+        columns_to_fill = [col for col in (h2h_columns + historic_columns + player_miss_columns) if col in df.columns]  
         
         if columns_to_fill:
             df_copy = df.copy()
@@ -570,12 +581,12 @@ class DataPreparationNew(DataPreparation):
     
     def fill_player_columns_with_min_value(self, df):
         """
-        Si uno de los dos equipos tiene NaN en las columnas de jugadores, entonces relleno los valores con el valor minimo de la columna.
-        Es ultimo recurso. Sobretodo para Spain que tiene NaN en equipos recien ascendidos como el Leganes.
+        Rellenado de emergencia de valores NaN con la media de la columna. Es ultimo recurso para poder predecir el partido. 
         """
         # Identificar las columnas de jugadores
         player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  
         
+        # Creo datafrmame auxiliar (para ver que partidos rellené)
         df_fill = pd.DataFrame(index=df.index)
         df_fill['emergency_fill'] = np.nan
 

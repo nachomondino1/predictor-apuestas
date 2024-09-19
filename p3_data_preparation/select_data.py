@@ -1,6 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('/Users/nachomondino/Documents/GitHub/predictor-apuestas')  # Fallaba el import de p4_modeling
+from set_up_logging import logger
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from p3_data_preparation import clean_data
@@ -320,7 +321,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: bool = False):
+def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = 'percentil', graf: bool = False):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -356,7 +357,14 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, graf: b
     df_normalized = fs.sum_and_normalize_importances(df_importance)
 
     # Determino columnas mas importantes
-    l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()
+    if thr_type == 'percentil':
+        # Basadas en percentil
+        percentile_value = df_normalized['suma_de_imp_norm'].quantile(thr_fs)
+        logger.info(f"El valor del percentil {thr_fs * 100}% es {percentile_value}")  # Loggear el valor del percentil
+        l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= percentile_value].index.tolist()
+    else:
+        # Numero fijo
+        l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()  
 
     # Grafico importancias teniendo en cuenta todos los modelos
     if graf:

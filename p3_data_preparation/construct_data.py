@@ -282,7 +282,7 @@ def determine_stats_columns(df: pd.DataFrame):
 
     return list(stats)
 
-def construct_sum_column(df: pd.DataFrame, l_columns: list, column_name: str = None):
+def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = None):
     """
     Crea dos nuevas columnas en el DataFrame, una con la suma de las columnas que contienen '_home' 
     y otra con la suma de las columnas que contienen '_away'.
@@ -308,26 +308,30 @@ def construct_sum_column(df: pd.DataFrame, l_columns: list, column_name: str = N
     
     return df
 
-def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str=None):
+def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str=None, laplace: bool = False):
     """
     Nueva columna siendo el porcentaje resultante de la division de otras dos columnas.
     """
 
     col_name = f'perc_{col_num}_of_{col_den}' if column_name is None else column_name
-    
-    df[f'{col_name}_home'] = round(df[f'{col_num}_home'] / df[f'{col_den}_home'], 3)
-    df[f'{col_name}_away'] = round(df[f'{col_num}_away'] / df[f'{col_den}_away'], 3)
-    return df
 
-def construct_reverse_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str=None):
-    """
-    Nueva columna siendo el porcentaje resultante de la division de otras dos columnas.
-    """
+    num1 = df[f'{col_num}_home'] + 1 if laplace else df[f'{col_num}_home']
+    num2 = df[f'{col_num}_away'] + 1 if laplace else df[f'{col_num}_away']
 
-    col_name = f'perc_{col_num}_of_{col_den}' if column_name is None else column_name
-    
-    df[f'{col_name}_home'] = round(df[f'{col_num}_away'] / df[f'{col_den}_home'], 3)
-    df[f'{col_name}_away'] = round(df[f'{col_num}_home'] / df[f'{col_den}_away'], 3)
+    # Home
+    df[f'{col_name}_home'] = np.where(
+        df[f'{col_den}_home'].notna(), 
+        num1 / df[f'{col_den}_home'], 
+        None 
+    )
+
+    # Away
+    df[f'{col_name}_away'] = np.where(
+        df[f'{col_den}_away'].notna(),  
+        num2 - df[f'{col_den}_away'], 
+        None  
+    )
+
     return df
 
 def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, calculate_dif: bool = True, _print: bool = False):
@@ -343,6 +347,10 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
     n_days = int(n_days*2) if segun_localia else n_days  # no me gusta esto... o si? Tecnicamente tambien tiene efecto en main_next_matches.py porque uso esta funcion... asique no habria problema.
+
+    # inicializo diccionarios (para evitar Performance Warning)
+    mean_last_matches = {}
+    mean_last_matches_against = {}
 
     # Por partido
     for id_match, row in df.iterrows():
@@ -369,6 +377,10 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
                 values_team = df_matches_team[variable_form].values
                 values_against_team = df_matches_team[f'{variable}_{other}'].values
 
+                # Convertir los valores a numéricos y forzar errores como NaN
+                values_team = pd.to_numeric(values_team, errors='coerce')
+                values_against_team = pd.to_numeric(values_against_team, errors='coerce')
+
                 # Remover los valores NaN
                 values_team_clean = values_team[~np.isnan(values_team)]
                 values_against_team_clean = values_against_team[~np.isnan(values_against_team)]
@@ -388,11 +400,18 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
                     print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_home']].head(5))
                     print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{variable}_away']].head(5))
 
+
                 # Obtener los valores de la variable para los partidos en casa y fuera de casa
                 values_home = df_matches_home_team[f'{variable}_home'].values
                 values_away = df_matches_away_team[f'{variable}_away'].values
                 values_against_home = df_matches_home_team[f'{variable}_away'].values
                 values_against_away = df_matches_away_team[f'{variable}_home'].values
+
+                # Convertir los valores a numéricos y forzar errores como NaN
+                values_home = pd.to_numeric(values_home, errors='coerce')
+                values_away = pd.to_numeric(values_away, errors='coerce')
+                values_against_home = pd.to_numeric(values_against_home, errors='coerce')
+                values_against_away = pd.to_numeric(values_against_away, errors='coerce')
 
                 # Remover los valores NaN
                 values_home_clean = values_home[~np.isnan(values_home)]
@@ -408,19 +427,39 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
 
             # Calcular el promedio  (COMO EVITAR WARNING?)
             if total_partidos > 0 and total_partidos_against > 0:
-                df.loc[id_match, f'mean_last_{n_days}_matches_{variable_form}'] = suma / total_partidos
-                df.loc[id_match, f'mean_last_{n_days}_matches_{variable_form}_against'] = suma_against / total_partidos_against
-                if _print:
-                    print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
+                # Guardar en los diccionarios
+                mean_last_matches[(id_match, variable_form)] = suma / total_partidos
+                mean_last_matches_against[(id_match, variable_form)] = suma_against / total_partidos_against
+
+                # df.loc[id_match, f'mean_last_{n_days}_matches_{variable_form}'] = suma / total_partidos
+                # df.loc[id_match, f'mean_last_{n_days}_matches_{variable_form}_against'] = suma_against / total_partidos_against
+                # if _print:
+                #     print(f"Valor a rellenar: {suma / total_partidos} en {variable_form}")
+
+    # Convertir los diccionarios a columnas del DataFrame
+    for home_or_away in ['home', 'away']:
+        variable_form = f'{variable}_{home_or_away}'
+        
+        # Asignar la columna para cada combinación de id_match y variable_form
+        df[f'mean_last_{n_days}_matches_{variable_form}'] = df.apply(
+            lambda row: mean_last_matches.get((row.name, variable_form), None), axis=1
+        )
+        
+        df[f'mean_last_{n_days}_matches_{variable_form}_against'] = df.apply(
+            lambda row: mean_last_matches_against.get((row.name, variable_form), None), axis=1
+        )
 
     # Calculo diferencia entre local y visitante
     if calculate_dif:
         not_none_condition = (df[f'mean_last_{n_days}_matches_{variable}_home'].notnull()) & (df[f'mean_last_{n_days}_matches_{variable}_away'].notnull())
         df[f'dif_mean_last_{n_days}_matches_{variable}'] = np.where(not_none_condition, df[f'mean_last_{n_days}_matches_{variable}_home'] - df[f'mean_last_{n_days}_matches_{variable}_away'], np.nan)
+        df = df.drop(columns=[f'mean_last_{n_days}_matches_{variable}_home', f'mean_last_{n_days}_matches_{variable}_away'], axis=1)
 
         # Calculo diferencia entre local y visitante against
         not_none_condition_2 = (df[f'mean_last_{n_days}_matches_{variable}_home_against'].notnull()) & (df[f'mean_last_{n_days}_matches_{variable}_away_against'].notnull())
         df[f'dif_mean_last_{n_days}_matches_{variable}_against'] = np.where(not_none_condition_2, df[f'mean_last_{n_days}_matches_{variable}_home_against'] - df[f'mean_last_{n_days}_matches_{variable}_away_against'], np.nan)
+        df = df.drop(columns=[f'mean_last_{n_days}_matches_{variable}_home_against', f'mean_last_{n_days}_matches_{variable}_away_against'], axis=1)
+
     return df
 
 ## Player

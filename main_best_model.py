@@ -82,7 +82,7 @@ if __name__ == "__main__":
     l_modelos = [LogisticRegression()]  # SVC()  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     d_params = {
         'construct': {
-            'n_dias_ult_part': [[30, 180]],
+            'n_dias_ult_part': [[30, 180], [60, 270]], 
             'n_years_h2h': [3],
             'segun_localia': [True, False]
         },
@@ -91,8 +91,8 @@ if __name__ == "__main__":
             'n_years_to_select': [3, 5, 10, None],
         },
         'select': {
-            'thr_corr': [0.7, 0.8, 0.9, None], 
-            'thr_fs': [0.3, 0.2, 0.1, None], 
+            'thr_corr': [0.7, 0.85, None], 
+            'thr_fs': [0, 0.25, 0.5, 0.75],  #  [0.3, 0.2, 0.1, None], 
         },
         'treat_nan': {
             'fill_na': [None, 'ml'], 

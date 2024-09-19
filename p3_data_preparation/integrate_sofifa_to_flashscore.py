@@ -260,6 +260,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     """
     print("\n Integrating players's data to df_match using mapping...")
     # Definicion de variables
+    df_aux = pd.DataFrame()
     l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se lo proceso con sup.
     l_condicion = ['home', 'away']
     d_n_reg_min = {'start': 7, 'sub': 4, 'miss': 0}
@@ -341,31 +342,24 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
 
                 # Guardo promedios de age, height, overall_rating y market value
                 if len(l_age) > n_reg_min:
-                    # if _print:
-                        # print(f"Promedio age: {sum(l_age) / len(l_age)}; Promedio height: {sum(l_height) / len(l_height)}; Promedio int rep: {sum(l_int_reputation) / len(l_int_reputation)}")
+                    if _print:
+                        print(f"Promedio age: {sum(l_age) / len(l_age)}; Promedio height: {sum(l_height) / len(l_height)}; Promedio int rep: {sum(l_int_reputation) / len(l_int_reputation)}")
 
                     df_match.loc[id_match, f'mean_age_player_{titularidad}_{condicion}'] = calcular_media(l_age)
                     df_match.loc[id_match, f'mean_hei_player_{titularidad}_{condicion}'] = calcular_media(l_height)
-                    # df_match.loc[id_match, f'mean_int_rep_player_{titularidad}_{condicion}'] = calcular_media(l_int_reputation)
                     df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = calcular_media(l_rating)
-                    # df_match.loc[id_match, f'mean_val_player_{titularidad}_{condicion}'] = calcular_media(l_market_value)
-                    # df_match.loc[id_match, f'mean_pot_player_{titularidad}_{condicion}'] = calcular_media(l_potential)
                     df_match.loc[id_match, f'mean_wage_player_{titularidad}_{condicion}'] = calcular_media(l_wages)
-                    df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)  # Cantidad de lesionados pero tambien 
+                    df_aux.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)  # Cantidad de lesionados pero tambien 
 
                     # Calculo nro de jugadores lesionados
-                    # if titularidad == 'miss':
-                        # df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)
-
-                        # Sumas
-                        # df_match.loc[id_match, f'sum_rat_player_{titularidad}_{condicion}'] = sum(l_rating)
-                        # df_match.loc[id_match, f'sum_val_player_{titularidad}_{condicion}'] = sum(l_market_value)
-                        # df_match.loc[id_match, f'sum_pot_player_{titularidad}_{condicion}'] = sum(l_potential)
-
+                    if titularidad == 'miss':
+                        df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)
+                        df_match.loc[id_match, f'sum_rat_player_{titularidad}_{condicion}'] = sum(l_rating)
 
                 progress_bar.update(1)
             progress_bar.close()
-    return df_match
+
+    return df_match, df_aux
 
 # Función auxiliar para calcular medias
 def calcular_media(lst):

@@ -324,7 +324,7 @@ class DataPreparation:
                 df_map_players_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx")
 
         # Integro datos de jugadores a df_match usando el mapeo
-        df = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
+        df, df_aux = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away'] # main_next a veces no tiene coaches.. deeberia copiar antes...
@@ -336,6 +336,7 @@ class DataPreparation:
         
         if export:
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_integrated.xlsx', index=True)
+            df_aux.to_excel(f'./data/{self.country}/p3_data_preparation/integrate_data/n_players_integrated.xlsx', index=True)
 
         return df
 
@@ -370,29 +371,39 @@ class DataPreparation:
 
             ## OFENSIVE
             ## Goal ratio
-            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", column_name="goal_ratio") 
-        
+            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio")  # Similar a G2A
+
             # Traduccion de posesion a tiros
-            df = construct_data.construct_percentaje_column(df, col_num='dangerous_attacks', col_den="ball_possession", column_name="BP2A") 
-            df = construct_data.construct_percentaje_column(df, col_num='expected_goals_(xg)', col_den="ball_possession", column_name="BP2xG") 
+            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="total_passes", laplace=True,  column_name="PPS")  # home = home / home
 
             # Dead balls
-            df = construct_data.construct_sum_column(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") # Calculo defesive actions de 
-            # df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="dead_balls", column_name="goal_ratio_dead_balls")  # genera valores infinitos x ser casi 0
+            df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
+
+            # Attacking efficiency
+            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
+            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
 
             ## DEFENSIVE
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
-            df = construct_data.construct_sum_column(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions de 
-            df = construct_data.construct_reverse_percentaje_column(df, col_num='total_passes', col_den="defensive_actions", column_name="PPDA") 
+            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
+            df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
+            df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
 
             # Clean Sheets
             df['clean_sheet_home'] = (df['goals_away'] == 0).astype(int)
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
             # Keeping Goals Prevented (KGP)
-            df['KGP_home'] = df['expected_goals_(xg)_away'] - df['goals_away'] 
-            df['KGP_away'] = df['expected_goals_(xg)_home'] - df['goals_home'] 
+            df['KGP_home'] = np.where(df['dangerous_attacks_away'].notna(),  (df['goals_away'] + 1) / df['dangerous_attacks_away'], None)
+            df['KGP_away'] = np.where(df['dangerous_attacks_home'].notna(),  (df['goals_home'] + 1) / df['dangerous_attacks_home'],  None)
 
+            # Defensive efficiency (en la teoria esto es KGP)
+            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
+            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
+
+            # Efficiency
+            df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
+            df['efficiency_away'] =df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
             # Numero de partidos jugados en ultimos n days
@@ -400,31 +411,30 @@ class DataPreparation:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
   
             # Historiales
-            # if with_h2h:
-            #     df = construct_data.h2h_by_date(df, n_years=-1)
-            #     df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-            #     df = construct_data.h2h_by_date_by_localia(df, n_years=-1)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
-            #     df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
+            if with_h2h:
+                df = construct_data.h2h_by_date(df, n_years=-1)
+                df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+                df = construct_data.h2h_by_date_by_localia(df, n_years=-1)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
+                df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
             # Determino cuales son las variables stats automaticamente
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
                 # Ofensive
                 'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
-                'shots_on_goal', 'goal_attempts', 'goals', 'points', 'goal_ratio', # 'shots_off_goal'
+                'shots_on_goal', 'goal_attempts', 'goals', 'points', 'goal_ratio', 'PPS', # 'shots_off_goal'
                 'attacks', 'dangerous_attacks', 'dead_balls', # 'goal_ratio_dead_balls',
-                'ball_possession', 'total_passes', 'BP2A', 'BP2xG', 
+                'ball_possession', 'total_passes', 'attacking_efficiency',
                 # Defensive
-                'yellow_cards', 'red_cards', 'interceptions', 'defensive_actions', # 'fouls',
-                'PPDA', 'clean_sheet', 'KGP'
+                'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls',  'interceptions'
+                'PPDA', 'KGP', 'clean_sheet', 'defensive_efficiency', "efficiency"
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
-
-            print(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
+            logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
 
             # Por stat (e.g. shots_on_goal)
             for var in relevant_stats_columns: 
-                print(f"Estadistica a promediar: {var}")
+                logger.info(f"Estadistica a promediar: {var}")
                 
                 # Por periodo de tiempo en el que calcular promedio
                 for n_days in l_days:
@@ -438,8 +448,8 @@ class DataPreparation:
                         logger.warning(f"Fallo la construccion de {var} por error {e}. Posibles causas: \n 1) Deberia ser porque hay muy pocos ultimos partidos. \n 2) En algun caso particular, si es una sola variable, puede que realmente no tenga valor en los ultimos partidos (En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos)")
                         
                         # Construyo las variables para evitar KeyError mas adelante
-                        df[f'dif_mean_last_match_{var}'] = np.nan  # relleno con nan y no con 0
-                        df[f'dif_mean_last_match_{var}_against'] = np.nan # relleno con nan y no con 0
+                        df[f'dif_mean_last_{n_days}_matches_{var}'] = np.nan  # relleno con nan y no con 0
+                        df[f'dif_mean_last_{n_days}_matches_{var}_against'] = np.nan # relleno con nan y no con 0
                 
                 # Elimino variables stat
                 df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
@@ -447,12 +457,11 @@ class DataPreparation:
             # Historica de jugadores
             try:
                 df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=False) # Variable para ponderar estadisticas
-                df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1) # no las uso pero las creo por usar determine_mean_in_last_matches()
+                df = df.drop(columns=[f'mean_last_{n_days}_matches_mean_rat_player_start_home', f'mean_last_{n_days}_matches_mean_rat_player_start_away'], axis=1) # Solo quiero 'against' (para tener medida de los rivales...)
             except KeyError:
                 # Construyo las variables para evitar KeyError mas adelante
-                df[f'mean_last_match_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
-                df[f'mean_last_match_mean_rat_player_start_away_against'] = np.nan # relleno con nan y no con 0
-                
+                df[f'mean_last_{n_days}_matches_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
+                df[f'mean_last_{n_days}_matches_mean_rat_player_start_away_against'] = np.nan # relleno con nan y no con 0
 
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
@@ -475,7 +484,7 @@ class DataPreparation:
         Conversion de columnas tipo "object" a "integer"
         """
         # Elimino columna 'season'
-        df = df.drop(['season'], axis=1)  # Arrooja error TypeError porque tiene tanto str como int en los valores originales y el label solo puede recibir un tipo (str o int). Season tiene valores como "2021" y "2020_2021", los primeros los entiende como int y los segundos como str.
+        df = df.drop(['season'], axis=1)  # Arroja error TypeError porque tiene tanto str como int en los valores originales y el label solo puede recibir un tipo (str o int). Season tiene valores como "2021" y "2020_2021", los primeros los entiende como int y los segundos como str.
         
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df)
@@ -495,6 +504,10 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
+        # Reemplazo infinitos
+        df = clean_data.replace_infinite(df)
+
+        # Ordeno valores por fecha y separo X e y
         df = df.sort_values(by='date', ascending=False)
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
         
@@ -938,19 +951,19 @@ def main(id_country, d_run, export: bool = True):
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         d_comps = select_data.determine_country_competitions(id_country)
         l_days, n_years_h2h, segun_localia = [30, 180], 3, False
-        thr_corr, thr_fs = 0.9, 0.2
+        thr_corr, thr_fs = 0.9, 0.5
         n_years_to_select, comp_to_select = 3, d_comps['comp_sin_b']
         fill_na = None
         df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
         
-        df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_constructed.xlsx', index_col=0)
-        print(df.head(2))
+        # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
+        # print(df.head(2))
 
         # Preparo el dataset para el analisis
-        # df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
-        # df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
-        # df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-        # df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
+        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
+        df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
+        df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
+        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
         df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
         df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)

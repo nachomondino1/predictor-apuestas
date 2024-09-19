@@ -74,12 +74,17 @@ def load_hyperparameters(row_hiper):
 
 def load_as_list(lista):
     """
-    Convierte elemento con forma de lista pero con otro formato a formato lista.
+    Convierte un elemento con forma de lista pero con otro formato a una lista.
+    Garantiza que el resultado siempre sea una lista.
     """
     try:
-        return eval(lista)
-    except TypeError: # Falla aqui cuando corro el find_best.
-        return list(lista)
+        # Intenta evaluar la expresión y asegurarte de que es una lista
+        result = eval(lista)
+        if not isinstance(result, list):
+            return [result]  # Si no es una lista, lo convierte en una lista con un solo elemento
+        return result
+    except (TypeError, SyntaxError):  # Captura posibles errores de eval() o tipo
+        return list(lista)  # Si eval falla, intenta convertir a lista usando list()
 
 def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
 
@@ -238,13 +243,13 @@ if __name__ == "__main__":
     d = {
         6: ["argentina", "2024-05-07"],
         # 48: ["england", '2024-09-07'], 
-        48: ["england", '2024-09-16'], 
+        48: ["england", '2024-09-18'], 
         55: ["france", "2024-09-06"], 
         59: ["germany", "2024-09-07"],
         77: ["italy", "2024-07-25"], 
         148: ["spain", "2024-07-31"], 
-        167: ["usa", "2024-09-07"]
-
+        # 167: ["usa", "2024-09-07"]
+        167: ["usa", "2024-09-18"]
     }
     country, date = d[id_country]
     logger.info(f"Country: {country}, Date: {date}")
