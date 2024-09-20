@@ -554,27 +554,40 @@ class DataPreparationNew(DataPreparation):
         """
         logger.info("\n\n" + "Treating NaN values...")
 
-        # Rellenar NaN en algunas columnas espeecificas
-        h2h_columns = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        historic_columns = [col for col in df.columns if re.match(r'^mean_last_\d+_matches', col)]
-        player_miss_columns = [col for col in df.columns if '_miss' in col]  # columnas_player_miss = ['dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss']
-        columns_to_fill = [col for col in (h2h_columns + historic_columns + player_miss_columns) if col in df.columns]  
-        
-        if columns_to_fill:
-            df_copy = df.copy()
-            df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
-            df = df_copy
-
-        # Si solo un equipo tiene NaN en las columnas de jugadores
+        # Relleno variables de jugadores en relleno de emergencia
         df, df_fill = self.fill_player_columns_with_min_value(df)
 
-        # Elimino partidos con al menos un NaN value
+        # Rellenar NaN en algunas columnas espeecificas
+        # h2h_columns = [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
+        # historic_columns = [col for col in df.columns if re.match(r'^mean_last_\d+_matches', col)]
+        # player_miss_columns = [col for col in df.columns if '_miss' in col]  # columnas_player_miss = ['dif_mean_age_player_miss', 'dif_mean_hei_player_miss', 'dif_mean_int_rep_player_miss']
+        # columns_to_fill = [col for col in (h2h_columns + historic_columns + player_miss_columns) if col in df.columns]  
+        columns_to_fill = [col for col in df.columns if df[col].isna().any()]  # En teoria, solo rellena las variables historicas que son nan.
+
+        if columns_to_fill:
+            # Crear una copia del DataFrame y rellenar los NaN
+            df_copy = df.copy()
+            df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
+
+            # Crear un DataFrame con las columnas que fueron rellenadas
+            df_filled_columns = df_copy[columns_to_fill]
+
+            # Calcular y mostrar el porcentaje de NaN por cada columna
+            for col in columns_to_fill:
+                nan_percentage = df[col].isna().mean() * 100
+                logger.warning(f"Columna '{col}' tiene {nan_percentage:.1f}% de valores NaN.")
+
+            # Actualizar el DataFrame original
+            df = df_copy
+
+        # Elimino partidos con al menos un NaN value --> Tal vez lo deberia poner al ppio para imprimir warning de cuantos partidos eliminaria...
         df_sin_dup = df.dropna()
         if len(df) != len(df_sin_dup):
             logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
 
         if self.export: 
             df_sin_dup.to_excel(f'{self.BASE_DIR}/df_selected_nan.xlsx', index=True)
+            df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
             df_fill.to_excel(f'{self.BASE_DIR}/df_emergency_fill.xlsx', index=True)
 
         return df_sin_dup, df_fill
@@ -584,7 +597,8 @@ class DataPreparationNew(DataPreparation):
         Rellenado de emergencia de valores NaN con la media de la columna. Es ultimo recurso para poder predecir el partido. 
         """
         # Identificar las columnas de jugadores
-        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  
+        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col) or ('player_miss' in col)]  
+        logger.info(f"Player columns to fill in emergency: {player_columns}")
         
         # Creo datafrmame auxiliar (para ver que partidos rellené)
         df_fill = pd.DataFrame(index=df.index)
@@ -702,7 +716,7 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
 
     # Guardo hiperparametros en diccionario
     ## Construct_data
-    d['n_dias_ult_part'] = int(row_hiper['n_dias_ult_part'].values[0])
+    d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part'].values[0])
     d['n_years_h2h'] = int(row_hiper['n_anios_hist'].values[0])
     d['segun_localia'] = row_hiper['segun_localia'].values[0]
     ## Clean_data_2
@@ -860,8 +874,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     # Levanto modelos, hiperparametros y demas
     if d_run['data_unders']:
         n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
-        BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
+        # BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
         BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
+        BASE_DIR_dp = f"{BASE_DIR_mod}/p3_data_preparation/"
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
         logger.info(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
@@ -989,7 +1004,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
         ## Para construct_data
         logger.info("Seleccion de ultimos partidos para construccion de variables...")
-        n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
+        n_days_max = max(d_hiper['n_dias_ult_part'])
+        n_days_period = n_days_max * 2 if d_hiper['segun_localia'] == True else n_days_max
         df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
         # Preparacion de datos
@@ -1080,9 +1096,10 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 48
-        n_days = 2
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        id_country = 167
+        n_days = 3
+        # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
