@@ -24,6 +24,7 @@ old/
 --modeling/
 # Main_find_best_hiper
 data/*/p4_modeling/*/data_seg/*.xlsx
+data/*/p4_modeling/*/models/*.xlsx
 assess_models_in_prod/
 old_train_iterations/
 old_assess_iterations/
