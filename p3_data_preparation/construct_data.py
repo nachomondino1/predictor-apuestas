@@ -1,5 +1,6 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from set_up_logging import logger
 import pandas as pd
 import numpy as np
 import time
@@ -498,7 +499,9 @@ def calculate_dif_col_players(df: pd.DataFrame):
 
                 # Elimino variables utilizadas para calcular la diferencia
                 df = df.drop([columna_home, columna_away], axis=1)
+                
             except KeyError:
+                logger.warning("Falló el calculo de diferencia entre local y visitante")
                 pass
     return df
 
