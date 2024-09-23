@@ -325,9 +325,28 @@ def replace_nan_with_zero(df, col1, col2):  # Si un equipo no tiene jug asusente
 
     df[col1] = np.where(condition_2, 0, df[col1])
     df[col2] = np.where(condition_1, 0, df[col2])
+    return df  
+
+def replace_infinite(df):
+    
+    # Reemplazar los valores infinitos por NaN para luego eliminarlos --> Para evitar error en scaler: (ValueError: Input X contains infinity or a value too large for dtype('float64')) 
+    df_numeric = df.select_dtypes(include=[np.number]) # Seleccionar solo las columnas numéricas
+    # logger.info(np.isinf(df_numeric).sum()) # Verificar si existen valores infinitos en las columnas numéricas
+    # Calcular el porcentaje de valores infinitos por columna
+    inf_percentages = (np.isinf(df_numeric).sum() / len(df_numeric)) * 100
+
+    # Crear una lista con los nombres de las columnas y su porcentaje de valores infinitos
+    inf_columns_info = [(col, inf_percentages[col]) for col in df_numeric.columns if inf_percentages[col] > 0]
+
+    # Loguear la información de las columnas con valores infinitos
+    for col, perc in inf_columns_info:
+        logger.info(f"Columna: {col}, Porcentaje de valores infinitos: {perc:.2f}%")
+
+    df[df_numeric.columns] = df_numeric.replace([np.inf, -np.inf], np.nan) # Reemplazar los valores infinitos por NaN en las columnas numéricas
     return df
 
-def prueba():
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
@@ -358,7 +377,3 @@ def prueba():
     # df['dif_sum_min_suplente'] = scaler.fit_transform(df['dif_sum_min_suplente'].values.reshape(-1, 1))
     
     df.to_excel(f'{BASE_DIR_LOCAL}/df_cleaned_prueba.xlsx', index=True)
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    prueba()

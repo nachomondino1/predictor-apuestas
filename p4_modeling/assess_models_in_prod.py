@@ -58,26 +58,33 @@ def load_hyperparameters(row_hiper):
 
     # Guardo hiperparametros en diccionario
     ## Construct_data
-    d['n_dias_ult_part'] =  int(row_hiper['n_dias_ult_part'].values[0])
+    d['n_dias_ult_part'] = load_as_list(row_hiper['n_dias_ult_part'].values[0])    # d['n_dias_ult_part'] =  int(row_hiper['n_dias_ult_part'].values[0])
     d['n_years_h2h'] = int(row_hiper['n_anios_hist'].values[0])
     d['segun_localia'] = row_hiper['segun_localia'].values[0]
     ## Clean_data_2
     n_years_to_select = row_hiper['n_years_to_select'].values[0]
     d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
-    try:
-        d['comp_to_select'] = eval(row_hiper['comp_to_select'].values[0])
-    except TypeError: # Falla aqui cuando corro el find_best.
-        d['comp_to_select'] = list(row_hiper['comp_to_select'].values[0])
-    ## Select_data
-    try:
-        d['selected_columns'] = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
-    except TypeError:  # Falla aqui cuando corro el find_best.
-        d['selected_columns'] = list(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
+    d['comp_to_select'] = load_as_list(row_hiper['comp_to_select'].values[0])
+    d['selected_columns'] = load_as_list(row_hiper['X_columns'].values[0])
 
     print("\nHiperparametros cargados:")
     for key, value in d.items():
         print(f'\t {key}: {value}')
     return d
+
+def load_as_list(lista):
+    """
+    Convierte un elemento con forma de lista pero con otro formato a una lista.
+    Garantiza que el resultado siempre sea una lista.
+    """
+    try:
+        # Intenta evaluar la expresión y asegurarte de que es una lista
+        result = eval(lista)
+        if not isinstance(result, list):
+            return [result]  # Si no es una lista, lo convierte en una lista con un solo elemento
+        return result
+    except (TypeError, SyntaxError):  # Captura posibles errores de eval() o tipo
+        return list(lista)  # Si eval falla, intenta convertir a lista usando list()
 
 def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
 
@@ -87,7 +94,7 @@ def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
     # Cargo modelos segun hiperparametros
     tager_loaded = pd.read_excel(f'{ruta_base_dp}/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}.xlsx')
     scaler, columns_scaled = joblib.load(f'{ruta_base_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl')
-    loaded_model = pickle.load(open(f"{ruta_base_mod}/data_seg/{n_model}_model.pkl", "rb"))
+    loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_model}_model.pkl", "rb"))
     return tager_loaded, scaler, columns_scaled,loaded_model
 
 ################################################### MAIN ###################################################
@@ -95,7 +102,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
-    n_days_to_fill = 150
+    n_days_to_fill = 60
 
     # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
     save_assess(ruta_base_mod)   # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
@@ -151,7 +158,8 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 
             # Selecciono los ultimos partidos de los ya jugados
             logger.info("Seleccion de ultimos partidos para construccion de variables...")
-            n_days_period = d_hiper['n_dias_ult_part'] * 2 if d_hiper['segun_localia'] == True else d_hiper['n_dias_ult_part']
+            n_days_max = max(d_hiper['n_dias_ult_part'])
+            n_days_period = n_days_max * 2 if d_hiper['segun_localia'] == True else n_days_max
             df_last_old_matches_construct = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=n_days_period) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
             if relleno_formaciones:
@@ -228,25 +236,30 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 167
+    id_country = 148
 
     # Defino condiciones del analisis
-    bet_strategy = 'reality' # general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
+    bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
-        48: ["england", '2024-09-07'], 
-        55: ["france", "2024-09-06"], 
-        59: ["germany", "2024-09-07"],
-        77: ["italy", "2024-07-25"], 
-        148: ["spain", "2024-07-31"], 
-        167: ["usa", "2024-09-07"]
-
+        # 48: ["england", '2024-09-07'], 
+        48: ["england", '2024-09-18'], 
+        # 55: ["france", "2024-09-06"], 
+        55: ["france", "2024-09-21"], 
+        # 59: ["germany", "2024-09-07"],
+        59: ["germany", "2024-09-22"],
+        # 77: ["italy", "2024-07-25"], 
+        77: ["italy", "2024-09-21"], 
+        # 148: ["spain", "2024-07-31"], 
+        148: ["spain", "2024-09-22"], 
+        # 167: ["usa", "2024-09-07"]
+        167: ["usa", "2024-09-18"]
     }
     country, date = d[id_country]
     logger.info(f"Country: {country}, Date: {date}")
 
     # Defino rutas
-    ruta_base_dp = f"./data/{country}/p3_data_preparation/{date}"
+    ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
     ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
     df_iteration_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
 
