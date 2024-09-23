@@ -57,6 +57,9 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         # Agrego columnas 'goals_home' y 'goals_away' a predicciones.xlsx
         df_pred_with_goals = pd.concat([df, df_results], axis=1)
 
+        # Elimino partidos con goals_home "-" puesto que son partidos suspendidos
+        df = drop_suspended_matches(df)
+
         # Determino ganador y si acerté
         df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
         df_pred_with_result = determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
@@ -69,6 +72,17 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     else:
         logger.warning("Se evitó el update de resultados puesto que no se detectaron partidos jugados ayer")
 
+def drop_suspended_matches(df):
+    # Convertir la columna 'goals_home' a numérica, convirtiendo valores no numéricos en NaN
+    df['goals_home'] = pd.to_numeric(df['goals_home'], errors='coerce')
+
+    # Eliminar las filas donde 'goals_home' es NaN (es decir, no era un número)
+    df = df.dropna(subset=['goals_home'])
+
+    # Opcional: Convertir de nuevo a entero si los valores en 'goals_home' deben ser enteros
+    df['goals_home'] = df['goals_home'].astype(int)
+    return df
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
@@ -78,7 +92,7 @@ if __name__ == "__main__":
 
     # Parametros de ejecución
     if env == 'dev':
-        n_days = 1
+        n_days = 5
     
     elif env == 'prod':
         n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
