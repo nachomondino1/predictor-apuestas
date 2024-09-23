@@ -361,7 +361,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
             b = y1 - m*x1
 
         # Calculo multiplier
-        df['multiplier'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.35, 0.10)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+        df['multiplier'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.5, 0.00)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
 
         # Ajusta el multiplier para que sea menor a 100
         df['multiplier'] = np.where(
@@ -385,7 +385,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         b = np.exp(log_b)   
 
         # Calculo multiplier
-        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.35, 0.10)))
+        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.5, 0.00)))
 
         # Ajusta el multiplier para que sea menor a 100
         df['multiplier'] = np.where(
