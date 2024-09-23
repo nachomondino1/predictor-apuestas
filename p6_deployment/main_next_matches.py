@@ -401,7 +401,7 @@ class DataPreparationNew(DataPreparation):
 
         return df_new, df_copiado
 
-    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: int, n_years_h2h: int, segun_localia: bool, columns_used: list):
+    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: list, n_years_h2h: int, segun_localia: bool, columns_used: list):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -425,9 +425,10 @@ class DataPreparationNew(DataPreparation):
         # Si hay "ultimos partidos"
         if len(df_last_old_matches) > 0:
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
+
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
             df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, with_h2h=False, export=False)
-            df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados
+            df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
 
         # Si no hay "ultimos partidos"
         else:
@@ -571,7 +572,9 @@ class DataPreparationNew(DataPreparation):
 
             # Crear un DataFrame con las columnas que fueron rellenadas
             df_filled_columns = df_copy[columns_to_fill]
-
+            if self.export: 
+                df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
+        
             # Calcular y mostrar el porcentaje de NaN por cada columna
             for col in columns_to_fill:
                 nan_percentage = df[col].isna().mean() * 100
@@ -587,7 +590,6 @@ class DataPreparationNew(DataPreparation):
 
         if self.export: 
             df_sin_dup.to_excel(f'{self.BASE_DIR}/df_selected_nan.xlsx', index=True)
-            df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
             df_fill.to_excel(f'{self.BASE_DIR}/df_emergency_fill.xlsx', index=True)
 
         return df_sin_dup, df_fill
@@ -765,7 +767,7 @@ def load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d):
     if n_model is not None:
         n_ult_part, n_years_h2h, segun_localia, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['n_years_to_select'], d['comp_to_select']
         path_scaler = f'{BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl'
-        path_model = f"{BASE_DIR_mod}/{n_model}_model.pkl"  #  f"{BASE_DIR_mod}/data_seg/{n_model}_model.pkl"
+        path_model = f"{BASE_DIR_mod}/models/{n_model}_model.pkl"  #  f"{BASE_DIR_mod}/data_seg/{n_model}_model.pkl"
     # Si se levanta de main.py
     else:
         path_scaler = f"./data/{country}/p3_data_preparation/scaler_model.pkl"
@@ -872,11 +874,10 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
     dp = DataPreparationNew(country=country, export=export) # Creo objeto de clase DataPreparation
 
     # Levanto modelos, hiperparametros y demas
-    if d_run['data_unders']:
+    if d_run['data_unders'] or d_run['modeling']:
         n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
-        # BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
         BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
-        BASE_DIR_dp = f"{BASE_DIR_mod}/p3_data_preparation/"
+        BASE_DIR_dp = f"{BASE_DIR_mod}/p3_data_preparation/"         # BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
         logger.info(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
 
@@ -905,6 +906,9 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         # df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=1)
         df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=2)
+        # df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+        # df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
+        # df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
 
         # Si hay partidos missing que no extraje aun
         if len(df_match_miss) > 0:
@@ -1096,10 +1100,10 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167
-        n_days = 3
-        # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        id_country = 148  # Volver a la normalidad despues de correr 77 y 148
+        n_days = 15
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':

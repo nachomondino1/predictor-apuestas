@@ -1,6 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from set_up_logging import logger
 import pandas as pd
 import datetime
 from sklearn.tree import DecisionTreeClassifier
@@ -75,14 +76,40 @@ def main(l_modelos, d_params, export: bool = True):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 48
+    id_country = 148
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression()]  # SVC()  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
-    d_params = {
+    l_modelos = [LogisticRegression(),  SVC()]  # SVC()  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
+
+    d_params_1 = {  # 324 iteraciones
         'construct': {
-            'n_dias_ult_part': [[30, 180], [60, 270]], 
+            'n_dias_ult_part': [[30, 180], [60, 180]], 
+            'n_years_h2h': [3],
+            'segun_localia': [True, False]
+        },
+        'clean_data_2': {
+            'competencies_to_select': [d_comps['all_comp']],
+            'n_years_to_select': [3, 5, 10, None],
+        },
+        'select': {
+            'thr_corr': [0.7, 0.85, None], 
+            'thr_fs': [0, 0.25, 0.5], 
+        },
+        'treat_nan': {
+            'fill_na': [None, 'ml'], 
+        },
+        'modeling': {
+            'val_size': [0.125],
+            'test_size': [0.10], 
+            'bal_type': [None, 'under'],
+            'k': [10] 
+        }
+    }
+
+    d_params_2 = { # 1536 iteraciones
+        'construct': {
+            'n_dias_ult_part': [[30, 180], [60, 180]], 
             'n_years_h2h': [3],
             'segun_localia': [True, False]
         },
@@ -92,7 +119,7 @@ if __name__ == "__main__":
         },
         'select': {
             'thr_corr': [0.7, 0.85, None], 
-            'thr_fs': [0, 0.25, 0.5, 0.75],  #  [0.3, 0.2, 0.1, None], 
+            'thr_fs': [0, 0.25, 0.5, 0.75], 
         },
         'treat_nan': {
             'fill_na': [None, 'ml'], 
@@ -104,6 +131,9 @@ if __name__ == "__main__":
             'k': [10] 
         }
     }
+
+    d_params = d_params_1
+    logger.info(f"Parametros para entrenar: {d_params}")
 
     # Creo directorios segun pais y fecha de corrida
     ## Determino fecha de hoy
