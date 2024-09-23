@@ -45,7 +45,9 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         if len(df_results_competition) > 0:
 
             # Elimino partidos con goals_home y goals_away None (A PRUEBA, NO SE SI FUNCIONA)
-            df_results_competition = df_results_competition.dropna(subset=["goals_home"])
+            # Elimino partidos con goals_home "-" puesto que son partidos suspendidos
+            df_results_competition = drop_suspended_matches(df_results_competition)
+            # df_results_competition = df_results_competition.dropna(subset=["goals_home"])
 
             # Guardo results de competencia
             df_results = pd.concat([df_results, df_results_competition], axis=0)
@@ -56,9 +58,6 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
 
         # Agrego columnas 'goals_home' y 'goals_away' a predicciones.xlsx
         df_pred_with_goals = pd.concat([df, df_results], axis=1)
-
-        # Elimino partidos con goals_home "-" puesto que son partidos suspendidos
-        df = drop_suspended_matches(df)
 
         # Determino ganador y si acerté
         df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
@@ -73,14 +72,19 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         logger.warning("Se evitó el update de resultados puesto que no se detectaron partidos jugados ayer")
 
 def drop_suspended_matches(df):
+    """
+    Si no los elimina, falla la determinacion de si acerte o no pues los goals no son integer.
+    """
     # Convertir la columna 'goals_home' a numérica, convirtiendo valores no numéricos en NaN
     df['goals_home'] = pd.to_numeric(df['goals_home'], errors='coerce')
+    df['goals_away'] = pd.to_numeric(df['goals_away'], errors='coerce')
 
     # Eliminar las filas donde 'goals_home' es NaN (es decir, no era un número)
-    df = df.dropna(subset=['goals_home'])
+    df = df.dropna(subset=['goals_home', 'goals_away'])
 
     # Opcional: Convertir de nuevo a entero si los valores en 'goals_home' deben ser enteros
     df['goals_home'] = df['goals_home'].astype(int)
+    df['goals_away'] = df['goals_away'].astype(int)
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
