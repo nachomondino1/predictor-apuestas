@@ -139,16 +139,9 @@ def concat_dfs_per_season(country, competition, l_dataframes, l_filenames, expor
 
 if __name__ == "__main__":
 
-    # Definicion de variables
-    id_country = 148
-    export = True
-    competicion, temporada, integracion = False, False, True
+    # Definicion de parametros
+    integracion = True
     d_countries = {6: 'argentina', 48: 'england', 55: 'france', 59: 'germany', 77: 'italy', 148: 'spain', 167: 'usa'}
-
-    # Levento df_countries y obtengo id
-    df_countries = pd.read_excel(f'./data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
-    print(country)
 
     # Integracion
     if integracion:
@@ -160,6 +153,16 @@ if __name__ == "__main__":
         df_player_fifa_sofifa.to_excel('data/df_player_fifa_sofifa.xlsx')
 
     
+    # Definicion de variables
+    competicion, temporada = False, False
+    id_country = 148
+    export = True
+
+        # Levento df_countries y obtengo id
+    df_countries = pd.read_excel(f'./data/df_countries.xlsx')
+    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    print(country)
+
     # Concateno competiciones del country
     if competicion:
         l_dataframes =  ['df_teams_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']

@@ -24,12 +24,12 @@ def convert_ball_possession_to_int(df):
             
     return df
 
-def convert_market_value_to_int(df):
+def convert_value_to_int(df):
     """
-    Transforma el valor de mercado de string a float.
+    Transforma los valores numéricos de string a float para las columnas 'value' y 'wage'.
 
-    :param df: Dataframe con columna 'value' cuyos valores son un string, por ejemplo, '€1.2M'.
-    :return: Dataframe con la columna 'value' interpretada como float, por ejemplo, 1.200.000.
+    :param df: Dataframe con columnas 'value' y 'wage', cuyos valores son strings, por ejemplo, '€1.2M'.
+    :return: Dataframe con las columnas 'value' y 'wage' interpretadas como float, por ejemplo, 1.200.000.
     """
     def convertir_value(value_str):
         d = {'M': 1000000, 'K': 1000}
@@ -47,12 +47,8 @@ def convert_market_value_to_int(df):
             return None
     
     # Reemplazo strings por numbers
-    df['value'] = df['value'].apply(convertir_value)
-
-    # Verifica si todos los elementos de la columna son de tipo float
-    if not all(isinstance(value, (float, np.floating)) for value in df['value']):
-        logger.error(f"Not all elements in the column 'value' are float.")  # Si no todos los elementos son de tipo float, raise una advertencia        
-
+    df['value'] = df['value'].apply(convertir_value).astype(float)
+    df['wage'] = df['wage'].apply(convertir_value).astype(float)
     return df
 
 def convert_goals_to_int(df):

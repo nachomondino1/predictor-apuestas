@@ -61,7 +61,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         n_days = 15
         l_countries = [48, 55, 59, 77, 148]
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
