@@ -102,7 +102,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
-    n_days_to_fill = 150
+    n_days_to_fill = 60
 
     # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
     save_assess(ruta_base_mod)   # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 48
+    id_country = 148
 
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
@@ -244,10 +244,14 @@ if __name__ == "__main__":
         6: ["argentina", "2024-05-07"],
         # 48: ["england", '2024-09-07'], 
         48: ["england", '2024-09-18'], 
-        55: ["france", "2024-09-06"], 
-        59: ["germany", "2024-09-07"],
-        77: ["italy", "2024-07-25"], 
-        148: ["spain", "2024-07-31"], 
+        # 55: ["france", "2024-09-06"], 
+        55: ["france", "2024-09-21"], 
+        # 59: ["germany", "2024-09-07"],
+        59: ["germany", "2024-09-22"],
+        # 77: ["italy", "2024-07-25"], 
+        77: ["italy", "2024-09-21"], 
+        # 148: ["spain", "2024-07-31"], 
+        148: ["spain", "2024-09-22"], 
         # 167: ["usa", "2024-09-07"]
         167: ["usa", "2024-09-18"]
     }
