@@ -4,7 +4,8 @@ on:
   schedule: # Se ejecutan en horario UTC 0 (arg es -3) y con 15' de retraso...
 
     # Todos los dias a la medianoche
-    - cron: "45 21 * * *"
+    - cron: "00 21 * * *" # 18 hs
+    - cron: "45 21 * * *" # 18.45 hs
     
     # Viernes (16:00 hs, 18:00 hs, 18:30 hs)
     - cron: "0 19 * * 5" # 16 ARG (partidos de las 14 hs)
