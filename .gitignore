@@ -1,7 +1,8 @@
-# Entornos virtaules
+# Entornos virtuales
 venv/
 backEnv/
 venv_mnm/
+requirements_original.txt
 
 # Variables entorno
 .env
