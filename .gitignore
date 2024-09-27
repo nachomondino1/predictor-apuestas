@@ -2,7 +2,7 @@
 venv/
 backEnv/
 venv_mnm/
-requirements_original.txt
+requirements_updated.txt
 
 # Variables entorno
 .env
