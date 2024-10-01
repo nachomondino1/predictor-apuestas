@@ -263,7 +263,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     df_aux = pd.DataFrame()
     l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se lo proceso con sup.
     l_condicion = ['home', 'away']
-    d_n_reg_min = {'start': 7, 'sub': 4, 'miss': 0}
+    d_n_reg_min = {'start': 9, 'sub': 5, 'miss': 0}
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -285,7 +285,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
             # Por partido
             for id_match, row_match in df_match.iterrows():
 
-                l_age, l_height, l_rating, l_wages = [], [], [], [] # l_int_reputation, , l_market_value, l_potential
+                l_age, l_height, l_rating = [], [], [] # l_int_reputation, , l_market_value, l_potential, l_wages
                 
                 # Busco el fifa correspondiente segun la fecha del partido
                 year_fifa = search_fecha_fifa(row_match['date'])                
@@ -333,7 +333,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 l_age.append(df_player_filt.age.values[0])
                                 l_height.append(height)  # l_height.append(df_player_filt.height.values[0])
                                 l_rating.append(df_player_filt.overall_rating.values[0])
-                                l_wages.append(df_player_filt.wage.values[0])
+                                # l_wages.append(df_player_filt.wage.values[0])
                                 # l_market_value.append(df_player_filt.value.values[0])
                                 # l_potential.append(df_player_filt.potential.values[0])
                                 # l_int_reputation.append(df_player_filt.int_reputation.values[0])
@@ -341,20 +341,20 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                     print(f"\t\t DATOS DEL JUGADOR: Age: {df_player_filt.age.values[0]}; Height: {height}; Rating: {df_player_filt.overall_rating.values[0]}; Market value: {df_player_filt.value.values[0]}; Potencial: {df_player_filt.potential.values[0]}; Int rep: {df_player_filt.int_reputation.values[0]}")       
 
                 # Guardo promedios de age, height, overall_rating y market value
-                if len(l_age) > n_reg_min:
-                    if _print:
-                        print(f"Promedio age: {sum(l_age) / len(l_age)}; Promedio height: {sum(l_height) / len(l_height)}; Promedio int rep: {sum(l_int_reputation) / len(l_int_reputation)}")
+                if len(l_age) >= n_reg_min:
 
                     df_match.loc[id_match, f'mean_age_player_{titularidad}_{condicion}'] = calcular_media(l_age)
                     df_match.loc[id_match, f'mean_hei_player_{titularidad}_{condicion}'] = calcular_media(l_height)
-                    df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = calcular_media(l_rating)
-                    df_match.loc[id_match, f'mean_wage_player_{titularidad}_{condicion}'] = calcular_media(l_wages)
+                    # df_match.loc[id_match, f'mean_wage_player_{titularidad}_{condicion}'] = calcular_media(l_wages)
                     df_aux.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)  # Cantidad de lesionados pero tambien 
 
                     # Calculo nro de jugadores lesionados
                     if titularidad == 'miss':
                         df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)
                         df_match.loc[id_match, f'sum_rat_player_{titularidad}_{condicion}'] = sum(l_rating)
+                    else:
+                        df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = calcular_media(l_rating)
+
 
                 progress_bar.update(1)
             progress_bar.close()
