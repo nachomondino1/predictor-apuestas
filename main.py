@@ -347,7 +347,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, calculate_against: bool = True, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, dif_con_against: bool = True, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -448,7 +448,7 @@ class DataPreparation:
                     # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
                     try:
                         # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-                        df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia, dif_con_against=True)  # mean_last_match_dif_points_home
+                        df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia, dif_con_against=dif_con_against)  # mean_last_match_dif_points_home
                     
                     except KeyError as e:
                         logger.warning(f"Fallo la construccion de {var} por error {e}. Posibles causas: \n 1) Deberia ser porque hay muy pocos ultimos partidos. \n 2) En algun caso particular, si es una sola variable, puede que realmente no tenga valor en los ultimos partidos (En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos)")
@@ -462,8 +462,8 @@ class DataPreparation:
                         
             # Historica de jugadores
             try:
-                df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=False) # Variable para ponderar estadisticas
-                df = df.drop(columns=[f'mean_last_{n_days}_matches_mean_rat_player_start_home', f'mean_last_{n_days}_matches_mean_rat_player_start_away'], axis=1) # Solo quiero 'against' (para tener medida de los rivales...)
+                df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
+                # df = df.drop(columns=[f'mean_last_{n_days}_matches_mean_rat_player_start_home', f'mean_last_{n_days}_matches_mean_rat_player_start_away'], axis=1) # Solo quiero 'against' (para tener medida de los rivales...)
             except KeyError:
                 # Construyo las variables para evitar KeyError mas adelante
                 df[f'mean_last_{n_days}_matches_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
@@ -471,11 +471,6 @@ class DataPreparation:
 
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
-
-        # VARIABLE DE EQUIPO
-        # func = lambda row: 1 if (row['id_team_home_rival_team'] == row['id_team_away']) or (row['id_team_away_rival_team'] == row['id_team_home']) else 0
-        # df['is_rival_match'] = df.apply(func, axis=1)
-        # df = df.drop(columns=['id_team_home_rival_team', 'id_team_away_rival_team'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -771,7 +766,7 @@ class Modeling:
             # Separo en train y validation
             X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
 
-        # Balanceo el dataset de entrenamiento
+        # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, bal_type=bal_type)
 
@@ -804,17 +799,22 @@ class Modeling:
         if nn:
             logger.info("Entrenando red neuronal")
             from tensorflow.keras.utils import to_categorical
+            from tensorflow.keras.callbacks import EarlyStopping
 
-            # Convertir las etiquetas a one-hot encoding para multiclase
+            # Convertir etiquetas a formato one-hot
+            y_val_categorical = to_categorical(y_val, num_classes=3)
             y_train_categorical = to_categorical(y_train, num_classes=3)
             self.classes = np.unique(y_train)
 
-            # Entrenar el modelo
+            # Definir un callback de EarlyStopping
+            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+            # Entrenar el modelo con early stopping
             model_best_params = model
-            history = model.fit(X_train, y_train_categorical, epochs=10, batch_size=32, validation_data=(X_val, to_categorical(y_val, 3)))
+            history = model.fit(X_train, y_train_categorical, epochs=100, batch_size=32, validation_data=(X_val, y_val_categorical), callbacks=[early_stopping])
 
             # Obtener la precisión de entrenamiento en la última época
-            train_accuracy = history.history['accuracy'][-1]
+            train_accuracy = history.history['accuracy'][-1] * 100
 
             # Obtener los hiperparámetros de las capas
             d_hiper_model = [layer.get_config() for layer in model.layers] 
@@ -823,8 +823,6 @@ class Modeling:
             #     print(f"Capa {i}: {params}")
 
         else:
-            self.classes = model.classes_
-
             # Find best hiperparameters
             if params is None:
                 model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
@@ -837,6 +835,7 @@ class Modeling:
 
             # Fit model
             model_best_params.fit(X_train, y_train)
+            self.classes = model_best_params.classes_
 
             # Evaluo el modelo con Cross Validation
             train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
@@ -885,9 +884,7 @@ class Modeling:
                 f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
                 f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=X_test.index)
-        
-        # df_pred_proba = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred, f'prob_class_{model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{model.classes_[2]}': y_pred_prob[:, 2]}, index=X_test.index)
-
+    
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100
@@ -938,7 +935,6 @@ class Modeling:
 
             if modelo == "neural_network": # A diferencia de los otros modelos, la tengo que crear
                 modelo = self.create_neural_network(X_train.shape[1], num_classes=3)
-                modelo.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
                 nn = True
 
             # Entreno modelo y evaluo su rendimiento     
@@ -959,20 +955,48 @@ class Modeling:
                 print("Se evitó entrenar este modelo")
         
         d_metrics_best_model.update({'model_name': model_name_best_mod, 'model_trained': d_hiper_best_model, 'train_cv_accuracy': cv_acc})
+        logger.info(f"Mejor modelo: {model_name_best_mod} con train_accuracy: {cv_acc}")
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
     
     # Definir el modelo
-    def create_neural_network(self, input_shape, num_classes):
+    def create_neural_network(self, input_shape, num_classes, batch_normalization: bool = False):
         
         import tensorflow as tf
         from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import Dense
-        
+        from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
+        from tensorflow.keras.regularizers import l2 
+        from tensorflow.keras.metrics import Recall
+        from tensorflow.keras import backend as K
+
         model = Sequential()
-        model.add(Dense(64, input_dim=input_shape, activation='relu'))  # Capa oculta
-        model.add(Dense(32, activation='relu'))  # Capa oculta
-        model.add(Dense(num_classes, activation='softmax'))  # Capa de salida softmax para clasificación multiclase
+
+        # Capa oculta 1 con regularización Dropout
+        # model.add(Dense(128, input_dim=input_shape, activation='relu'))
+        model.add(Dense(128, input_dim=input_shape, activation='relu', kernel_regularizer=l2(0.001)))
+        if batch_normalization:
+            model.add(BatchNormalization())
+        model.add(Dropout(0.3))  # Dropout para evitar sobreajuste. El 30% de las neuronas se "apagará" de manera aleatoria en cada paso de entrenamiento.
+
+        # Capa oculta 2
+        model.add(Dense(64, activation='relu', kernel_regularizer=l2(0.001)))
+        # model.add(Dense(64, activation='relu'))
+        if batch_normalization:
+            model.add(BatchNormalization())
+
+        # Capa oculta 3 (nueva)
+        model.add(Dense(32, activation='relu', kernel_regularizer=l2(0.001)))
+        # model.add(Dense(32, activation='relu'))
+        if batch_normalization:
+            model.add(BatchNormalization())
+
+        # Capa de salida con softmax para clasificación multiclase (Empate, Local, Visitante)
+        model.add(Dense(num_classes, activation='softmax'))
+
+        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='categorical_crossentropy',  metrics=[Recall(class_id=0), 'accuracy'])  # Suponiendo que el empate es la clase 0
+
         return model
+
 
 
 ##################################################### MAIN #####################################################
@@ -1016,7 +1040,7 @@ def main(id_country, d_run, export: bool = True):
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         d_comps = select_data.determine_country_competitions(id_country)
-        l_days, n_years_h2h, segun_localia = [90], 3, False
+        l_days, n_years_h2h, segun_localia, dif_con_against = [90], 3, False, True
         thr_corr, thr_fs = 0.9, 0.5
         n_years_to_select, comp_to_select = 3, d_comps['comp_sin_b']
         fill_na = None
@@ -1029,7 +1053,7 @@ def main(id_country, d_run, export: bool = True):
         # df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
         # df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         # df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
+        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=export)
         df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
         df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)

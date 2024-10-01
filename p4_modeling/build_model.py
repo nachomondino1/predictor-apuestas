@@ -59,7 +59,7 @@ def select_best_hiperparameters(model, X, y, k, _print: bool = False):
             # 'loss': ['deviance']
         },
         'LogisticRegression': {
-            'penalty': ['l1', 'l2'],
+            'penalty': ['l2'], # 'l1' solo usa solver 'saga'
             'C': [0.1, 1, 5],
             'solver': ['saga', 'liblinear', 'newton-cg', 'sag', 'lbfgs'],
             'fit_intercept': [True, False],

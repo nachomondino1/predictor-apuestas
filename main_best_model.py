@@ -49,7 +49,7 @@ def main(l_modelos, d_params, export: bool = True):
     Entrena modelos segun las combinaciones de hiperparametros deseadas. Luego los evalua en produccion y selecciona el mejor.
     """
     # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
-    save_old_assess()      # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
+    # save_old_assess()      # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
 
     ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
     ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
@@ -76,21 +76,22 @@ def main(l_modelos, d_params, export: bool = True):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 148
+    id_country = 48
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(),  SVC()]  # SVC()  #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
+    l_modelos = [LogisticRegression(), 'neural_network']  # SVC() --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
 
-    d_params_1 = {  # 324 iteraciones
+    # 1728 iteraciones
+    d_params_1 = {  
         'construct': {
-            'n_dias_ult_part': [[30, 180], [60, 180]], 
+            'n_dias_ult_part': [[90], [30, 180], [60, 210]], 
             'n_years_h2h': [3],
             'segun_localia': [True, False]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['all_comp']],
-            'n_years_to_select': [3, 5, 10, None],
+            'competencies_to_select': [d_comps['comp_sin_cups'], d_comps['comp_sin_b'], d_comps['all_comp']],
+            'n_years_to_select': [5, 10], #3,  None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años)
         },
         'select': {
             'thr_corr': [0.7, 0.85, None], 
@@ -100,39 +101,39 @@ if __name__ == "__main__":
             'fill_na': [None, 'ml'], 
         },
         'modeling': {
-            'val_size': [0.125],
+            'val_size': [0.10],
             'test_size': [0.10], 
             'bal_type': [None, 'under'],
             'k': [10] 
         }
     }
 
-    d_params_2 = { # 1536 iteraciones
+    d_params = {  
         'construct': {
-            'n_dias_ult_part': [[30, 180], [60, 180]], 
+            'n_dias_ult_part': [[90], [30, 180]], 
             'n_years_h2h': [3],
-            'segun_localia': [True, False]
+            'segun_localia': [False, True],
+            'dif_con_against': [False, True]
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']],
-            'n_years_to_select': [3, 5, 10, None],
+            'competencies_to_select': [d_comps['all_comp']],
+            'n_years_to_select': [5, 10], #3,  None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años)
         },
         'select': {
-            'thr_corr': [0.7, 0.85, None], 
-            'thr_fs': [0, 0.25, 0.5, 0.75], 
+            'thr_corr': [0.7, None], 
+            'thr_fs': [0, 0.5], 
         },
         'treat_nan': {
             'fill_na': [None, 'ml'], 
         },
         'modeling': {
-            'val_size': [0.125],
+            'val_size': [0.10],
             'test_size': [0.10], 
-            'bal_type': [None, 'under'], # 'over'
+            'bal_type': ['under'],
             'k': [10] 
         }
     }
 
-    d_params = d_params_1
     logger.info(f"Parametros para entrenar: {d_params}")
 
     # Creo directorios segun pais y fecha de corrida

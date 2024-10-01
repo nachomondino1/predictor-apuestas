@@ -1,6 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from set_up_logging import logger
 import pandas as pd
 from itertools import product
 from main import DataPreparation, Modeling
@@ -15,39 +16,42 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
     # Definicion de variables
     df_iteration = pd.DataFrame()
     cont_iter = 0
+    rows_to_features_min = 40  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
     var_resp, var_pred = 'result', 'predicted_result'
     dp = DataPreparation(country)
     mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
 
     # Imprimo largo de iteraciones
     n_iter = define_n_iterations(d_params)
-    print(f"Numero de iteraciones totales: {n_iter}")
+    logger.info(f"Numero de iteraciones totales: {n_iter}")
 
     # Por combinacion de parametros de construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
         # Asigno valor a cada hiperpametro
-        n_dias_ult_part, n_years_h2h, segun_localia= param_values_2[0], param_values_2[1], param_values_2[2]
-        print(f" Iteracion Construct Nº {i} ".center(120, "#"))
-        print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia}')
+        n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
+        path_construct = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
+        logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
+        logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
+        print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 
         # Construyo datos
-        path = f'{ruta_base_dp}/df_constructed_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        path = f'{ruta_base_dp}/df_constructed_{path_construct}.xlsx'
         try:
             df_constructed = pd.read_excel(path, index_col=0)
-            print("\n DF_CONSTRUCTED \n", df_constructed.head(2))
+            # print("\n DF_CONSTRUCTED \n", df_constructed.head(2))
         except FileNotFoundError:
             # Levanto dataset formateado e integrado (estos no cambian entre iteraciones)
             df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-            print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
+            # print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
 
-            df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=False)
+            df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
             if export:
                 df_constructed.to_excel(path, index=True)
 
         # Etiqueto df_constructed
         df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=False)
-        path = f'{ruta_base_dp}/df_etiquetas_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'
+        path = f'{ruta_base_dp}/df_etiquetas_{path_construct}.xlsx'
         if export:
             df_etiquetas.to_excel(path, index=True)
 
@@ -55,22 +59,24 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
         for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
 
             n_years_to_select, comp_to_select = param_values_00[1], param_values_00[0]
-            print(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
+            path_clean = f'{n_years_to_select}_{comp_to_select}'
+            logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
             print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
 
             df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, n_years_to_select, comp_to_select, export=False)
-            joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}.pkl')
+            joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_construct}_{path_clean}.pkl')
         
             # Por combinacion de parametros de select_data
             for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
                 # Asigno valor a cada hiperpametro
                 thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                print(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
+                path_select = f'{thr_corr}_{thr_fs}'
+                logger.info(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
                 print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
                 # Selecciono datos
-                path = f'{ruta_base_dp}/df_selected_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_to_select}_{comp_to_select}_{thr_corr}_{thr_fs}.xlsx'
+                path = f'{ruta_base_dp}/df_selected_{path_construct}_{path_clean}_{path_select}.xlsx'
                 try:
                     df_sel = pd.read_excel(path, index_col=0)
                 except FileNotFoundError:
@@ -80,7 +86,7 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                 for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
 
                     fill_na = param_values_3[0]
-                    print(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
+                    logger.info(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
                     print(f"Hiper treat --> fill_na: {fill_na}")
 
                     df_sel_treated = dp.treat_nan_values(df_sel, fill_na=fill_na, export=False)
@@ -91,22 +97,23 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
                         # Asigno valor a cada hiperparametro
                         val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
-                        print(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
-                        print(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
+                        logger.info(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
+                        logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
                         print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
 
                         # Generar el diseño de la prueba
                         X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
+                        rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
+                        logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
 
                         # Si hay suficientes datos
-                        if len(X_test) >= 50:
+                        if rows_to_features >= rows_to_features_min: # len(X_test) >= 50 and 
                             
                             # Select best model
                             best_model, d_hiper_best_model, d_metrics_best_model, df_pred = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
-
                             # Guardo datos en dataframe
                             row_data = {'n_iteration': cont_iter, 
-                                        'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia,
+                                        'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
                                         'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                         'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
                                         'fill_na': fill_na, 'bal_type': bal_type,
@@ -126,6 +133,8 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                                     df_hiper_best_model.to_csv(f"{ruta_base_mod_seg}/{cont_iter}_model_hiper.csv")
                                 except:
                                     pass
+                        else:
+                            logger.warning(f"Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
     # Guardo datos de todas las iteraciones
     if export:
