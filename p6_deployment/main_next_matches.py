@@ -849,7 +849,7 @@ def read_data_of_best_model(id_country):
 
 
 ########################################################################## MAIN #######################################################################
-def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:bool = True):
+def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_missing=1, export:bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
     """
@@ -904,7 +904,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, export:boo
         df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=1)
+        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
         # df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
         # df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
         # df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
@@ -1099,8 +1099,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167  # 55, 48, 167?
+        id_country = 48  # 55, 48, 167?
         n_days = 15
+        n_seasons_missing = 2
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
@@ -1110,7 +1111,8 @@ if __name__ == "__main__":
         n_days = float(sys.argv[1])  # Número de días máximo desde hoy para extraer partidos (e.g. 7)
         id_country = int(sys.argv[2])  # Id de país a extraer (e.g. 48)
         d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario
+        n_seasons_missing = 1
         directorio = "data/"
 
-    df = main(d_run, id_country, n_days, export=d_run['export'])
+    df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, export=d_run['export'])
     df.to_excel(f"{directorio}/predicciones.xlsx")
