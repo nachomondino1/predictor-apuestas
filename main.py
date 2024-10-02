@@ -208,12 +208,6 @@ class DataPreparation:
         start = time.time()
         logger.info("\nCleanning data...")
 
-        # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
-        # print("\nEliminacion de estadisticas irrelevantes")
-        # stats_columns = construct_data.determine_stats_columns(df_match)
-        # relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
-        # df_match = clean_data.delete_not_relevant_stats(df_match, stats_columns, relevant_stats_columns)
-       
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
         df_match_player.drop(columns=non_object_columns, inplace=True)
@@ -232,10 +226,9 @@ class DataPreparation:
         ### Elimino jugadores duplicados por haber jugado mas de una competicion del pais
         len_inic = len(df_player_sofifa)
         df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
-        len_final = len(df_player_sofifa)
-        dif = len_inic - len_final
-        if dif > 0:
-            logger.warning(f"Se eliminaron {dif} jugadores de los {len_inic} de Sofifa que habia.")
+        n_players_eliminated = len_inic - len(df_player_sofifa)
+        if n_players_eliminated > 0:
+            logger.warning(f"Se eliminaron {n_players_eliminated} jugadores de los {len_inic} de Sofifa que habia.")
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
         ### Dataframe teams sofifa (df_teams_sofifa)
@@ -449,7 +442,7 @@ class DataPreparation:
                     try:
                         # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
                         df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia, dif_con_against=dif_con_against)  # mean_last_match_dif_points_home
-                    
+
                     except KeyError as e:
                         logger.warning(f"Fallo la construccion de {var} por error {e}. Posibles causas: \n 1) Deberia ser porque hay muy pocos ultimos partidos. \n 2) En algun caso particular, si es una sola variable, puede que realmente no tenga valor en los ultimos partidos (En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos)")
                         
@@ -463,7 +456,9 @@ class DataPreparation:
             # Historica de jugadores
             try:
                 df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
-                # df = df.drop(columns=[f'mean_last_{n_days}_matches_mean_rat_player_start_home', f'mean_last_{n_days}_matches_mean_rat_player_start_away'], axis=1) # Solo quiero 'against' (para tener medida de los rivales...)
+                n_days_final = n_days * 2 if segun_localia else n_days
+                df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
+
             except KeyError:
                 # Construyo las variables para evitar KeyError mas adelante
                 df[f'mean_last_{n_days}_matches_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
@@ -982,12 +977,12 @@ class Modeling:
         model.add(Dropout(dropout_rate))
 
         # Capa oculta 2
-        model.add(Dense(neurons_2, activation='relu', kernel_regularizer=l2(0.001)))
+        model.add(Dense(neurons_2, activation='relu')) # kernel_regularizer=l2(0.001)
         if batch_normalization:
             model.add(BatchNormalization())
 
         # Capa oculta 3 (nueva)
-        model.add(Dense(neurons_3, activation='relu', kernel_regularizer=l2(0.001)))
+        model.add(Dense(neurons_3, activation='relu')) # kernel_regularizer=l2(0.001)
         if batch_normalization:
             model.add(BatchNormalization())
 
@@ -1042,19 +1037,19 @@ def main(id_country, d_run, export: bool = True):
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         d_comps = select_data.determine_country_competitions(id_country)
-        l_days, n_years_h2h, segun_localia, dif_con_against = [90], 3, False, True
-        thr_corr, thr_fs = 0.9, 0.5
+        l_days, n_years_h2h, segun_localia, dif_con_against = [30, 180], 3, False, False
+        thr_corr, thr_fs = 0.85, 0.5
         n_years_to_select, comp_to_select = 3, d_comps['comp_sin_b']
         fill_na = None
-        df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
+        df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'dif_con_against': [dif_con_against], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
         
-        df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-        print(df.head(2))
+        # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
+        # print(df.head(2))
 
         # Preparo el dataset para el analisis
-        # df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
-        # df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
-        # df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
+        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
+        df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
+        df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
         df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=export)
         df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
         df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
