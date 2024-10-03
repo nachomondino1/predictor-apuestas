@@ -148,7 +148,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         print("DATA PREPARATION".center(120, "-"))
 
         # Levanto datos ya construidos
-        path_cons = f'{ruta_base_mod}/assess_models_in_prod/data_preparation/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx'
+        path_cons = f'{ruta_base_mod}/assess_models_in_prod/data_preparation/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}_{d_hiper['dif_con_against']}.xlsx'
 
         try:
             df_cons = pd.read_excel(path_cons, index_col=0)
@@ -259,10 +259,10 @@ if __name__ == "__main__":
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
-        48: ["england", '2024-10-01'], # ["england", '2024-09-18'], 
+        48: ["england", '2024-10-02'], # ["england", '2024-09-18'], 
         55: ["france", "2024-09-21"], 
         59: ["germany", "2024-09-22"],
-        77: ["italy", "2024-09-21"], 
+        77: ["italy", "2024-10-02"], # "2024-09-21"
         148: ["spain", "2024-09-22"], 
         167: ["usa", "2024-09-18"]
     }
