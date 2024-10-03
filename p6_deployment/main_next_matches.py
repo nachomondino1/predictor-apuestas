@@ -425,11 +425,14 @@ class DataPreparationNew(DataPreparation):
         # Si hay "ultimos partidos"
         if len(df_last_old_matches) > 0:
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
-
+            n_rows_inic = len(df_next_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
             df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
-
+            if len(df_next_matches) > n_rows_inic:
+                logger.error("En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)")
+                raise KeyError
+            
         # Si no hay "ultimos partidos"
         else:
             # evito construir variables historicas
@@ -681,8 +684,8 @@ def load_df_etiquetas(country, n_model, BASE_DIR, d):
         print("2) Levento etiquetas viejo puesto que no hay uno actualizado")
         # Si se levanta de find_best_hyper.py
         if n_model is not None:
-            n_ult_part, n_years_h2h, segun_localia = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia']
-            path_tag = f'{BASE_DIR}/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}.xlsx'       
+            n_ult_part, n_years_h2h, segun_localia, dif_con_against = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against']
+            path_tag = f'{BASE_DIR}/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}.xlsx'       
         # Si se levanta de main.py
         else:
             path_tag = f"./data/{country}/p3_data_preparation/df_etiquetas.xlsx"
@@ -715,12 +718,15 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
         df_selected = pd.read_excel(f'./data/{country}/p3_data_preparation/df_selected.xlsx', index_col=0)
         df_selected = df_selected.drop(['result'], axis=1)
         selected_columns = list(df_selected.columns)
+        logger.error("Se levantan los hiperparametros de Data Preparation desde de main.py")
+
 
     # Guardo hiperparametros en diccionario
     ## Construct_data
     d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part'].values[0])
     d['n_years_h2h'] = int(row_hiper['n_anios_hist'].values[0])
     d['segun_localia'] = row_hiper['segun_localia'].values[0]
+    d['dif_con_against'] = row_hiper['dif_con_against'].values[0]
     ## Clean_data_2
     n_years_to_select = row_hiper['n_years_to_select'].values[0]
     d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
@@ -745,6 +751,7 @@ def load_modeling_hyperparameters(country, n_model, BASE_DIR):
         row_hiper_bet_strat = df_iteration.loc[n_model]
     else:
         row_hiper_bet_strat = pd.read_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx')
+        logger.error("Se levantan los hiperparametros de Modeling desde de main.py")
 
     # Guardo hiperparametros en diccionario
     d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best.1']
@@ -765,11 +772,12 @@ def load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d):
 
     # Si se levanta de main_find_best_hyper.py
     if n_model is not None:
-        n_ult_part, n_years_h2h, segun_localia, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['n_years_to_select'], d['comp_to_select']
-        path_scaler = f'{BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl'
+        n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'],  d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
+        path_scaler = f'{BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
         path_model = f"{BASE_DIR_mod}/models/{n_model}_model.pkl"  #  f"{BASE_DIR_mod}/data_seg/{n_model}_model.pkl"
     # Si se levanta de main.py
     else:
+        logger.error("Se levanta el modelo y el scaler desde de main.py")
         path_scaler = f"./data/{country}/p3_data_preparation/scaler_model.pkl"
         path_model = f"./data/{country}/p4_modeling/modelo.pkl"
 
@@ -849,7 +857,7 @@ def read_data_of_best_model(id_country):
 
 
 ########################################################################## MAIN #######################################################################
-def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_missing=1, export:bool = True):
+def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_missing:int = 1, extract_missing: bool = True, export:bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
     """
@@ -904,16 +912,18 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
-        # df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
-        # df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
-        # df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
+        if extract_missing:
+            df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
+        else:
+            df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+            df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
+            df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
 
         # Si hay partidos missing que no extraje aun
         if len(df_match_miss) > 0:
             logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
-            if export:
+            if export and extract_missing:
                 # Guardo datos con los que entrenó el modelo y los missing
                 concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country)
                 concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
@@ -1052,9 +1062,22 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']]
 
         # Realizo predicciones sobre los nuevos partidos
-        y_pred_prob = loaded_model.predict_proba(df)
+        # y_pred_prob = loaded_model.predict_proba(df)
+        try:
+            y_pred_prob = loaded_model.predict_proba(df) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
+            classes = loaded_model.classes_
+        except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
+            y_pred_prob = loaded_model.predict(df)
+            classes = [0, 1, 2]
+
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
-        df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df.index)
+        df_pred_proba = pd.DataFrame({
+                'predicted_result': y_pred,
+                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
+                f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
+            }, index=df.index)
+        # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df.index)
 
         # Concateno conjunto de datos
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -1099,9 +1122,10 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 48  # 55, 48, 167?
+        id_country = 59  # 55, 48, 167?
         n_days = 15
         n_seasons_missing = 2
+        extract_missing = True
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
@@ -1112,7 +1136,8 @@ if __name__ == "__main__":
         id_country = int(sys.argv[2])  # Id de país a extraer (e.g. 48)
         d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario
         n_seasons_missing = 1
+        extract_missing = True
         directorio = "data/"
 
-    df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, export=d_run['export'])
+    df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, extract_missing=extract_missing ,export=d_run['export'])
     df.to_excel(f"{directorio}/predicciones.xlsx")
