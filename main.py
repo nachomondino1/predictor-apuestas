@@ -208,6 +208,14 @@ class DataPreparation:
         start = time.time()
         logger.info("\nCleanning data...")
 
+        # Elimino partidos viejos sin estadisticas y sin datos de jugadores --> PROBAR!
+        n_rows_inic = len(df_match)
+        df_match['date'] = pd.to_datetime(df_match['date'])  # Asegurarte de que la columna 'date' sea de tipo datetime (si no lo es ya)
+        start_date = '2012-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
+        df_match = df_match[df_match['date'] >= start_date]
+        df_match_player = df_match_player[df_match_player.index.isin(df_match.index)] # Es clave para eliminar jugadores y hacer una mejor integracion (tener menos falsos positivos)
+        logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
+
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
         df_match_player.drop(columns=non_object_columns, inplace=True)
@@ -226,6 +234,7 @@ class DataPreparation:
         ### Elimino jugadores duplicados por haber jugado mas de una competicion del pais
         len_inic = len(df_player_sofifa)
         df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
+        df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates() # No por id_player porque no es unico (hay 2 por fifa)
         n_players_eliminated = len_inic - len(df_player_sofifa)
         if n_players_eliminated > 0:
             logger.warning(f"Se eliminaron {n_players_eliminated} jugadores de los {len_inic} de Sofifa que habia.")
@@ -1121,7 +1130,7 @@ def main(id_country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 48 # 55, 59, 77, 148
+    id_country = 59 # 55, 59, 77, 148
     d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)
