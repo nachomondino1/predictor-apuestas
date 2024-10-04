@@ -16,7 +16,7 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
     # Definicion de variables
     df_iteration = pd.DataFrame()
     cont_iter = 0
-    rows_to_features_min = 40  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
+    rows_to_features_min = 30  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
     var_resp, var_pred = 'result', 'predicted_result'
     dp = DataPreparation(country)
     mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
@@ -31,7 +31,6 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
         # Asigno valor a cada hiperpametro
         n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
         path_construct = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
-        logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
         logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
         print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 

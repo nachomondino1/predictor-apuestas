@@ -253,17 +253,17 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 48
+    id_country = 77
 
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'], # ["england", '2024-09-18'], 
-        55: ["france", "2024-09-21"], 
-        59: ["germany", "2024-09-22"],
-        77: ["italy", "2024-10-02"], # "2024-09-21"
-        148: ["spain", "2024-09-22"], 
+        55: ["france", "2024-10-03"], 
+        59: ["germany", "2024-10-03"],
+        77: ["italy", "2024-10-03"], # "2024-09-21"
+        148: ["spain", "2024-10-03"], 
         167: ["usa", "2024-09-18"]
     }
     country, date = d[id_country]

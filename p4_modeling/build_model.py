@@ -63,10 +63,10 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 'penalty': ['l1', 'l2'], # 'l1' solo usa solver 'saga'
                 'C': [0.1, 0.5, 1], # 5
                 'solver': ['saga', 'liblinear'], #  'newton-cg', 'sag', 'lbfgs'
-                'fit_intercept': [True], # False
+                'fit_intercept': [True, False], 
                 'max_iter': [2000],
                 # 'multi_class': ['auto'],
-                'class_weight': ['balanced', None], # hace un under basicamente... no tiene sentido cuando hago under creo.
+                # 'class_weight': ['balanced', None], # hace un under basicamente... no tiene sentido cuando hago under creo.
             },
             'SVC': {
                 'C': [0.1, 1, 5],

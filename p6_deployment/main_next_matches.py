@@ -511,9 +511,14 @@ class DataPreparationNew(DataPreparation):
         logger.info(f"Filas luego de filtrar x competencia: {n_reg_inic} --> {len(df)}")
 
         # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
-        df = df.loc[:, columns_used]
-        logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
-
+        try:
+            df = df.loc[:, columns_used]
+            logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
+        except KeyError as e:
+            logger.error("Las columnas del scaler no coinciden con las de los proximos partidos.")
+            logger.info(df)
+            logger.info(df.shape)
+            raise e
         # Transforma los nuevos datos de predicción utilizando el StandardScaler cargado
         try: 
             X_scaled = scaler_loaded.transform(df)
@@ -772,7 +777,7 @@ def load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d):
 
     # Si se levanta de main_find_best_hyper.py
     if n_model is not None:
-        n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'],  d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
+        n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
         path_scaler = f'{BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
         path_model = f"{BASE_DIR_mod}/models/{n_model}_model.pkl"  #  f"{BASE_DIR_mod}/data_seg/{n_model}_model.pkl"
     # Si se levanta de main.py
@@ -1026,7 +1031,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
         df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
-        df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled)
+        df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], columns_used=columns_scaled)
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas)
         df = dp.clean_data_2_new(df, scaler, columns_scaled, comp_public) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
         if len(df) == 0:
@@ -1122,12 +1127,12 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 59  # 55, 48, 167?
+        id_country = 148  # 55, 48, 167?
         n_days = 15
         n_seasons_missing = 2
         extract_missing = True
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+        # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
