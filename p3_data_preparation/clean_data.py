@@ -240,6 +240,13 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
     :return: (Dataframe)
     """
     X_filled = X.copy()
+    params = {
+            'n_estimators': [100], 
+            'criterion': ["friedman_mse"], # "squared_error",  # "absolute_error", --> tarda mucho, "poisson"
+            'max_depth': [5, 10], # No quiero None por overfitting.
+            'bootstrap': [True],  # Si se utiliza o no bootstrap para muestreo de datos
+            'min_samples_leaf': [3],
+        }
     
     # Por columna a rellenar
     for col in l_columns_to_fill:
@@ -268,7 +275,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
             X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
             # Selecciono los mejores hiperparametros usando el set de validacion
-            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3)
+            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, params=params, k=3, _print=True)
 
             # Entrenar el modelo con los datos de entrenamiento
             model.fit(X_train, y_train)

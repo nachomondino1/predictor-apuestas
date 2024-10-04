@@ -31,3 +31,9 @@ old_train_iterations/
 old_assess_iterations/
 # Deployment
 --missing/
+
+# Temporal
+-- p3_data_preparation (integré solo algunas var)/
+2024-10-01 (1)/
+2024-10-01 (2)/
+integracion_mala/

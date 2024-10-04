@@ -61,6 +61,7 @@ def load_hyperparameters(row_hiper):
     d['n_dias_ult_part'] = load_as_list(row_hiper['n_dias_ult_part'].values[0])    # d['n_dias_ult_part'] =  int(row_hiper['n_dias_ult_part'].values[0])
     d['n_years_h2h'] = int(row_hiper['n_anios_hist'].values[0])
     d['segun_localia'] = row_hiper['segun_localia'].values[0]
+    d['dif_con_against'] = row_hiper['dif_con_against'].values[0]
     ## Clean_data_2
     n_years_to_select = row_hiper['n_years_to_select'].values[0]
     d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
@@ -89,11 +90,13 @@ def load_as_list(lista):
 def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
 
     # Levanto hiperparametros de DataPreparation de la iteracion 
-    n_ult_part, n_years_h2h, segun_localia, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['n_years_to_select'], d['comp_to_select']
+    n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
+    path_construct = f'{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}'
+    path_clean = f'{n_years_sel}_{comp}'
 
     # Cargo modelos segun hiperparametros
-    tager_loaded = pd.read_excel(f'{ruta_base_dp}/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}.xlsx')
-    scaler, columns_scaled = joblib.load(f'{ruta_base_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{n_years_sel}_{comp}.pkl')
+    tager_loaded = pd.read_excel(f'{ruta_base_dp}/df_etiquetas_{path_construct}.xlsx')
+    scaler, columns_scaled = joblib.load(f'{ruta_base_dp}/scaler_model_{path_construct}_{path_clean}.pkl')
     loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_model}_model.pkl", "rb"))
     return tager_loaded, scaler, columns_scaled,loaded_model
 
@@ -145,7 +148,8 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         print("DATA PREPARATION".center(120, "-"))
 
         # Levanto datos ya construidos
-        path_cons = f'{ruta_base_mod}/assess_models_in_prod/data_preparation/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}.xlsx'
+        path_cons = f'{ruta_base_mod}/assess_models_in_prod/data_preparation/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}_{d_hiper['dif_con_against']}.xlsx'
+
         try:
             df_cons = pd.read_excel(path_cons, index_col=0)
             print("Evito construir datos dado que levanto dataframe ya construido")
@@ -172,7 +176,7 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
                 df_int = df_fill
 
             # Construyo datos usando partidos viejos
-            df_cons = dp.construct_data_new(df_next_matches=df_int, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_old_int, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled)
+            df_cons = dp.construct_data_new(df_next_matches=df_int, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_old_int, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'],  columns_used=columns_scaled)
             df_cons.to_excel(path_cons, index=True)
         
         # Sigo preparando datos
@@ -188,10 +192,23 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         #______________________________________________ MODELING ______________________________________________#
         print("MODELING".center(120, "-"))
         # Realizo predicciones sobre los nuevos partidos
-        y_pred_prob = loaded_model.predict_proba(df_treat)
-        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
-        df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
+        try:
+            y_pred_prob = loaded_model.predict_proba(df_treat) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
+            classes = loaded_model.classes_
+        except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
+            y_pred_prob = loaded_model.predict(df_treat)
+            classes = [0, 1, 2]
+        logger.info(classes)
 
+        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
+        # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
+        df_pred_proba = pd.DataFrame({
+                'predicted_result': y_pred,
+                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
+                f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
+            }, index=df_treat.index)
+    
         # Agrego resultado y cuotas a df_match
         df_match_odds_2 = df_match_odds[df_match_odds.index.isin(df_treat.index)]
         df_match_odds_2 = df_match_odds.reindex(df_treat.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
@@ -236,23 +253,17 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 148
+    id_country = 77
 
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
-        # 48: ["england", '2024-09-07'], 
-        48: ["england", '2024-09-18'], 
-        # 55: ["france", "2024-09-06"], 
-        55: ["france", "2024-09-21"], 
-        # 59: ["germany", "2024-09-07"],
-        59: ["germany", "2024-09-22"],
-        # 77: ["italy", "2024-07-25"], 
-        77: ["italy", "2024-09-21"], 
-        # 148: ["spain", "2024-07-31"], 
-        148: ["spain", "2024-09-22"], 
-        # 167: ["usa", "2024-09-07"]
+        48: ["england", '2024-10-02'], # ["england", '2024-09-18'], 
+        55: ["france", "2024-10-03"], 
+        59: ["germany", "2024-10-03"],
+        77: ["italy", "2024-10-03"], # "2024-09-21"
+        148: ["spain", "2024-10-03"], 
         167: ["usa", "2024-09-18"]
     }
     country, date = d[id_country]
