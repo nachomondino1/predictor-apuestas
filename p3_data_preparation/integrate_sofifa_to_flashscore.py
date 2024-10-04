@@ -263,7 +263,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     df_aux = pd.DataFrame()
     l_titularidad = ['start', 'sub', 'miss']  # tendria que agregar 'sup_ing' pero se lo proceso con sup.
     l_condicion = ['home', 'away']
-    d_n_reg_min = {'start': 7, 'sub': 4, 'miss': 0}
+    d_n_reg_min = {'start': 8, 'sub': 5, 'miss': 1}
+    n_fif_ant, n_fif_act = 0, 0
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -282,13 +283,11 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
             # Inicializo barra de progreso
             progress_bar = tqdm(total=len(df_match_player), ncols=80)
 
-            # Por partido
-            for id_match, row_match in df_match.iterrows():
-
-                l_age, l_height, l_rating, l_wages = [], [], [], [] # l_int_reputation, , l_market_value, l_potential
+            for id_match, row_match in df_match.iterrows():  # Podria mapear o usar where() en vez de hacer este for?
+                l_age, l_height, l_rating, l_int_reputation, l_market_value, l_potential, l_wages = [], [], [], [], [], [], []
                 
                 # Busco el fifa correspondiente segun la fecha del partido
-                year_fifa = search_fecha_fifa(row_match['date'])                
+                year_fifa, year_fifa_ant = search_fecha_fifa(row_match['date'])  
                 if _print:
                     print(f' Partido Nº: {id_match} '.center(120, '#'))
                     print(f"Fecha partido: {row_match['date']} --> Fifa a buscar: {year_fifa}")
@@ -318,7 +317,20 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
 
                             # Busco el id y la fecha en df_player (Sofifa)
                             df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'] == id_player_sofifa)]
-                            df_player_filt = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
+                            df_player_fifa_actual = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
+                            # df_player_filt = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
+                            
+                            # Si no encontro jugador en el actual fifa, busco en el anterior (Solucion cuando aun no salio el nuevo fifa)
+                            if (len(df_player_filt) > 0) and len(df_player_fifa_actual) == 0:
+                                # logger.warning("Tuve que usar fifa anterior")
+                                df_player_fifa_ant = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa_ant))]
+                                df_player_filt = df_player_fifa_ant
+                                if len(df_player_fifa_ant) > 0:
+                                    n_fif_ant += 1
+                            else:
+                                df_player_filt = df_player_fifa_actual
+                                n_fif_act += 1
+
                             if _print:
                                 print(f"Cantidad de jugadores fs: {len(df_map_fs_so)}, Encontró jugador de fs: {len(row_map)}")
                                 print(f"\t\t Hizo match para este jugador! Id jugador en Sofifa: {id_player_sofifa}")       
@@ -334,30 +346,41 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 l_height.append(height)  # l_height.append(df_player_filt.height.values[0])
                                 l_rating.append(df_player_filt.overall_rating.values[0])
                                 l_wages.append(df_player_filt.wage.values[0])
-                                # l_market_value.append(df_player_filt.value.values[0])
-                                # l_potential.append(df_player_filt.potential.values[0])
-                                # l_int_reputation.append(df_player_filt.int_reputation.values[0])
+                                l_market_value.append(df_player_filt.value.values[0])
+                                l_potential.append(df_player_filt.potential.values[0])
+                                l_int_reputation.append(df_player_filt.int_reputation.values[0])
                                 if _print:
                                     print(f"\t\t DATOS DEL JUGADOR: Age: {df_player_filt.age.values[0]}; Height: {height}; Rating: {df_player_filt.overall_rating.values[0]}; Market value: {df_player_filt.value.values[0]}; Potencial: {df_player_filt.potential.values[0]}; Int rep: {df_player_filt.int_reputation.values[0]}")       
 
                 # Guardo promedios de age, height, overall_rating y market value
-                if len(l_age) > n_reg_min:
-                    if _print:
-                        print(f"Promedio age: {sum(l_age) / len(l_age)}; Promedio height: {sum(l_height) / len(l_height)}; Promedio int rep: {sum(l_int_reputation) / len(l_int_reputation)}")
+                if len(l_age) >= n_reg_min:
 
                     df_match.loc[id_match, f'mean_age_player_{titularidad}_{condicion}'] = calcular_media(l_age)
                     df_match.loc[id_match, f'mean_hei_player_{titularidad}_{condicion}'] = calcular_media(l_height)
-                    df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = calcular_media(l_rating)
-                    df_match.loc[id_match, f'mean_wage_player_{titularidad}_{condicion}'] = calcular_media(l_wages)
                     df_aux.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)  # Cantidad de lesionados pero tambien 
 
-                    # Calculo nro de jugadores lesionados
+                    # Calculo suma si los jugadores son missing (debido a nro ≠ de missing, depende el part)
                     if titularidad == 'miss':
-                        df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating)
+                        df_match.loc[id_match, f'n_player_{titularidad}_{condicion}'] = len(l_rating) # Calculo nro de jugadores lesionados
                         df_match.loc[id_match, f'sum_rat_player_{titularidad}_{condicion}'] = sum(l_rating)
-
+                        df_match.loc[id_match, f'sum_wage_player_{titularidad}_{condicion}'] = sum(l_wages)
+                        df_match.loc[id_match, f'sum_value_player_{titularidad}_{condicion}'] = sum(l_market_value)
+                        df_match.loc[id_match, f'sum_pot_player_{titularidad}_{condicion}'] = sum(l_potential)
+                        df_match.loc[id_match, f'sum_rep_player_{titularidad}_{condicion}'] = sum(l_int_reputation)
+                    # Calculo promedio si los jugadores son start o sub (debido a = numero de jugadores, 11 tit y 7 sup)
+                    else:
+                        df_match.loc[id_match, f'mean_rat_player_{titularidad}_{condicion}'] = calcular_media(l_rating)
+                        df_match.loc[id_match, f'mean_wage_player_{titularidad}_{condicion}'] = calcular_media(l_wages) 
+                        df_match.loc[id_match, f'mean_value_player_{titularidad}_{condicion}'] = calcular_media(l_market_value)
+                        df_match.loc[id_match, f'mean_pot_player_{titularidad}_{condicion}'] = calcular_media(l_potential)
+                        df_match.loc[id_match, f'mean_rep_player_{titularidad}_{condicion}'] = calcular_media(l_int_reputation)
+                # else:
+                #     logger.warning(f"Se evitó promediar {titularidad} {condicion} por ser {len(l_age)} menor al minimo de {n_reg_min}")
+   
                 progress_bar.update(1)
             progress_bar.close()
+
+    logger.critical(f"{n_fif_ant} - {n_fif_act}")
 
     return df_match, df_aux
 
@@ -377,25 +400,19 @@ def search_fecha_fifa(fecha_part):
     """
     # Definicion de variables
     year_part = fecha_part.year  # e.g. "2021"
-    
-    # Obtener el año actual
-    año_actual = datetime.datetime.now().year
 
     # Si el partido se jugo de Julio a Diciembre (post mercado de pases de invierno)
     if fecha_part.month >= 7:  # Puedo poner 9? (Usaria 9 porque el fifa sale en Septiembre (mes 9)) Creo que no porque si un jugador no esta en el fifa anterior, quedaria NaN.
 
-        # Si el partido es de la nueva temporada y el fifa aun no salió (Con esto creo que arreglaria lo de que el fifa aun no salió)
-        if (year_part == año_actual) and (fecha_part.month <= 9):
-            year_part_str = str(year_part)[-2:]  # Ultimos dos "21"
-            return year_part_str
-        
+        year_part_ant_str = str(year_part)[-2:]
         year_part_str = str(year_part + 1)[-2:]  # Ultimos dos "22"
-        return year_part_str
+        return year_part_str, year_part_ant_str
 
     # Si el partido se jugo de Enero a Julio (post mercado de pases de verano)
     else:
+        year_part_ant_str = str(year_part-1)[-2:]
         year_part_str = str(year_part)[-2:]  # Ultimos dos "21"
-        return year_part_str
+        return year_part_str, year_part_ant_str
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

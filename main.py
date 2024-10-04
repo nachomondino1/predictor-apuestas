@@ -208,12 +208,14 @@ class DataPreparation:
         start = time.time()
         logger.info("\nCleanning data...")
 
-        # Elimino estadisticas que no quiero promediar porque no sirven y solo introducen ruido en el analisis
-        # print("\nEliminacion de estadisticas irrelevantes")
-        # stats_columns = construct_data.determine_stats_columns(df_match)
-        # relevant_stats_columns = ['ball_possession', 'goal_attempts', 'interceptions', 'shots_on_goal', 'goals', 'points', 'expected_goals_(xg)', 'fouls'] # 'perc_shots_on_goal_of_goal_attempts', 'perc_goals_of_goal_attempts']
-        # df_match = clean_data.delete_not_relevant_stats(df_match, stats_columns, relevant_stats_columns)
-       
+        # Elimino partidos viejos sin estadisticas y sin datos de jugadores --> PROBAR!
+        n_rows_inic = len(df_match)
+        df_match['date'] = pd.to_datetime(df_match['date'])  # Asegurarte de que la columna 'date' sea de tipo datetime (si no lo es ya)
+        start_date = '2012-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
+        df_match = df_match[df_match['date'] >= start_date]
+        df_match_player = df_match_player[df_match_player.index.isin(df_match.index)] # Es clave para eliminar jugadores y hacer una mejor integracion (tener menos falsos positivos)
+        logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
+
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
         df_match_player.drop(columns=non_object_columns, inplace=True)
@@ -232,10 +234,10 @@ class DataPreparation:
         ### Elimino jugadores duplicados por haber jugado mas de una competicion del pais
         len_inic = len(df_player_sofifa)
         df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
-        len_final = len(df_player_sofifa)
-        dif = len_inic - len_final
-        if dif > 0:
-            logger.warning(f"Se eliminaron {dif} jugadores de los {len_inic} de Sofifa que habia.")
+        df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates() # No por id_player porque no es unico (hay 2 por fifa)
+        n_players_eliminated = len_inic - len(df_player_sofifa)
+        if n_players_eliminated > 0:
+            logger.warning(f"Se eliminaron {n_players_eliminated} jugadores de los {len_inic} de Sofifa que habia.")
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
         ### Dataframe teams sofifa (df_teams_sofifa)
@@ -278,6 +280,7 @@ class DataPreparation:
         start = time.time()
         logger.info("\nIntegrating data...")
 
+        '''
         # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
         print("\nIntegrating team's data to df_match...")
         # Si ya hice el mapeo
@@ -294,17 +297,17 @@ class DataPreparation:
             if export:
                 df_teams.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx", index=True)
                 df_map_teams_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx")
-  
-        # Integro datos de equipos a df_match usando el mapeo
+        
+        # Integro datos de equipos a df_match usando el mapeo       
         df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
+        '''
 
-       # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
+        # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
         print("\nIntegrating player's data to df_match...")
         # Si ya hice el mapeo
         try:
-            # df_map_players_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
             df_map_players_fs_so = pd.read_excel(f'data/df_map_players_fs_so.xlsx', index_col=0)
-            logger.info("No vuelvo a mapear sino que levanto df_map ")
+            logger.info("No vuelvo a mapear sino que levanto df_map general ")
 
             # Reemplazo los df_player de Sofifa del pais por los completos
             df_player_sofifa = pd.read_excel(f'data/df_player_sofifa.xlsx', index_col=0)
@@ -314,17 +317,23 @@ class DataPreparation:
 
         # Si aun no hice el mapeo
         except FileNotFoundError:
-            # Matcheo jugadores de Sofifa y Flashscore
-            print("Mapeo jugadores de Sofifa y Flashscore")
-            df_player = create_df_player(df_match_player)
-            df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
 
-            if export:
-                df_player.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player.xlsx", index=True)
-                df_map_players_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx")
+            try:
+                df_map_players_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
+                logger.info("No vuelvo a mapear sino que levanto df_map del pais ")
+
+            except FileNotFoundError:
+                # Matcheo jugadores de Sofifa y Flashscore
+                logger.info("Mapeo jugadores de Sofifa y Flashscore")
+                df_player = create_df_player(df_match_player)
+                df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+
+                if export:
+                    df_player.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player.xlsx", index=True)
+                    df_map_players_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx")
 
         # Integro datos de jugadores a df_match usando el mapeo
-        df, df_aux = integrate_player_data_in_match(df, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
+        df, df_aux = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away'] # main_next a veces no tiene coaches.. deeberia copiar antes...
@@ -340,7 +349,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, dif_con_against: bool = True, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -362,7 +371,6 @@ class DataPreparation:
             df = construct_data.determine_result(df, self.var_resp)
             df = construct_data.determine_points(df)
 
-
             # VARIABLES DERIVADAS
             # Expected Result and Expected Points (xPts) (from Expected Goals)
             df = construct_data.determine_expected_result(df)
@@ -379,11 +387,11 @@ class DataPreparation:
             # Dead balls
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
-            # Attacking efficiency
-            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
-            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
+            # Attacking efficiency --> (lo evito por cantidad de NaN)
+            # df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
+            # df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
 
-            ## DEFENSIVE
+            ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
             df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
             df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
@@ -397,13 +405,13 @@ class DataPreparation:
             df['KGP_home'] = np.where(df['dangerous_attacks_away'].notna(),  (df['goals_away'] + 1) / df['dangerous_attacks_away'], None)
             df['KGP_away'] = np.where(df['dangerous_attacks_home'].notna(),  (df['goals_home'] + 1) / df['dangerous_attacks_home'],  None)
 
-            # Defensive efficiency (en la teoria esto es KGP)
-            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
-            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
+            # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
+            # df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
+            # df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
 
-            # Efficiency
-            df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
-            df['efficiency_away'] =df['attacking_efficiency_away'] + df['defensive_efficiency_away']
+            # Efficiency --> (lo evito por cantidad de NaN)
+            # df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
+            # df['efficiency_away'] =df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
             # Numero de partidos jugados en ultimos n days
@@ -424,10 +432,10 @@ class DataPreparation:
                 'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
                 'shots_on_goal', 'goal_attempts', 'goals', 'points', 'goal_ratio', 'PPS', # 'shots_off_goal'
                 'attacks', 'dangerous_attacks', 'dead_balls', # 'goal_ratio_dead_balls',
-                'ball_possession', 'total_passes', 'attacking_efficiency',
+                'ball_possession', 'total_passes', # 'attacking_efficiency',
                 # Defensive
                 'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls',  'interceptions'
-                'PPDA', 'KGP', 'clean_sheet', 'defensive_efficiency', "efficiency"
+                'PPDA', 'KGP', 'clean_sheet' # 'defensive_efficiency', "efficiency"
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
@@ -442,8 +450,8 @@ class DataPreparation:
                     # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
                     try:
                         # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la estadistica
-                        df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia)  # mean_last_match_dif_points_home
-                    
+                        df = construct_data.determine_mean_in_last_matches(df, n_days=n_days, variable=var, segun_localia=segun_localia, dif_con_against=dif_con_against)  # mean_last_match_dif_points_home
+
                     except KeyError as e:
                         logger.warning(f"Fallo la construccion de {var} por error {e}. Posibles causas: \n 1) Deberia ser porque hay muy pocos ultimos partidos. \n 2) En algun caso particular, si es una sola variable, puede que realmente no tenga valor en los ultimos partidos (En USA, no miedieron expected goals durante 1 mes y era NaN en todos los ultimos partidos)")
                         
@@ -456,8 +464,10 @@ class DataPreparation:
                         
             # Historica de jugadores
             try:
-                df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=False) # Variable para ponderar estadisticas
-                df = df.drop(columns=[f'mean_last_{n_days}_matches_mean_rat_player_start_home', f'mean_last_{n_days}_matches_mean_rat_player_start_away'], axis=1) # Solo quiero 'against' (para tener medida de los rivales...)
+                df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
+                n_days_final = n_days * 2 if segun_localia else n_days
+                df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
+
             except KeyError:
                 # Construyo las variables para evitar KeyError mas adelante
                 df[f'mean_last_{n_days}_matches_mean_rat_player_start_home_against'] = np.nan # relleno con nan y no con 0
@@ -465,11 +475,6 @@ class DataPreparation:
 
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
-
-        # VARIABLE DE EQUIPO
-        func = lambda row: 1 if (row['id_team_home_rival_team'] == row['id_team_away']) or (row['id_team_away_rival_team'] == row['id_team_home']) else 0
-        df['is_rival_match'] = df.apply(func, axis=1)
-        df = df.drop(columns=['id_team_home_rival_team', 'id_team_away_rival_team'], axis=1)
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -578,6 +583,9 @@ class DataPreparation:
         start = time.time()
         logger.info("\nSelecting data...")
 
+        # Elimino columnas "Ruido"
+        df = df.drop(['id_competition', 'id_team_home', 'id_team_away'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
             l_columnas_a_eliminar, df_corr_tri_X = select_data.delete_correlated_columns(df, self.var_resp, thr_corr)
@@ -654,7 +662,7 @@ class DataPreparation:
 
         if export:
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
-      
+        
         return df
 
 
@@ -762,7 +770,7 @@ class Modeling:
             # Separo en train y validation
             X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
 
-        # Balanceo el dataset de entrenamiento
+        # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, bal_type=bal_type)
 
@@ -777,7 +785,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, export: bool = True):
+    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, nn: bool = False, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -792,29 +800,60 @@ class Modeling:
         # warnings.filterwarnings("ignore")
         print("\nTraining model...")
         
-        # Find best hiperparameters
-        if params is None:
-            model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
+        if nn:
+            logger.info("Entrenando red neuronal")
+            from tensorflow.keras.utils import to_categorical
+            from tensorflow.keras.callbacks import EarlyStopping
+
+             # Convertir etiquetas a formato one-hot
+            y_val_categorical = to_categorical(y_val, num_classes=3)
+            y_train_categorical = to_categorical(y_train, num_classes=3)
+            self.classes = np.unique(y_train)
+
+            # Selecciono mejores hiperparametros --> En un futuro, ahora no se si tengo muchos hiperparametros para probar.
+            # model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val_categorical, k=5, _print=True)
+
+            # Definir un callback de EarlyStopping
+            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+            # Entrenar el modelo con early stopping
+            model_best_params = model
+            history = model_best_params.fit(X_train, y_train_categorical, epochs=100, batch_size=32, validation_data=(X_val, y_val_categorical), callbacks=[early_stopping])
+
+            # Obtener la precisión de entrenamiento en la última época
+            train_accuracy = history.history['accuracy'][-1] * 100
+
+            # Obtener los hiperparámetros de las capas
+            d_hiper_model = [layer.get_config() for layer in model.layers] 
+            # print("Hiperparámetros de las capas:")
+            # for i, params in enumerate(d_hiper_model):
+            #     print(f"Capa {i}: {params}")
+
         else:
-            model_best_params = model.set_params(**params)
-            # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
+            # Find best hiperparameters
+            if params is None:
+                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
+            else:
+                model_best_params = model.set_params(**params)
+                # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
 
-        d_hiper_model = model_best_params.get_params()
-        print("Hiperparametros:", d_hiper_model)
+            d_hiper_model = model_best_params.get_params()
+            print("Hiperparametros:", d_hiper_model)
 
-        # Fit model
-        model_best_params.fit(X_train, y_train)
+            # Fit model
+            model_best_params.fit(X_train, y_train)
+            self.classes = model_best_params.classes_
 
-        # Evaluo el modelo con Cross Validation
-        cv_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-        print(f"\nAccuracy promedio de validación cruzada: {cv_accuracy:.1f}%")
+            # Evaluo el modelo con Cross Validation
+            train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
+            print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
 
         if export:
             pickle.dump(model_best_params, open(f"./data/{self.country}/p4_modeling/modelo.pkl", "wb"))
             df_hiperparametros = pd.DataFrame.from_dict(d_hiper_model, orient='index', columns=['Valor'])
             df_hiperparametros.to_csv(f"./data/{self.country}/p4_modeling/modeling/hiperparametros.csv")
 
-        return model_best_params, d_hiper_model, cv_accuracy
+        return model_best_params, d_hiper_model, train_accuracy
 
     def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, _print: bool = True):
         """
@@ -837,10 +876,22 @@ class Modeling:
         self.var_pred_bm = 'bookmaker_result'  
 
         # Predecir las etiquetas para los datos de prueba
-        y_pred_prob = model.predict_proba(X_test) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
+        try:
+            y_pred_prob = model.predict_proba(X_test) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
+        except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
+            y_pred_prob = model.predict(X_test)
+            
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array
-        df_pred_proba = pd.DataFrame({self.var_resp: y_test, self.var_pred: y_pred, f'prob_class_{model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{model.classes_[2]}': y_pred_prob[:, 2]}, index=X_test.index)
 
+        # Crear el DataFrame con las probabilidades
+        df_pred_proba = pd.DataFrame({
+                self.var_resp: y_test,
+                self.var_pred: y_pred,
+                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
+                f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
+            }, index=X_test.index)
+    
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100
@@ -875,7 +926,7 @@ class Modeling:
 
         return df_predicciones, d_metrics
     
-    def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=True):
+    def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, nn: bool = False, export=True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -889,9 +940,13 @@ class Modeling:
             model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
             print(f" Modelo: {model_name} ".center(120, '-'))
 
+            if modelo == "neural_network": # A diferencia de los otros modelos, la tengo que crear
+                modelo = self.create_neural_network(X_train.shape[1], num_classes=3)
+                nn = True
+
             # Entreno modelo y evaluo su rendimiento     
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, nn=nn, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Si la precision_test_es mayor, guardar datos...
@@ -907,7 +962,48 @@ class Modeling:
                 print("Se evitó entrenar este modelo")
         
         d_metrics_best_model.update({'model_name': model_name_best_mod, 'model_trained': d_hiper_best_model, 'train_cv_accuracy': cv_acc})
+        logger.info(f"Mejor modelo: {model_name_best_mod} con train_accuracy: {cv_acc}")
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
+    
+    # Definir el modelo
+    def create_neural_network(self, input_shape, num_classes, batch_normalization: bool = False):
+        
+        import tensorflow as tf
+        from tensorflow.keras.models import Sequential
+        from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
+        from tensorflow.keras.regularizers import l2 
+        from tensorflow.keras.metrics import Recall
+        from tensorflow.keras import backend as K
+
+        model = Sequential()
+        neurons_1, neurons_2, neurons_3 = 128, 64, 32
+        dropout_rate = 0.3  # Dropout para evitar sobreajuste. El 30% de las neuronas se "apagará" de manera aleatoria en cada paso de entrenamiento.
+
+        # Capa oculta 1 con regularización Dropout
+        model.add(Dense(neurons_1, input_dim=input_shape, activation='relu', kernel_regularizer=l2(0.001)))
+        if batch_normalization:
+            model.add(BatchNormalization())
+        model.add(Dropout(dropout_rate))
+
+        # Capa oculta 2
+        model.add(Dense(neurons_2, activation='relu')) # kernel_regularizer=l2(0.001)
+        if batch_normalization:
+            model.add(BatchNormalization())
+
+        # Capa oculta 3 (nueva)
+        model.add(Dense(neurons_3, activation='relu')) # kernel_regularizer=l2(0.001)
+        if batch_normalization:
+            model.add(BatchNormalization())
+
+        # Capa de salida con softmax para clasificación multiclase (Empate, Local, Visitante)
+        model.add(Dense(num_classes, activation='softmax'))
+
+        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='categorical_crossentropy',  metrics=[Recall(class_id=0), 'accuracy'])  # Suponiendo que el empate es la clase 0
+
+        return model
+
+
 
 ##################################################### MAIN #####################################################
 def main(id_country, d_run, export: bool = True):
@@ -950,11 +1046,11 @@ def main(id_country, d_run, export: bool = True):
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
         d_comps = select_data.determine_country_competitions(id_country)
-        l_days, n_years_h2h, segun_localia = [30, 180], 3, False
-        thr_corr, thr_fs = 0.9, 0.5
+        l_days, n_years_h2h, segun_localia, dif_con_against = [30, 180], 3, False, False
+        thr_corr, thr_fs = 0.85, 0.5
         n_years_to_select, comp_to_select = 3, d_comps['comp_sin_b']
         fill_na = None
-        df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
+        df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'dif_con_against': [dif_con_against], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
         
         # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
         # print(df.head(2))
@@ -963,7 +1059,7 @@ def main(id_country, d_run, export: bool = True):
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=export)
+        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=export)
         df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
         df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
         df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
@@ -1033,8 +1129,8 @@ def main(id_country, d_run, export: bool = True):
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    # Definicion de variables
-    id_country = 48
+    # Definicion declea variables
+    id_country = 59 # 55, 59, 77, 148
     d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)
