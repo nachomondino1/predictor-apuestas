@@ -39,23 +39,23 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 'bootstrap': [True],
             },
             'XGBClassifier': {
-                'n_estimators': [100, 500, 1000],
+                'n_estimators': [100, 500], # 1000
                 'learning_rate': [0.01, 0.1],
-                'max_depth': [3, 7, 10, 15, 20],
+                'max_depth': [3, 7, 10], #  15, 20
                 # 'min_child_weight': [1, 3, 5],
-                'subsample': [0.8, 1.0],
-                'colsample_bytree': [0.8, 1.0],
+                # 'subsample': [0.8, 1.0],
+                # 'colsample_bytree': [0.8, 1.0],
                 # 'gamma': [0, 0.1, 0.5],
                 # 'reg_alpha': [0, 0.01, 0.1],
                 # 'reg_lambda': [0, 0.01, 0.1],
             },
             'GradientBoostingClassifier': {
-                'n_estimators': [100, 200, 500],
+                'n_estimators': [100, 500], # 200
                 'learning_rate': [0.01, 0.1],
                 'max_depth': [3, 5],
                 # 'min_samples_split': [1, 5, 10],
                 # 'min_samples_leaf': [2, 4],
-                'subsample': [0.8, 1.0],
+                # 'subsample': [0.8, 1.0],
                 # 'max_features': ['auto'],
                 # 'loss': ['deviance']
             },
@@ -69,14 +69,15 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 # 'class_weight': ['balanced', None], # hace un under basicamente... no tiene sentido cuando hago under creo.
             },
             'SVC': {
-                'C': [0.1, 1, 5],
-                'kernel': ['poly', 'rbf', 'sigmoid'],
+                'C': [0.1, 0.5, 1],
+                'kernel': ['rbf', 'sigmoid'], # 'poly',
                 'gamma': ['scale', 'auto'], 
-                'degree': [3, 5],
+                # 'degree': [3, 5],
                 'coef0': [0.0,  0.5], # , 1.0
-                'shrinking': [True], # False
-                'probability': [True],
+                'shrinking': [True, False], # False
+                'probability': [True], # Tiene que ser True para poder usar predict.proba()
                 # 'tol': [1e-3, 1e-4, 1e-5],
+                'class_weight': ['balanced', None], # No deberia usarlo porque ya balanceo pero es que tal vez es diferente...?
                 'decision_function_shape': ['ovo', 'ovr'],
             },
             'neural_networ': {
@@ -92,13 +93,13 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 # use_multiprocessing
             },
             'MLPClassifier': {
-                'hidden_layer_sizes': [(10,), (50,), (100,)], 
-                'activation': ['logistic',  'relu', 'tanh'],
-                'solver': ['lbfgs'], # 'sgd'
-                'alpha': [0.0001, 0.001, 0.01],
-                'learning_rate': ['constant', 'adaptive'],
+                'hidden_layer_sizes': [(50,), (100,)], 
+                'activation': ['logistic',  'relu'],  #  'tanh'
+                'solver': ['lbfgs', 'adam'], # 'sgd'
+                'alpha': [0.0001, 0.001], #  0.01
+                # 'learning_rate': ['constant', 'adaptive'],
                 'learning_rate_init': [0.01, 0.1],  # 0.001
-                # 'max_iter': [100, 200, 500],
+                'max_iter': [500],
                 'early_stopping': [True] # False
             },
             'PCA': {

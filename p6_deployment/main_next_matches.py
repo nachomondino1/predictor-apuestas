@@ -1078,8 +1078,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
         df_pred_proba = pd.DataFrame({
                 'predicted_result': y_pred,
-                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=df.index)
         # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df.index)
@@ -1127,9 +1127,9 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 148  # 55, 48, 167?
-        n_days = 15
-        n_seasons_missing = 2
+        id_country = 167  # 55, 48, 167?
+        n_days = 2
+        n_seasons_missing = 1
         extract_missing = True
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.

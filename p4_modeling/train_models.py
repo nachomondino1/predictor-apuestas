@@ -9,14 +9,13 @@ from p3_data_preparation.select_data import determine_country_competitions
 import pickle
 import joblib
 
-def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, export:bool = True):
+def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, rows_to_features_min, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
     # Definicion de variables
     df_iteration = pd.DataFrame()
     cont_iter = 0
-    rows_to_features_min = 30  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
     var_resp, var_pred = 'result', 'predicted_result'
     dp = DataPreparation(country)
     mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
