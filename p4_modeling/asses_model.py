@@ -116,7 +116,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stak
                 b = a2 if key in lst else None
                 p1 = a1 if key not in lst else None
                 p2 = a2 if key not in lst else None
-                logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
+                # logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
 
                 # Determino stake a apostar segun curva
                 df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
@@ -357,6 +357,9 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
     # Returns
         Dataframe pasado como parametro con nueva columna 'multiplier', el multiplicador para variar el stake.
     """
+    dif_prob_inf_cap = 0 # Hasta 2024-10-08 era -0.5
+    dif_prob_sup_cap = 0
+
     # Separo puntos en x e y
     if p1 is not None and p2 is not None:
         x1, y1 = p1
@@ -366,7 +369,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         df['multiplier'] = 1
 
     # Linear
-    elif type_relation in ['linear', 'linear_2', 'linear_3']:
+    elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
         # Si la pendiente no fue pasada como parametro, calculo la pendiente y ordenada al origen
         if m is None:
@@ -374,27 +377,17 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
 
-        # Calculo multiplier
-        if type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
+        if dif_prob_inf_cap != dif_prob_sup_cap:
+            df['multiplier'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+        else:
+            df['multiplier'] = df['prob_result_to_bet'] * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
 
-            df['multiplier'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.5, 0.00)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
-
-            # Ajusta el multiplier para que sea menor a 100
-            df['multiplier'] = np.where(
-                df['multiplier'] > 90,
-                df['prob_result_to_bet'] * m + b,
-                df['multiplier']
-            )
-
-        elif type_relation == "linear_2":   # Vario stake con prob_result_to_bet pero sin cuotas de la casa
-
-            # Calculo multiplier
-            df['multiplier'] = df['prob_result_to_bet'] * m + b 
-
-        elif type_relation == "linear_3":   # No vario el stake con prob_result_to_bet ni las cuotas de la casa
-
-            # Calculo multiplier
-            df['multiplier'] = m + b 
+        # Ajusta el multiplier para que sea menor a 100
+        df['multiplier'] = np.where(
+            df['multiplier'] > 90,
+            df['prob_result_to_bet'] * m + b,
+            df['multiplier']
+        )
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass
@@ -411,7 +404,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         b = np.exp(log_b)   
 
         # Calculo multiplier
-        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], -0.5, 0.00)))
+        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)))
 
         # Ajusta el multiplier para que sea menor a 100
         df['multiplier'] = np.where(
