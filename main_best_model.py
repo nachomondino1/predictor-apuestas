@@ -44,7 +44,7 @@ def select_best_model(df):
     # print("Mejores hiperparámetros:", best_hyperparameters)
     # print("ROI obtenido:", best_roi_max)
 
-def main(l_modelos, d_params, export: bool = True):
+def main(l_modelos, d_params, rows_to_features_min: int = 10, export: bool = True):
     """
     Entrena modelos segun las combinaciones de hiperparametros deseadas. Luego los evalua en produccion y selecciona el mejor.
     """
@@ -59,7 +59,7 @@ def main(l_modelos, d_params, export: bool = True):
     directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_modelos, ruta_assess, ruta_assess_2])
     
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_iteration = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_modelos, d_params, l_modelos, export=export)
+    df_iteration = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_modelos, d_params, l_modelos, rows_to_features_min=rows_to_features_min, export=export)
 
     # Preparo datos missing y evaluo modelos en produccion
     df_iteration_prod = assess_models_in_prod.main(df_iteration, country, date, ruta_base_dp, ruta_base_mod, export=export)
@@ -80,19 +80,19 @@ if __name__ == "__main__":
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [SVC()] #LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
-
+    l_modelos = [LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
+    l_modelos = [LogisticRegression(), 'neural_network', RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()]
     # 2304 iteraciones
     d_params = {  
         'construct': {
-            'n_dias_ult_part': [[30, 180], [60, 240]], 
+            'n_dias_ult_part': [[30], [30, 180], [60, 240]], # [90],
             'n_years_h2h': [3],
-            'segun_localia': [True, False],
-            'dif_con_against': [True, False]
+            'segun_localia': [True, False], # False
+            'dif_con_against': [True, False] # False
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # d_comps['comp_sin_cups'] --> Con is_cup ta.
-            'n_years_to_select': [5, 10], # None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
+            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_b'] solo para USA
+            'n_years_to_select': [3, 5, 10], # None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -104,10 +104,11 @@ if __name__ == "__main__":
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.10], 
-            'bal_type': [None, 'under'],
+            'bal_type': ['under'], # None,
             'k': [5] 
         }
     }
+    rows_to_features_min = 10      # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
 
     d_params_2 = {  
         'construct': {
@@ -147,5 +148,5 @@ if __name__ == "__main__":
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
 
     # Entreno modelos y los evaluo en produccion.
-    df = main(l_modelos, d_params)
+    df = main(l_modelos, d_params, rows_to_features_min=rows_to_features_min)
     df.to_excel(f"./data/{country}/p4_modeling/{date}/df_iteration.xlsx", index=True)
