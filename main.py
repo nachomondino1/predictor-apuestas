@@ -537,9 +537,9 @@ class DataPreparation:
             print("Eliminacion de filas...")
             print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
-        # Eliminacion de columnas         
+        # Eliminacion de columnas   
         # usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
@@ -582,9 +582,6 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("\nSelecting data...")
-
-        # Elimino columnas "Ruido"
-        df = df.drop(['id_competition', 'id_team_home', 'id_team_away'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
 
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
@@ -943,6 +940,8 @@ class Modeling:
             if modelo == "neural_network": # A diferencia de los otros modelos, la tengo que crear
                 modelo = self.create_neural_network(X_train.shape[1], num_classes=3)
                 nn = True
+            else:
+                nn = False
 
             # Entreno modelo y evaluo su rendimiento     
             try:
@@ -962,7 +961,7 @@ class Modeling:
                 print("Se evitó entrenar este modelo")
         
         d_metrics_best_model.update({'model_name': model_name_best_mod, 'model_trained': d_hiper_best_model, 'train_cv_accuracy': cv_acc})
-        logger.info(f"Mejor modelo: {model_name_best_mod} con train_accuracy: {cv_acc}")
+        logger.info(f"Mejor modelo: {model_name_best_mod} con ROIpp {d_metrics['roi_por_partido']} y train_accuracy: {cv_acc}")
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
     
     # Definir el modelo
@@ -1130,7 +1129,7 @@ def main(id_country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 59 # 55, 59, 77, 148
+    id_country = 167 # 55, 59, 77, 148
     d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)
