@@ -63,8 +63,14 @@ def load_hyperparameters(row_hiper):
     d['segun_localia'] = row_hiper['segun_localia'].values[0]
     d['dif_con_against'] = row_hiper['dif_con_against'].values[0]
     ## Clean_data_2
-    n_years_to_select = row_hiper['n_years_to_select'].values[0]
-    d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
+    n_years_to_select = row_hiper['n_years_to_select'].values[0]    
+    if pd.isna(n_years_to_select):
+        d['n_years_to_select'] = None
+    else:
+        # Verificar si el valor tiene decimales
+        d['n_years_to_select'] = int(n_years_to_select) if n_years_to_select.is_integer() else float(n_years_to_select)
+    # d['n_years_to_select'] = None if pd.isna(n_years_to_select) else float(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
+    # d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
     d['comp_to_select'] = load_as_list(row_hiper['comp_to_select'].values[0])
     d['selected_columns'] = load_as_list(row_hiper['X_columns'].values[0])
 
@@ -198,14 +204,14 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
             y_pred_prob = loaded_model.predict(df_treat)
             classes = [0, 1, 2]
-        logger.info(classes)
+        # logger.info(classes)
 
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
         # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
         df_pred_proba = pd.DataFrame({
                 'predicted_result': y_pred,
-                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=df_treat.index)
     
@@ -253,18 +259,18 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 77
+    id_country = 48
 
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
-        48: ["england", '2024-10-02'], # ["england", '2024-09-18'], 
+        48: ["england", '2024-10-02'], # '2024-10-02
         55: ["france", "2024-10-03"], 
         59: ["germany", "2024-10-03"],
-        77: ["italy", "2024-10-03"], # "2024-09-21"
+        77: ["italy", "2024-10-06"], #  "2024-10-03"
         148: ["spain", "2024-10-03"], 
-        167: ["usa", "2024-09-18"]
+        167: ["usa", "2024-10-06"]
     }
     country, date = d[id_country]
     logger.info(f"Country: {country}, Date: {date}")
