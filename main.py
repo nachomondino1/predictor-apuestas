@@ -796,35 +796,12 @@ class Modeling:
         """
         # warnings.filterwarnings("ignore")
         print("\nTraining model...")
-        
+        self.classes = np.unique(y_train)
+
         if nn:
             logger.info("Entrenando red neuronal")
-            from tensorflow.keras.utils import to_categorical
-            from tensorflow.keras.callbacks import EarlyStopping
-
-             # Convertir etiquetas a formato one-hot
-            y_val_categorical = to_categorical(y_val, num_classes=3)
-            y_train_categorical = to_categorical(y_train, num_classes=3)
-            self.classes = np.unique(y_train)
-
-            # Selecciono mejores hiperparametros --> En un futuro, ahora no se si tengo muchos hiperparametros para probar.
-            # model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val_categorical, k=5, _print=True)
-
-            # Definir un callback de EarlyStopping
-            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-
-            # Entrenar el modelo con early stopping
-            model_best_params = model
-            history = model_best_params.fit(X_train, y_train_categorical, epochs=100, batch_size=32, validation_data=(X_val, y_val_categorical), callbacks=[early_stopping])
-
-            # Obtener la precisión de entrenamiento en la última época
-            train_accuracy = history.history['accuracy'][-1] * 100
-
-            # Obtener los hiperparámetros de las capas
-            d_hiper_model = [layer.get_config() for layer in model.layers] 
-            # print("Hiperparámetros de las capas:")
-            # for i, params in enumerate(d_hiper_model):
-            #     print(f"Capa {i}: {params}")
+            red = build_model.NeuralNetwork()
+            model_best_params, d_hiper_model, train_accuracy = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
 
         else:
             # Find best hiperparameters
@@ -930,7 +907,7 @@ class Modeling:
         """
         # Definicion de variables
         best_roi_max = -100000
-        
+
         # Por modelo
         for modelo in l_modelos:
             
@@ -938,11 +915,8 @@ class Modeling:
             print(f" Modelo: {model_name} ".center(120, '-'))
 
             if modelo == "neural_network": # A diferencia de los otros modelos, la tengo que crear
-                modelo = self.create_neural_network(X_train.shape[1], num_classes=3)
                 nn = True
-            else:
-                nn = False
-
+                
             # Entreno modelo y evaluo su rendimiento     
             try:
                 model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, nn=nn, export=False)
@@ -964,44 +938,6 @@ class Modeling:
         logger.info(f"Mejor modelo: {model_name_best_mod} con ROIpp {d_metrics['roi_por_partido']} y train_accuracy: {cv_acc}")
         return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
     
-    # Definir el modelo
-    def create_neural_network(self, input_shape, num_classes, batch_normalization: bool = False):
-        
-        import tensorflow as tf
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
-        from tensorflow.keras.regularizers import l2 
-        from tensorflow.keras.metrics import Recall
-        from tensorflow.keras import backend as K
-
-        model = Sequential()
-        neurons_1, neurons_2, neurons_3 = 128, 64, 32
-        dropout_rate = 0.3  # Dropout para evitar sobreajuste. El 30% de las neuronas se "apagará" de manera aleatoria en cada paso de entrenamiento.
-
-        # Capa oculta 1 con regularización Dropout
-        model.add(Dense(neurons_1, input_dim=input_shape, activation='relu', kernel_regularizer=l2(0.001)))
-        if batch_normalization:
-            model.add(BatchNormalization())
-        model.add(Dropout(dropout_rate))
-
-        # Capa oculta 2
-        model.add(Dense(neurons_2, activation='relu')) # kernel_regularizer=l2(0.001)
-        if batch_normalization:
-            model.add(BatchNormalization())
-
-        # Capa oculta 3 (nueva)
-        model.add(Dense(neurons_3, activation='relu')) # kernel_regularizer=l2(0.001)
-        if batch_normalization:
-            model.add(BatchNormalization())
-
-        # Capa de salida con softmax para clasificación multiclase (Empate, Local, Visitante)
-        model.add(Dense(num_classes, activation='softmax'))
-
-        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.compile(optimizer='adam', loss='categorical_crossentropy',  metrics=[Recall(class_id=0), 'accuracy'])  # Suponiendo que el empate es la clase 0
-
-        return model
-
 
 
 ##################################################### MAIN #####################################################
