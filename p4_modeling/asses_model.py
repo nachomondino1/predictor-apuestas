@@ -78,7 +78,7 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     return df_match_odds
 
 # Nosotros
-def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stake_base: int = 1):
+def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general"):
     """
     Determine the ROI for different betting strategies.
 
@@ -109,17 +109,20 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stak
 
         # Por recta con la cual variar el stake
         for key, value in d_rectas.items():
+            normalized = True if key == 'kelly' else False  # Solo lo aplico a Kelly dado que puede tener stakes negativos y este debe ser mayor a 0.
+
             for a1, a2 in value:
 
-                lst = ['linear', 'linear_2', 'linear_3']
+                lst = ['linear', 'kelly']
                 m = a1 if key in lst else None  # m, b = a1, a2 if key == 'linear' else None, None
                 b = a2 if key in lst else None
                 p1 = a1 if key not in lst else None
                 p2 = a2 if key not in lst else None
                 # logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
 
+                # for normalized in [True, False]:
                 # Determino stake a apostar segun curva
-                df_aux = determine_stake_to_bet(df2, stake_base=stake_base, type_relation=key, m=m, b=b, p1=p1, p2=p2)
+                df_aux = determine_stake_to_bet(df2, type_relation=key, m=m, b=b, p1=p1, p2=p2, normalized=normalized)
 
                 # Calculo roi stake a apostar segun curva
                 if strategy == 'reality':
@@ -127,7 +130,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stak
                     roi = d_rois['roi_por_partido_r']                    
                 else: 
                     df_no_se, d_rois, = calculate_roi(df_aux) 
-                    roi = d_rois['roi_por_partido']                    
+                    roi = d_rois['roi_por_partido']            
 
                 # roi = d_rois['roi_por_partido']                    
                 d[f'roi_stake_{key}_{a1}_{a2}'] = roi
@@ -137,6 +140,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stak
                     d_rois_best = d_rois
                     best_prob = prob
                     best_key = key
+                    best_normalized = normalized
                     best_a1, best_a2 = a1, a2
                     df_pred_best = df_no_se.copy()
 
@@ -147,7 +151,7 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", stak
                 best_d_rois = d_rois_best
 
                 # Guardar hiperparametros de estrategia...
-                d_best = {'thr_prob_min_best': best_prob, 'curva': best_key, 'param1': best_a1, 'param2': best_a2}
+                d_best = {'thr_prob_min_best': best_prob, 'curva': best_key, 'param1': best_a1, 'param2': best_a2, "normalized": best_normalized}
                 best_d_rois.update(d_best)
 
     return best_df_pred, best_d_rois
@@ -160,18 +164,9 @@ def define_hiperparameters(strategy):
         l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
         d_rectas = {
             # "equal": [[(0, 0), (1, 0)]],
+            'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
             'linear': [[5, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],
-            # 'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
-        }
-
-    elif strategy=="different_stakes":
-        l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-        d_rectas = {
-            # "equal": [[(0, 0), (1, 0)]],
-            'linear': [[5, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],
-            'linear_2': [[5, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],
-            'linear_3': [[5, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],
-            # 'exponential': [[(0.5, 4), (1, 10)], [(0.33, 5), (1, 50)], [(0.33, 10), (1, 50)], [(0.33, 10), (1, 80)]]
+            # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
         }
 
     elif strategy=="reality":
@@ -330,18 +325,7 @@ def determine_winning_bets(df: pd.DataFrame):
 
     return df
 
-def determine_stake_to_bet(df, stake_base, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None):
-
-    df = calculate_multiplier(df, type_relation=type_relation, p1=p1, p2=p2, m=m, b=b)
-    df['stake_to_bet'] =  df['multiplier']  * stake_base
-
-    # Ajusto valores de stake_to_bet segun valor minimo y valor maximo
-    val_min, val_max = 0, 100  # Evito que el stake a apostar sea mayor al 100% del bank
-    func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
-    df['stake_to_bet'] = df['stake_to_bet'].apply(func)
-    return df
-
-def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None):
+def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, normalized: bool = True):
     """
     Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
     Cuanto mayor es la probabilidad del modelo para el resultado a apostar, mas dinero apuesto.
@@ -355,7 +339,7 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         b: Ordenada al origen de la recta. Solo cuando type_relation = 'linear'. (float)
 
     # Returns
-        Dataframe pasado como parametro con nueva columna 'multiplier', el multiplicador para variar el stake.
+        Dataframe pasado como parametro con nueva columna 'stake_to_bet'
     """
     dif_prob_inf_cap = 0 # Hasta 2024-10-08 era -0.5
     dif_prob_sup_cap = 0
@@ -365,29 +349,32 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
         x1, y1 = p1
         x2, y2 = p2
 
-    if type_relation == "equal":  
-        df['multiplier'] = 1
+    # Si la pendiente no fue pasada como parametro, calculo la pendiente y ordenada al origen
+    if m is None:
+        m = (y2-y1) / (x2-x1)
+        b = y1 - m*x1
 
+    if type_relation == "equal":  
+        df['stake_to_bet'] = 1
+
+    elif type_relation == 'kelly':
+        # df['stake_to_bet'] = (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100
+        df['stake_to_bet'] = (df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet']) / (df['odd_to_bet'] - 1) 
+        df['stake_to_bet'] = df['stake_to_bet'] * 100
+
+        # Puntos para normalizar
+        p_min, p_max = 0, 50 
+        
     # Linear
     elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
-        # Si la pendiente no fue pasada como parametro, calculo la pendiente y ordenada al origen
-        if m is None:
-
-            m = (y2-y1) / (x2-x1)
-            b = y1 - m*x1
-
         if dif_prob_inf_cap != dif_prob_sup_cap:
-            df['multiplier'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+            df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
         else:
-            df['multiplier'] = df['prob_result_to_bet'] * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
-
-        # Ajusta el multiplier para que sea menor a 100
-        df['multiplier'] = np.where(
-            df['multiplier'] > 90,
-            df['prob_result_to_bet'] * m + b,
-            df['multiplier']
-        )
+            df['stake_to_bet'] = df['prob_result_to_bet'] * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+        
+        # Puntos para normalizar
+        p_min, p_max = (0.55 * m + b), (0.7 * m + b) # 0.33 no tiene sentido puesto que usa stake de m_to_bet / 2 para dicha prob
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass
@@ -396,23 +383,35 @@ def calculate_multiplier(df: pd.DataFrame,  type_relation: str = 'equal', p1: tu
 
         # Resolver el sistema de ecuaciones
         A = np.array([[1, np.log(x1)], [1, np.log(x2)]])
-        b = np.array([np.log(y1), np.log(y2)])
+        B = np.array([np.log(y1), np.log(y2)])
 
-        a, log_b = np.linalg.solve(A, b)
+        a, log_b = np.linalg.solve(A, B)
 
         # Calcular b a partir de su logaritmo
         b = np.exp(log_b)   
 
-        # Calculo multiplier
-        df['multiplier'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)))
+        # Calculo stake_to_bet
+        if dif_prob_inf_cap != dif_prob_sup_cap:
+            df['stake_to_bet'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)))
+        else:
+            df['stake_to_bet'] = a * (b ** df['prob_result_to_bet'])
 
-        # Ajusta el multiplier para que sea menor a 100
-        df['multiplier'] = np.where(
-            df['multiplier'] > 90,
-            a * (b ** df['prob_result_to_bet']),
-            df['multiplier']
-        )
+    # Capa de funcion sigmoide (creo que sirve nada mas para Kelly. Para linear seria muy parecico a la variacion exponencial puesto que buscas agrandar las diferencias entre probas de 0.33 y 1)
+    if normalized:
+        df = df.rename(columns={'stake_to_bet': 'stake_to_bet_raw'})
 
+        # Normalización: Escalar los valores de kelly_raw entre 0 y 1
+        df['stake_to_bet_norm'] = (df['stake_to_bet_raw'] - p_min) / (p_max - p_min)
+
+        # Usar la función sigmoide para reducir la variabilidad y escalar entre 0 y 30
+        num = m if m > 0 else 1
+        df['stake_to_bet'] = num / (1 + np.exp(-df['stake_to_bet_norm']))
+        # df = df.drop(['stake_to_bet_raw', 'stake_to_bet_normalized'], axis=1)
+    
+    # Ajusto valores de stake_to_bet segun valor minimo y valor maximo
+    val_min, val_max = 0, 100  # Evito que el stake a apostar sea mayor al 100% del bank
+    func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
+    df['stake_to_bet'] = df['stake_to_bet'].apply(func)
     return df
 
 # Metricas
@@ -572,7 +571,7 @@ if __name__ == "__main__":
     df_predicciones = pd.read_excel('main_find_best_hyper/data/england/2024-04-22/assess_model_in_prod/modeling/1_df_pred_metrics.xlsx', index_col=0)
     print(df_predicciones.head(5))
     
-    l_cols = ['stake_to_bet', 'multiplier', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet']
+    l_cols = ['stake_to_bet', 'stake_to_bet', 'odd_to_bet', 'strategy', 'acerte', 'G/P', 'dinero_tras_apuestas', 'prob_result_to_bet', 'dif_prob_result_to_bet', 'result_to_bet']
     for col in l_cols:
         try:
             df_predicciones = df_predicciones.drop(col, axis=1)
