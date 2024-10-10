@@ -782,7 +782,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, nn: bool = False, export: bool = True):
+    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -798,9 +798,13 @@ class Modeling:
         print("\nTraining model...")
         self.classes = np.unique(y_train)
 
-        if nn:
+        if model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
             logger.info("Entrenando red neuronal")
+
+            # Creo instancia de clase NeuralNetwork()
             red = build_model.NeuralNetwork()
+
+            # Seleccion mejor arquitectura con la validacion y entreno el modelo
             model_best_params, d_hiper_model, train_accuracy = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
 
         else:
@@ -900,7 +904,7 @@ class Modeling:
 
         return df_predicciones, d_metrics
     
-    def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, nn: bool = False, export=True):
+    def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -914,12 +918,9 @@ class Modeling:
             model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
             print(f" Modelo: {model_name} ".center(120, '-'))
 
-            if modelo == "neural_network": # A diferencia de los otros modelos, la tengo que crear
-                nn = True
-                
             # Entreno modelo y evaluo su rendimiento     
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, nn=nn, export=False)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Si la precision_test_es mayor, guardar datos...
