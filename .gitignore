@@ -17,6 +17,7 @@ __pycache__/
 
 # Data
 *.csv
+*.pkl
 data_seg/
 old/
 
@@ -33,7 +34,5 @@ old_assess_iterations/
 --missing/
 
 # Temporal
--- p3_data_preparation (integré solo algunas var)/
-2024-10-01 (1)/
-2024-10-01 (2)/
-integracion_mala/
+2024-10-05/
+2024-10-03 (Sin SVC)/
