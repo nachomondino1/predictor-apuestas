@@ -932,43 +932,6 @@ class Modeling:
             df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
         
         return df_metrics
-    
-    def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=True):
-        """
-        Pruebo varios modelos 
-        Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
-        """
-        # Definicion de variables
-        best_roi_max = -100000
-
-        # Por modelo
-        for modelo in l_modelos:
-            
-            model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
-            print(f" Modelo: {model_name} ".center(120, '-'))
-
-            # Entreno modelo y evaluo su rendimiento     
-            try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
-                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
-
-                # Si la precision_test_es mayor, guardar datos...
-                if d_metrics['roi_por_partido'] > best_roi_max:
-                    best_roi_max = d_metrics['roi_por_partido']
-
-                    # Guardo datos del mejor modelo
-                    best_model, d_hiper_best_model, cv_acc = model, d_hiper_model, cv_accuracy
-                    df_pred, d_metrics_best_model = df_predicciones, d_metrics
-                    model_name_best_mod = model_name
-
-            except KeyboardInterrupt:
-                print("Se evitó entrenar este modelo")
-        
-        d_metrics_best_model.update({'model_name': model_name_best_mod, 'model_trained': d_hiper_best_model, 'train_cv_accuracy': cv_acc})
-        logger.info(f"Mejor modelo: {model_name_best_mod} con ROIpp {d_metrics['roi_por_partido']} y train_accuracy: {cv_acc}")
-        return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
-    
-
 
 ##################################################### MAIN #####################################################
 def main(id_country, d_run, export: bool = True):
