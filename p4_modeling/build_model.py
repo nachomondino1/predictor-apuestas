@@ -75,11 +75,11 @@ class NeuralNetwork():
 
         # Hiperparametros de arquitectura
         param_grid = { 
-                    'hidden_layer_sizes': [[50], [100], [128, 64], [128, 64, 32], [256, 128, 64], [512, 256, 128, 64]], # [50], [100, 50], [64, 32], [100, 100], [1024, 512, 256]
-                    'learning_rate': [0.001, 0.01, 0.1],
+                    'hidden_layer_sizes': [[128, 64], [128, 64, 32], [256, 128, 64], [512, 256, 128, 64]], # [100], [50], [100, 50], [64, 32], [100, 100], [1024, 512, 256]
+                    'learning_rate': [0.01, 0.1], # 0.001,
                     'activation': ['relu'], #  'tanh'
                     'optimizer': ['adam'], #  'sgd']
-                    'kernel_regularizer': [0.001, 0.01],
+                    'kernel_regularizer': [None, 0.01], # 0.001,
                     'batch_normalization': [False], # True
                     'dropout_rate': [0.2, None]
                 }

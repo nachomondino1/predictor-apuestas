@@ -22,7 +22,7 @@ def save_assess(ruta_base):
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
 
-    l_dir_origen = [f'{ruta_base}/assess_models_in_prod', f'{ruta_base}/df_iteration_prod.xlsx', f'{ruta_base}/df_iteration.xlsx']
+    l_dir_origen = [f'{ruta_base}/assess_models_in_prod', f'{ruta_base}/df_iteration_test_prod.xlsx', f'{ruta_base}/df_iteration_test_ct.xlsx']
     directorio_destino = f'{ruta_base}/old_assess_iterations/{date}'
 
     # Creo directorio de destino
@@ -52,7 +52,7 @@ def select_league_matches(df):
     print(f"Shape sin copas: {df.shape}")
     return df
 
-def load_hyperparameters(row_hiper):
+def load_preparation_hyperparameters(row_hiper):
 
     d = {}
 
@@ -69,8 +69,6 @@ def load_hyperparameters(row_hiper):
     else:
         # Verificar si el valor tiene decimales
         d['n_years_to_select'] = int(n_years_to_select) if n_years_to_select.is_integer() else float(n_years_to_select)
-    # d['n_years_to_select'] = None if pd.isna(n_years_to_select) else float(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
-    # d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
     d['comp_to_select'] = load_as_list(row_hiper['comp_to_select'].values[0])
     d['selected_columns'] = load_as_list(row_hiper['X_columns'].values[0])
 
@@ -93,7 +91,7 @@ def load_as_list(lista):
     except (TypeError, SyntaxError):  # Captura posibles errores de eval() o tipo
         return list(lista)  # Si eval falla, intenta convertir a lista usando list()
 
-def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
+def load_models(ruta_base_dp, d):
 
     # Levanto hiperparametros de DataPreparation de la iteracion 
     n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
@@ -103,14 +101,29 @@ def load_models(n_model, ruta_base_dp, ruta_base_mod, d):
     # Cargo modelos segun hiperparametros
     tager_loaded = pd.read_excel(f'{ruta_base_dp}/df_etiquetas_{path_construct}.xlsx')
     scaler, columns_scaled = joblib.load(f'{ruta_base_dp}/scaler_model_{path_construct}_{path_clean}.pkl')
-    loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_model}_model.pkl", "rb"))
-    return tager_loaded, scaler, columns_scaled,loaded_model
+    return tager_loaded, scaler, columns_scaled
+
+def load_trained_models(n_ite, ruta_base_mod):
+    """
+    Carga todos los modelos entrenados para la iteracion
+    """
+    l_models, l_names = [], []
+    l_model_names = ['LogisticRegression', 'neural_networ', 'XGBClassifier']  # Podria hacer unique a df_iteration_test['model_name']
+    for model_name in l_model_names:
+        try:
+            loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_{model_name}.pkl", "rb"))
+        except FileNotFoundError:
+            pass
+        l_models.append(loaded_model)
+        l_names.append(model_name)
+    return l_models, l_names
 
 ################################################### MAIN ###################################################
 def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, strategy = 'general'):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
+    logger.critical("ASSESS MODELS IN PRODUCTION...")
     n_days_to_fill = 60
 
     # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
@@ -142,13 +155,13 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
     for idx, row in df_iteration.iterrows():
 
         # Definicion de variables
-        n_model = row['n_iteration']
-        row_hiper = df_iteration[df_iteration['n_iteration'] == n_model]
-        print("\n", "#"*120, "\n", f"MODEL Nº {n_model}".center(120), "\n", "#"*120, "\n")
+        n_ite = row['n_iteration']
+        row_hiper = df_iteration[df_iteration['n_iteration'] == n_ite]
+        print("\n", "#"*120, "\n", f"ITERATION Nº {n_ite}".center(120), "\n", "#"*120, "\n")
 
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
-        d_hiper = load_hyperparameters(row_hiper)
-        tager, scaler, columns_scaled, loaded_model = load_models(n_model, ruta_base_dp, ruta_base_mod, d_hiper)
+        d_hiper = load_preparation_hyperparameters(row_hiper)
+        tager, scaler, columns_scaled = load_models(ruta_base_dp, d_hiper)
         
         #______________________________________________ DATA PREPARATION ______________________________________________#
         print("DATA PREPARATION".center(120, "-"))
@@ -188,69 +201,84 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         # Sigo preparando datos
         df_tag = dp.tag_string_data_to_integer_new(df_cons, tager)
         df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'])
-        df_sel = dp.select_data_new(df_clean, d_hiper['selected_columns'])
-        df_treat, df_emer = dp.treat_nan_values_new(df_sel)
 
-        print("\nShape Dataframe antes de Modeling(): ", df_treat.shape)
-        if len(df_sel) != len(df_treat):
-            logger.warning(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
 
-        #______________________________________________ MODELING ______________________________________________#
-        print("MODELING".center(120, "-"))
-        # Realizo predicciones sobre los nuevos partidos
-        try:
-            y_pred_prob = loaded_model.predict_proba(df_treat) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
-            classes = loaded_model.classes_
-        except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
-            y_pred_prob = loaded_model.predict(df_treat)
-            classes = [0, 1, 2]
-        # logger.info(classes)
+        # Por modelo entrenado en iteration (tienen misma preparacion hasta select_data)
+        l_models, l_names = load_trained_models(n_ite, ruta_base_mod)
+        i = 0
+        for loaded_model in l_models:
+            model_name = l_names[i]
+            i += 1
+            # print("MODEL {}".center(120, "-"))
 
-        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
-        # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
-        df_pred_proba = pd.DataFrame({
-                'predicted_result': y_pred,
-                f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
-                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
-                f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
-            }, index=df_treat.index)
-    
-        # Agrego resultado y cuotas a df_match
-        df_match_odds_2 = df_match_odds[df_match_odds.index.isin(df_treat.index)]
-        df_match_odds_2 = df_match_odds.reindex(df_treat.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-        df_match = df_int.loc[df_int.index.isin(df_treat.index), ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'result']]
+            df_sel = dp.select_data_new(df_clean, d_hiper['selected_columns'])
+            df_treat, df_emer = dp.treat_nan_values_new(df_sel)
 
-        # Concateno conjunto de datos
-        df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
-        if relleno_formaciones:
-            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_c1['copiado_formaciones'], df_emer['emergency_fill']], axis=1)
-        else:
-            df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_emer['emergency_fill']], axis=1)
-        df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-        df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
+            print("\nShape Dataframe antes de Modeling(): ", df_treat.shape)
+            if len(df_sel) != len(df_treat):
+                logger.warning(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
 
-        # Evaluo predicciones del modelo
-        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy=strategy)
-        print("Metricas: ", d_roi)
+            #______________________________________________ MODELING ______________________________________________#
+            print("MODELING".center(120, "-"))
+            # Realizo predicciones sobre los nuevos partidos
+            try:
+                y_pred_prob = loaded_model.predict_proba(df_treat) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
+                classes = loaded_model.classes_
+            except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
+                y_pred_prob = loaded_model.predict(df_treat)
+                classes = [0, 1, 2]
+            # logger.info(classes)
 
-        # Revierto etiquetas para tener nombres de equipos en vez de ids
-        d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
-        df_predicciones['id_team_home'] = df_predicciones['id_team_home'].replace(d_mapeo)
-        df_predicciones['id_team_away'] = df_predicciones['id_team_away'].replace(d_mapeo)
+            y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
+            # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
+            df_pred_proba = pd.DataFrame({
+                    'predicted_result': y_pred,
+                    f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                    f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
+                    f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
+                }, index=df_treat.index)
         
-        # Concateno datos
-        d_roi['param1'], d_roi['param2'] = str(d_roi['param1']), str(d_roi['param2'])
-        df_roi = pd.DataFrame(d_roi, index=[row['n_iteration']])
-        df_roi['X_shape_missing'] = [df_treat.shape]  # Me interesa saber el largo del df_missing
-        df_iteration_prod = pd.concat([df_iteration_prod, df_roi], axis=0)
+            # Agrego resultado y cuotas a df_match
+            df_match_odds_2 = df_match_odds[df_match_odds.index.isin(df_treat.index)]
+            df_match_odds_2 = df_match_odds.reindex(df_treat.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+            df_match = df_int.loc[df_int.index.isin(df_treat.index), ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'result']]
 
-        # Exporto datos
-        if export:
-            df_predicciones.to_excel(f'{ruta_base_mod}/assess_models_in_prod/modeling/{row['n_iteration']}_df_pred_metrics.xlsx', index=True)
-            df_iteration_prod.to_excel(f'{ruta_base_mod}/assess_models_in_prod/df_iteration_prod_seg_{iteration_date}.xlsx')
+            # Concateno conjunto de datos
+            df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
+            # try:
+            if relleno_formaciones:
+                df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_c1['copiado_formaciones'], df_emer['emergency_fill']], axis=1)
+            else:
+                df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_emer['emergency_fill']], axis=1)
+            # except:
+            #     df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_emer['emergency_fill']], axis=1)
+                
+            df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+            df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
+
+            # Evaluo predicciones del modelo
+            df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy=strategy)
+            print("Metricas: ", d_roi)
+
+            # Revierto etiquetas para tener nombres de equipos en vez de ids
+            d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
+            df_predicciones['id_team_home'] = df_predicciones['id_team_home'].replace(d_mapeo)
+            df_predicciones['id_team_away'] = df_predicciones['id_team_away'].replace(d_mapeo)
+            
+            # Concateno datos
+            d_roi['param1'], d_roi['param2'] = str(d_roi['param1']), str(d_roi['param2'])
+            df_roi = pd.DataFrame(d_roi, index=[row['n_iteration']])
+            df_roi['X_shape_missing'] = [df_treat.shape]  # Me interesa saber el largo del df_missing
+            df_roi['model_name'] = model_name
+            df_iteration_prod = pd.concat([df_iteration_prod, df_roi], axis=0)
+
+            # Exporto datos
+            if export:
+                df_predicciones.to_excel(f'{ruta_base_mod}/assess_models_in_prod/modeling/{row['n_iteration']}__{model_name}_pred.xlsx', index=True)
+                df_iteration_prod.to_excel(f'{ruta_base_mod}/assess_models_in_prod/df_iteration_prod_seg_{iteration_date}.xlsx')
 
     if export:
-        df_iteration_prod.to_excel(f'{ruta_base_mod}/df_iteration_prod.xlsx')
+        df_iteration_prod.to_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx')
 
     return df_iteration_prod
 
@@ -259,7 +287,7 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 48
+    id_country = 59
 
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
@@ -267,9 +295,9 @@ if __name__ == "__main__":
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'], # '2024-10-02
         55: ["france", "2024-10-03"], 
-        59: ["germany", "2024-10-03"],
-        77: ["italy", "2024-10-06"], #  "2024-10-03"
-        148: ["spain", "2024-10-03"], 
+        59: ["germany", "2024-10-12"], # 03
+        77: ["italy", "2024-10-12"], # 03
+        148: ["spain", "2024-10-10"],  # 03
         167: ["usa", "2024-10-06"]
     }
     country, date = d[id_country]
@@ -279,11 +307,24 @@ if __name__ == "__main__":
     ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
     ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
     df_iteration_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
+    df_iteration_test = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
 
     # Evaluo modelos en produccion
-    df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, strategy=bet_strategy)
+    # df_iteration_prod = main(df_iteration_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, strategy=bet_strategy)
+    df_iteration_prod = pd.read_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx', index_col=0)
+    print(df_iteration_prod)
+    
+    # Selecciono el mejor modelo (mayor roi por partido en produccion)
+    import main_best_model as mbm
+    ruta_assess_2 = f'{ruta_base_mod}/assess_models_in_prod/modeling'
+    best_model, df_best = mbm.select_best_model(df_iteration_prod, ruta_assess_2, thr_distrib=0.5)
+    df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
+    pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
+
+    # Saco n_iteration de indice y la hago una columna normal
+    df_iteration_prod = df_iteration_prod.reset_index() # Convertir el índice en una columna normal
+    df_iteration_prod.rename(columns={'index': 'n_iteration'}, inplace=True)
 
     # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
-    df_iteration_train.set_index('n_iteration', inplace=True) # Establecer 'n_iteration' como índice del DataFrame
-    df_concat = pd.concat([df_iteration_train, df_iteration_prod], axis=1)
-    df_concat.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=True)
+    df_concat = pd.merge(df_iteration_test, df_iteration_prod, on=['n_iteration', 'model_name'], how='outer', suffixes=('_test', '_prod'))
+    df_concat.to_excel(f'{ruta_base_mod}/df_iteration_test_ct.xlsx', index=True)
