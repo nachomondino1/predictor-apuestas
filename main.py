@@ -917,20 +917,24 @@ class Modeling:
             model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
             print(f" Modelo: {model_name} ".center(120, '-'))
 
-            # Entreno modelo y evaluo su rendimiento     
-            model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
-            df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
+            # Entreno modelo y evaluo su rendimiento 
+            try:
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
-            # Hiperparametros del modelo y Metricas en testeo y train
-            new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': d_hiper_model}
-            new_row.update(d_metrics)
-            df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
-            df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
+                # Hiperparametros del modelo y Metricas en testeo y train
+                new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': d_hiper_model}
+                new_row.update(d_metrics)
+                df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
+                df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
-            # Exporto datos del modelo
-            pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
-            df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
-        
+                # Exporto datos del modelo
+                pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
+
+            except KeyboardInterrupt as e:
+                logger.warning(f"Se evitó entrenar este modelo mediante {e}")
+                
         return df_metrics
 
 ##################################################### MAIN #####################################################

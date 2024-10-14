@@ -142,18 +142,24 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
     df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
     pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
 
-   # Concateno df_iteration y df_iteration_prod para tener df_iteration_completo
+    # Concateno dataframes en un solo dataframe.
+    ##  test y prod
     # Saco n_iteration de indice y la hago una columna normal
     df_ite_test_prod = df_ite_test_prod.reset_index() # Convertir el índice en una columna normal
     df_ite_test_prod.rename(columns={'index': 'n_iteration'}, inplace=True)
     df_concat = pd.merge(df_ite_test, df_ite_test_prod, on=['n_iteration', 'model_name'], how='outer', suffixes=('_test', '_prod'))
-    return df_concat
+    # df_concat.to_excel('/Users/nachomondino/Desktop/df_iteration_test_ct.xlsx')
+    # test + prod y train
+    df_ite = pd.merge(df_ite_train, df_concat, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+    df_ite.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
+    # logger.info(df_merged)
+    return df_ite
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
+    id_country = 59
 
     # Creo directorios segun pais y fecha de corrida
     date_con_hora = datetime.datetime.now()
@@ -191,9 +197,9 @@ if __name__ == "__main__":
         }
     }
     rows_to_features_min = 10      # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-    continue_old_train = False
+    continue_old_train = True
     if continue_old_train:
-        date = '2024-10-11'
+        date = '2024-10-13'
 
     d_params_2 = {  
         'construct': {
@@ -229,4 +235,3 @@ if __name__ == "__main__":
 
     # Entreno modelos y los evaluo en produccion.
     df = main(l_modelos, d_params, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train)
-    df.to_excel(f"./data/{country}/p4_modeling/{date}/df_iteration_test_ct.xlsx", index=True)

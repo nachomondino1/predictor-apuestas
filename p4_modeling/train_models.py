@@ -27,12 +27,15 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
     if continue_old_train:
         df_ite_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
+        df_ite_test_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
+
         row = df_ite_old[df_ite_old['n_iteration'] == df_ite_old['n_iteration'].max()]
         idx = row.index[0]
         n_last_model, lm_n_dias_ult_part, lm_n_anios_hist, lm_segun_localia, lm_dif_con_against = row.loc[idx, 'n_iteration'], eval(row.loc[idx, 'n_dias_ult_part']), row.loc[idx, 'n_anios_hist'], row.loc[idx, 'segun_localia'], row.loc[idx, 'dif_con_against']
         logger.warning("Se esta continuando el entrenamiento anterior dado que continue_old_train=True.")
 
         df_iteration = df_ite_old.copy()
+        df_ite_test = df_ite_test_old.copy()
         cont_iter = n_last_model
 
     # Por combinacion de parametros de construct_data
@@ -157,6 +160,7 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
     # Guardo datos de todas las iteraciones
     if export:
         df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
+        df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
 
     return df_iteration, df_ite_test
 
