@@ -75,7 +75,7 @@ class NeuralNetwork():
 
         # Hiperparametros de arquitectura
         param_grid = { 
-                    'hidden_layer_sizes': [[128, 64], [128, 64, 32], [256, 128, 64], [512, 256, 128, 64]], # [100], [50], [100, 50], [64, 32], [100, 100], [1024, 512, 256]
+                    'hidden_layer_sizes': [[100], [128, 64], [128, 64, 32], [256, 128, 64]], # [100], [50], [100, 50], [64, 32], [100, 100], [1024, 512, 256],  [512, 256, 128, 64] (no gana y encima creo que es la causa del kill...)
                     'learning_rate': [0.01, 0.1], # 0.001,
                     'activation': ['relu'], #  'tanh'
                     'optimizer': ['adam'], #  'sgd']
@@ -172,13 +172,13 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 'bootstrap': [True],
             },
             'XGBClassifier': {
-                'n_estimators': [100, 300], # 1000
-                'learning_rate': [0.01, 0.1],
-                'max_depth': [3, 5, 10], #  15, 20
-                'min_child_weight': [1, 5],
-                'subsample': [0.8, 1.0],
+                'n_estimators': [100], # suele ganar 100 
+                'learning_rate': [0.01, 0.1], 
+                'max_depth': [3, 5, 10, None], #  15, 20
+                # 'min_child_weight': [1, 5],
+                # 'subsample': [0.8, 1.0],
                 # 'colsample_bytree': [0.8, 1.0],
-                # 'gamma': [0, 0.1, 0.5],
+                'gamma': [0, 0.5],
                 # 'reg_alpha': [0, 0.1], # 0.01,
                 # 'reg_lambda': [0, 0.1], # 0.01,
             },
