@@ -341,8 +341,9 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
     # Returns
         Dataframe pasado como parametro con nueva columna 'stake_to_bet'
     """
-    dif_prob_inf_cap = 0 # Hasta 2024-10-08 era -0.5
-    dif_prob_sup_cap = 0
+    dif_prob_inf_cap = -0.5 # Hasta 2024-10-08 era -0.5
+    dif_prob_sup_cap = -0.1  # empiezo a reducir stake recien cuando tengo un 10% menos de certeza que la casa
+    k = 0.50  # Nuestro modelo es mas robusto por estar balanceado (x lo que, lo afecto menos)
 
     # Separo puntos en x e y
     if p1 is not None and p2 is not None:
@@ -369,7 +370,10 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
     elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
         if dif_prob_inf_cap != dif_prob_sup_cap:
-            df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)) * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+            df['stake_to_bet'] = (df['prob_result_to_bet'] + 
+                       k * np.where((df['dif_prob_result_to_bet'] >= dif_prob_inf_cap) & 
+                                    (df['dif_prob_result_to_bet'] <= dif_prob_sup_cap),
+                                    df['dif_prob_result_to_bet'], 0)) * m + b
         else:
             df['stake_to_bet'] = df['prob_result_to_bet'] * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
         

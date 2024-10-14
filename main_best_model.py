@@ -26,34 +26,6 @@ def save_old_assess():
     directories.make_directories([directorio_destino])
     directories.mover_archivo(directorio_origen, directorio_destino)
 
-
-def read_model_predictions(ruta_assess_2, n_ite, model_name):
-    df_pred = pd.read_excel(f'{ruta_assess_2}/{n_ite}__{model_name}_pred.xlsx')
-    return df_pred
-
-def calculate_distribucion(df, col_to_sum: str = 'predicted_result'):
-
-    n_local = len(df[df[f'{col_to_sum}'] == 1])
-    n_empate = len(df[df[f'{col_to_sum}'] == 0])
-    n_vis = len(df[df[f'{col_to_sum}'] == 2])
-    return n_local, n_empate, n_vis
-
-def check_similar_distribution(thr, n_loc, n_emp, n_vis, n_loc_real, n_emp_real, n_vis_real):
-
-    # Calculo variacion por resultado
-    var_loc = calculate_variation(n_loc, n_loc_real)
-    var_emp = calculate_variation(n_emp, n_emp_real)
-    var_vis = calculate_variation(n_vis, n_vis_real)
-    
-    for var in [var_loc, var_emp, var_vis]:
-        if abs(var) >= thr:
-            return False
-    return True
-
-def calculate_variation(end, ini):
-    return (end - ini) / abs(ini)
-
-
 def select_best_model(df, ruta_assess_2, thr_distrib=0.2):
     """
     Selecciona el mejor modelo
@@ -68,11 +40,8 @@ def select_best_model(df, ruta_assess_2, thr_distrib=0.2):
     df_top_rois = df[df['roi_por_partido'] >= percentile_value]
     logger.info(df_top_rois)
 
-
-    # 2) Descarto % ROI negativos en actual temporada
-    # Calcular % ROI
-    df_top_rois['% ROI 100'] = (df_top_rois['roi_por_partido'] - df_top_rois['roi_100']) / abs(df_top_rois['roi_100'])
-    df_top_rois_filt = df_top_rois[df_top_rois['% ROI 100'] >= 0]
+    # 2) Selecciono modelos con ROI creciente
+    df_top_rois_filt = roi_creciente(df_top_rois)
 
     # Analisis de distribucion
     df_best = df_top_rois_filt.copy()
@@ -113,6 +82,52 @@ def select_best_model(df, ruta_assess_2, thr_distrib=0.2):
     logger.info(df_best)
     best_model = df_best[df_best['roi_por_partido']==df_best['roi_por_partido'].max()]
     return best_model, df_best
+
+def roi_creciente(df_top_rois):
+    # Calcular % ROI
+    df_top_rois['% ROI 100'] = (df_top_rois['roi_por_partido'] - df_top_rois['roi_100']) / abs(df_top_rois['roi_100'])
+    df_top_rois_filt = df_top_rois[df_top_rois['% ROI 100'] >= 0]
+
+    # ROIpp 50 < ROIpp 100 < ROIpp 150 y asi. --> ROI creciente (en la realidad no es tan asi... no siempre son lineales...)
+    '''
+    if 'roi_150' in df_top_rois.columns: # Tendria que automatizarlo...
+        # Seleccionar filas donde la condición de múltiples columnas se cumpla
+        df_top_rois_filt = df_top_rois[(df_top_rois['roi_50'] < df_top_rois['roi_100']) &
+                                (df_top_rois['roi_100'] < df_top_rois['roi_150']) &
+                                (df_top_rois['roi_150'] < df_top_rois['roi_por_partido'])]
+    else:
+        # Seleccionar filas sin 'roi_150'
+        df_top_rois_filt = df_top_rois[(df_top_rois['roi_50'] < df_top_rois['roi_100']) &
+                                (df_top_rois['roi_100'] < df_top_rois['roi_por_partido'])]
+    '''
+    return df_top_rois_filt
+
+
+def read_model_predictions(ruta_assess_2, n_ite, model_name):
+    df_pred = pd.read_excel(f'{ruta_assess_2}/{n_ite}__{model_name}_pred.xlsx')
+    return df_pred
+
+def calculate_distribucion(df, col_to_sum: str = 'predicted_result'):
+
+    n_local = len(df[df[f'{col_to_sum}'] == 1])
+    n_empate = len(df[df[f'{col_to_sum}'] == 0])
+    n_vis = len(df[df[f'{col_to_sum}'] == 2])
+    return n_local, n_empate, n_vis
+
+def check_similar_distribution(thr, n_loc, n_emp, n_vis, n_loc_real, n_emp_real, n_vis_real):
+
+    # Calculo variacion por resultado
+    var_loc = calculate_variation(n_loc, n_loc_real)
+    var_emp = calculate_variation(n_emp, n_emp_real)
+    var_vis = calculate_variation(n_vis, n_vis_real)
+    
+    for var in [var_loc, var_emp, var_vis]:
+        if abs(var) >= thr:
+            return False
+    return True
+
+def calculate_variation(end, ini):
+    return (end - ini) / abs(ini)
 
 
 def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train: bool = False, export: bool = True):
