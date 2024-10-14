@@ -700,7 +700,7 @@ def load_df_etiquetas(country, n_model, BASE_DIR, d):
     print(df_etiquetas.head(3))
     return df_etiquetas
 
-def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
+def load_data_preparation_hyperparameters(country, n_model, BASE_DIR): # Probar
     """
     Cargo hiperparametros de DataPreparation()
     """
@@ -710,11 +710,12 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
     if n_model is not None:
         
         df_iteration = pd.read_excel(f"{BASE_DIR}/df_iteration_train.xlsx")
-        row_hiper = df_iteration[df_iteration['n_iteration'] == n_model]
-
+        row_hiper = df_iteration[df_iteration['n_iteration'] == n_model].iloc[0]  # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
+        # logger.warning(row_hiper)
+        
         ## Levanto columnas utilizadas para entrenar el modelo
-        selected_columns = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
-    
+        # selected_columns = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
+        selected_columns = eval(row_hiper['X_columns'])  # eval() para pasar de string a lista
     # Si se levanta de main.py
     else:
         row_hiper = pd.read_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx')
@@ -728,14 +729,14 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
 
     # Guardo hiperparametros en diccionario
     ## Construct_data
-    d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part'].values[0])
-    d['n_years_h2h'] = int(row_hiper['n_anios_hist'].values[0])
-    d['segun_localia'] = row_hiper['segun_localia'].values[0]
-    d['dif_con_against'] = row_hiper['dif_con_against'].values[0]
+    d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part'])# eval(row_hiper['n_dias_ult_part'].values[0])
+    d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
+    d['segun_localia'] = row_hiper['segun_localia'] # .values[0]
+    d['dif_con_against'] = row_hiper['dif_con_against'] # .values[0]
     ## Clean_data_2
-    n_years_to_select = row_hiper['n_years_to_select'].values[0]
+    n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
     d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
-    d['comp_to_select'] = row_hiper['comp_to_select'].values[0]
+    d['comp_to_select'] = row_hiper['comp_to_select'] # .values[0]
     ## Select_data
     d['selected_columns'] = selected_columns
 
@@ -744,50 +745,82 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR):
         logger.info(f'\t {key}: {value}')
     return d
 
-def load_modeling_hyperparameters(country, n_model, BASE_DIR):
+def load_modeling_hyperparameters(country, n_model, model_name, BASE_DIR): # Probar
     """
     Cargo hiperparametros de Modeling()
     """
     d = {}
+    l_curvas = ['linear', 'kelly']
 
     # Si se levanta de main_find_best_hyper.py
     if n_model is not None:
-        df_iteration = pd.read_excel(f"{BASE_DIR}/df_iteration.xlsx", index_col=0)
-        row_hiper_bet_strat = df_iteration.loc[n_model]
+        df_iteration = pd.read_excel(f"{BASE_DIR}/df_iteration.xlsx", index_col=0) #  index_col=0
+        col_model = 'model_name' if 'model_name' in df_iteration.columns else 'model_name_test'
+        rows_ite = df_iteration[df_iteration['n_iteration'] == n_model]
+        logger.warning(len(rows_ite))
+        if len(rows_ite) > 1:
+            row_hiper_bet_strat = rows_ite[rows_ite[col_model] == model_name]
+            logger.warning(len(row_hiper_bet_strat))
+        else:
+            row_hiper_bet_strat = rows_ite
+
+        # Verificacion de que se selecciono una sola row
+        if len(row_hiper_bet_strat) != 1:
+            logger.error(f"Falló la carga de hiperparametros de la estrategia de apuesta. El modelo a cargar era el {n_model}, un {model_name}. La fila con los hiperparametros tiene un largo de {len(row_hiper_bet_strat)} (≠ de 1:).")
+            logger.info(df_iteration)
+            raise ValueError
     else:
         row_hiper_bet_strat = pd.read_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx')
         logger.error("Se levantan los hiperparametros de Modeling desde de main.py")
 
     # Guardo hiperparametros en diccionario
-    d['thr_prob_min'] = row_hiper_bet_strat['thr_prob_min_best.1']
-    d['curva'] = row_hiper_bet_strat['curva.1']
-    param1 = int(row_hiper_bet_strat['param1.1'])
-    param2 = int(row_hiper_bet_strat['param2.1'])
-    d['curva_m'] = param1 if d['curva'] == 'linear' else None
-    d['curva_b'] = param2 if d['curva'] == 'linear' else None
-    d['curva_p1'] = eval(param1) if d['curva'] != 'linear' else None
-    d['curva_p2'] = eval(param2) if d['curva'] != 'linear' else None
+    d['thr_prob_min'] = load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best_prod')
+    d['curva'] = load_value_from_series(row_hiper_bet_strat, 'curva_prod')
+    param1 = int(load_value_from_series(row_hiper_bet_strat, 'param1_prod'))
+    param2 = int(load_value_from_series(row_hiper_bet_strat, 'param2_prod'))
+    d['curva_m'] = param1 if d['curva'] in l_curvas else None
+    d['curva_b'] = param2 if d['curva'] in l_curvas else None
+    d['curva_p1'] = eval(param1) if d['curva'] not in l_curvas else None
+    d['curva_p2'] = eval(param2) if d['curva'] not in l_curvas else None
+
+    try:
+        d['normalized'] = load_value_from_series(row_hiper_bet_strat, 'normalized_prod')
+    except KeyError:
+        d['normalized'] = load_value_from_series(row_hiper_bet_strat, 'normalized')
 
     logger.info("Hiperparametros cargados:")
     for key, value in d.items():
         logger.info(f'\t {key}: {value}')
     return d
 
-def load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d):
+def load_value_from_series(row, col_name):
+    try:
+        val = row[col_name].values[0]
+    except IndexError:
+        val = row[col_name]
+    logger.warning(f'{col_name}: {val}')
+    return val
+    
+def load_models(country, n_model, model_name, BASE_DIR_dp, BASE_DIR_mod, d): # Probar
 
     # Si se levanta de main_find_best_hyper.py
     if n_model is not None:
         n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
         path_scaler = f'{BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
-        path_model = f"{BASE_DIR_mod}/models/{n_model}_model.pkl"  #  f"{BASE_DIR_mod}/data_seg/{n_model}_model.pkl"
+        path_model_1 = f"{BASE_DIR_mod}/models/{n_model}_{model_name}.pkl" 
+        path_model_2 =  f"{BASE_DIR_mod}/models/{n_model}_model.pkl"
     # Si se levanta de main.py
     else:
         logger.error("Se levanta el modelo y el scaler desde de main.py")
         path_scaler = f"./data/{country}/p3_data_preparation/scaler_model.pkl"
-        path_model = f"./data/{country}/p4_modeling/modelo.pkl"
+        path_model_1 = f"./data/{country}/p4_modeling/modelo.pkl"
 
     scaler, columns_scaled = joblib.load(path_scaler)
-    loaded_model = pickle.load(open(path_model, "rb"))
+    try:
+        loaded_model = pickle.load(open(path_model_1, "rb"))
+    except FileNotFoundError:
+        loaded_model = pickle.load(open(path_model_2, "rb"))
+
     return scaler, columns_scaled, loaded_model
     
 def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country):
@@ -855,10 +888,11 @@ def read_data_of_best_model(id_country):
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
     row_country = df_best_models[df_best_models['id_country'] == id_country]
     n_model = int(row_country['n_model'].values[0])
+    model_name = str(row_country['model_name'].values[0])
     iteration_date_str = row_country['iteration_date'].values[0]
     iteration_date_dt = pd.to_datetime(iteration_date_str, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
     m_to_use = row_country['m_to_use'].values[0]
-    return n_model, iteration_date_dt, m_to_use
+    return n_model, model_name, iteration_date_dt, m_to_use
 
 
 ########################################################################## MAIN #######################################################################
@@ -888,7 +922,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
 
     # Levanto modelos, hiperparametros y demas
     if d_run['data_unders'] or d_run['modeling']:
-        n_model, iteration_date_dt, m_to_use = read_data_of_best_model(id_country)
+        n_model, model_name, iteration_date_dt, m_to_use = read_data_of_best_model(id_country) # model_name????
         BASE_DIR_mod = f"./data/{country}/p4_modeling/{iteration_date_dt}"
         BASE_DIR_dp = f"{BASE_DIR_mod}/p3_data_preparation/"         # BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{iteration_date_dt}"
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
@@ -897,7 +931,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
         d_hiper = load_data_preparation_hyperparameters(country, n_model, BASE_DIR_mod)
         df_etiquetas = load_df_etiquetas(country, n_model, BASE_DIR_dp, d_hiper)
-        scaler, columns_scaled, loaded_model = load_models(country, n_model, BASE_DIR_dp, BASE_DIR_mod, d_hiper)
+        scaler, columns_scaled, loaded_model = load_models(country, n_model, model_name, BASE_DIR_dp, BASE_DIR_mod, d_hiper)
         if env == 'dev':
             # comp_to_select = eval(d_hiper['comp_to_select'])
             comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para incluir ARG y USA
@@ -1054,13 +1088,14 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df_match_odds = pd.read_excel(f'./data/{country}/p6_deployment/data_understanding/df_match_next_odds.xlsx', index_col=0)
         df_c1 = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/fill_data/df_copiado_formaciones.xlsx', index_col=0)
         df_c2 = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/fill_data/df_copiado_ref_and_coaches.xlsx', index_col=0)
-    
+        df_fill = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_emergency_fill.xlsx', index_col=0)
+
     #_____________________________________________________________ MODELING _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
 
         # Levanto hiperparametros de modeling
-        d_hiper_mod = load_modeling_hyperparameters(country, n_model, BASE_DIR_mod)
+        d_hiper_mod = load_modeling_hyperparameters(country, n_model, model_name, BASE_DIR_mod)
 
         # Levanto datasets
         df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
@@ -1094,10 +1129,11 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
 
         # Vario el stake segun curva especifica
         # if env == 'dev':
-        #     df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation=d_hiper_mod['curva'], m=d_hiper_mod['curva_m'], b=d_hiper_mod['curva_b']) # Uso un m bajo para los clientes
-        #     logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
+        df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
+        # df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=d_hiper_mod['curva_m'], b=d_hiper_mod['curva_b']) # Uso un m bajo para los clientes
+        logger.info(f"m_to_use: {m_to_use}") # logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
         # elif env == 'prod':
-        df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
+        # df = asses_model.determine_stake_to_bet(df, stake_base=1, type_relation='linear', m=m_to_use, b=0) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -1127,12 +1163,12 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 167  # 55, 48, 167?
-        n_days = 2
+        id_country = 48  # 55, 48, 167?
+        n_days = 15
         n_seasons_missing = 1
         extract_missing = True
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
