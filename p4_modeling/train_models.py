@@ -8,15 +8,15 @@ from main import DataPreparation, Modeling
 from p3_data_preparation.select_data import determine_country_competitions
 import pickle
 import joblib
+# from itertools import product
 
-def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, export:bool = True):
+def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, rows_to_features_min, continue_old_train: bool = False, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
     # Definicion de variables
-    df_iteration = pd.DataFrame()
-    cont_iter = 0
-    rows_to_features_min = 30  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
+    df_iteration, df_ite_test = pd.DataFrame(), pd.DataFrame()
+    cont_iter, n_last_model, one_time, avoid_construct = 0, 0, True, False
     var_resp, var_pred = 'result', 'predicted_result'
     dp = DataPreparation(country)
     mo = Modeling(var_resp, var_pred, country)  # Creo objeto de clase Modeling
@@ -25,121 +25,144 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
     n_iter = define_n_iterations(d_params)
     logger.info(f"Numero de iteraciones totales: {n_iter}")
 
+    if continue_old_train:
+        df_ite_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
+        df_ite_test_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
+
+        row = df_ite_old[df_ite_old['n_iteration'] == df_ite_old['n_iteration'].max()]
+        idx = row.index[0]
+        n_last_model, lm_n_dias_ult_part, lm_n_anios_hist, lm_segun_localia, lm_dif_con_against = row.loc[idx, 'n_iteration'], eval(row.loc[idx, 'n_dias_ult_part']), row.loc[idx, 'n_anios_hist'], row.loc[idx, 'segun_localia'], row.loc[idx, 'dif_con_against']
+        logger.warning("Se esta continuando el entrenamiento anterior dado que continue_old_train=True.")
+
+        df_iteration = df_ite_old.copy()
+        df_ite_test = df_ite_test_old.copy()
+        cont_iter = n_last_model
+
     # Por combinacion de parametros de construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
         # Asigno valor a cada hiperpametro
         n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
-        path_construct = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
         logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
         print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 
-        # Construyo datos
-        path = f'{ruta_base_dp}/df_constructed_{path_construct}.xlsx'
-        try:
-            df_constructed = pd.read_excel(path, index_col=0)
-            # print("\n DF_CONSTRUCTED \n", df_constructed.head(2))
-        except FileNotFoundError:
-            # Levanto dataset formateado e integrado (estos no cambian entre iteraciones)
-            df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-            # print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
+        if continue_old_train and one_time:
+            # Una vez que alcance la construccion de last model
+            if (n_dias_ult_part == lm_n_dias_ult_part) and (n_years_h2h==lm_n_anios_hist) and (segun_localia==lm_segun_localia) and (dif_con_against==lm_dif_con_against):
+                one_time = False
+                avoid_construct = False
+            else:
+                logger.warning("Se evito construccion.")
+                avoid_construct = True
 
-            df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
+        if not avoid_construct:
+            # Construyo datos
+            path_1 = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
+            path_construct = f'{ruta_base_dp}/df_constructed_{path_1}.xlsx'
+            try:
+                df_constructed = pd.read_excel(path_construct, index_col=0)
+                # print("\n DF_CONSTRUCTED \n", df_constructed.head(2))
+            except FileNotFoundError:
+                # Levanto dataset formateado e integrado (estos no cambian entre iteraciones)
+                df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
+                # print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
+
+                df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
+                if export:
+                    df_constructed.to_excel(path_construct, index=True)
+
+            # Etiqueto df_constructed
+            df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=False)
+            path_etiqueta = f'{ruta_base_dp}/df_etiquetas_{path_1}.xlsx'
             if export:
-                df_constructed.to_excel(path, index=True)
+                df_etiquetas.to_excel(path_etiqueta, index=True)
 
-        # Etiqueto df_constructed
-        df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=False)
-        path = f'{ruta_base_dp}/df_etiquetas_{path_construct}.xlsx'
-        if export:
-            df_etiquetas.to_excel(path, index=True)
+            # Clean data 2
+            for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
 
-        # Clean data 2
-        for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
+                n_years_to_select, comp_to_select = param_values_00[1], param_values_00[0]
+                path_2 = f'{n_years_to_select}_{comp_to_select}'
+                logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
+                print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
 
-            n_years_to_select, comp_to_select = param_values_00[1], param_values_00[0]
-            path_clean = f'{n_years_to_select}_{comp_to_select}'
-            logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
-            print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
-
-            df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, n_years_to_select, comp_to_select, export=False)
-            joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_construct}_{path_clean}.pkl')
-        
-            # Por combinacion de parametros de select_data
-            for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
-
-                # Asigno valor a cada hiperpametro
-                thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                path_select = f'{thr_corr}_{thr_fs}'
-                logger.info(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
-                print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
-
-                # Selecciono datos
-                path = f'{ruta_base_dp}/df_selected_{path_construct}_{path_clean}_{path_select}.xlsx'
-                try:
-                    df_sel = pd.read_excel(path, index_col=0)
-                except FileNotFoundError:
-                    df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
-                    # df_sel.to_excel(path, index=True)
+                df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, n_years_to_select, comp_to_select, export=False)
+                joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_1}_{path_2}.pkl')
             
-                for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
+                # Por combinacion de parametros de select_data
+                for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
-                    fill_na = param_values_3[0]
-                    logger.info(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
-                    print(f"Hiper treat --> fill_na: {fill_na}")
+                    # Asigno valor a cada hiperpametro
+                    thr_corr, thr_fs = param_values_4[0], param_values_4[1]
+                    path_3 = f'{thr_corr}_{thr_fs}'
+                    logger.info(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
+                    print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
-                    df_sel_treated = dp.treat_nan_values(df_sel, fill_na=fill_na, export=False)
+                    # Selecciono datos
+                    path_select = f'{ruta_base_dp}/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
+                    try:
+                        df_sel = pd.read_excel(path_select, index_col=0)
+                    except FileNotFoundError:
+                        df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                        # df_sel.to_excel(path_select, index=True)
+                
+                    # Por combinacion de parametros de treat_nan_values
+                    for z, param_values_3 in enumerate(product(*d_params['treat_nan'].values()), start=1):
 
-                    # Por combinacion de parametros de modeling
-                    for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-                        cont_iter += 1
+                        fill_na = param_values_3[0]
+                        path4 = f"{fill_na}"
+                        path_treat = f'{ruta_base_dp}/df_selected_{path_1}_{path_2}_{path_3}_{path4}.xlsx'
+                        logger.info(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
+                        print(f"Hiper treat --> fill_na: {fill_na}")
 
-                        # Asigno valor a cada hiperparametro
-                        val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
-                        logger.info(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
-                        logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
-                        print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                        try:
+                            df_sel_treated = pd.read_excel(path_treat, index_col=0)
+                        except FileNotFoundError:
+                            df_sel_treated = dp.treat_nan_values(df_sel, fill_na=fill_na, export=False)            
+                            # df_sel_treated.to_excel(path_treat, index=True)
 
-                        # Generar el diseño de la prueba
-                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
-                        rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-                        logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
+                        # Por combinacion de parametros de modeling
+                        for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
 
-                        # Si hay suficientes datos
-                        if rows_to_features >= rows_to_features_min: # len(X_test) >= 50 and 
-                            
-                            # Select best model
-                            best_model, d_hiper_best_model, d_metrics_best_model, df_pred = mo.select_best_model(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, export=False)
-                            # Guardo datos en dataframe
-                            row_data = {'n_iteration': cont_iter, 
-                                        'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
-                                        'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                        'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
-                                        'fill_na': fill_na, 'bal_type': bal_type,
-                                        'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
-                                        'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
-                                        'k': k}
-                            row_data.update(d_metrics_best_model)
-                            df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                            if export:
-                                df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
+                            # Asigno valor a cada hiperparametro
+                            val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                            logger.info(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
+                            print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                            cont_iter += 1
+                            logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
 
-                                # Guardo datos del modelo
-                                pickle.dump(best_model, open(f"{ruta_base_mod_seg}/{cont_iter}_model.pkl", "wb"))
-                                df_pred.to_excel(f'{ruta_base_mod_seg}/{cont_iter}_df_predicciones.xlsx', index=True)
-                                try:
-                                    df_hiper_best_model = pd.DataFrame.from_dict(d_hiper_best_model, orient='index', columns=['Valor'])
-                                    df_hiper_best_model.to_csv(f"{ruta_base_mod_seg}/{cont_iter}_model_hiper.csv")
-                                except:
-                                    pass
-                        else:
-                            logger.warning(f"Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
+                            # Generar el diseño de la prueba
+                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
+                            rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
+                            logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
+
+                            # Si hay suficientes datos
+                            if rows_to_features >= rows_to_features_min: # len(X_test) >= 50 and 
+                                
+                                df_metrics = mo.train_models(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, export=False)
+                                df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
+                                # Guardo datos en dataframe
+                                row_data = {'n_iteration': cont_iter, 
+                                            'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
+                                            'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                                            'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
+                                            'fill_na': fill_na, 'bal_type': bal_type,
+                                            'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                            'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                                            'k': k}
+                                df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
+                                if export:                            
+                                    df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
+                                    df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
+
+                            else:
+                                logger.warning(f"Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
     # Guardo datos de todas las iteraciones
     if export:
         df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
+        df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
 
-    return df_iteration
+    return df_iteration, df_ite_test
 
 def define_n_iterations(d_params):
     """

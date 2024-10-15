@@ -537,9 +537,9 @@ class DataPreparation:
             print("Eliminacion de filas...")
             print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
-        # Eliminacion de columnas         
+        # Eliminacion de columnas   
         # usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
@@ -582,9 +582,6 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("\nSelecting data...")
-
-        # Elimino columnas "Ruido"
-        df = df.drop(['id_competition', 'id_team_home', 'id_team_away'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
 
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
@@ -785,7 +782,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, nn: bool = False, export: bool = True):
+    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -799,35 +796,16 @@ class Modeling:
         """
         # warnings.filterwarnings("ignore")
         print("\nTraining model...")
-        
-        if nn:
+        self.classes = np.unique(y_train)
+
+        if model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
             logger.info("Entrenando red neuronal")
-            from tensorflow.keras.utils import to_categorical
-            from tensorflow.keras.callbacks import EarlyStopping
 
-             # Convertir etiquetas a formato one-hot
-            y_val_categorical = to_categorical(y_val, num_classes=3)
-            y_train_categorical = to_categorical(y_train, num_classes=3)
-            self.classes = np.unique(y_train)
+            # Creo instancia de clase NeuralNetwork()
+            red = build_model.NeuralNetwork()
 
-            # Selecciono mejores hiperparametros --> En un futuro, ahora no se si tengo muchos hiperparametros para probar.
-            # model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val_categorical, k=5, _print=True)
-
-            # Definir un callback de EarlyStopping
-            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-
-            # Entrenar el modelo con early stopping
-            model_best_params = model
-            history = model_best_params.fit(X_train, y_train_categorical, epochs=100, batch_size=32, validation_data=(X_val, y_val_categorical), callbacks=[early_stopping])
-
-            # Obtener la precisión de entrenamiento en la última época
-            train_accuracy = history.history['accuracy'][-1] * 100
-
-            # Obtener los hiperparámetros de las capas
-            d_hiper_model = [layer.get_config() for layer in model.layers] 
-            # print("Hiperparámetros de las capas:")
-            # for i, params in enumerate(d_hiper_model):
-            #     print(f"Capa {i}: {params}")
+            # Seleccion mejor arquitectura con la validacion y entreno el modelo
+            model_best_params, d_hiper_model, train_accuracy = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
 
         else:
             # Find best hiperparameters
@@ -926,84 +904,38 @@ class Modeling:
 
         return df_predicciones, d_metrics
     
-    def select_best_model(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, nn: bool = False, export=True):
+    def train_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, export=True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
         """
-        # Definicion de variables
-        best_roi_max = -100000
-        
+        df_metrics = pd.DataFrame()
+
         # Por modelo
         for modelo in l_modelos:
             
             model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
             print(f" Modelo: {model_name} ".center(120, '-'))
 
-            if modelo == "neural_network": # A diferencia de los otros modelos, la tengo que crear
-                modelo = self.create_neural_network(X_train.shape[1], num_classes=3)
-                nn = True
-
-            # Entreno modelo y evaluo su rendimiento     
+            # Entreno modelo y evaluo su rendimiento 
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, nn=nn, export=False)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
-                # Si la precision_test_es mayor, guardar datos...
-                if d_metrics['roi_por_partido'] > best_roi_max:
-                    best_roi_max = d_metrics['roi_por_partido']
+                # Hiperparametros del modelo y Metricas en testeo y train
+                new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': d_hiper_model}
+                new_row.update(d_metrics)
+                df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
+                df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
-                    # Guardo datos del mejor modelo
-                    best_model, d_hiper_best_model, cv_acc = model, d_hiper_model, cv_accuracy
-                    df_pred, d_metrics_best_model = df_predicciones, d_metrics
-                    model_name_best_mod = model_name
+                # Exporto datos del modelo
+                pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
-            except KeyboardInterrupt:
-                print("Se evitó entrenar este modelo")
-        
-        d_metrics_best_model.update({'model_name': model_name_best_mod, 'model_trained': d_hiper_best_model, 'train_cv_accuracy': cv_acc})
-        logger.info(f"Mejor modelo: {model_name_best_mod} con train_accuracy: {cv_acc}")
-        return best_model, d_hiper_best_model, d_metrics_best_model, df_pred
-    
-    # Definir el modelo
-    def create_neural_network(self, input_shape, num_classes, batch_normalization: bool = False):
-        
-        import tensorflow as tf
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
-        from tensorflow.keras.regularizers import l2 
-        from tensorflow.keras.metrics import Recall
-        from tensorflow.keras import backend as K
-
-        model = Sequential()
-        neurons_1, neurons_2, neurons_3 = 128, 64, 32
-        dropout_rate = 0.3  # Dropout para evitar sobreajuste. El 30% de las neuronas se "apagará" de manera aleatoria en cada paso de entrenamiento.
-
-        # Capa oculta 1 con regularización Dropout
-        model.add(Dense(neurons_1, input_dim=input_shape, activation='relu', kernel_regularizer=l2(0.001)))
-        if batch_normalization:
-            model.add(BatchNormalization())
-        model.add(Dropout(dropout_rate))
-
-        # Capa oculta 2
-        model.add(Dense(neurons_2, activation='relu')) # kernel_regularizer=l2(0.001)
-        if batch_normalization:
-            model.add(BatchNormalization())
-
-        # Capa oculta 3 (nueva)
-        model.add(Dense(neurons_3, activation='relu')) # kernel_regularizer=l2(0.001)
-        if batch_normalization:
-            model.add(BatchNormalization())
-
-        # Capa de salida con softmax para clasificación multiclase (Empate, Local, Visitante)
-        model.add(Dense(num_classes, activation='softmax'))
-
-        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.compile(optimizer='adam', loss='categorical_crossentropy',  metrics=[Recall(class_id=0), 'accuracy'])  # Suponiendo que el empate es la clase 0
-
-        return model
-
-
+            except KeyboardInterrupt as e:
+                logger.warning(f"Se evitó entrenar este modelo mediante {e}")
+                
+        return df_metrics
 
 ##################################################### MAIN #####################################################
 def main(id_country, d_run, export: bool = True):
@@ -1130,7 +1062,7 @@ def main(id_country, d_run, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 59 # 55, 59, 77, 148
+    id_country = 167 # 55, 59, 77, 148
     d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
 
     main(id_country, d_params, export=True)

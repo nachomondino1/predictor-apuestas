@@ -2,7 +2,140 @@ import numpy as np
 from sklearn.model_selection import GridSearchCV  # Seleccion de hiperparametros
 from sklearn.metrics import accuracy_score  # Metrica de precision
 import time
+# Red neuronal
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Input, Dropout, BatchNormalization
+from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras.regularizers import l2 
+from tensorflow.keras.metrics import Recall
+from tensorflow.keras import backend as K
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.callbacks import EarlyStopping
+# from scikeras.wrappers import KerasClassifier
+from itertools import product
+from set_up_logging import logger
 
+class NeuralNetwork():
+    
+    def __init__(self) -> None:
+        pass
+
+    def create_neural_network(self, input_shape, output_shape, activation='relu', hidden_layer_sizes=[50, 100], 
+                          optimizer='adam', learning_rate=0.001, kernel_regularizer=0.001, 
+                          batch_normalization=False, dropout_rate=None, metrics=['accuracy']):
+        """
+        Creación de la arquitectura de la red neuronal y del modelo.
+        """
+        model = Sequential()
+        
+        # First layer
+        model.add(Input(shape=(input_shape,)))
+        model.add(Dense(hidden_layer_sizes[0], activation=activation, kernel_regularizer=l2(kernel_regularizer)))
+        
+        # Dropout opcional en la primera capa
+        if dropout_rate:
+            model.add(Dropout(dropout_rate))
+
+        # Hidden layers
+        for neurons in hidden_layer_sizes[1:]:
+            model.add(Dense(neurons, activation=activation, kernel_regularizer=l2(kernel_regularizer)))
+            
+            # Dropout opcional en capas ocultas
+            if dropout_rate:
+                model.add(Dropout(dropout_rate))
+            
+            if batch_normalization:
+                model.add(BatchNormalization())
+
+        # Output layer (Capa de salida con softmax para clasificación multiclase)
+        model.add(Dense(output_shape, activation='softmax'))
+
+        # Configuración del optimizador
+        if optimizer == 'adam':
+            opt = Adam(learning_rate=learning_rate)
+        elif optimizer == 'sgd':
+            opt = SGD(learning_rate=learning_rate, momentum=0.9)  # Agregamos momentum
+        else:
+            raise ValueError(f"Optimizer '{optimizer}' not supported")
+
+        # Compilación del modelo
+        model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=metrics)
+        
+        return model
+     
+    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=10, batch_size=32):
+        """
+        Entrenamiento de redes neuronales y seleccion de la mejor
+        """
+        start = time.time()
+
+        # Lista para guardar los resultados y modelos
+        results = []
+
+        # Hiperparametros de arquitectura
+        param_grid = { 
+                    'hidden_layer_sizes': [[100], [128, 64], [128, 64, 32], [256, 128, 64]], # [100], [50], [100, 50], [64, 32], [100, 100], [1024, 512, 256],  [512, 256, 128, 64] (no gana y encima creo que es la causa del kill...)
+                    'learning_rate': [0.01, 0.1], # 0.001,
+                    'activation': ['relu'], #  'tanh'
+                    'optimizer': ['adam'], #  'sgd']
+                    'kernel_regularizer': [None, 0.01], # 0.001,
+                    'batch_normalization': [False], # True
+                    'dropout_rate': [0.2, None]
+                }
+        
+        # Generar todas las combinaciones de hiperparámetros
+        param_combinations = list(product(
+            param_grid['hidden_layer_sizes'],
+            param_grid['learning_rate'],
+            param_grid['activation'],
+            param_grid['optimizer'],
+            param_grid['kernel_regularizer'],
+            param_grid['batch_normalization'],
+            param_grid['dropout_rate']
+        ))
+
+        # Convertir etiquetas a formato one-hot --> Evita error target y output con different shape. 
+        input_shape = X_train.shape[1]
+        output_shape = 3  # Estaria bueno que sea automatico
+        y_val_categorical = to_categorical(y_val, num_classes=output_shape)
+        y_train_categorical = to_categorical(y_train, num_classes=output_shape)
+
+        # Iterar sobre cada combinación
+        for params in param_combinations:
+            hidden_layers, learning_rate, activation, optimizer, regularizer, batch_norm, dropout_rate = params
+            
+            # Creo red neuronal
+            model = self.create_neural_network(input_shape=input_shape, output_shape=output_shape, hidden_layer_sizes=hidden_layers, learning_rate=learning_rate, activation=activation, optimizer=optimizer, kernel_regularizer=regularizer, batch_normalization=batch_norm, dropout_rate=dropout_rate)
+
+            # Definir un callback de EarlyStopping
+            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+            # Entrenar el modelo (usa el validation como test en vez de hacer cross val entre X_train)
+            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=0, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
+            
+            # Evaluar en el set de validación
+            val_loss, val_acc = model.evaluate(X_val, y_val_categorical, verbose=0)
+            
+            # Guardar el resultado
+            results.append({
+                'params': params,
+                'val_loss': val_loss,
+                'val_acc': val_acc,
+                'model': model
+            })
+            
+            # print(f"Params: {params} => Val Loss: {val_loss}, Val Accuracy: {val_acc}")
+
+        # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
+        best_result = min(results, key=lambda x: x['val_loss'])
+
+        # Imprimo rdos
+        end = time.time()
+        logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
+        logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
+
+        return best_result['model'], best_result['params'], best_result['val_acc']
 
 def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: bool = False):
     """
@@ -39,23 +172,23 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 'bootstrap': [True],
             },
             'XGBClassifier': {
-                'n_estimators': [100, 500, 1000],
-                'learning_rate': [0.01, 0.1],
-                'max_depth': [3, 7, 10, 15, 20],
-                # 'min_child_weight': [1, 3, 5],
-                'subsample': [0.8, 1.0],
-                'colsample_bytree': [0.8, 1.0],
-                # 'gamma': [0, 0.1, 0.5],
-                # 'reg_alpha': [0, 0.01, 0.1],
-                # 'reg_lambda': [0, 0.01, 0.1],
+                'n_estimators': [100], # suele ganar 100 
+                'learning_rate': [0.01, 0.1], 
+                'max_depth': [3, 5, 10, None], #  15, 20
+                # 'min_child_weight': [1, 5],
+                # 'subsample': [0.8, 1.0],
+                # 'colsample_bytree': [0.8, 1.0],
+                'gamma': [0, 0.5],
+                # 'reg_alpha': [0, 0.1], # 0.01,
+                # 'reg_lambda': [0, 0.1], # 0.01,
             },
-            'GradientBoostingClassifier': {
-                'n_estimators': [100, 200, 500],
-                'learning_rate': [0.01, 0.1],
+            'GradientBoostingClassifier': { # Tarda muchisimo en entrenar.
+                'n_estimators': [100], # 200
+                'learning_rate': [0.01], #  0.1
                 'max_depth': [3, 5],
                 # 'min_samples_split': [1, 5, 10],
                 # 'min_samples_leaf': [2, 4],
-                'subsample': [0.8, 1.0],
+                # 'subsample': [0.8, 1.0],
                 # 'max_features': ['auto'],
                 # 'loss': ['deviance']
             },
@@ -69,36 +202,25 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
                 # 'class_weight': ['balanced', None], # hace un under basicamente... no tiene sentido cuando hago under creo.
             },
             'SVC': {
-                'C': [0.1, 1, 5],
-                'kernel': ['poly', 'rbf', 'sigmoid'],
+                'C': [0.1, 0.5, 1],
+                'kernel': ['rbf', 'sigmoid'], # 'poly',
                 'gamma': ['scale', 'auto'], 
-                'degree': [3, 5],
+                # 'degree': [3, 5],
                 'coef0': [0.0,  0.5], # , 1.0
-                'shrinking': [True], # False
-                'probability': [True],
+                'shrinking': [True, False], # False
+                'probability': [True], # Tiene que ser True para poder usar predict.proba()
                 # 'tol': [1e-3, 1e-4, 1e-5],
+                'class_weight': ['balanced', None], # No deberia usarlo porque ya balanceo pero es que tal vez es diferente...?
                 'decision_function_shape': ['ovo', 'ovr'],
             },
-            'neural_networ': {
-                'epochs': [100],
-                'batch_size': [32, 64],
-                # verbose
-                # shuffle
-                # sample_weight
-                # steps_per_epoch
-                # validation_steps
-                # initial_epoch
-                # 'workers'
-                # use_multiprocessing
-            },
             'MLPClassifier': {
-                'hidden_layer_sizes': [(10,), (50,), (100,)], 
-                'activation': ['logistic',  'relu', 'tanh'],
-                'solver': ['lbfgs'], # 'sgd'
-                'alpha': [0.0001, 0.001, 0.01],
-                'learning_rate': ['constant', 'adaptive'],
+                'hidden_layer_sizes': [(50,), (100,)], 
+                'activation': ['logistic',  'relu'],  #  'tanh'
+                'solver': ['adam'], # 'sgd', 'lbfgs'
+                'alpha': [0.0001, 0.001], #  0.01
+                # 'learning_rate': ['constant', 'adaptive'],
                 'learning_rate_init': [0.01, 0.1],  # 0.001
-                # 'max_iter': [100, 200, 500],
+                'max_iter': [500],
                 'early_stopping': [True] # False
             },
             'PCA': {
@@ -229,14 +351,6 @@ def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que
     cv_accuracy = np.mean(scores)
     return cv_accuracy
 
-def prueba():
-
-    modelo = RandomForestClassifier()
-    X_val = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/X_val.xlsx')
-    y_val = pd.read_excel('/Users/nachomondino/Documents/GitHub/predictor-apuestas/p4_modeling/data/england/X_val.xlsx')
- 
-    best_model = bayer_optimization_hiperparameters(RandomForestClassifier, X, y, 5)
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    prueba()
+    pass
