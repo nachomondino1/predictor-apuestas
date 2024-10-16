@@ -19,8 +19,12 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
     # Por country
     for id_country in l_countries:
 
+        # Determino n_days_fill_data segun el pais --> para FRA uso un n_days mas grande.
+        n_days_fill_data = 360 if id_country == 55 else 60
+        logger.critical(f"n days a rellenar formaciones: {n_days_fill_data}")
+
         # Extraigo, preparo y predigo proximos partidos
-        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, export=d_run['export'])
+        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days, n_days_fill_data=n_days_fill_data, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
         if len(df_predicciones_country) > 0:
@@ -61,7 +65,7 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         n_days = 15
         l_countries = [48, 55, 59, 77, 148]
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)

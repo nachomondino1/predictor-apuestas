@@ -286,11 +286,13 @@ class DataPreparationNew(DataPreparation):
         logger.info("\n\n" + "Rellenando datos aun no disponibles...")
 
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos
-        l_player_cols = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
-        df_next_matches, df_copiado_formaciones = self.fillna_with_mean_in_last_matches(df_next_matches, df_last_old_matches, cols_to_fill=l_player_cols)            
+        # self.start_sub_player_cols = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
+        self.l_player_cols = [col for col in df_last_old_matches.columns if re.search(r'_player_', col)]  # Selecciono las variables que corresponden a jugadores
+        df_next_matches, df_copiado_formaciones = self.fillna_with_mean_in_last_matches(df_next_matches, df_last_old_matches, cols_to_fill=self.l_player_cols)            
             
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
-        l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away']
+        # self.miss_player_columns = [col for col in df_last_old_matches.columns if ('player_miss' in col)] --> ojo porque no se si las rellena ok... es complejo el rellenado.
+        l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away'] # + self.miss_player_columns
         df_next_matches, df_copiado = self.fillna_with_last_match_value(df_next_matches, df_last_old_matches, cols_to_fill=l_var_to_copy) 
 
         if self.export:
@@ -607,7 +609,7 @@ class DataPreparationNew(DataPreparation):
         Rellenado de emergencia de valores NaN con la media de la columna. Es ultimo recurso para poder predecir el partido. 
         """
         # Identificar las columnas de jugadores
-        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col) or ('player_miss' in col)]  
+        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  # ('player_miss' in col)
         logger.info(f"Player columns to fill in emergency: {player_columns}")
         
         # Creo datafrmame auxiliar (para ver que partidos rellené)
@@ -896,7 +898,7 @@ def read_data_of_best_model(id_country):
 
 
 ########################################################################## MAIN #######################################################################
-def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_missing:int = 1, extract_missing: bool = True, export:bool = True):
+def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_missing:int = 1, extract_missing: bool = True, n_days_fill_data:int = 60, export:bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
     """
@@ -905,10 +907,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
     load_dotenv()
     env = os.getenv('ENVIRONMENT')
     logger.info(f"Environment: {env}")
-
-    # Parametros
-    n_days_fill_data = 60  # Usaba 150 pero era muy largo para el inicio de la temporada y le daba demasiado peso a la formacion de la temporada anterior. 
-
+    
     # Determino country
     df_countries = pd.read_excel('./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
@@ -1163,12 +1162,13 @@ if __name__ == "__main__":
 
     if env == 'dev':
         # Definir condiciones del análisis
-        id_country = 48  # 55, 48, 167?
+        id_country = 55  # 55, 48, 167?
         n_days = 15
         n_seasons_missing = 1
         extract_missing = True
+        n_days_fill_data = 360  # Usaba 150 pero era muy largo para el inicio de la temporada y le daba demasiado peso a la formacion de la temporada anterior. 
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
@@ -1178,7 +1178,8 @@ if __name__ == "__main__":
         d_run = json.loads(sys.argv[3])  # Convertir la cadena JSON de vuelta a un diccionario
         n_seasons_missing = 1
         extract_missing = True
+        n_days_fill_data = 60
         directorio = "data/"
 
-    df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, extract_missing=extract_missing ,export=d_run['export'])
+    df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, extract_missing=extract_missing, n_days_fill_data=n_days_fill_data, export=d_run['export'])
     df.to_excel(f"{directorio}/predicciones.xlsx")
