@@ -118,20 +118,20 @@ def load_trained_models(n_ite, ruta_base_mod):
     for model_name in l_model_names:
         try:
             loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_{model_name}.pkl", "rb"))
+
+            # Agrego modelo a lista
+            l_models.append(loaded_model)
+            l_names.append(model_name)
         except FileNotFoundError:
             pass
-        l_models.append(loaded_model)
-        l_names.append(model_name)
     return l_models, l_names
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, strategy = 'general'):
+def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, n_days_to_fill:int = 60, strategy = 'general'):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
     logger.critical("ASSESS MODELS IN PRODUCTION...")
-    n_days_to_fill = 60
-
     # Evito sobreescribir assess actual y lo muevo. Ademas, creo directorio para el nuevo assess.
     save_assess(ruta_base_mod)   # Cuidado al correr este progrma, sobreescribis el assess que esta hoy actualmente. Si lo queres evitar, guarda el assess en carpeta "old_assess_iterations" 
 
@@ -293,16 +293,17 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 148
+    id_country = 55
+    n_days_to_fill = 360
 
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
-        48: ["england", '2024-10-02'], # '2024-10-02
+        48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
         59: ["germany", "2024-10-13"], # 03
-        77: ["italy", "2024-10-12"], # 03
+        77: ["italy", "2024-10-12"], # 12
         148: ["spain", "2024-10-13"],  # 03
         167: ["usa", "2024-10-06"]
     }
@@ -323,7 +324,7 @@ if __name__ == "__main__":
         pass
 
     # Evaluo modelos en produccion
-    df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, strategy=bet_strategy)
+    df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_to_fill, strategy=bet_strategy)
     # df_ite_test_prod = pd.read_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx', index_col=0)
     # logger.info(df_ite_test_prod)
 
