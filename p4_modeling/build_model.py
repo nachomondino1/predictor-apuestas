@@ -173,12 +173,12 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: boo
             },
             'XGBClassifier': {
                 'n_estimators': [100], # suele ganar 100 
-                'learning_rate': [0.01, 0.1], 
-                'max_depth': [3, 5, 10, None], #  15, 20
-                # 'min_child_weight': [1, 5],
-                # 'subsample': [0.8, 1.0],
-                # 'colsample_bytree': [0.8, 1.0],
+                'learning_rate': [0.001, 0.01, 0.1], 
+                'max_depth': [3, 4, 5, 6, 10], #  15, 20
                 'gamma': [0, 0.5],
+                'min_child_weight': [1, 5, None],        # Peso mínimo del niño
+                'subsample': [0.8, 1.0],                 # Tasa de muestreo
+                'colsample_bytree': [0.8, 1.0]           # Fracción de columnas por árbol
                 # 'reg_alpha': [0, 0.1], # 0.01,
                 # 'reg_lambda': [0, 0.1], # 0.01,
             },

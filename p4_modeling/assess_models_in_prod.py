@@ -22,7 +22,7 @@ def save_assess(ruta_base):
     date_con_hora = datetime.datetime.now()
     date = date_con_hora.date()
 
-    l_dir_origen = [f'{ruta_base}/assess_models_in_prod', f'{ruta_base}/df_iteration_test_prod.xlsx', f'{ruta_base}/df_iteration.xlsx']
+    l_dir_origen = [f'{ruta_base}/assess_models_in_prod', f'{ruta_base}/df_iteration_test_prod.xlsx',  f'{ruta_base}/df_best_model.xlsx', f'{ruta_base}/df_iteration.xlsx']
     directorio_destino = f'{ruta_base}/old_assess_iterations/{date}'
 
     # Creo directorio de destino
@@ -290,12 +290,14 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+    import main_best_model as mbm
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Seleccionar pais
-    id_country = 55
-    n_days_to_fill = 360
-
+    id_country = 77
+    n_days_fill_data = 360 if id_country == 55 else 60  # Para FRA uso 360 porque no llega a minimos para integrar var de jugadores.
+    only_select_best_model = False # False
+    
     # Defino condiciones del analisis
     bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
@@ -303,7 +305,7 @@ if __name__ == "__main__":
         48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
         59: ["germany", "2024-10-13"], # 03
-        77: ["italy", "2024-10-12"], # 12
+        77: ["italy", "2024-10-15"], # 12
         148: ["spain", "2024-10-13"],  # 03
         167: ["usa", "2024-10-06"]
     }
@@ -313,6 +315,7 @@ if __name__ == "__main__":
     # Defino rutas
     ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
     ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
+    ruta_assess_2 = f'{ruta_base_mod}/assess_models_in_prod/modeling'
 
     # Levanto datos de modelos entrenados
     df_ite_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
@@ -324,16 +327,14 @@ if __name__ == "__main__":
         pass
 
     # Evaluo modelos en produccion
-    df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_to_fill, strategy=bet_strategy)
-    # df_ite_test_prod = pd.read_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx', index_col=0)
-    # logger.info(df_ite_test_prod)
+    if only_select_best_model:
+        df_ite_test_prod = pd.read_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx', index_col=0)
+        logger.info(df_ite_test_prod)
+    else:
+        df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_fill_data, strategy=bet_strategy)
 
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    import main_best_model as mbm
-    ruta_assess_2 = f'{ruta_base_mod}/assess_models_in_prod/modeling'
     best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, thr_distrib=0.8)
-    df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
-    pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
     
     # Concateno dataframes en un solo dataframe.
     ##  test y prod
@@ -351,7 +352,12 @@ if __name__ == "__main__":
     except NameError: 
         # df_merged = pd.concat([df_ite_train, df_ite_test_prod], axis=1)
         df_merged = pd.merge(df_ite_train, df_ite_test_prod, on='n_iteration', how='outer', suffixes=('_test', '_prod'))     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-
-    df_merged.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
     logger.info(df_merged)
+
+    # Exporto datos
+    ## Seleccion de modelo
+    df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
+    pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
+    ## df_iteration concatenando train, test y test_prod
+    df_merged.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
 
