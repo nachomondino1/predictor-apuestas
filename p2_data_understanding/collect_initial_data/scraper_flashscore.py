@@ -362,13 +362,13 @@ class FlashscoreCrawler(Crawler):
         d_row = {}
 
         # Extraer bajas
-        tag_bajas = super().extract_tag(xpath=f'.//div[@id="detail"]//div[text()="Will not play"]', sec_wait=self.SEC_WAIT_MIN, print_fail=True)
+        tag_bajas = super().extract_tag(xpath=f'.//div[@id="detail"]//div[text()="Will not play"]/../..', sec_wait=self.SEC_WAIT_MIN, print_fail=True)  # con '/../..' subo dos niveles (padre del padre)
 
         if tag_bajas:
 
             # Extraigo listado de jugadores
-            l_tags_player_home = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
-            l_tags_player_away = super().extract_tags(tag_inicial=tag_bajas, xpath='.//following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+            l_tags_player_home = super().extract_tags(tag_inicial=tag_bajas, xpath='.//div[text()="Will not play" or text()="Questionable"]/following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+            l_tags_player_away = super().extract_tags(tag_inicial=tag_bajas, xpath='.//div[text()="Will not play" or text()="Questionable"]/following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
 
             if l_tags_player_home:
                 # Obtengo urls de jugadores
