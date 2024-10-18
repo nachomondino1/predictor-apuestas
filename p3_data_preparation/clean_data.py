@@ -2,10 +2,6 @@ import sys
 sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
-from p4_modeling.build_model import select_best_hiperparameters
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import GridSearchCV
 from set_up_logging import logger
 import string
 import requests
@@ -239,6 +235,11 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
     :param percentil_nan: A mayor valor, mas alto el porc_nan_max_col y, por ende, menos columnas son consideradas con mucho nan (es decir, menos relleno de datos).
     :return: (Dataframe)
     """
+    # Importar solo cuando es necesario
+    from p4_modeling.build_model import select_best_hiperparameters
+    from sklearn.model_selection import train_test_split
+    from sklearn.ensemble import RandomForestRegressor
+
     X_filled = X.copy()
     params = {
             'n_estimators': [100], 
