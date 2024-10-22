@@ -69,9 +69,9 @@ jobs:
             p3_data_preparation/clean_data.py
             p4_modeling
             p6_deployment/automatize_predict
-            p6_deployment/requirements_mnm.txt
+            p6_deployment/requirements_update.txt
           sparse-checkout-cone-mode: false
-          ref: prod # Branch
+          ref: staging # Branch # Prueba con staging. prod
 
       # Instalacion de dependencias 
       - name: Set up Python
@@ -83,39 +83,42 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_mnm.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/p6_deployment/requirements_update.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r p6_deployment/requirements_mnm.txt
+          pip install -r p6_deployment/requirements_update.txt
 
       - name: Set n_days based on hour
         id: set-ndays
         run: |
           current_hour=$(date +"%H")  # Hora actual solo HH. Se compara la hora (HH), ignorando los minutos, lo que hace que sea menos sensible a posibles retrasos.
           echo "La hora actual es: $current_hour"
-          if [ "$current_hour" == "13" ]; then
+          if [ "$current_hour" == "10" ]; then
             echo "n_days=0.13" >> $GITHUB_ENV
             echo "El valor de n_days es 0.13"
-          elif [ "$current_hour" == "15" ]; then
+          elif [ "$current_hour" == "11" ]; then
+            echo "n_days=0.10" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.50"
+          elif [ "$current_hour" == "12" ]; then
             echo "n_days=0.10" >> $GITHUB_ENV
             echo "El valor de n_days es 0.10"
-          elif [ "$current_hour" == "16" ]; then
+          elif [ "$current_hour" == "13" ]; then
             echo "n_days=0.21" >> $GITHUB_ENV
             echo "El valor de n_days es 0.21"
-          elif [ "$current_hour" == "17" ]; then
+          elif [ "$current_hour" == "14" ]; then
             echo "n_days=0.06" >> $GITHUB_ENV
             echo "El valor de n_days es 0.06"
-          elif [ "$current_hour" == "18" ]; then
+          elif [ "$current_hour" == "15" ]; then
             echo "n_days=0.08" >> $GITHUB_ENV
             echo "El valor de n_days es 0.08"
-          elif [ "$current_hour" == "19" ]; then
+          elif [ "$current_hour" == "16" ]; then
             echo "n_days=0.04" >> $GITHUB_ENV
             echo "El valor de n_days es 0.04"
-          elif [ "$current_hour" == "21" ]; then
+          elif [ "$current_hour" == "18" ]; then
             echo "n_days=0.10" >> $GITHUB_ENV
             echo "El valor de n_days es 0.10"
           else
@@ -140,7 +143,8 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .  # Agregar todos los cambios
           git commit -m "Update results of bets"
-          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+          # git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:prod
+          git push https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }} HEAD:staging
 
       # Dispath to transfer
       - name: Dispatch event to second repository
