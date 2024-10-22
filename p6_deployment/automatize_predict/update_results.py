@@ -99,7 +99,7 @@ if __name__ == "__main__":
         n_days = 5
     
     elif env == 'prod':
-        n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+        n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
 
     # Levanto datasets
     df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  

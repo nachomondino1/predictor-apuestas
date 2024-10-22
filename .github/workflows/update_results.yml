@@ -96,30 +96,37 @@ jobs:
         id: set-ndays
         run: |
           current_hour=$(date +"%H")  # Hora actual solo HH. Se compara la hora (HH), ignorando los minutos, lo que hace que sea menos sensible a posibles retrasos.
+          echo "La hora actual es: $current_hour"
           if [ "$current_hour" == "13" ]; then
             echo "n_days=0.13" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.13"
           elif [ "$current_hour" == "15" ]; then
             echo "n_days=0.10" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.10"
           elif [ "$current_hour" == "16" ]; then
             echo "n_days=0.21" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.21"
           elif [ "$current_hour" == "17" ]; then
             echo "n_days=0.06" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.06"
           elif [ "$current_hour" == "18" ]; then
             echo "n_days=0.08" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.08"
           elif [ "$current_hour" == "19" ]; then
             echo "n_days=0.04" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.04"
           elif [ "$current_hour" == "21" ]; then
             echo "n_days=0.10" >> $GITHUB_ENV
-          elif [ "$current_hour" == "22" ]; then
-            echo "n_days=1.00" >> $GITHUB_ENV
+            echo "El valor de n_days es 0.10"
           else
             echo "n_days=1.00" >> $GITHUB_ENV  # Valor predeterminado en caso de error
-          fi
+            echo "El valor predeterminado de n_days es 1"
 
       # Run update_results script
       - name: Run update_results script
         run: |
           # python p6_deployment/automatize_predict/update_results.py 1
+          echo "Ejecutando el script con n_days=${{ env.n_days }}"
           python p6_deployment/automatize_predict/update_results.py ${{ env.n_days }}
 
 
