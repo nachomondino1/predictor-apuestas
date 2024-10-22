@@ -9,7 +9,7 @@ from p2_data_understanding.collect_initial_data.scraper_flashscore import extrac
 from p3_data_preparation.construct_data import determine_result
 from p4_modeling.asses_model import determine_winning_bets
 
-def determine_last_matches(df: pd.DataFrame, n_days: int = 1):
+def determine_last_matches(df: pd.DataFrame, n_days: float = 1):
     """
     Selecciono los partidos jugados en los ultimos <n_days>.
     """
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         n_days = 5
     
     elif env == 'prod':
-        n_days = int(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
+        n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
 
     # Levanto datasets
     df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  

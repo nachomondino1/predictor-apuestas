@@ -4,13 +4,11 @@ on:
   schedule: # Se ejecutan en horario UTC 0 (arg es -3) y con 15' de retraso...
 
     # Todos los dias a la medianoche
-    - cron: "00 21 * * *" # 18 hs
-    - cron: "45 21 * * *" # 18.45 hs
+    - cron: "00 22 * * *" # 19.00 hs
     
     # Viernes (16:00 hs, 18:00 hs, 18:30 hs)
     - cron: "0 19 * * 5" # 16 ARG (partidos de las 14 hs)
     - cron: "0 21 * * 5" # 18 ARG (partidos de las 16 hs)
-    # - cron: "45 21 * * 5" # 18.45 ARG (partidos de las 16.30 hs)
 
     # Sabado (10:30 hs, 12:30 hs, 13:00 hs, 14:00 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
     - cron: "30 13 * * 6"
@@ -20,7 +18,6 @@ on:
     - cron: "30 18 * * 6"
     - cron: "0 19 * * 6"
     - cron: "0 21 * * 6"
-    # - cron: "30 21 * * 6"
 
     # Domingo (12:00 hs, 12:30 hs, 14:00 hs, 14:30 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
     - cron: "30 15 * * 0"
@@ -28,12 +25,10 @@ on:
     - cron: "30 18 * * 0"
     - cron: "0 19 * * 0"
     - cron: "0 21 * * 0"
-    # - cron: "30 21 * * 0"
   
-    # Lunes (15:30 hs, 17:45 hs, 18:30 hs)
+    # Lunes (15:30 hs, 18:00 hs, 18:30 hs)
     - cron: "30 18 * * 1"
-    - cron: "45 20 * * 1"
-    # - cron: "30 21 * * 1"
+    - cron: "00 21 * * 1"
 
   # push: # Para hacer que se ejecute la action
   #   branches:
@@ -71,7 +66,7 @@ jobs:
             p6_deployment/automatize_predict
             p6_deployment/requirements_mnm.txt
           sparse-checkout-cone-mode: false
-          ref: prod # Branch
+          ref: prod # Branch # Prueba con staging
 
       # Instalacion de dependencias 
       - name: Set up Python
@@ -92,10 +87,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r p6_deployment/requirements_mnm.txt
 
+      - name: Set n_days based on hour
+        id: set-ndays
+        run: |
+          current_hour=$(date +"%H")  # Hora actual solo HH. Se compara la hora (HH), ignorando los minutos, lo que hace que sea menos sensible a posibles retrasos.
+          echo "La hora actual es: $current_hour"
+          if [ "$current_hour" == "10" ]; then
+            echo "n_days=0.13" >> $GITHUB_ENV            
+          elif [ "$current_hour" == "12" ]; then
+            echo "n_days=0.10" >> $GITHUB_ENV
+          elif [ "$current_hour" == "13" ]; then
+            echo "n_days=0.21" >> $GITHUB_ENV
+          elif [ "$current_hour" == "14" ]; then
+            echo "n_days=0.06" >> $GITHUB_ENV
+          elif [ "$current_hour" == "15" ]; then
+            echo "n_days=0.08" >> $GITHUB_ENV
+          elif [ "$current_hour" == "16" ]; then
+            echo "n_days=0.04" >> $GITHUB_ENV
+          elif [ "$current_hour" == "18" ]; then
+            echo "n_days=0.10" >> $GITHUB_ENV
+          else
+            echo "n_days=1.00" >> $GITHUB_ENV  # Valor predeterminado en caso de error
+          fi  # ¡Cerrar el bloque condicional correctamente!
+
       # Run update_results script
       - name: Run update_results script
         run: |
-          python p6_deployment/automatize_predict/update_results.py 1
+          # python p6_deployment/automatize_predict/update_results.py 1
+          echo "Ejecutando el script con n_days=${{ env.n_days }}"
+          python p6_deployment/automatize_predict/update_results.py ${{ env.n_days }}
 
       # Push to Github
       - name: Commit and push all changes
