@@ -3,3 +3,4 @@ selenium
 webdriver-manager
 tqdm
 requests
+scikit-learn==1.5.0
