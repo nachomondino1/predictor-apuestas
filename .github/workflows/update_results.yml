@@ -121,6 +121,7 @@ jobs:
           else
             echo "n_days=1.00" >> $GITHUB_ENV  # Valor predeterminado en caso de error
             echo "El valor predeterminado de n_days es 1"
+          fi  # ¡Cerrar el bloque condicional correctamente!
 
       # Run update_results script
       - name: Run update_results script
