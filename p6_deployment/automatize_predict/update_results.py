@@ -9,7 +9,7 @@ from p2_data_understanding.collect_initial_data.scraper_flashscore import extrac
 from p3_data_preparation.construct_data import determine_result
 from p4_modeling.asses_model import determine_winning_bets
 
-def determine_last_matches(df: pd.DataFrame, n_days: int = 1):
+def determine_last_matches(df: pd.DataFrame, n_days: float = 1):
     """
     Selecciono los partidos jugados en los ultimos <n_days>.
     """
