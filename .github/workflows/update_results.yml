@@ -117,7 +117,6 @@ jobs:
           echo "Ejecutando el script con n_days=${{ env.n_days }}"
           python p6_deployment/automatize_predict/update_results.py ${{ env.n_days }}
 
-
       # Push to Github
       - name: Commit and push all changes
         env:
