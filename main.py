@@ -782,7 +782,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, export: bool = True):
+    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, bayes:bool = True, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -810,13 +810,13 @@ class Modeling:
         else:
             # Find best hiperparameters
             if params is None:
-                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
+                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, bayes=bayes,_print=True)
             else:
                 model_best_params = model.set_params(**params)
                 # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
 
             d_hiper_model = model_best_params.get_params()
-            print("Hiperparametros:", d_hiper_model)
+            # print("Hiperparametros:", d_hiper_model)
 
             # Fit model
             model_best_params.fit(X_train, y_train)
@@ -919,7 +919,8 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento 
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                # model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k,  bayes=False, export=False)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Hiperparametros del modelo y Metricas en testeo y train

@@ -276,7 +276,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
             X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
             # Selecciono los mejores hiperparametros usando el set de validacion
-            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, params=params, k=3, _print=True)
+            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, params=params, k=3, bayes=False, _print=True)
 
             # Entrenar el modelo con los datos de entrenamiento
             model.fit(X_train, y_train)
