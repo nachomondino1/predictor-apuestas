@@ -543,7 +543,7 @@ class DataPreparation:
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(0.15*len(X))
+        n_reg_min = int(0.15*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
         if _print:
             print("Eliminación de columnas...")
@@ -600,7 +600,7 @@ class DataPreparation:
         print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         
         end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
+        logger.info(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_corr_tri_X.to_excel(f'./data/{self.country}/p3_data_preparation/select_data/df_correlation.xlsx', index=True)
@@ -624,6 +624,8 @@ class DataPreparation:
             Dataframe sin NaN values
         """ 
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
+        start = time.time()
+
         # Separo en X e y
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
@@ -656,6 +658,9 @@ class DataPreparation:
         # Concateno X e y
         y = y[y.index.isin(X.index)]
         df = pd.concat([X, y], axis=1)
+
+        end = time.time()
+        logger.info(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
 
         if export:
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
@@ -919,7 +924,6 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento 
             try:
-                # model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k,  bayes=False, export=False)
                 model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
