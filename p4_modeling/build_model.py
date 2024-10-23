@@ -139,7 +139,7 @@ class NeuralNetwork():
 
         return best_result['model'], best_result['params'], best_result['val_acc']
 
-def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool = True, _print: bool = False):
+def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool = True, n_iter:int = 50, _print: bool = False):
     """
     Selecciona los mejores hiperparametros para un modelo.
 
@@ -151,7 +151,6 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
     """
     if _print:
         start = time.time()
-        # logger.info(f"\nSeleccionando mejores hiperparametros para {model} con k={k}")
 
     # Definicion de hiperparametros a considerar para cada modelo
     if params is None:
@@ -165,39 +164,45 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
                 'max_features': ['auto'],
             },
             'RandomForestClassifier': {
-                'n_estimators': Integer(100, 200) if bayes else [100, 500],
+                'n_estimators': Integer(20, 500) if bayes else [100, 500],
                 'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
-                'max_depth': Integer(3, 10) if bayes else [3, 5, 7, 10],
-                'min_samples_split': Integer(2, 10) if bayes else [2, 10],
-                'min_samples_leaf': Integer(1, 4) if bayes else [1, 4],
+                'max_depth': Integer(3, 50) if bayes else [3, 5, 7, 10],
+                'min_samples_split': Integer(10, 100) if bayes else [2, 10], # Mayor o igual a 2
+                'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
                 'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'],
                 'bootstrap': Categorical([True, False]) if bayes else [True, False]
             },
             'XGBClassifier': {
-                'n_estimators': Integer(100, 500) if bayes else [100],  # Suele ganar con 100
-                'learning_rate': Real(0.001, 0.1) if bayes else [0.001, 0.01, 0.1],
-                'max_depth': Integer(3, 10) if bayes else [3, 4, 5, 6, 10],
+                'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree', 'dart'], 
+                'n_estimators': Integer(20, 200) if bayes else [100],  # Suele ganar con 100
+                'learning_rate': Real(0, 1) if bayes else [0.001, 0.01, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
+                'max_depth': Integer(3, 50) if bayes else [3, 4, 5, 6, 10],
                 'gamma': Real(0, 1) if bayes else [0, 0.5],
-                'min_child_weight': Integer(1, 5) if bayes else [1, 5, None],
-                'subsample': Real(0.8, 1.0) if bayes else [0.8, 1.0],
-                'colsample_bytree': Real(0.8, 1.0) if bayes else [0.8, 1.0]
+                'min_child_weight': Integer(1, 100) if bayes else [1, 5, None], #5
+                'subsample': Real(0, 1.0) if bayes else [0.8, 1.0], #  sample of the training data prior to growing trees
+                # 'colsample_bytree': Real(0, 1.0) if bayes else [0.8, 1.0],
+                'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
+                'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
             },
-            'GradientBoostingClassifier': { # Tarda muchisimo en entrenar.
+            'GradientBoostingClassifier': { # Tarda muchisimo en entrenar a pesar de usar Bayes optimazation
                 'n_estimators': Integer(100, 300) if bayes else [100], 
                 'learning_rate': Real(0.001, 0.1) if bayes else [0.001, 0.01, 0.1],
-                'max_depth': Integer(3, 10) if bayes else [3, 5],
-                'min_samples_split': Integer(2, 10) if bayes else [2, 5, 10],  # Minimo 2.
+                'max_depth': Integer(3, 12) if bayes else [3, 5],
+                'min_samples_split': Integer(2, 8) if bayes else [2, 5, 10],  # Minimo 2.
                 'min_samples_leaf': Integer(2, 5) if bayes else [2, 4], 
-                'subsample': Real(0.8, 1.0) if bayes else [0.8, 1.0],
+                'subsample': Real(0.7, 1.0) if bayes else [0.8, 1.0],
                 # 'max_features': ['auto'],
                 # 'loss': ['deviance']
             },
             'LogisticRegression': {
-                    'penalty': Categorical(['l1', 'l2']) if bayes else ['l1', 'l2'],
-                    'solver': Categorical(['saga', 'liblinear']) if bayes else ['saga', 'liblinear'],
-                    'C': Real(0.1, 1.0) if bayes else [0.1, 0.5, 1],
-                    'fit_intercept': Categorical([True, False]) if bayes else [True, False],
-                    'max_iter': Integer(500, 2000) if bayes else [500, 2000]
+                'penalty': Categorical(['l1', 'l2']) if bayes else ['l1', 'l2'], # 'elasticnet', None
+                'tol': Real(0.00001, 0.01) if bayes else [0.0001],
+                'solver': Categorical(['saga', 'liblinear']) if bayes else ['saga', 'liblinear'], # 'sag', 'lbfgs', 'newton-cg' tienen problemas con elasticnet o l1
+                'C': Real(0.01, 5) if bayes else [0.1, 0.5, 1],
+                'fit_intercept': Categorical([True, False]) if bayes else [True, False],
+                'max_iter': Integer(50, 10000) if bayes else [500, 2000],
+                # 'multi_class': Categorical(['auto', 'ovr', 'multinomial']) if bayes else ['auto'], --> deprecated. FutureWarning: 'multi_class' was deprecated in version 1.5 and will be removed in 1.7. From then on, it will always use 'multinomial'. Leave it to its default value to avoid this warning.
+                'warm_start': Categorical([True, False]) if bayes else [True, False],
             },
             'SVC': {
                 'C': Real(0.1, 1.0) if bayes else [0.1, 0.5, 1],
@@ -211,8 +216,8 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
             },
             'MLPClassifier': {
                 # 'hidden_layer_sizes': Categorical([(50,), (100,)]) if bayes else [(50,), (100,)], # Tiene problema.
-                'hidden_layer_sizes': Categorical([50, 100]) if bayes else [50, 100],
-                'activation': Categorical(['logistic', 'relu']) if bayes else ['logistic', 'relu'],
+                'hidden_layer_sizes': Categorical([50, 100]) if bayes else [50, 100], # 50 va bien
+                'activation': Categorical(['logistic', 'relu']) if bayes else ['logistic', 'relu'], # logistic va.
                 'solver': Categorical(['adam']) if bayes else ['adam'],
                 'alpha': Real(0.0001, 0.001) if bayes else [0.0001, 0.001],
                 'learning_rate_init': Real(0.01, 0.1) if bayes else [0.01, 0.1],
@@ -236,25 +241,30 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
                 'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
             },
             'RandomForestRegressor': {
-                'n_estimators': Integer(100, 500) if bayes else [100, 200, 500],
-                'max_depth': Integer(3, 10) if bayes else [3, 5, 10],
-                'bootstrap': Categorical([True]) if bayes else [True]
+                'bootstrap': Categorical([True]) if bayes else [True, False], # False
+                'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse", "squared_error", "absolute_error"], # "squared_error", "absolute_error"
+                'max_depth': Integer(3, 50) if bayes else [3, 5, 10], 
+                'n_estimators': Integer(10, 500) if bayes else [100, 200, 500],
+                'min_samples_split': Integer(10, 100) if bayes else [10, 100] # Mayor o igual a 2
+                # 'verbose': Categorical([0]) if bayes else [0]
             }
         }
         
         # Obtengo el nombre del modelo para poder buscar sus hiperparametros
         model_name = str(model)[:str(model).find('(')]
-        logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
+        if _print:
+            logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
 
         # Busco hiperpamateros default a probar
         params = d_params[model_name]
 
     if bayes:
-        logger.warning("Bayes optimization...")
-        logger.info(f"Hiperparametros a probar: {params}")
+        if _print:
+            logger.warning("Bayes optimization...")
+            logger.info(f"Hiperparametros a probar: {params}")
 
         # Crear el objeto BayesSearchCV
-        bayes_search = BayesSearchCV(estimator=model, search_spaces=params, cv=k, n_iter=50, n_jobs=-1)
+        bayes_search = BayesSearchCV(estimator=model, search_spaces=params, cv=k, n_iter=n_iter, random_state=42, n_jobs=-1)
 
         # Ajustar el objeto BayesSearchCV a los datos de entrenamiento
         bayes_search.fit(X, y)
@@ -263,8 +273,9 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
         best_params = bayes_search.best_params_
 
     else:
-        logger.warning("Grid Search...")
-        logger.info(f"Hiperparametros a probar: {params}")
+        if _print:
+            logger.warning("Grid Search...")
+            logger.info(f"Hiperparametros a probar: {params}")
 
         # Crear el objeto GridSearchCV
         grid_search = GridSearchCV(estimator=model, param_grid=params, cv=k)
@@ -279,8 +290,9 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
     model.set_params(**best_params)
     if _print:
         end = time.time()
-        logger.info(f"Mejores hiperparametros: {model}")
+        logger.info(f"Mejores hiperparametros: {best_params}")
         logger.info(f"Seleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
+
     return model
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
