@@ -139,7 +139,7 @@ class NeuralNetwork():
 
         return best_result['model'], best_result['params'], best_result['val_acc']
 
-def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool = True, n_iter:int = 50, _print: bool = False):
+def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool = True, n_iter:int = 100, _print: bool = False):
     """
     Selecciona los mejores hiperparametros para un modelo.
 
@@ -164,25 +164,25 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
                 'max_features': ['auto'],
             },
             'RandomForestClassifier': {
-                'n_estimators': Integer(20, 500) if bayes else [100, 500],
+                'n_estimators': Integer(10, 100) if bayes else [100, 500],
                 'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
-                'max_depth': Integer(3, 50) if bayes else [3, 5, 7, 10],
+                'max_depth': Integer(3, 40) if bayes else [3, 5, 7, 10],
                 'min_samples_split': Integer(10, 100) if bayes else [2, 10], # Mayor o igual a 2
-                'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
+                # 'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
                 'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'],
-                'bootstrap': Categorical([True, False]) if bayes else [True, False]
+                'bootstrap': Categorical([True]) if bayes else [True, False] # False
             },
             'XGBClassifier': {
-                'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree', 'dart'], 
-                'n_estimators': Integer(20, 200) if bayes else [100],  # Suele ganar con 100
-                'learning_rate': Real(0, 1) if bayes else [0.001, 0.01, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
-                'max_depth': Integer(3, 50) if bayes else [3, 4, 5, 6, 10],
+                'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree', 'dart'], # 'gbtree',
+                'n_estimators': Integer(10, 100) if bayes else [100],  # Suele ganar con 100
+                'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.01, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
+                'max_depth': Integer(3, 20) if bayes else [3, 4, 5, 6, 10],
                 'gamma': Real(0, 1) if bayes else [0, 0.5],
-                'min_child_weight': Integer(1, 100) if bayes else [1, 5, None], #5
-                'subsample': Real(0, 1.0) if bayes else [0.8, 1.0], #  sample of the training data prior to growing trees
+                # 'min_child_weight': Integer(1, 100) if bayes else [1, 5, None], #5
+                'subsample': Real(0.8, 1.0) if bayes else [0.8, 1.0], #  sample of the training data prior to growing trees
                 # 'colsample_bytree': Real(0, 1.0) if bayes else [0.8, 1.0],
-                'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
-                'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
+                # 'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
+                # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
             },
             'GradientBoostingClassifier': { # Tarda muchisimo en entrenar a pesar de usar Bayes optimazation
                 'n_estimators': Integer(100, 300) if bayes else [100], 
@@ -195,14 +195,14 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes:bool 
                 # 'loss': ['deviance']
             },
             'LogisticRegression': {
-                'penalty': Categorical(['l1', 'l2']) if bayes else ['l1', 'l2'], # 'elasticnet', None
-                'tol': Real(0.00001, 0.01) if bayes else [0.0001],
-                'solver': Categorical(['saga', 'liblinear']) if bayes else ['saga', 'liblinear'], # 'sag', 'lbfgs', 'newton-cg' tienen problemas con elasticnet o l1
+                'penalty': Categorical(['l2']) if bayes else ['l1', 'l2'], # 'elasticnet', None (No usa C ni l1_ratio)
+                # 'tol': Real(0.00001, 0.01) if bayes else [0.0001],
+                'solver': Categorical(['saga', 'sag', 'lbfgs', 'newton-cg']) if bayes else ['saga', 'liblinear'], # ,  tienen problemas con elasticnet o l1. 'liblinear'
                 'C': Real(0.01, 5) if bayes else [0.1, 0.5, 1],
                 'fit_intercept': Categorical([True, False]) if bayes else [True, False],
-                'max_iter': Integer(50, 10000) if bayes else [500, 2000],
+                'max_iter': Integer(100, 10000) if bayes else [500, 2000],
                 # 'multi_class': Categorical(['auto', 'ovr', 'multinomial']) if bayes else ['auto'], --> deprecated. FutureWarning: 'multi_class' was deprecated in version 1.5 and will be removed in 1.7. From then on, it will always use 'multinomial'. Leave it to its default value to avoid this warning.
-                'warm_start': Categorical([True, False]) if bayes else [True, False],
+                # 'warm_start': Categorical([True, False]) if bayes else [True, False],
             },
             'SVC': {
                 'C': Real(0.1, 1.0) if bayes else [0.1, 0.5, 1],

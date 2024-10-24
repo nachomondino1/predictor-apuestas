@@ -188,9 +188,9 @@ if __name__ == "__main__":
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
     l_modelos = [LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
-    l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier() # Pruebo red neuroanl segun precision y no recall
+    # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier() # Pruebo red neuroanl segun precision y no recall
     # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()]
-    l_modelos = [XGBClassifier()]
+    # l_modelos = [XGBClassifier()]
 
     # 1728 iteraciones
     d_params = {  
@@ -201,15 +201,15 @@ if __name__ == "__main__":
             'dif_con_against': [True, False] # False
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['all_comp'], d_comps['comp_sin_b']], # d_comps['comp_sin_b'] solo para USA
+            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_b'] solo para USA 
             'n_years_to_select': [3, 5, 10], # None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
-            'thr_fs': [0.25, 0.5, 0.75], # None
+            'thr_fs': [None, 0.25, 0.5, 0.75],
         },
         'treat_nan': {
-            'fill_na': ['ml'], # None
+            'fill_na': [None, 'ml'],
         },
         'modeling': {
             'val_size': [0.125],

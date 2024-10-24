@@ -285,12 +285,13 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
             X_test = X.loc[X[col].isnull()]
             X_test = X_test.drop(columns=l_columns_to_fill)  # e.g. (378, 11)
 
+            # Despues de definir columns con mucho NaN, elimino registros con nan en las otras columnas y puede que una columna con mucho nan ya no tenga nan.
             if len(X_test) > 0:
                 ## Separo en train y val
                 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
                 # Selecciono los mejores hiperparametros usando el set de validacion
-                model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3, n_iter=25, _print=False) #  Con 50, tarda 1 min x columna.
+                model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3, n_iter=30, _print=False) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
 
                 # Entrenar el modelo con los datos de entrenamiento
                 model.fit(X_train, y_train)
@@ -301,8 +302,9 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
                 # Rellenar los valores faltantes en el dataframe
                 predicted_values_index = X_test.index
                 X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
+
             else:
-                logger.error(f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. ")
+                logger.error(f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. No hacer nada.")
         else:
             logger.error(f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'.")
 

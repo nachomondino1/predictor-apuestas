@@ -295,14 +295,14 @@ if __name__ == "__main__":
 
     # Defino condiciones del analisis
     # l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [59]
     only_select_best_model = False # False
     bet_strategy = 'general' # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
-        59: ["germany", "2024-10-13"], # 03
+        59: ["germany", "2024-10-24"], # 13
         77: ["italy", "2024-10-23"], # 15
         148: ["spain", "2024-10-13"],  # 03
         167: ["usa", "2024-10-06"]
@@ -337,7 +337,7 @@ if __name__ == "__main__":
             df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_fill_data, strategy=bet_strategy)
 
         # Selecciono el mejor modelo (mayor roi por partido en produccion)
-        best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, thr_distrib=0.8)
+        best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, thr_distrib=0.35)
         
         # Concateno dataframes en un solo dataframe.
         ##  test y prod

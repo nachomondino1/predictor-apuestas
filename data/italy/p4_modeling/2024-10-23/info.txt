@@ -1,0 +1,5 @@
+*Por que creo que el ROIpp es peor que con GridSearchCV?*
+Use un n_iter muy bajo para seleccionar hiperparametros de modelos de ML, por lo que, el bayes no llega al mismo maximo que GridSearchCV(). 
+- select_data: 20
+- fill_na: 8
+- modeling: 30

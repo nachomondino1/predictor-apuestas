@@ -509,6 +509,9 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
+        start = time.time()
+        logger.info("\nSelecting data...")
+
         # Reemplazo infinitos
         df = clean_data.replace_infinite(df)
 
@@ -531,7 +534,7 @@ class DataPreparation:
             print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
         ## con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, 0.6)
+        X = clean_data.delete_rows_nan(X, 0.5)
         if _print:
             print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
@@ -562,6 +565,9 @@ class DataPreparation:
         # Concateno X e y
         y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
         df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
+
+        end = time.time()
+        logger.info(f"Clean data 2 en {(end - start)/60:.1f} minutos")
 
         if export: 
             joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./data/{self.country}/p3_data_preparation/scaler_model.pkl")       
@@ -869,8 +875,8 @@ class Modeling:
         df_pred_proba = pd.DataFrame({
                 self.var_resp: y_test,
                 self.var_pred: y_pred,
-                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=X_test.index)
     
