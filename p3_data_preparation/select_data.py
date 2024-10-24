@@ -160,21 +160,11 @@ class FeatureSelection():
         # Returns
         Dataframe. Importancia por variable. (Dataframe)
         """
-        params = {
-                'n_estimators': [100],
-                'criterion': ['entropy'],
-                'max_depth': [3, 7], # 5, 
-                'min_samples_split': [5], # 2, 10
-                'min_samples_leaf': [2], # 1, 4
-                'max_features': ['sqrt'],
-                'bootstrap': [True]
-            }
-
         # Separo en train y val (para que select_best_hiperparameters() no tarde tanto)
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Verificar si se deben buscar los mejores hiperparámetros
-        model = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k, params=params, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k, n_iter=50, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(X_train, y_train)
@@ -223,15 +213,6 @@ class FeatureSelection():
         """
         # Definicion de variables
         n_features = 1  # Número deseado de características seleccionadas hasta que se eliminan las menos relevantes
-        params = {
-                'penalty': ['l1', 'l2'], # 'l1' solo usa solver 'saga'
-                'C': [0.1, 0.5, 1],
-                'solver': ['saga', 'liblinear'],
-                'fit_intercept': [True],
-                'max_iter': [2000],
-                # 'multi_class': ['auto'],
-                'class_weight': ['balanced', None]
-            }
 
         from sklearn.preprocessing import StandardScaler
         scaler = StandardScaler()
@@ -241,7 +222,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=k, params=params, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=k, n_iter=50, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
         # model = LogisticRegression(solver='lbfgs', max_iter=10000)
 
         rfe = RFE(estimator=model, n_features_to_select=n_features)
@@ -276,7 +257,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model = select_best_hiperparameters(Lasso(), X_val, y_val, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = select_best_hiperparameters(Lasso(), X_val, y_val, n_iter=50, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo
         model.fit(X_train, y_train)

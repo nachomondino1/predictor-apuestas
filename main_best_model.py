@@ -26,7 +26,7 @@ def save_old_assess():
     directories.make_directories([directorio_destino])
     directories.mover_archivo(directorio_origen, directorio_destino)
 
-def select_best_model(df, ruta_assess_2, thr_distrib=0.2):
+def select_best_model(df, ruta_assess_2, thr_distrib=0.35):
     """
     Selecciona el mejor modelo
     """
@@ -85,7 +85,8 @@ def select_best_model(df, ruta_assess_2, thr_distrib=0.2):
 
 def roi_creciente(df_top_rois):
     # Calcular % ROI
-    df_top_rois['% ROI 100'] = (df_top_rois['roi_por_partido'] - df_top_rois['roi_100']) / abs(df_top_rois['roi_100'])
+    col_to_use = 'roi_50'  # Para FRA: col_to_use = 'roi_50'
+    df_top_rois['% ROI 100'] = (df_top_rois['roi_por_partido'] - df_top_rois[col_to_use]) / abs(df_top_rois[col_to_use])
     df_top_rois_filt = df_top_rois[df_top_rois['% ROI 100'] >= 0]
 
     # ROIpp 50 < ROIpp 100 < ROIpp 150 y asi. --> ROI creciente (en la realidad no es tan asi... no siempre son lineales...)
@@ -175,15 +176,21 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 59
+    continue_old_train = False
 
-    # Creo directorios segun pais y fecha de corrida
-    date_con_hora = datetime.datetime.now()
-    date = date_con_hora.date()
+    # Determina date de la iteracion
+    if continue_old_train:
+        date = '2024-10-13'
+    else:
+        date_con_hora = datetime.datetime.now()
+        date = date_con_hora.date()
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
     l_modelos = [LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
-    l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier() # Pruebo red neuroanl segun precision y no recall
+    # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier() # Pruebo red neuroanl segun precision y no recall
+    # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()]
+    # l_modelos = [XGBClassifier()]
 
     # 1728 iteraciones
     d_params = {  
@@ -194,15 +201,15 @@ if __name__ == "__main__":
             'dif_con_against': [True, False] # False
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_b'] solo para USA
+            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_b'] solo para USA 
             'n_years_to_select': [3, 5, 10], # None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
-            'thr_fs': [None, 0.25, 0.5, 0.75], 
+            'thr_fs': [None, 0.25, 0.5, 0.75],
         },
         'treat_nan': {
-            'fill_na': [None, 'ml'], 
+            'fill_na': [None, 'ml'],
         },
         'modeling': {
             'val_size': [0.125],
@@ -212,9 +219,6 @@ if __name__ == "__main__":
         }
     }
     rows_to_features_min = 10      # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-    continue_old_train = True
-    if continue_old_train:
-        date = '2024-10-13'
 
     d_params_2 = {  
         'construct': {

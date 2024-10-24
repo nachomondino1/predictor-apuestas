@@ -509,6 +509,9 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
+        start = time.time()
+        logger.info("\nSelecting data...")
+
         # Reemplazo infinitos
         df = clean_data.replace_infinite(df)
 
@@ -516,7 +519,7 @@ class DataPreparation:
         df = df.sort_values(by='date', ascending=False)
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
         
-        # Eliminacion de filas 
+        # (1) Eliminacion de filas 
         ## Para evitar partidos muy viejos
         print("Eliminacion de filas...")
         n_reg_inic = len(X)
@@ -531,40 +534,40 @@ class DataPreparation:
             print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
         ## con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, 0.5, _print=True)
-        print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+        X = clean_data.delete_rows_nan(X, 0.5)
         if _print:
-            print("Eliminacion de filas...")
-            print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+            print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+            logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
-        # Eliminacion de columnas   
-        # usadas solo para construir y constantes
+        # (2) Eliminacion de columnas   
+        print("Eliminación de columnas...")
+        ## usadas solo para construir y constantes
         cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(0.15*len(X))
+        n_reg_min = int(0.15*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
-        if _print:
-            print("Eliminación de columnas...")
-            print(f"Columnas constantes eliminadas: {cols_constants}")
-            if len(X.columns) != len(X_sin_col_mucho_nan.columns):
-                l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
-                logger.info(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
-            
-            print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
 
-        # Escalado de datos
+        if _print and len(X.columns) != len(X_sin_col_mucho_nan.columns):
+            print(f"Columnas constantes eliminadas: {cols_constants}")
+            print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
+            l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
+            logger.warning(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
+
+        # (3) Escalado de datos
+        print("\nEscalado de datos...")
         scaler = StandardScaler()
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
-        if _print:
-            print("\nEscalado de datos...")
 
         # Concateno X e y
         y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
         df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
+
+        end = time.time()
+        logger.info(f"Clean data 2 en {(end - start)/60:.1f} minutos")
 
         if export: 
             joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./data/{self.country}/p3_data_preparation/scaler_model.pkl")       
@@ -600,7 +603,7 @@ class DataPreparation:
         print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         
         end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
+        logger.info(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_corr_tri_X.to_excel(f'./data/{self.country}/p3_data_preparation/select_data/df_correlation.xlsx', index=True)
@@ -624,6 +627,8 @@ class DataPreparation:
             Dataframe sin NaN values
         """ 
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
+        start = time.time()
+
         # Separo en X e y
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
@@ -631,13 +636,11 @@ class DataPreparation:
         if fill_na is not None:
             l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=percentil_nan)
 
-        # Elimino registros con al menos un NaN 
-        X = X.dropna(subset=X.columns if fill_na is None else l_columns_poco_nan)  # df = clean_data.delete_rows_nan(X_sin_col_mucho_nan, porc_nan_max=0)
-        if _print:
-            print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
+            # Elimino registros con al menos un NaN 
+            X = X.dropna(subset=l_columns_poco_nan)
+            if _print:
+                print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
 
-        # Si hay que rellenar, hago el rellenado de columnas con mucho NaN
-        if fill_na is not None:
             # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
             df_rellenado = pd.DataFrame(index=X.index)
             df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
@@ -653,9 +656,16 @@ class DataPreparation:
             # Agrego columna rellenado a X (post fill puesto que no quiero limpiar la columna "rellenado")
             X['rellenado'] = df_rellenado['rellenado']
 
+        else:
+            # Elimino registros con al menos un NaN 
+            X = X.dropna(subset=X.columns)
+
         # Concateno X e y
         y = y[y.index.isin(X.index)]
         df = pd.concat([X, y], axis=1)
+
+        end = time.time()
+        logger.info(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
 
         if export:
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
@@ -782,7 +792,7 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, export: bool = True):
+    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, bayes:bool = True, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -810,13 +820,13 @@ class Modeling:
         else:
             # Find best hiperparameters
             if params is None:
-                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
+                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, bayes=bayes,_print=True)
             else:
                 model_best_params = model.set_params(**params)
                 # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
 
             d_hiper_model = model_best_params.get_params()
-            print("Hiperparametros:", d_hiper_model)
+            # print("Hiperparametros:", d_hiper_model)
 
             # Fit model
             model_best_params.fit(X_train, y_train)
@@ -865,8 +875,8 @@ class Modeling:
         df_pred_proba = pd.DataFrame({
                 self.var_resp: y_test,
                 self.var_pred: y_pred,
-                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=X_test.index)
     
@@ -919,7 +929,7 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento 
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Hiperparametros del modelo y Metricas en testeo y train

@@ -181,21 +181,36 @@ def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = Fal
         logger.warning(f"De las {len(df.columns)} columns, se eliminaron {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
     return df_sin_nan
 
-def determine_columns_to_fill(df, percentil_nan, _print: bool = False): # Funciona perfecto
+def determine_columns_to_fill(df, percentil_nan, porc_max: float = 0.3, _print: bool = False):
     """
     Determinar que columnas del dataframe son consideradas con mucho nan y cuales con poco nan
+    # Parameters
+        df: Dataframe a rellenar NaN values.
+        percentil_nan: Percentil para determinar porcentaje de nan umbral para decidir si una columna se rellenara a no.
+        porc_max: Porcentaje de nan umbral para decidir si una columna se rellenara a no.
+    # Return
+        df: Dataframe habiendo rellenado NaN values de las columnas consideradas con mucho NaN.
     """
     # Calcula porcentaje de nan para cada columna
     df_nan = df.isna().mean()
 
     # Determino porc_nan_max_col segun percentil 
-    porc_nan_max_col = np.percentile(df_nan.sort_values(), percentil_nan) # Ordena el DataFrame df_porc_nan antes de tomar el percentil (no hace falta pero bueno, para mas seguridad)
+    perc_max = np.percentile(df_nan.sort_values(), percentil_nan) # Ordena el DataFrame df_porc_nan antes de tomar el percentil (no hace falta pero bueno, para mas seguridad)
+
+    # Determino porcentaje min de nan (En caso que el percentil sea muy grande, uso el porcentaje fijo mas pequeño de manera de rellenar mas)
+    porc_nan_max_col = min(porc_max, perc_max)
+    if _print:
+        df_nan.to_excel('/Users/nachomondino/Desktop/df_nan.xlsx')
+        logger.info(f"Porcentaje min de nan para considerar con mucho nan: {perc_max}")
+        logger.info(f"Porcentaje min de nan para considerar con mucho nan: {porc_max}")
+        logger.info(f"Porcentaje a considerar: {porc_nan_max_col}")
 
     # Diferencio entre columnas con mucho nan y poco nan
     l_columns_con_mucho_nan = df.columns[df_nan > porc_nan_max_col].tolist() 
     l_columns_con_poco_nan = df.columns.difference(l_columns_con_mucho_nan)
     if _print:
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
+
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
 def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = False):
@@ -239,19 +254,17 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
     from p4_modeling.build_model import select_best_hiperparameters
     from sklearn.model_selection import train_test_split
     from sklearn.ensemble import RandomForestRegressor
+    from tqdm import tqdm
 
     X_filled = X.copy()
-    params = {
-            'n_estimators': [100], 
-            'criterion': ["friedman_mse"], # "squared_error",  # "absolute_error", --> tarda mucho, "poisson"
-            'max_depth': [5, 10], # No quiero None por overfitting.
-            'bootstrap': [True],  # Si se utiliza o no bootstrap para muestreo de datos
-            'min_samples_leaf': [3],
-        }
-    
+
+    # Progress bar
+    logger.warning(f"Se rellenaran {len(l_columns_to_fill)} columnas.")
+    progress_bar = tqdm(total=len(l_columns_to_fill), ncols=80)  # Inicializo barra de progreso
+
     # Por columna a rellenar
     for col in l_columns_to_fill:
-        # print(f"Columna a rellenar: {col}")
+        # logger.info(f"Columna a rellenar: {col}")
 
         # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
         if fill_type == "mode":  #     raise KeyError(key) from err --> KeyError: 0
@@ -272,27 +285,32 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
             X_test = X.loc[X[col].isnull()]
             X_test = X_test.drop(columns=l_columns_to_fill)  # e.g. (378, 11)
 
-            ## Separo en train y val
-            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
-
-            # Selecciono los mejores hiperparametros usando el set de validacion
-            model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, params=params, k=3, _print=True)
-
-            # Entrenar el modelo con los datos de entrenamiento
-            model.fit(X_train, y_train)
-
-            # Predecir los valores faltantes
+            # Despues de definir columns con mucho NaN, elimino registros con nan en las otras columnas y puede que una columna con mucho nan ya no tenga nan.
             if len(X_test) > 0:
+                ## Separo en train y val
+                X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
+
+                # Selecciono los mejores hiperparametros usando el set de validacion
+                model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3, n_iter=30, _print=False) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
+
+                # Entrenar el modelo con los datos de entrenamiento
+                model.fit(X_train, y_train)
+
+                # Predecir los valores faltantes
                 predicted_values = model.predict(X_test)
 
                 # Rellenar los valores faltantes en el dataframe
                 predicted_values_index = X_test.index
                 X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
+
             else:
-                logger.error(f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. ")
+                logger.error(f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. No hacer nada.")
         else:
             logger.error(f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'.")
 
+        progress_bar.update(1)
+
+    progress_bar.close()
     return X_filled
 
 def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"):

@@ -114,7 +114,7 @@ def load_trained_models(n_ite, ruta_base_mod):
         pass
 
     l_models, l_names = [], []
-    l_model_names = ['LogisticRegression', 'neural_networ', 'XGBClassifier']  # Podria hacer unique a df_iteration_test['model_name']
+    l_model_names = ['LogisticRegression', 'neural_networ', 'XGBClassifier', 'GradientBoostingClassifier', 'MLPClassifier']  # Podria hacer unique a df_iteration_test['model_name']
     for model_name in l_model_names:
         try:
             loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_{model_name}.pkl", "rb"))
@@ -293,71 +293,74 @@ if __name__ == "__main__":
     import main_best_model as mbm
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
-    # Seleccionar pais
-    id_country = 77
-    n_days_fill_data = 360 if id_country == 55 else 60  # Para FRA uso 360 porque no llega a minimos para integrar var de jugadores.
-    only_select_best_model = False # False
-    
     # Defino condiciones del analisis
-    bet_strategy = 'general' # reality, general ; reality  # Si queres saber el ROI de la realidad, usar 'reality'
+    # l_countries = [48, 55, 59, 77, 148]
+    l_countries = [59]
+    only_select_best_model = False # False
+    bet_strategy = 'general' # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
-        59: ["germany", "2024-10-13"], # 03
-        77: ["italy", "2024-10-15"], # 12
+        59: ["germany", "2024-10-24"], # 13
+        77: ["italy", "2024-10-23"], # 15
         148: ["spain", "2024-10-13"],  # 03
         167: ["usa", "2024-10-06"]
     }
-    country, date = d[id_country]
-    logger.info(f"Country: {country}, Date: {date}")
 
-    # Defino rutas
-    ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
-    ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
-    ruta_assess_2 = f'{ruta_base_mod}/assess_models_in_prod/modeling'
+    for id_country in l_countries:
 
-    # Levanto datos de modelos entrenados
-    df_ite_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
-    logger.info(df_ite_train)
-    try:
-        df_ite_test = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
-        logger.info(df_ite_test)
-    except FileNotFoundError:
-        pass
+        # Seleccionar pais
+        n_days_fill_data = 360 if id_country == 55 else 60  # Para FRA uso 360 porque no llega a minimos para integrar var de jugadores.
+        country, date = d[id_country]
+        logger.info(f"Country: {country}, Date: {date}")
 
-    # Evaluo modelos en produccion
-    if only_select_best_model:
-        df_ite_test_prod = pd.read_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx', index_col=0)
-        logger.info(df_ite_test_prod)
-    else:
-        df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_fill_data, strategy=bet_strategy)
+        # Defino rutas
+        ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
+        ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
+        ruta_assess_2 = f'{ruta_base_mod}/assess_models_in_prod/modeling'
 
-    # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, thr_distrib=0.8)
-    
-    # Concateno dataframes en un solo dataframe.
-    ##  test y prod
-    # Saco n_iteration de indice y la hago una columna normal
-    try:
-        df_ite_test_prod = df_ite_test_prod.reset_index() # Convertir el índice en una columna normal
-        df_ite_test_prod.rename(columns={'index': 'n_iteration'}, inplace=True)
-        df_concat = pd.merge(df_ite_test, df_ite_test_prod, on=['n_iteration', 'model_name'], how='outer', suffixes=('_test', '_prod'))
-        logger.info(df_concat)
-        # df_concat.to_excel('/Users/nachomondino/Desktop/df_iteration_test_ct.xlsx')
-        # test + prod y train
-        df_merged = pd.merge(df_ite_train, df_concat, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-    
-    # En entrenamientos anteriores a 2024-10-10, no separaba df_ite_test de df_ite_train, lo ponia junto en df_ite_train.
-    except NameError: 
-        # df_merged = pd.concat([df_ite_train, df_ite_test_prod], axis=1)
-        df_merged = pd.merge(df_ite_train, df_ite_test_prod, on='n_iteration', how='outer', suffixes=('_test', '_prod'))     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-    logger.info(df_merged)
+        # Levanto datos de modelos entrenados
+        df_ite_train = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
+        logger.info(df_ite_train)
+        try:
+            df_ite_test = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
+            logger.info(df_ite_test)
+        except FileNotFoundError:
+            pass
 
-    # Exporto datos
-    ## Seleccion de modelo
-    df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
-    pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
-    ## df_iteration concatenando train, test y test_prod
-    df_merged.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
+        # Evaluo modelos en produccion
+        if only_select_best_model:
+            df_ite_test_prod = pd.read_excel(f'{ruta_base_mod}/df_iteration_test_prod.xlsx', index_col=0)
+            logger.info(df_ite_test_prod)
+        else:
+            df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_fill_data, strategy=bet_strategy)
+
+        # Selecciono el mejor modelo (mayor roi por partido en produccion)
+        best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, thr_distrib=0.35)
+        
+        # Concateno dataframes en un solo dataframe.
+        ##  test y prod
+        # Saco n_iteration de indice y la hago una columna normal
+        try:
+            df_ite_test_prod = df_ite_test_prod.reset_index() # Convertir el índice en una columna normal
+            df_ite_test_prod.rename(columns={'index': 'n_iteration'}, inplace=True)
+            df_concat = pd.merge(df_ite_test, df_ite_test_prod, on=['n_iteration', 'model_name'], how='outer', suffixes=('_test', '_prod'))
+            logger.info(df_concat)
+            # df_concat.to_excel('/Users/nachomondino/Desktop/df_iteration_test_ct.xlsx')
+            # test + prod y train
+            df_merged = pd.merge(df_ite_train, df_concat, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+        
+        # En entrenamientos anteriores a 2024-10-10, no separaba df_ite_test de df_ite_train, lo ponia junto en df_ite_train.
+        except NameError: 
+            # df_merged = pd.concat([df_ite_train, df_ite_test_prod], axis=1)
+            df_merged = pd.merge(df_ite_train, df_ite_test_prod, on='n_iteration', how='outer', suffixes=('_test', '_prod'))     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+        logger.info(df_merged)
+
+        # Exporto datos
+        ## Seleccion de modelo
+        df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
+        pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
+        ## df_iteration concatenando train, test y test_prod
+        df_merged.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
 
