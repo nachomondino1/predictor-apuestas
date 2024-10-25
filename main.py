@@ -152,6 +152,7 @@ class DataPreparation:
             f'./data/{self.country}/p3_data_preparation/clean_data',
             f'./data/{self.country}/p3_data_preparation/integrate_data',
             f'./data/{self.country}/p3_data_preparation/select_data',
+            f'./data/{self.country}/p3_data_preparation/treat_nan',
         ]
 
         for directorio in l_directorios:
@@ -645,7 +646,7 @@ class DataPreparation:
             df_rellenado = pd.DataFrame(index=X.index)
             df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
             if export:
-                df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/df_rellenado.xlsx', index=True)
+                df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/treat_nan/df_rellenado.xlsx', index=True)
 
             # Relleno nan de las columnas con mucho NaN
             X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
@@ -792,7 +793,8 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, bayes:bool = True, export: bool = True):
+    def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
+                    bayes: bool = True, compare_tuning:bool = False, scoring: str = 'f1_macro', export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         :param model: Modelo de Machine Learning. (sklearn.ensemble)
@@ -808,7 +810,7 @@ class Modeling:
         print("\nTraining model...")
         self.classes = np.unique(y_train)
 
-        if model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
+        if default_model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
             logger.info("Entrenando red neuronal")
 
             # Creo instancia de clase NeuralNetwork()
@@ -820,17 +822,13 @@ class Modeling:
         else:
             # Find best hiperparameters
             if params is None:
-                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, bayes=bayes,_print=True)
-            else:
-                model_best_params = model.set_params(**params)
-                # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
+                params, metrica = build_model.select_best_hiperparameters(default_model, X_val, y_val, k=5, bayes=bayes, scoring=scoring, all_tuning=compare_tuning, _print=True)
 
-            d_hiper_model = model_best_params.get_params()
-            # print("Hiperparametros:", d_hiper_model)
+            model_best_params = default_model.set_params(**params)
 
             # Fit model
             model_best_params.fit(X_train, y_train)
-            self.classes = model_best_params.classes_
+            # self.classes = model_best_params.classes_
 
             # Evaluo el modelo con Cross Validation
             train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
@@ -841,7 +839,7 @@ class Modeling:
             df_hiperparametros = pd.DataFrame.from_dict(d_hiper_model, orient='index', columns=['Valor'])
             df_hiperparametros.to_csv(f"./data/{self.country}/p4_modeling/modeling/hiperparametros.csv")
 
-        return model_best_params, d_hiper_model, train_accuracy
+        return model_best_params, params, train_accuracy
 
     def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, _print: bool = True):
         """
@@ -929,7 +927,7 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento 
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
+                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, compare_tuning=True, export=False)
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Hiperparametros del modelo y Metricas en testeo y train

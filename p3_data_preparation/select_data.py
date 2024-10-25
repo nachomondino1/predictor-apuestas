@@ -148,7 +148,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def random_forest(self, X, y, k: int = 5):
+    def random_forest(self, X, y, k: int = 5, compare_tuning: bool = True, scoring: str = 'f1_macro'):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
@@ -164,7 +164,9 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Verificar si se deben buscar los mejores hiperparámetros
-        model = select_best_hiperparameters(RandomForestClassifier(), X_val, y_val, k=k, n_iter=50, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        default_model = RandomForestClassifier()
+        params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=k, scoring=scoring, all_tuning=compare_tuning, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = default_model.set_params(**params)
 
         # Entrenar el modelo final con todos los datos de entrenamiento
         model.fit(X_train, y_train)
@@ -202,7 +204,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def rfe(self, X, y, k: int = 5):
+    def rfe(self, X, y, k: int = 5, compare_tuning: bool = True, scoring: str = 'f1_macro'):
         """
         Calculo de importancia de cada variable segun rfe.
 
@@ -222,8 +224,9 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model = select_best_hiperparameters(LogisticRegression(), X_val, y_val, k=k, n_iter=50, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
-        # model = LogisticRegression(solver='lbfgs', max_iter=10000)
+        default_model = LogisticRegression()
+        params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=k, scoring=scoring, all_tuning=compare_tuning, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = default_model.set_params(**params)
 
         rfe = RFE(estimator=model, n_features_to_select=n_features)
 
@@ -244,7 +247,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def lasso_selection(self, X, y, k: int = 5):
+    def lasso_selection(self, X, y, k: int = 5, compare_tuning: bool = False):
         """
         Calculo de importancia de cada variable segun lasso.
 
@@ -257,7 +260,9 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Busco los mejores hiperparametros para el modelo
-        model = select_best_hiperparameters(Lasso(), X_val, y_val, n_iter=50, k=k)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        default_model = Lasso()
+        params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=k, all_tuning=compare_tuning)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model = default_model.set_params(**params)
 
         # Entreno modelo
         model.fit(X_train, y_train)
@@ -341,7 +346,7 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
     X, y = df.drop(var_resp, axis=1), df[var_resp]
 
     # Trato NaN values para evitar input=NaN puesto que uso algoritmos de ML para seleccionar variables mas importanetes
-    X = clean_data.drop_and_fill_nan_values(X, percentil_nan=75)
+    X = clean_data.drop_and_fill_nan_values(X, percentil_nan=75, verbose=0)
     y = y[y.index.isin(X.index)]
     # print(np.any(np.isinf(X))) # Tiene que dar False
 

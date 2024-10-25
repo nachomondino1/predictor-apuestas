@@ -5,6 +5,7 @@ import numpy as np
 from set_up_logging import logger
 import string
 import requests
+import json
 
 # 1) Preparacion de columnas string
 class TextPreparation:
@@ -239,7 +240,7 @@ def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_mi
 
     return df
 
-def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"): 
+def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", compare_tuning: bool = True, verbose: int = 1): 
     """
     Relleno NaN values en un Dataframe.
     1) dropna teniendo en cuenta solo las columnas con menos nan + 2) imput (o fillna) solo de las columnas con mayor cant de nan  
@@ -256,15 +257,20 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
     from sklearn.ensemble import RandomForestRegressor
     from tqdm import tqdm
 
+    # Defino variables
+    default_model = RandomForestRegressor()
     X_filled = X.copy()
 
     # Progress bar
-    logger.warning(f"Se rellenaran {len(l_columns_to_fill)} columnas.")
-    progress_bar = tqdm(total=len(l_columns_to_fill), ncols=80)  # Inicializo barra de progreso
+    if verbose >= 1:
+        logger.warning(f"Se rellenaran {len(l_columns_to_fill)} columnas.")
+        progress_bar = tqdm(total=len(l_columns_to_fill), ncols=80)  # Inicializo barra de progreso
 
     # Por columna a rellenar
     for col in l_columns_to_fill:
-        # logger.info(f"Columna a rellenar: {col}")
+
+        if verbose >= 1:
+            logger.info(f"Columna a rellenar: {col}")
 
         # OPCION 1: Llenar los valores faltantes con el valor más frecuente en cada columna
         if fill_type == "mode":  #     raise KeyError(key) from err --> KeyError: 0
@@ -291,7 +297,8 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
                 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
                 # Selecciono los mejores hiperparametros usando el set de validacion
-                model = select_best_hiperparameters(RandomForestRegressor(), X_val, y_val, k=3, n_iter=30, _print=False) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
+                params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=3, all_tuning=compare_tuning, _print=False) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
+                model = default_model.set_params(**params)
 
                 # Entrenar el modelo con los datos de entrenamiento
                 model.fit(X_train, y_train)
@@ -308,12 +315,15 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode"):
         else:
             logger.error(f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'.")
 
-        progress_bar.update(1)
+        if verbose >= 1:
+            progress_bar.update(1)
 
-    progress_bar.close()
+    if verbose >= 1:
+        progress_bar.close()
+
     return X_filled
 
-def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"):
+def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode", verbose: int = 1):
     """
     Elimino columnas con muy alto porcentaje de NaN values. Luego, elimino filas con NaN considerando solo las columnas con menos % de NaN values. 
     En las filas restantes, relleno las columnas con mucho NaN con la moda.
@@ -327,7 +337,7 @@ def drop_and_fill_nan_values(X, percentil_nan: int = 75, fill_type: str = "mode"
     # print(f"De las {len(X_sin_col_mucho_nan)} filas, se han eliminado {len(X_sin_col_mucho_nan)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
 
     ## Relleno filas
-    X = fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_type)
+    X = fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_type, verbose=verbose)
     print(f"Tras eliminar y reemplazar nan values, se hara el feature selection con {X.shape[0]} filas y {X.shape[1]} columnas")
     return X
 
