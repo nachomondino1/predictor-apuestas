@@ -93,19 +93,19 @@ jobs:
           current_hour=$(date +"%H")  # Hora actual solo HH. Se compara la hora (HH), ignorando los minutos, lo que hace que sea menos sensible a posibles retrasos.
           echo "La hora actual es: $current_hour"
           if [ "$current_hour" == "10" ]; then
-            echo "n_days=0.13" >> $GITHUB_ENV            
+            echo "n_days=0.2" >> $GITHUB_ENV            
           elif [ "$current_hour" == "12" ]; then
-            echo "n_days=0.10" >> $GITHUB_ENV
+            echo "n_days=0.2" >> $GITHUB_ENV
           elif [ "$current_hour" == "13" ]; then
-            echo "n_days=0.21" >> $GITHUB_ENV
+            echo "n_days=0.5" >> $GITHUB_ENV
           elif [ "$current_hour" == "14" ]; then
-            echo "n_days=0.06" >> $GITHUB_ENV
+            echo "n_days=0.2" >> $GITHUB_ENV
           elif [ "$current_hour" == "15" ]; then
-            echo "n_days=0.08" >> $GITHUB_ENV
+            echo "n_days=0.2" >> $GITHUB_ENV
           elif [ "$current_hour" == "16" ]; then
-            echo "n_days=0.04" >> $GITHUB_ENV
+            echo "n_days=0.2" >> $GITHUB_ENV
           elif [ "$current_hour" == "18" ]; then
-            echo "n_days=0.10" >> $GITHUB_ENV
+            echo "n_days=0.20" >> $GITHUB_ENV
           else
             echo "n_days=1.00" >> $GITHUB_ENV  # Valor predeterminado en caso de error
           fi  # ¡Cerrar el bloque condicional correctamente!
