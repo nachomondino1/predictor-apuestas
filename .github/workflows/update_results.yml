@@ -87,35 +87,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r p6_deployment/requirements_mnm.txt
 
-      - name: Set n_days based on hour
-        id: set-ndays
-        run: |
-          current_hour=$(date +"%H")  # Hora actual solo HH. Se compara la hora (HH), ignorando los minutos, lo que hace que sea menos sensible a posibles retrasos.
-          echo "La hora actual es: $current_hour"
-          if [ "$current_hour" == "10" ]; then
-            echo "n_days=0.2" >> $GITHUB_ENV            
-          elif [ "$current_hour" == "12" ]; then
-            echo "n_days=0.2" >> $GITHUB_ENV
-          elif [ "$current_hour" == "13" ]; then
-            echo "n_days=0.5" >> $GITHUB_ENV
-          elif [ "$current_hour" == "14" ]; then
-            echo "n_days=0.2" >> $GITHUB_ENV
-          elif [ "$current_hour" == "15" ]; then
-            echo "n_days=0.2" >> $GITHUB_ENV
-          elif [ "$current_hour" == "16" ]; then
-            echo "n_days=0.2" >> $GITHUB_ENV
-          elif [ "$current_hour" == "18" ]; then
-            echo "n_days=0.20" >> $GITHUB_ENV
-          else
-            echo "n_days=1.00" >> $GITHUB_ENV  # Valor predeterminado en caso de error
-          fi  # ¡Cerrar el bloque condicional correctamente!
+      # - name: Set n_days based on hour
+      #   id: set-ndays
+      #   run: |
+      #     current_hour=$(date +"%H")  # Hora actual solo HH. Se compara la hora (HH), ignorando los minutos, lo que hace que sea menos sensible a posibles retrasos.
+      #     echo "La hora actual es: $current_hour"
+      #     if [ "$current_hour" == "10" ]; then
+      #       echo "n_days=0.2" >> $GITHUB_ENV            
+      #     elif [ "$current_hour" == "12" ]; then
+      #       echo "n_days=0.2" >> $GITHUB_ENV
+      #     elif [ "$current_hour" == "13" ]; then
+      #       echo "n_days=0.5" >> $GITHUB_ENV
+      #     elif [ "$current_hour" == "14" ]; then
+      #       echo "n_days=0.2" >> $GITHUB_ENV
+      #     elif [ "$current_hour" == "15" ]; then
+      #       echo "n_days=0.2" >> $GITHUB_ENV
+      #     elif [ "$current_hour" == "16" ]; then
+      #       echo "n_days=0.2" >> $GITHUB_ENV
+      #     elif [ "$current_hour" == "18" ]; then
+      #       echo "n_days=0.20" >> $GITHUB_ENV
+      #     else
+      #       echo "n_days=1.00" >> $GITHUB_ENV  # Valor predeterminado en caso de error
+      #     fi  # ¡Cerrar el bloque condicional correctamente!
 
       # Run update_results script
       - name: Run update_results script
         run: |
-          # python p6_deployment/automatize_predict/update_results.py 1
-          echo "Ejecutando el script con n_days=${{ env.n_days }}"
-          python p6_deployment/automatize_predict/update_results.py ${{ env.n_days }}
+          python p6_deployment/automatize_predict/update_results.py 1
+          # echo "Ejecutando el script con n_days=${{ env.n_days }}"
+          # python p6_deployment/automatize_predict/update_results.py ${{ env.n_days }}
 
       # Push to Github
       - name: Commit and push all changes
