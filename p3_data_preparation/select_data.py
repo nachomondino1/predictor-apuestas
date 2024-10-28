@@ -95,6 +95,10 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
 class FeatureSelection():
 
     def __init__(self, graficar_cada_metodo: bool = False) -> None:
+        self.scoring = 'f1_macro' # accuracy --> Todavia no esta balanceado asique f1_score puede ser mejor
+        self.bayes = True
+        self.all_tuning = False
+        self.verbose = 1
         self.graficar_cada_metodo = graficar_cada_metodo
 
     def modelos_estadisticos(self, X, y):
@@ -148,7 +152,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def random_forest(self, X, y, k: int = 5, compare_tuning: bool = True, scoring: str = 'f1_macro'):
+    def random_forest(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
@@ -163,16 +167,13 @@ class FeatureSelection():
         # Separo en train y val (para que select_best_hiperparameters() no tarde tanto)
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
-        # Verificar si se deben buscar los mejores hiperparámetros
-        default_model = RandomForestClassifier()
-        params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=k, scoring=scoring, all_tuning=compare_tuning, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
-        model = default_model.set_params(**params)
-
-        # Entrenar el modelo final con todos los datos de entrenamiento
-        model.fit(X_train, y_train)
+        # Entreno modelo con los mejores hiperparámetros
+        model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, scoring=self.scoring,  
+                                                                           bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
-        df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)
+        df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)   # AttributeError: 'BayesSearchCV' object has no attribute 'feature_importances_'
+        # df_importance = pd.DataFrame({'random_forest': model.best_estimator_.feature_importances_}, index=X.columns)
 
         # Grafico variables y su importancia
         if self.graficar_cada_metodo:
@@ -204,7 +205,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def rfe(self, X, y, k: int = 5, compare_tuning: bool = True, scoring: str = 'f1_macro'):
+    def rfe(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun rfe.
 
@@ -218,19 +219,16 @@ class FeatureSelection():
 
         from sklearn.preprocessing import StandardScaler
         scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns, index=X.index)  # X_scaled = scaler.fit_transform(X) --> numpy y falla en la concatenacion en select_best_hyper
 
         # Separo en train y val
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
-        # Busco los mejores hiperparametros para el modelo
-        default_model = LogisticRegression()
-        params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=k, scoring=scoring, all_tuning=compare_tuning, _print=True)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
-        model = default_model.set_params(**params)
+        # Entreno modelos buscando los mejores hiperparametros
+        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, scoring=self.scoring, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
+        # Entreno modelo RFE a partir de Logistic
         rfe = RFE(estimator=model, n_features_to_select=n_features)
-
-        # Entreno modelo
         rfe.fit_transform(X_train, y_train) # rfe.fit_transform(X_scaled, y)
 
         # Obtengo importancias por variable
@@ -247,7 +245,7 @@ class FeatureSelection():
 
         return df_importance
 
-    def lasso_selection(self, X, y, k: int = 5, compare_tuning: bool = False):
+    def lasso_selection(self, X, y, k: int = 5):
         """
         Calculo de importancia de cada variable segun lasso.
 
@@ -259,13 +257,8 @@ class FeatureSelection():
         # Separo en train y val
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
-        # Busco los mejores hiperparametros para el modelo
-        default_model = Lasso()
-        params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=k, all_tuning=compare_tuning)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
-        model = default_model.set_params(**params)
-
-        # Entreno modelo
-        model.fit(X_train, y_train)
+        # Entreno modelo con los mejores hiperparametros
+        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, all_tuning=self.all_tuning, scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'lasso': model.coef_}, index=X.columns)

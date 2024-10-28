@@ -240,16 +240,18 @@ def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_mi
 
     return df
 
-def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", compare_tuning: bool = True, verbose: int = 1): 
+def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int = 1): 
     """
-    Relleno NaN values en un Dataframe.
-    1) dropna teniendo en cuenta solo las columnas con menos nan + 2) imput (o fillna) solo de las columnas con mayor cant de nan  
+    Relleno NaN values en las columnas especificas del Dataframe.
 
-    :param X: (Dataframe)
-    :param y: (Dataframe)
-    :param fill_type: Tipo de relleno de datos como mode o ml. (String)
-    :param percentil_nan: A mayor valor, mas alto el porc_nan_max_col y, por ende, menos columnas son consideradas con mucho nan (es decir, menos relleno de datos).
-    :return: (Dataframe)
+    # Parameters
+        X: (Dataframe)
+        y: (Dataframe)
+        fill_type: Tipo de relleno de datos como mode o ml. (String)
+        percentil_nan: A mayor valor, mas alto el porc_nan_max_col y, por ende, menos columnas son consideradas con mucho nan (es decir, menos relleno de datos).
+    
+    # Return
+        X e y sin nan values en las columnas especificadas. (Dataframe)
     """
     # Importar solo cuando es necesario
     from p4_modeling.build_model import select_best_hiperparameters
@@ -279,7 +281,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", compare_tunin
             X_filled[col] = X_filled[col].fillna(mode_value)
 
         # OPCION 2: Llenar los valores faltantes con ML
-        elif fill_type == "ml":
+        elif fill_type == "ml": # Poner un limite a las columnas a rellenar? Por ej, si tiene un 80% de nan, no rellenar sino eliminar columna...
 
             # Dividir el dataframe en conjunto de entrenamiento, validacion y prueba
             ## Separo test de train y val puesto que test tendra los NaN values para la columna
@@ -297,11 +299,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", compare_tunin
                 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
                 # Selecciono los mejores hiperparametros usando el set de validacion
-                params, metrica = select_best_hiperparameters(default_model, X_val, y_val, k=3, all_tuning=compare_tuning, _print=False) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
-                model = default_model.set_params(**params)
-
-                # Entrenar el modelo con los datos de entrenamiento
-                model.fit(X_train, y_train)
+                model, params, best_metric, results  = select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=3, bayes=True, all_tuning=False, verbose=1) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
 
                 # Predecir los valores faltantes
                 predicted_values = model.predict(X_test)

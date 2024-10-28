@@ -1,9 +1,14 @@
+import pandas as pd
 import numpy as np
-from sklearn.model_selection import GridSearchCV  # Seleccion de hiperparametros
+import time
+from itertools import product
+from set_up_logging import logger
+import warnings
+# Grid y Bayes
+from sklearn.model_selection import PredefinedSplit, GridSearchCV
+from sklearn.metrics import accuracy_score  # Metrica de precision
 from skopt import BayesSearchCV
 from skopt.space import Real, Integer, Categorical
-from sklearn.metrics import accuracy_score  # Metrica de precision
-import time
 # Red neuronal
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -15,12 +20,9 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 # from scikeras.wrappers import KerasClassifier
-from itertools import product
-from set_up_logging import logger
-import warnings
 
 
-class NeuralNetwork():
+class TrainNeuralNetwork():
     
     def __init__(self) -> None:
         pass
@@ -68,7 +70,7 @@ class NeuralNetwork():
         
         return model
      
-    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=10, batch_size=32):
+    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=20, batch_size=32, verbose: int = 1):
         """
         Entrenamiento de redes neuronales y seleccion de la mejor
         """
@@ -88,47 +90,44 @@ class NeuralNetwork():
                     'dropout_rate': [0.2, None]
                 }
         
-        # Generar todas las combinaciones de hiperparámetros
-        param_combinations = list(product(
-            param_grid['hidden_layer_sizes'],
-            param_grid['learning_rate'],
-            param_grid['activation'],
-            param_grid['optimizer'],
-            param_grid['kernel_regularizer'],
-            param_grid['batch_normalization'],
-            param_grid['dropout_rate']
-        ))
+        # Generar combinaciones de parámetros automáticamente
+        param_combinations = list(product(*param_grid.values()))
 
         # Convertir etiquetas a formato one-hot --> Evita error target y output con different shape. 
         input_shape = X_train.shape[1]
         output_shape = 3  # Estaria bueno que sea automatico
+        patience = int(epochs * 0.2)  # Por ejemplo, 20% de las épocas totales
         y_val_categorical = to_categorical(y_val, num_classes=output_shape)
         y_train_categorical = to_categorical(y_train, num_classes=output_shape)
 
+        # Definir un callback de EarlyStopping
+        early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
         # Iterar sobre cada combinación
         for params in param_combinations:
-            hidden_layers, learning_rate, activation, optimizer, regularizer, batch_norm, dropout_rate = params
-            
-            # Creo red neuronal
-            model = self.create_neural_network(input_shape=input_shape, output_shape=output_shape, hidden_layer_sizes=hidden_layers, learning_rate=learning_rate, activation=activation, optimizer=optimizer, kernel_regularizer=regularizer, batch_normalization=batch_norm, dropout_rate=dropout_rate)
+            # Emparejar cada parámetro con su nombre desde `param_grid`
+            param_dict = dict(zip(param_grid.keys(), params))
 
-            # Definir un callback de EarlyStopping
-            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+            # Creo red neuronal
+            model = self.create_neural_network(
+                input_shape=input_shape,
+                output_shape=output_shape,
+                **param_dict  # Desempaqueta el diccionario como argumentos nombrados
+            )
 
             # Entrenar el modelo (usa el validation como test en vez de hacer cross val entre X_train)
             history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=0, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
             
             # Evaluar en el set de validación
             val_loss, val_acc = model.evaluate(X_val, y_val_categorical, verbose=0)
-            
-            # Guardar el resultado
+
             results.append({
                 'params': params,
+                **param_dict,
                 'val_loss': val_loss,
                 'val_acc': val_acc,
                 'model': model
             })
-            
             # print(f"Params: {params} => Val Loss: {val_loss}, Val Accuracy: {val_acc}")
 
         # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
@@ -136,13 +135,16 @@ class NeuralNetwork():
 
         # Imprimo rdos
         end = time.time()
-        logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
-        logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
 
-        return best_result['model'], best_result['params'], best_result['val_acc']
+        if verbose >= 1:
+            logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
+            logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
+
+        return best_result['model'], best_result['params'], best_result['val_acc'], pd.DataFrame(results)
 
 
-def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes: bool = True, n_iter:int = None, scoring: bool = None, all_tuning: bool = False, _print: bool = False):
+def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, 
+                                scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
     """
     Selecciona los mejores hiperparametros para un modelo.
 
@@ -157,48 +159,93 @@ def select_best_hiperparameters(model, X, y, k, params: dict = None, bayes: bool
         scoring: Métrica de evaluación para definir mejor combinacion de hiperparametros (e.g. 'accuracy', 'precision', 'recall', 'roc_auc', 'f1', etc) (str)
 
     # Return
-        best_params: Mejores hiperparametros (dict) 
-        best_metric: Metrica obtenida en el testeo de los mejores hiperparametros (float) 
+        best_search: Elemento Search con el mejor estimador, los mejores hiperparametros, las metricas de cada combinacion, etcetera.
     """
-    # Obtengo el nombre del modelo para poder buscar sus hiperparametros
-    model_name = str(model)[:str(model).find('(')]
-    logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
+    # Defino el set de val como test en CV de GridSearchCV / BayesSearchCV
+    X_val_train = pd.concat([X_train, X_val], axis=0) 
+    y_val_train = pd.concat([y_train, y_val], axis=0) 
+    split_index = [-1 if x in X_train.index else 0 for x in X_val_train.index] # Create a list where train data indices are -1 and validation data indices are 0
+    pds = PredefinedSplit(test_fold = split_index) # Use the list to create PredefinedSplit
+    if verbose >= 2:
+        logger.warning(f'X_train: {X_train.shape} + X_val: {X_val.shape} = {X_val_train.shape}')
+        logger.warning(pds)
 
     # Definicion de variables
+    model_name = str(model)[:str(model).find('(')]   # Obtengo el nombre del modelo para poder buscar sus hiperparametros
     bayes, all_tuning = (False, False) if model_name == 'LogisticRegression' else (bayes, all_tuning) # Seteo Bayes a False cuando es Logistic. Evito Bayes para Logistic
     params = space(model_name, bayes) if params is None else params
-    scoring = default_scoring(num_classes=len(np.unique(y))) if scoring is None else scoring
-            
-    # All searchs
-    if all_tuning:
-        # Determino hiperparametros a probar
-        params_bayes = space(model_name, bayes=True)
+    scoring = default_scoring(num_classes=len(np.unique(y_val_train))) if scoring is None else scoring
+    logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
+
+    # BayesSearch
+    if bayes or all_tuning:
+                
+        if verbose >= 1: 
+            logger.warning("BayesSearchCV...")
+        start_bayes = time.time()
+
+        if n_iter is None:
+            # Calcular iteraciones basadas en el tamaño del dataset
+            d_n_hip = {'RandomForestClassifier': 5, 'XGBClassifier': 10, 'LogisticRegression': 1, 'RandomForestRegressor': 3} # automatizar
+            n_iter = determine_n_iter(len(X_val_train), d_n_hip[model_name], verbose=verbose)
+            # n_iter = 5
+
+        with warnings.catch_warnings():  # Logistic te vuelve loco --> no funciona.
+            warnings.simplefilter("ignore")  # Ignora todas las advertencias
+
+            # Crear el objeto BayesSearchCV
+            bayes_search = BayesSearchCV(estimator=model, search_spaces=params, cv=pds, n_iter=n_iter, n_jobs=-1, scoring=scoring)
+
+            # Ajustar el objeto BayesSearchCV a los datos de entrenamiento
+            bayes_search.fit(X_val_train, y_val_train)
+            best_search = bayes_search
+
+        end_bayes = time.time()
+        if verbose >= 1:
+            logger.info(f"Seleccion de hiperparametros optimos con Bayes en {(end_bayes - start_bayes) / 60:.1f} minutos")
+
+    # GridSearch
+    if (not bayes) or all_tuning:
+        
+        if verbose >= 1: 
+            logger.warning("GridSearchCV...")
+
+        start_grid = time.time()
         params_grid = space(model_name, bayes=False)
 
-        # Hago Bayes y Grid
-        params1, metric1 = search_bayes(X, y, model_name, model, params_bayes, scoring, k, n_iter)
-        params2, metric2 = search_grid(X, y, model_name, model, params_grid, scoring, k)
+        # Crear el objeto GridSearchCV
+        with warnings.catch_warnings():  # Logistic te vuelve loco
+            warnings.simplefilter("ignore")  # Ignora todas las advertencias
+            grid_search = GridSearchCV(estimator=model, param_grid=params_grid, cv=pds, scoring=scoring)
 
-        # Comparacion y seleccion del mejor
-        if metric1 > metric2:
-            dif = (metric1 - metric2) / abs(metric2) * 100
-            ganador, best_params, best_metric = "BayesSearch", params1, metric1
-            logger.critical(f"Ganador: {ganador} por {dif:.0f}%.")
-        else:
-            dif = (metric2 - metric1) / abs(metric1) * 100
-            ganador, best_params, best_metric = "GridSearch", params2, metric2
-            logger.error(f"Ganador: {ganador} por {dif:.0f}%.")
-    
-        logger.info(f"Mejores hiperparametros: {best_params}")
+            # Ajustar el objeto GridSearchCV a los datos de entrenamiento
+            grid_search.fit(X_val_train, y_val_train)
+            best_search = grid_search
+ 
+        # Obtener los mejores hiperparámetros
+        end_grid = time.time()
+        if verbose >= 1: 
+            logger.info(f"Seleccion de hiperparametros optimos con Grid en {(end_grid - start_grid) / 60:.1f} minutos")
 
-    # Especific search
-    else:
-        if bayes:
-            best_params, best_metric = search_bayes(X, y, model_name, model, params, scoring, k, n_iter)
-        else:
-            best_params, best_metric = search_grid(X, y, model_name, model, params, scoring, k)
+        # Selecciono mejor modelo de todos los tunner
+        if all_tuning:
+            best_search = compare_tunners(bayes_search, grid_search, verbose=verbose)
 
-    return  best_params, best_metric
+    # Obtengo el mejor modelo (ya entrenado), los mejores hiper, la mejor metrica y los resultados de todas las combinaciones de hiper
+    best_model = best_search.best_estimator_ 
+    best_params = best_search.best_params_
+    best_metric = best_search.best_score_
+    results = pd.DataFrame(data=best_search.cv_results_)
+
+    # Obtener los mejores hiperparámetros
+    if verbose >= 1:
+        logger.info(f"Best score: {best_metric*100:.1f}. Best parameters: {best_params}")
+
+    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
+    if verbose >= 2:
+        results.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")    
+
+    return best_model, best_params, best_metric, results
 
 def default_scoring(num_classes, verbose: int = 0):
     """
@@ -208,7 +255,7 @@ def default_scoring(num_classes, verbose: int = 0):
         num_classes: Cantidad de clases de variable respuesta
     
     # Return
-        Metrica a utilizar en evaluacion para determinar mejor combinacion de hiperparametros. 
+        scoring: Metrica a utilizar en evaluacion para determinar mejor combinacion de hiperparametros. 
     """
     # Si la variable respuesta es discreta
     if num_classes <= 5:
@@ -221,88 +268,6 @@ def default_scoring(num_classes, verbose: int = 0):
         logger.info(f"Nº clases: {num_classes} --> Scoring: {scoring}")
 
     return scoring
-
-def search_bayes(X, y, model_name, model, params, scoring, k, n_iter, verbose: int = 1):
-    """
-    Obtencion de mejores hiperparametros segun Bayes Optimization
-
-    # Parameters
-        X: Dataframe de validacion con variables predictoras. (DataFrame)
-        y: Dataframe de validacion solo con variable respuesta. (DataFrame)
-        model: Modelo de Machine Learning. (sklearn.ensemble)
-        model_name: Nombre del modelo (e.g. LogisticRegression, SVC, etc) (str)
-        k: Numero de folds. (int)
-        params: Parametros a evaluar (dict)
-        scoring: Métrica de evaluación para definir mejor combinacion de hiperparametros (e.g. 'accuracy', 'precision', 'recall', 'roc_auc', 'f1', etc) (str)
-        n_iter: Numero de iteraciones a utilizar para el BayesSearchCV.
-
-    # Return
-        best_params: Mejores hiperparametros segun BayesSearchCV (dict) 
-        best_metric: Metrica de la mejor combinacion de hiperparametros segun BayesSearchCV (float) 
-    """
-    start_bayes = time.time()
-
-    if n_iter is None:
-        # Calcular iteraciones basadas en el tamaño del dataset
-        d_n_hip = {'RandomForestClassifier': 5, 'XGBClassifier': 11, 'LogisticRegression': 1, 'RandomForestRegressor': 3} # automatizar
-        n_iter = determine_n_iter(len(X), d_n_hip[model_name])
-    
-    # Crear el objeto BayesSearchCV
-    with warnings.catch_warnings():  # Logistic te vuelve loco
-        warnings.simplefilter("ignore")  # Ignora todas las advertencias
-        bayes_search = BayesSearchCV(estimator=model, search_spaces=params, cv=k, n_iter=n_iter, n_jobs=-1, scoring=scoring)
-
-        # Ajustar el objeto BayesSearchCV a los datos de entrenamiento
-        bayes_search.fit(X, y)
-
-    # Obtener los mejores hiperparámetros
-    best_params = bayes_search.best_params_
-    best_metric = bayes_search.best_score_
-    end_bayes = time.time()
-
-    if verbose >= 1:
-        logger.info(f"\n\t- Best parameters: {best_params} \n\t- Best score: {best_metric*100:.1f}")
-        logger.info(f"Seleccion de hiperparametros optimos con Bayes en {(end_bayes - start_bayes) / 60:.1f} minutos")
-
-    return best_params, best_metric
-
-def search_grid(X, y, model_name, model, params, scoring, k, verbose: int = 1):
-    """
-    Obtencion de mejores hiperparametros segun GridSearch
-
-    # Parameters
-        X: Dataframe de validacion con variables predictoras. (DataFrame)
-        y: Dataframe de validacion solo con variable respuesta. (DataFrame)
-        model: Modelo de Machine Learning. (sklearn.ensemble)
-        model_name: Nombre del modelo (e.g. LogisticRegression, SVC, etc) (str)
-        k: Numero de folds. (int)
-        params: Parametros a evaluar (dict)
-        scoring: Métrica de evaluación para definir mejor combinacion de hiperparametros (e.g. 'accuracy', 'precision', 'recall', 'roc_auc', 'f1', etc) (str)
-
-    # Return
-        best_params: Mejores hiperparametros segun GridSearchCV (dict) 
-        best_metric: Metrica de la mejor combinacion de hiperparametros segun GridSearchCV (float) 
-    """
-    start_grid = time.time()
-
-    # Crear el objeto GridSearchCV
-    with warnings.catch_warnings():  # Logistic te vuelve loco
-        warnings.simplefilter("ignore")  # Ignora todas las advertencias
-        grid_search = GridSearchCV(estimator=model, param_grid=params, cv=k, scoring=scoring)
-
-        # Ajustar el objeto GridSearchCV a los datos de entrenamiento
-        grid_search.fit(X, y)
-
-    # Obtener los mejores hiperparámetros
-    best_params_grid = grid_search.best_params_
-    best_metric_grid = grid_search.best_score_
-    end_grid = time.time()
-
-    if verbose >= 1: 
-        logger.info(f"\n\t- Best parameters: {best_params_grid} \n\t- Best score: {best_metric_grid*100:.1f}")
-        logger.info(f"Seleccion de hiperparametros optimos con Grid en {(end_grid - start_grid) / 60:.1f} minutos")
-
-    return best_params_grid, best_metric_grid
 
 def space(model_name, bayes, verbose: int = 0):
     """
@@ -407,7 +372,7 @@ def space(model_name, bayes, verbose: int = 0):
             'bootstrap': Categorical([True]) if bayes else [True, False], # False
             'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
             'max_depth': Integer(3, 30) if bayes else [3, 5, 10],  # 30
-            'n_estimators': Integer(50, 200) if bayes else [100, 200, 300],
+            'n_estimators': Integer(100, 300) if bayes else [100, 200, 300],
             'min_samples_split': Integer(5, 50) if bayes else [10, 50] # Mayor o igual a 2 
             # 'verbose': Categorical([0]) if bayes else [0]
         }
@@ -433,17 +398,49 @@ def determine_n_iter(num_samples, num_hyperparameters, verbose: int = 0):
     # Return
         n_iter: Número sugerido de iteraciones (n_iter).
     """
+    mult_iter, mult_hip = 0.01, 5 # 0.05, 7
+    min_iter, max_iter = 50, 200
+
     # Determinar n_iter basado en el tamaño del conjunto de datos
-    n_iter = int(0.05 * num_samples)
+    n_iter_reg = int(mult_iter * num_samples)
 
     # Ajustar n_iter según el número de hiperparámetros
-    n_iter += num_hyperparameters * 7  # Aumentar por cada hiperparámetro
+    n_iter_hip = mult_hip * num_hyperparameters  # Aumentar por cada hiperparámetro
+    n_iter = n_iter_reg + n_iter_hip
 
     if verbose >= 1:
-        logger.info(f"n_reg: {num_samples} n_hip: {num_hyperparameters}")
-        logger.info(f"Nº iteraciones: {n_iter}")
+        logger.info(f"n_reg: {n_iter_reg} (={num_samples} * {mult_iter}) + n_hip: {n_iter_hip} (={num_hyperparameters} * {mult_hip}) = {n_iter}")
 
-    return min(max(n_iter, 50), 200) # Asegurarse de que n_iter sea al menos 50
+    return min(max(n_iter, min_iter), max_iter) # Asegurarse de que n_iter sea al menos 50
+
+def compare_tunners(bayes_search, grid_search, verbose: int = 0):
+    """
+    Comparacion de mejores modelos de cada search y seleccion del mejor.
+
+    # Parameters:
+        bayes_search: Elemento BayesSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (BayesSearchCV)
+        grid_search: Elemento GridSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (GridSearchCV)
+    
+    # Return
+        best_search: Elemento GridSearchCV / BayesSearchCV segun el que sea mejor. (BayesSearchCV o GridSearchCV)
+    """
+    # Hago Bayes y Grid
+    metric1 = bayes_search.best_score_
+    metric2 = grid_search.best_score_
+
+    # Comparacion y seleccion del mejor
+    if metric1 > metric2:
+        dif = (metric1 - metric2) / abs(metric2) * 100
+        ganador, best_search = "BayesSearch", bayes_search
+        if verbose >= 1:
+            logger.critical(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
+    else:
+        dif = (metric2 - metric1) / abs(metric1) * 100
+        ganador, best_search= "GridSearch", grid_search
+        if verbose >= 1:
+            logger.error(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
+
+    return best_search
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
     """

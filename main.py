@@ -704,14 +704,14 @@ class Modeling:
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
         # Parameters
-        df: Dataframe a dividir en test, validation y train. (Dataframe)
-        bal_type: Tipo de balanceo de clases a realizar. (String)
-        val_size: Porcentaje del total de datos destinado a validacion. (Float)
-        test_size:  Porcentaje del total de datos destinado a test. (Float)
-        export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (Bool)
-        
+            df: Dataframe a dividir en test, validation y train. (Dataframe)
+            bal_type: Tipo de balanceo de clases a realizar. (String)
+            val_size: Porcentaje del total de datos destinado a validacion. (Float)
+            test_size:  Porcentaje del total de datos destinado a test. (Float)
+            export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (Bool)
+            
         # Returns
-        Dataframe de entrenamiento y de testeo balanceados (DataFrame)
+            Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         # warnings.filterwarnings('ignore') # no son mias, son de openpyxl
         print("\nSeparating data in train, val and test...")
@@ -794,17 +794,22 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = True, compare_tuning:bool = False, scoring: str = 'f1_macro', export: bool = True):
+                    bayes: bool = True, compare_tuning: bool = False, scoring: str = 'f1_macro', export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
-        :param model: Modelo de Machine Learning. (sklearn.ensemble)
-        :param X_val: Dataframe de validacion con variables predictoras. (DataFrame)
-        :param y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
-        :param X_train: Dataframe de entrenamiento con variables predictoras.  (DataFrame)
-        :param y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
-        :param k: Numero de folds. (int)
-        :param timeout: Cantidad de segundos de espera maxima para entrenar un modelo. (int)
-        :return: Mejor modelo. (sklearn.ensemble?)
+        
+        # Parameters
+            model: Modelo de Machine Learning. (sklearn.ensemble)
+            X_val: Dataframe de validacion con variables predictoras. (DataFrame)
+            y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
+            X_train: Dataframe de entrenamiento con variables predictoras.  (DataFrame)
+            y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
+            k: Numero de folds. (int)
+        
+        # Return
+            model_best_params: Modelo entrenado con hiperparaemtros optimos (sklearn.ensemble?)
+            params: Combinacion de hiperparametros del modelo (dict)
+            train_accuracy: Precision de entrenamiento (float)
         """
         # warnings.filterwarnings("ignore")
         print("\nTraining model...")
@@ -814,32 +819,35 @@ class Modeling:
             logger.info("Entrenando red neuronal")
 
             # Creo instancia de clase NeuralNetwork()
-            red = build_model.NeuralNetwork()
+            red = build_model.TrainNeuralNetwork()
 
             # Seleccion mejor arquitectura con la validacion y entreno el modelo
-            model_best_params, d_hiper_model, train_accuracy = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+            model_best_params, params, train_accuracy, results = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
 
         else:
-            # Find best hiperparameters
+            # Train model searching for best hiper
             if params is None:
-                params, metrica = build_model.select_best_hiperparameters(default_model, X_val, y_val, k=5, bayes=bayes, scoring=scoring, all_tuning=compare_tuning, _print=True)
+                model_best_params, params, best_metric, results = build_model.select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=5, bayes=bayes, scoring=scoring, all_tuning=compare_tuning, verbose=1)
+                train_accuracy = best_metric # no es train_acc... es el scoring que uso, en este caso, f1_macro..
+      
+            # Train model with prefix params
+            else:
+                model_best_params = default_model.set_params(**params)
 
-            model_best_params = default_model.set_params(**params)
+                # Fit model
+                model_best_params.fit(X_train, y_train)
 
-            # Fit model
-            model_best_params.fit(X_train, y_train)
-            # self.classes = model_best_params.classes_
+                # Eval en val...
 
-            # Evaluo el modelo con Cross Validation
-            train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-            print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
+                # Evaluo el modelo con Cross Validation
+                train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
+                print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
 
         if export:
             pickle.dump(model_best_params, open(f"./data/{self.country}/p4_modeling/modelo.pkl", "wb"))
-            df_hiperparametros = pd.DataFrame.from_dict(d_hiper_model, orient='index', columns=['Valor'])
-            df_hiperparametros.to_csv(f"./data/{self.country}/p4_modeling/modeling/hiperparametros.csv")
+            # results.to_excel(f"./data/{self.country}/{ite_date}/p4_modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
 
-        return model_best_params, params, train_accuracy
+        return model_best_params, params, train_accuracy, results
 
     def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, _print: bool = True):
         """
@@ -927,17 +935,21 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento 
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, compare_tuning=True, export=False)
+                # Entreno modelo
+                model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
+
+                # Evaluo modelo en test
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Hiperparametros del modelo y Metricas en testeo y train
-                new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': d_hiper_model}
+                new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params}
                 new_row.update(d_metrics)
                 df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
                 df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
                 # Exporto datos del modelo
                 pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
                 df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
             except KeyboardInterrupt as e:
