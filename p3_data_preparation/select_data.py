@@ -96,7 +96,7 @@ class FeatureSelection():
 
     def __init__(self, graficar_cada_metodo: bool = False) -> None:
         self.scoring = 'f1_macro' # accuracy --> Todavia no esta balanceado asique f1_score puede ser mejor
-        self.bayes = True
+        self.bayes = False # Random tarda banda y Logistic +
         self.all_tuning = False
         self.verbose = 1
         self.graficar_cada_metodo = graficar_cada_metodo

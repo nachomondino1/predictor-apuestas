@@ -240,7 +240,7 @@ def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_mi
 
     return df
 
-def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int = 1): 
+def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int = 0): 
     """
     Relleno NaN values en las columnas especificas del Dataframe.
 
@@ -264,7 +264,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
     X_filled = X.copy()
 
     # Progress bar
-    if verbose >= 1:
+    if verbose >= 0:
         logger.warning(f"Se rellenaran {len(l_columns_to_fill)} columnas.")
         progress_bar = tqdm(total=len(l_columns_to_fill), ncols=80)  # Inicializo barra de progreso
 
@@ -299,7 +299,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
                 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
                 # Selecciono los mejores hiperparametros usando el set de validacion
-                model, params, best_metric, results  = select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=3, bayes=True, all_tuning=False, verbose=1) #  Con 50, tarda 1 min/columna. Con 25, tarda 0.3 min/columna.
+                model, params, best_metric, results  = select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=3, bayes=False, all_tuning=False, verbose=verbose) #  Bayes tarda mucho y tiene los = rdos.
 
                 # Predecir los valores faltantes
                 predicted_values = model.predict(X_test)
@@ -313,10 +313,10 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
         else:
             logger.error(f"No se rellenaron los datos puesto que el tipo='{fill_type}' no es una opcion. Las opciones son 'mode' y 'ml'.")
 
-        if verbose >= 1:
+        if verbose >= 0:
             progress_bar.update(1)
 
-    if verbose >= 1:
+    if verbose >= 0:
         progress_bar.close()
 
     return X_filled

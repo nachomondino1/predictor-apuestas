@@ -70,7 +70,7 @@ class TrainNeuralNetwork():
         
         return model
      
-    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=20, batch_size=32, verbose: int = 1):
+    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=20, batch_size=32, verbose: int = 0):
         """
         Entrenamiento de redes neuronales y seleccion de la mejor
         """
@@ -116,7 +116,7 @@ class TrainNeuralNetwork():
             )
 
             # Entrenar el modelo (usa el validation como test en vez de hacer cross val entre X_train)
-            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=0, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
+            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
             
             # Evaluar en el set de validación
             val_loss, val_acc = model.evaluate(X_val, y_val_categorical, verbose=0)
@@ -126,9 +126,9 @@ class TrainNeuralNetwork():
                 **param_dict,
                 'val_loss': val_loss,
                 'val_acc': val_acc,
-                'model': model
+                'model': model,
+                # 'history': history # &lt;keras.src.callbacks.history.History object at 0x34f4a3e30&gt;
             })
-            # print(f"Params: {params} => Val Loss: {val_loss}, Val Accuracy: {val_acc}")
 
         # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
         best_result = min(results, key=lambda x: x['val_loss'])
@@ -136,14 +136,14 @@ class TrainNeuralNetwork():
         # Imprimo rdos
         end = time.time()
 
-        if verbose >= 1:
+        if verbose >= 0:
             logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
             logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
 
         return best_result['model'], best_result['params'], best_result['val_acc'], pd.DataFrame(results)
 
 
-def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, 
+def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
                                 scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
     """
     Selecciona los mejores hiperparametros para un modelo.
@@ -173,7 +173,7 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
     # Definicion de variables
     model_name = str(model)[:str(model).find('(')]   # Obtengo el nombre del modelo para poder buscar sus hiperparametros
     bayes, all_tuning = (False, False) if model_name == 'LogisticRegression' else (bayes, all_tuning) # Seteo Bayes a False cuando es Logistic. Evito Bayes para Logistic
-    params = space(model_name, bayes) if params is None else params
+    params = space_params(model_name, bayes) if params is None else params
     scoring = default_scoring(num_classes=len(np.unique(y_val_train))) if scoring is None else scoring
     logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
 
@@ -186,7 +186,7 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
 
         if n_iter is None:
             # Calcular iteraciones basadas en el tamaño del dataset
-            d_n_hip = {'RandomForestClassifier': 5, 'XGBClassifier': 10, 'LogisticRegression': 1, 'RandomForestRegressor': 3} # automatizar
+            d_n_hip = {'RandomForestClassifier': 3, 'XGBClassifier': 5, 'LogisticRegression': 1, 'RandomForestRegressor': 1, 'SVC': 1} # automatizar
             n_iter = determine_n_iter(len(X_val_train), d_n_hip[model_name], verbose=verbose)
             # n_iter = 5
 
@@ -211,7 +211,7 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
             logger.warning("GridSearchCV...")
 
         start_grid = time.time()
-        params_grid = space(model_name, bayes=False)
+        params_grid = space_params(model_name, bayes=False)
 
         # Crear el objeto GridSearchCV
         with warnings.catch_warnings():  # Logistic te vuelve loco
@@ -237,15 +237,38 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
     best_metric = best_search.best_score_
     results = pd.DataFrame(data=best_search.cv_results_)
 
-    # Obtener los mejores hiperparámetros
+    # Expansion de space de params
+    # if verbose >= 0:
+    #     check_best_params_limits(best_params, params) # probar, no funca aun.
+
+    # Mejores hiperparámetros
     if verbose >= 1:
         logger.info(f"Best score: {best_metric*100:.1f}. Best parameters: {best_params}")
 
-    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
+    #  Metricas para cada combinacion de hiperparametros
     if verbose >= 2:
         results.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")    
 
     return best_model, best_params, best_metric, results
+
+def check_best_params_limits(best_params, space):
+    for param, value in best_params.items():
+        # Obtiene el rango del parámetro desde el espacio
+        param_space = space.get(param, None)
+        
+        if param_space:
+            # Solo verifica límites para parámetros continuos (Integer, Real)
+            if isinstance(param_space, Integer) or isinstance(param_space, Real):
+                min_val, max_val = param_space.bounds  # Límite inferior y superior del espacio
+
+                # Genera un warning si el valor del parámetro es igual al límite inferior o superior
+                if value == min_val:
+                    warnings.warn(f"El parámetro '{param}' ha tomado su valor mínimo {min_val}. "
+                                  f"Considera ampliar el espacio inferior.")
+                elif value == max_val:
+                    warnings.warn(f"El parámetro '{param}' ha tomado su valor máximo {max_val}. "
+                                  f"Considera ampliar el espacio superior.")
+            # Para Categorical, no hay un límite "numérico" pero puedes agregar alguna lógica si es necesario.
 
 def default_scoring(num_classes, verbose: int = 0):
     """
@@ -269,7 +292,7 @@ def default_scoring(num_classes, verbose: int = 0):
 
     return scoring
 
-def space(model_name, bayes, verbose: int = 0):
+def space_params(model_name, bayes, verbose: int = 0):
     """
     Defino hiperparametros a probar por modelo.
 
@@ -293,21 +316,21 @@ def space(model_name, bayes, verbose: int = 0):
             'max_features': ['auto'],
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(50, 500) if bayes else [100, 500],
+            'n_estimators': Integer(100, 500) if bayes else [100, 500],
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
-            'max_depth': Integer(3, 30) if bayes else [3, 5, 7, 10],
-            'min_samples_split': Integer(2, 100) if bayes else [2, 10], # Mayor o igual a 2
+            'max_depth': Integer(3, 20) if bayes else [3, 5, 7, 10],
+            'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
             # 'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
             'bootstrap': Categorical([True]) if bayes else [True, False] # False
         },
         'XGBClassifier': {
             'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
-            'n_estimators': Integer(10, 150) if bayes else [100],  # Suele ganar con 100
+            'n_estimators': Integer(50, 120) if bayes else [100],  # Suele ganar con 100
             'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
-            'max_depth': Integer(3, 30) if bayes else [3, 5, 10],
+            'max_depth': Integer(3, 20) if bayes else [3, 5, 10],
             'gamma': Real(0, 1) if bayes else [0],
-            'min_child_weight': Integer(1, 100) if bayes else [1, 5], #5
+            'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
             'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
             'alpha': Real(0, 10) if bayes else [0.001],
             'lambda': Real(0, 10) if bayes else [0.001],
@@ -333,13 +356,13 @@ def space(model_name, bayes, verbose: int = 0):
             {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}
         ],
         'SVC': {
-            'C': Real(0.1, 1.0) if bayes else [0.1, 0.5, 1],
+            'C': Real(0.1, 1) if bayes else [0.1, 0.5, 1],
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'],
             'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
             'coef0': Real(0.0, 0.5) if bayes else [0.0, 0.5],
             'shrinking': Categorical([True, False]) if bayes else [True, False],
             'probability': Categorical([True]) if bayes else [True],
-            'class_weight': Categorical(['balanced', None]) if bayes else ['balanced', None],
+            # 'class_weight': Categorical(['balanced', None]) if bayes else ['balanced', None],
             'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
         },
         'MLPClassifier': {
@@ -369,7 +392,7 @@ def space(model_name, bayes, verbose: int = 0):
             'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
         },
         'RandomForestRegressor': {
-            'bootstrap': Categorical([True]) if bayes else [True, False], # False
+            'bootstrap': Categorical([True]) if bayes else [True], # False
             'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
             'max_depth': Integer(3, 30) if bayes else [3, 5, 10],  # 30
             'n_estimators': Integer(100, 300) if bayes else [100, 200, 300],

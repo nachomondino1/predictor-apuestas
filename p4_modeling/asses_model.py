@@ -78,7 +78,7 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     return df_match_odds
 
 # Nosotros
-def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general"):
+def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", verbose: int = 0):
     """
     Determine the ROI for different betting strategies.
 
@@ -93,7 +93,10 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general"):
     # Definicion de variables
     l_thr_dif_prob, d_rectas = define_hiperparameters(strategy)
     best_roi, roi_max = -100000, -100000
-
+    logger.info(f"Calculating ROI...")
+    if verbose >= 1:
+        logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas}")
+    
     # Eliminate rows with NaN odds or missing predictions
     df = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])
     df = calculate_dif_proba_in_predicted_result(df)  # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
@@ -118,7 +121,8 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general"):
                 b = a2 if key in lst else None
                 p1 = a1 if key not in lst else None
                 p2 = a2 if key not in lst else None
-                # logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
+                if verbose >= 1:
+                    logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
 
                 # for normalized in [True, False]:
                 # Determino stake a apostar segun curva
@@ -176,8 +180,6 @@ def define_hiperparameters(strategy):
             'linear': [[5, 0], [10, 0], [15, 0],[20, 0], [25, 0],[30, 0], [40, 0]],
             # 'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
         }
-    
-    logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas}")
     
     return l_thr_dif_prob, d_rectas
 

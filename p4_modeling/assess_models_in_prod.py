@@ -114,7 +114,7 @@ def load_trained_models(n_ite, ruta_base_mod):
         pass
 
     l_models, l_names = [], []
-    l_model_names = ['LogisticRegression', 'neural_networ', 'XGBClassifier', 'GradientBoostingClassifier', 'MLPClassifier']  # Podria hacer unique a df_iteration_test['model_name']
+    l_model_names = ['LogisticRegression', 'neural_networ', 'XGBClassifier', 'GradientBoostingClassifier', 'MLPClassifier', 'SVC']  # Podria hacer unique a df_iteration_test['model_name']
     for model_name in l_model_names:
         try:
             loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_{model_name}.pkl", "rb"))
@@ -294,17 +294,18 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Defino condiciones del analisis
-    # l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
+    l_countries = [48, 55, 59, 77, 148] 
+    l_countries = [77]
+    # l_countries = [55]
     only_select_best_model = False # False
     bet_strategy = 'general' # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
-        59: ["germany", "2024-10-24"], # 13
-        77: ["italy", "2024-10-23"], # 15
-        148: ["spain", "2024-10-13"],  # 03
+        59: ["germany", "2024-10-28"], # 13
+        77: ["italy", "2024-10-29"], # 15
+        148: ["spain", "2024-10-13"],  # 13
         167: ["usa", "2024-10-06"]
     }
 
@@ -337,7 +338,7 @@ if __name__ == "__main__":
             df_ite_test_prod = main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, relleno_formaciones=True, n_days_to_fill=n_days_fill_data, strategy=bet_strategy)
 
         # Selecciono el mejor modelo (mayor roi por partido en produccion)
-        best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, thr_distrib=0.35)
+        best_model, df_best = mbm.select_best_model(df_ite_test_prod, ruta_assess_2, country, thr_distrib=0.35)
         
         # Concateno dataframes en un solo dataframe.
         ##  test y prod

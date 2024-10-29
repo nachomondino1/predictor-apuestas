@@ -699,7 +699,7 @@ class Modeling:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
         
-    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -714,56 +714,67 @@ class Modeling:
             Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         # warnings.filterwarnings('ignore') # no son mias, son de openpyxl
-        print("\nSeparating data in train, val and test...")
+        if verbose >= 0:
+            print("\nSeparating data in train, val and test...")
 
         # Si rellené NaN values
         if 'rellenado' in df.columns:
-            print("\tDejo registros no rellenados en df_test y df_val")
+
+            if verbose >= 1:
+                print("\tDejo registros no rellenados en df_test y df_val")
 
             # Obtengo indice de filas no rellenadas
             index_no_rellenado = df[~df['rellenado']].index
             df = df.drop('rellenado', axis=1)
-            print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
+            if verbose >= 1:
+                print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
 
             # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
             n_reg_test = int(len(df) * test_size)
             n_reg_test_max = len(index_no_rellenado)
-            print(f"Numero de registros para df_test: {n_reg_test}")
+            if verbose >= 1:
+                print(f"Numero de registros para df_test: {n_reg_test}")
             if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
                 # Ajusta n para tomar todas las filas no rellenadas disponibles
-                print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
+                if verbose >= 1:
+                    print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
                 n_reg_test = n_reg_test_max
 
             # Construyo el dataset de testeo a partir de registros que no han sido rellenados
             df_test = df.loc[index_no_rellenado].sample(n_reg_test, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
             X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
-            print(f"Shape df_test: {df_test.shape}")
+            if verbose >= 1:
+                print(f"Shape df_test: {df_test.shape}")
 
             # Eliminar los índices de df_test de index_no_rellenado
             indices_a_eliminar = df_test.index
             index_no_rellenado_sin_test = index_no_rellenado.drop(indices_a_eliminar)
-            print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
+            if verbose >= 1:
+                print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
 
             # Determino si hay suficientes registros no rellenados para poner en el dataframe de validacion
             n_reg_val = int(len(df) * val_size)
             n_reg_val_max = len(index_no_rellenado_sin_test)
-            print(f"Numero de registros para df_val: {n_reg_val}")
+            if verbose >= 1:
+                print(f"Numero de registros para df_val: {n_reg_val}")
             if n_reg_val > n_reg_val_max: # Si no hay suficientes filas no rellenadas disponibles
                 # Ajusta n para tomar todas las filas no rellenadas disponibles
-                print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
+                if verbose >= 1:
+                    print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
                 n_reg_val = n_reg_val_max
 
             # Construyo train y val a partir de las filas que quedan
             df_train_val = df[~df.index.isin(df_test.index)]
             df_val = df_train_val.loc[index_no_rellenado_sin_test].sample(n_reg_val, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
             X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]
-            print(f"Shape df_train_val: {df_train_val.shape}")
-            print(f"Shape df_val: {df_val.shape}")
 
             # Construyo train con los registros que quedan
             df_train = df_train_val[~df_train_val.index.isin(df_val.index)]
             X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
-            print(f"Shape df_train: {df_train.shape}")
+            if verbose >= 1:
+                print(f"Shape df_train_val: {df_train_val.shape}")
+                print(f"Shape df_val: {df_val.shape}")
+                print(f"Shape df_train: {df_train.shape}")
 
         # Si no rellene nan values
         else:
@@ -782,7 +793,8 @@ class Modeling:
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, bal_type=bal_type)
 
-        print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
+        if verbose >= 0:
+            print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
         if export:
             X_train.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_train.xlsx', index=True)
             X_val.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_val.xlsx', index=True)
