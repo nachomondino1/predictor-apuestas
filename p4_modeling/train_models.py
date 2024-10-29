@@ -8,9 +8,12 @@ from main import DataPreparation, Modeling
 from p3_data_preparation.select_data import determine_country_competitions
 import pickle
 import joblib
+import time
+
 # from itertools import product
 
-def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, rows_to_features_min, continue_old_train: bool = False, export:bool = True):
+def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, rows_to_features_min, continue_old_train: bool = False, 
+         verbose: int = 0, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
     """
@@ -23,8 +26,10 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
     # Imprimo largo de iteraciones
     n_iter = define_n_iterations(d_params)
-    logger.info(f"Numero de iteraciones totales: {n_iter}")
-
+    if verbose >= 0:
+        logger.info(f"Numero de iteraciones totales: {n_iter}")
+        start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC
+    
     if continue_old_train:
         df_ite_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
         df_ite_test_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
@@ -43,8 +48,9 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
         # Asigno valor a cada hiperpametro
         n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
-        logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
-        print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
+        if verbose >= 0:
+            logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
+            print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 
         if continue_old_train and one_time:
             # Una vez que alcance la construccion de last model
@@ -82,8 +88,9 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
                 n_years_to_select, comp_to_select = param_values_00[1], param_values_00[0]
                 path_2 = f'{n_years_to_select}_{comp_to_select}'
-                logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
-                print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
+                if verbose >= 0:
+                    logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
+                    print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
 
                 df_cons_clean, scaler, columns_used = dp.clean_data_2(df_cons_etiquetado, n_years_to_select, comp_to_select, export=False)
                 joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_1}_{path_2}.pkl')
@@ -94,8 +101,9 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                     # Asigno valor a cada hiperpametro
                     thr_corr, thr_fs = param_values_4[0], param_values_4[1]
                     path_3 = f'{thr_corr}_{thr_fs}'
-                    logger.info(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
-                    print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
+                    if verbose >= 0:
+                        logger.info(f" Iteracion Select Nº {i}.{j} ".center(120, "#"))
+                        print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
                     # Selecciono datos
                     path_select = f'{ruta_base_dp}/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
@@ -111,8 +119,9 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                         fill_na = param_values_3[0]
                         path4 = f"{fill_na}"
                         path_treat = f'{ruta_base_dp}/df_selected_{path_1}_{path_2}_{path_3}_{path4}.xlsx'
-                        logger.info(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
-                        print(f"Hiper treat --> fill_na: {fill_na}")
+                        if verbose >= 0:
+                            logger.info(f" Iteracion Treat NaN Nº {i}.{j}.{z} ".center(120, "#"))
+                            print(f"Hiper treat --> fill_na: {fill_na}")
 
                         try:
                             df_sel_treated = pd.read_excel(path_treat, index_col=0)
@@ -122,18 +131,20 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
                         # Por combinacion de parametros de modeling
                         for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-
+                            
                             # Asigno valor a cada hiperparametro
                             val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
-                            logger.info(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
-                            print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
-                            cont_iter += 1
-                            logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
+                            if verbose >= 0:
+                                cont_iter += 1
+                                logger.info(f" Iteracion Modeling Nº {i}.{j}.{z}.{h} ".center(120, "#"))
+                                print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                                logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
 
                             # Generar el diseño de la prueba
                             X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
                             rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-                            logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
+                            if verbose >= 0:
+                                logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
 
                             # Si hay suficientes datos
                             if rows_to_features >= rows_to_features_min: # len(X_test) >= 50 and 
@@ -156,6 +167,21 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
 
                             else:
                                 logger.warning(f"Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
+
+                            if verbose >= 0:
+                                current_train = time.time()
+                                ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
+                                ite_restantes = n_iter - cont_iter
+                                horas_restantes = ite_restantes / ritmo
+                                min_restantes = horas_restantes * 60
+                                horas_train = n_iter / ritmo
+                                # logger.warning(f'{current_train} {start_train} {cont_iter}')
+                                logger.warning(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
+                                logger.warning(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
+
+    if verbose >= 0:
+        end_train = time.time()
+        logger.info(f"Tiempo total de entrenamiento: {(end_train - start_train) / 60:.1f} minutos")
 
     # Guardo datos de todas las iteraciones
     if export:

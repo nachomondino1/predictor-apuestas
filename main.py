@@ -152,6 +152,7 @@ class DataPreparation:
             f'./data/{self.country}/p3_data_preparation/clean_data',
             f'./data/{self.country}/p3_data_preparation/integrate_data',
             f'./data/{self.country}/p3_data_preparation/select_data',
+            f'./data/{self.country}/p3_data_preparation/treat_nan',
         ]
 
         for directorio in l_directorios:
@@ -509,6 +510,9 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
+        start = time.time()
+        logger.info("\nSelecting data...")
+
         # Reemplazo infinitos
         df = clean_data.replace_infinite(df)
 
@@ -516,7 +520,7 @@ class DataPreparation:
         df = df.sort_values(by='date', ascending=False)
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
         
-        # Eliminacion de filas 
+        # (1) Eliminacion de filas 
         ## Para evitar partidos muy viejos
         print("Eliminacion de filas...")
         n_reg_inic = len(X)
@@ -531,40 +535,40 @@ class DataPreparation:
             print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
         ## con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, 0.5, _print=True)
-        print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+        X = clean_data.delete_rows_nan(X, 0.5)
         if _print:
-            print("Eliminacion de filas...")
-            print(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+            print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+            logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
-        # Eliminacion de columnas   
-        # usadas solo para construir y constantes
+        # (2) Eliminacion de columnas   
+        print("Eliminación de columnas...")
+        ## usadas solo para construir y constantes
         cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(0.15*len(X))
+        n_reg_min = int(0.15*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
-        if _print:
-            print("Eliminación de columnas...")
-            print(f"Columnas constantes eliminadas: {cols_constants}")
-            if len(X.columns) != len(X_sin_col_mucho_nan.columns):
-                l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
-                logger.info(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
-            
-            print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
 
-        # Escalado de datos
+        if _print and len(X.columns) != len(X_sin_col_mucho_nan.columns):
+            print(f"Columnas constantes eliminadas: {cols_constants}")
+            print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
+            l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
+            logger.warning(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
+
+        # (3) Escalado de datos
+        print("\nEscalado de datos...")
         scaler = StandardScaler()
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
-        if _print:
-            print("\nEscalado de datos...")
 
         # Concateno X e y
         y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
         df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
+
+        end = time.time()
+        logger.info(f"Clean data 2 en {(end - start)/60:.1f} minutos")
 
         if export: 
             joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./data/{self.country}/p3_data_preparation/scaler_model.pkl")       
@@ -600,7 +604,7 @@ class DataPreparation:
         print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         
         end = time.time()
-        print(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
+        logger.info(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
             df_corr_tri_X.to_excel(f'./data/{self.country}/p3_data_preparation/select_data/df_correlation.xlsx', index=True)
@@ -624,6 +628,8 @@ class DataPreparation:
             Dataframe sin NaN values
         """ 
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
+        start = time.time()
+
         # Separo en X e y
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
 
@@ -631,18 +637,16 @@ class DataPreparation:
         if fill_na is not None:
             l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=percentil_nan)
 
-        # Elimino registros con al menos un NaN 
-        X = X.dropna(subset=X.columns if fill_na is None else l_columns_poco_nan)  # df = clean_data.delete_rows_nan(X_sin_col_mucho_nan, porc_nan_max=0)
-        if _print:
-            print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
+            # Elimino registros con al menos un NaN 
+            X = X.dropna(subset=l_columns_poco_nan)
+            if _print:
+                print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
 
-        # Si hay que rellenar, hago el rellenado de columnas con mucho NaN
-        if fill_na is not None:
             # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
             df_rellenado = pd.DataFrame(index=X.index)
             df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
             if export:
-                df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/df_rellenado.xlsx', index=True)
+                df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/treat_nan/df_rellenado.xlsx', index=True)
 
             # Relleno nan de las columnas con mucho NaN
             X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
@@ -653,9 +657,16 @@ class DataPreparation:
             # Agrego columna rellenado a X (post fill puesto que no quiero limpiar la columna "rellenado")
             X['rellenado'] = df_rellenado['rellenado']
 
+        else:
+            # Elimino registros con al menos un NaN 
+            X = X.dropna(subset=X.columns)
+
         # Concateno X e y
         y = y[y.index.isin(X.index)]
         df = pd.concat([X, y], axis=1)
+
+        end = time.time()
+        logger.info(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
 
         if export:
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
@@ -688,71 +699,82 @@ class Modeling:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
         
-    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
         # Parameters
-        df: Dataframe a dividir en test, validation y train. (Dataframe)
-        bal_type: Tipo de balanceo de clases a realizar. (String)
-        val_size: Porcentaje del total de datos destinado a validacion. (Float)
-        test_size:  Porcentaje del total de datos destinado a test. (Float)
-        export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (Bool)
-        
+            df: Dataframe a dividir en test, validation y train. (Dataframe)
+            bal_type: Tipo de balanceo de clases a realizar. (String)
+            val_size: Porcentaje del total de datos destinado a validacion. (Float)
+            test_size:  Porcentaje del total de datos destinado a test. (Float)
+            export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (Bool)
+            
         # Returns
-        Dataframe de entrenamiento y de testeo balanceados (DataFrame)
+            Dataframe de entrenamiento y de testeo balanceados (DataFrame)
         """
         # warnings.filterwarnings('ignore') # no son mias, son de openpyxl
-        print("\nSeparating data in train, val and test...")
+        if verbose >= 0:
+            print("\nSeparating data in train, val and test...")
 
         # Si rellené NaN values
         if 'rellenado' in df.columns:
-            print("\tDejo registros no rellenados en df_test y df_val")
+
+            if verbose >= 1:
+                print("\tDejo registros no rellenados en df_test y df_val")
 
             # Obtengo indice de filas no rellenadas
             index_no_rellenado = df[~df['rellenado']].index
             df = df.drop('rellenado', axis=1)
-            print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
+            if verbose >= 1:
+                print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
 
             # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
             n_reg_test = int(len(df) * test_size)
             n_reg_test_max = len(index_no_rellenado)
-            print(f"Numero de registros para df_test: {n_reg_test}")
+            if verbose >= 1:
+                print(f"Numero de registros para df_test: {n_reg_test}")
             if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
                 # Ajusta n para tomar todas las filas no rellenadas disponibles
-                print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
+                if verbose >= 1:
+                    print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
                 n_reg_test = n_reg_test_max
 
             # Construyo el dataset de testeo a partir de registros que no han sido rellenados
             df_test = df.loc[index_no_rellenado].sample(n_reg_test, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
             X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
-            print(f"Shape df_test: {df_test.shape}")
+            if verbose >= 1:
+                print(f"Shape df_test: {df_test.shape}")
 
             # Eliminar los índices de df_test de index_no_rellenado
             indices_a_eliminar = df_test.index
             index_no_rellenado_sin_test = index_no_rellenado.drop(indices_a_eliminar)
-            print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
+            if verbose >= 1:
+                print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
 
             # Determino si hay suficientes registros no rellenados para poner en el dataframe de validacion
             n_reg_val = int(len(df) * val_size)
             n_reg_val_max = len(index_no_rellenado_sin_test)
-            print(f"Numero de registros para df_val: {n_reg_val}")
+            if verbose >= 1:
+                print(f"Numero de registros para df_val: {n_reg_val}")
             if n_reg_val > n_reg_val_max: # Si no hay suficientes filas no rellenadas disponibles
                 # Ajusta n para tomar todas las filas no rellenadas disponibles
-                print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
+                if verbose >= 1:
+                    print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
                 n_reg_val = n_reg_val_max
 
             # Construyo train y val a partir de las filas que quedan
             df_train_val = df[~df.index.isin(df_test.index)]
             df_val = df_train_val.loc[index_no_rellenado_sin_test].sample(n_reg_val, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
             X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]
-            print(f"Shape df_train_val: {df_train_val.shape}")
-            print(f"Shape df_val: {df_val.shape}")
 
             # Construyo train con los registros que quedan
             df_train = df_train_val[~df_train_val.index.isin(df_val.index)]
             X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
-            print(f"Shape df_train: {df_train.shape}")
+            if verbose >= 1:
+                print(f"Shape df_train_val: {df_train_val.shape}")
+                print(f"Shape df_val: {df_val.shape}")
+                print(f"Shape df_train: {df_train.shape}")
 
         # Si no rellene nan values
         else:
@@ -771,7 +793,8 @@ class Modeling:
         if bal_type is not None:
             X_train, y_train = generate_test_design.balance_dataset(X_train, y_train, bal_type=bal_type)
 
-        print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
+        if verbose >= 0:
+            print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
         if export:
             X_train.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_train.xlsx', index=True)
             X_val.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_val.xlsx', index=True)
@@ -782,56 +805,61 @@ class Modeling:
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
-    def build_model(self, model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, export: bool = True):
+    def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
+                    bayes: bool = True, compare_tuning: bool = False, scoring: str = 'f1_macro', export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
-        :param model: Modelo de Machine Learning. (sklearn.ensemble)
-        :param X_val: Dataframe de validacion con variables predictoras. (DataFrame)
-        :param y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
-        :param X_train: Dataframe de entrenamiento con variables predictoras.  (DataFrame)
-        :param y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
-        :param k: Numero de folds. (int)
-        :param timeout: Cantidad de segundos de espera maxima para entrenar un modelo. (int)
-        :return: Mejor modelo. (sklearn.ensemble?)
+        
+        # Parameters
+            model: Modelo de Machine Learning. (sklearn.ensemble)
+            X_val: Dataframe de validacion con variables predictoras. (DataFrame)
+            y_val: Dataframe de validacion solo con variable respuesta. (DataFrame)
+            X_train: Dataframe de entrenamiento con variables predictoras.  (DataFrame)
+            y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
+            k: Numero de folds. (int)
+        
+        # Return
+            model_best_params: Modelo entrenado con hiperparaemtros optimos (sklearn.ensemble?)
+            params: Combinacion de hiperparametros del modelo (dict)
+            train_accuracy: Precision de entrenamiento (float)
         """
         # warnings.filterwarnings("ignore")
         print("\nTraining model...")
         self.classes = np.unique(y_train)
 
-        if model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
+        if default_model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
             logger.info("Entrenando red neuronal")
 
             # Creo instancia de clase NeuralNetwork()
-            red = build_model.NeuralNetwork()
+            red = build_model.TrainNeuralNetwork()
 
             # Seleccion mejor arquitectura con la validacion y entreno el modelo
-            model_best_params, d_hiper_model, train_accuracy = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+            model_best_params, params, train_accuracy, results = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
 
         else:
-            # Find best hiperparameters
+            # Train model searching for best hiper
             if params is None:
-                model_best_params = build_model.select_best_hiperparameters(model, X_val, y_val, k=5, _print=True)
+                model_best_params, params, best_metric, results = build_model.select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=5, bayes=bayes, scoring=scoring, all_tuning=compare_tuning, verbose=1)
+                train_accuracy = best_metric # no es train_acc... es el scoring que uso, en este caso, f1_macro..
+      
+            # Train model with prefix params
             else:
-                model_best_params = model.set_params(**params)
-                # DEBERIA CONCATENAR X_VAL E Y_VAL A X_TRAIN E Y_TRAIN PUESTO QUE SINO ESTOY TIRANDO DATOS AL TACHO.
+                model_best_params = default_model.set_params(**params)
 
-            d_hiper_model = model_best_params.get_params()
-            print("Hiperparametros:", d_hiper_model)
+                # Fit model
+                model_best_params.fit(X_train, y_train)
 
-            # Fit model
-            model_best_params.fit(X_train, y_train)
-            self.classes = model_best_params.classes_
+                # Eval en val...
 
-            # Evaluo el modelo con Cross Validation
-            train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-            print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
+                # Evaluo el modelo con Cross Validation
+                train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
+                print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
 
         if export:
             pickle.dump(model_best_params, open(f"./data/{self.country}/p4_modeling/modelo.pkl", "wb"))
-            df_hiperparametros = pd.DataFrame.from_dict(d_hiper_model, orient='index', columns=['Valor'])
-            df_hiperparametros.to_csv(f"./data/{self.country}/p4_modeling/modeling/hiperparametros.csv")
+            # results.to_excel(f"./data/{self.country}/{ite_date}/p4_modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
 
-        return model_best_params, d_hiper_model, train_accuracy
+        return model_best_params, params, train_accuracy, results
 
     def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, _print: bool = True):
         """
@@ -865,8 +893,8 @@ class Modeling:
         df_pred_proba = pd.DataFrame({
                 self.var_resp: y_test,
                 self.var_pred: y_pred,
-                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=X_test.index)
     
@@ -919,17 +947,21 @@ class Modeling:
 
             # Entreno modelo y evaluo su rendimiento 
             try:
-                model, d_hiper_model, cv_accuracy = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                # Entreno modelo
+                model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
+
+                # Evaluo modelo en test
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
 
                 # Hiperparametros del modelo y Metricas en testeo y train
-                new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': d_hiper_model}
+                new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params}
                 new_row.update(d_metrics)
                 df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
                 df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
                 # Exporto datos del modelo
                 pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
                 df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
             except KeyboardInterrupt as e:

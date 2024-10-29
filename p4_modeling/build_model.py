@@ -1,7 +1,14 @@
+import pandas as pd
 import numpy as np
-from sklearn.model_selection import GridSearchCV  # Seleccion de hiperparametros
-from sklearn.metrics import accuracy_score  # Metrica de precision
 import time
+from itertools import product
+from set_up_logging import logger
+import warnings
+# Grid y Bayes
+from sklearn.model_selection import PredefinedSplit, GridSearchCV
+from sklearn.metrics import accuracy_score  # Metrica de precision
+from skopt import BayesSearchCV
+from skopt.space import Real, Integer, Categorical
 # Red neuronal
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -13,10 +20,9 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 # from scikeras.wrappers import KerasClassifier
-from itertools import product
-from set_up_logging import logger
 
-class NeuralNetwork():
+
+class TrainNeuralNetwork():
     
     def __init__(self) -> None:
         pass
@@ -64,7 +70,7 @@ class NeuralNetwork():
         
         return model
      
-    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=10, batch_size=32):
+    def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=20, batch_size=32, verbose: int = 0):
         """
         Entrenamiento de redes neuronales y seleccion de la mejor
         """
@@ -84,243 +90,393 @@ class NeuralNetwork():
                     'dropout_rate': [0.2, None]
                 }
         
-        # Generar todas las combinaciones de hiperparámetros
-        param_combinations = list(product(
-            param_grid['hidden_layer_sizes'],
-            param_grid['learning_rate'],
-            param_grid['activation'],
-            param_grid['optimizer'],
-            param_grid['kernel_regularizer'],
-            param_grid['batch_normalization'],
-            param_grid['dropout_rate']
-        ))
+        # Generar combinaciones de parámetros automáticamente
+        param_combinations = list(product(*param_grid.values()))
 
         # Convertir etiquetas a formato one-hot --> Evita error target y output con different shape. 
         input_shape = X_train.shape[1]
         output_shape = 3  # Estaria bueno que sea automatico
+        patience = int(epochs * 0.2)  # Por ejemplo, 20% de las épocas totales
         y_val_categorical = to_categorical(y_val, num_classes=output_shape)
         y_train_categorical = to_categorical(y_train, num_classes=output_shape)
 
+        # Definir un callback de EarlyStopping
+        early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
         # Iterar sobre cada combinación
         for params in param_combinations:
-            hidden_layers, learning_rate, activation, optimizer, regularizer, batch_norm, dropout_rate = params
-            
-            # Creo red neuronal
-            model = self.create_neural_network(input_shape=input_shape, output_shape=output_shape, hidden_layer_sizes=hidden_layers, learning_rate=learning_rate, activation=activation, optimizer=optimizer, kernel_regularizer=regularizer, batch_normalization=batch_norm, dropout_rate=dropout_rate)
+            # Emparejar cada parámetro con su nombre desde `param_grid`
+            param_dict = dict(zip(param_grid.keys(), params))
 
-            # Definir un callback de EarlyStopping
-            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+            # Creo red neuronal
+            model = self.create_neural_network(
+                input_shape=input_shape,
+                output_shape=output_shape,
+                **param_dict  # Desempaqueta el diccionario como argumentos nombrados
+            )
 
             # Entrenar el modelo (usa el validation como test en vez de hacer cross val entre X_train)
-            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=0, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
+            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
             
             # Evaluar en el set de validación
             val_loss, val_acc = model.evaluate(X_val, y_val_categorical, verbose=0)
-            
-            # Guardar el resultado
+
             results.append({
                 'params': params,
+                **param_dict,
                 'val_loss': val_loss,
                 'val_acc': val_acc,
-                'model': model
+                'model': model,
+                # 'history': history # &lt;keras.src.callbacks.history.History object at 0x34f4a3e30&gt;
             })
-            
-            # print(f"Params: {params} => Val Loss: {val_loss}, Val Accuracy: {val_acc}")
 
         # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
         best_result = min(results, key=lambda x: x['val_loss'])
 
         # Imprimo rdos
         end = time.time()
-        logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
-        logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
 
-        return best_result['model'], best_result['params'], best_result['val_acc']
+        if verbose >= 0:
+            logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
+            logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
 
-def select_best_hiperparameters(model, X, y, k, params: dict = None, _print: bool = False):
+        return best_result['model'], best_result['params'], best_result['val_acc'], pd.DataFrame(results)
+
+
+def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
+                                scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
     """
     Selecciona los mejores hiperparametros para un modelo.
 
-    :param model: Modelo de Machine Learning. (sklearn.ensemble)
-    :param X: Dataframe de validacion con variables predictoras. (DataFrame)
-    :param y: Dataframe de validacion solo con variable respuesta. (DataFrame)
-    :param k: Numero de folds. (int)
-    :return: Modelo actualizado con los hiperparametros optimos pero aun sin ajustar. (sklearn.ensemble)  # sklearn.ensemble._forest.RandomForestClassifier
+    # Parameters
+        model: Modelo de Machine Learning. (sklearn.ensemble)
+        X: Dataframe de validacion con variables predictoras. (DataFrame)
+        y: Dataframe de validacion solo con variable respuesta. (DataFrame)
+        k: Numero de folds. (int)
+        params: Parametros a evaluar (dict)
+        bayes: True para usar BayesSearchCV y false para usar GridSearchCV (bool)
+        all_tunning: True para usar tanto BayesSearchCV como GridSearchCV y elegir el mejor (bool)
+        scoring: Métrica de evaluación para definir mejor combinacion de hiperparametros (e.g. 'accuracy', 'precision', 'recall', 'roc_auc', 'f1', etc) (str)
+
+    # Return
+        best_search: Elemento Search con el mejor estimador, los mejores hiperparametros, las metricas de cada combinacion, etcetera.
     """
-    if _print:
-        start = time.time()
-        print(f"\nSeleccionando mejores hiperparametros para {model} con k={k}")
+    # Defino el set de val como test en CV de GridSearchCV / BayesSearchCV
+    X_val_train = pd.concat([X_train, X_val], axis=0) 
+    y_val_train = pd.concat([y_train, y_val], axis=0) 
+    split_index = [-1 if x in X_train.index else 0 for x in X_val_train.index] # Create a list where train data indices are -1 and validation data indices are 0
+    pds = PredefinedSplit(test_fold = split_index) # Use the list to create PredefinedSplit
+    if verbose >= 2:
+        logger.warning(f'X_train: {X_train.shape} + X_val: {X_val.shape} = {X_val_train.shape}')
+        logger.warning(pds)
 
-    # Definicion de hiperparametros a considerar para cada modelo
-    if params is None:
-        d_params = {
-            'DecisionTreeClassifier': {
-                'criterion': ['entropy'],
-                'splitter': ['random', 'best'],
-                'max_depth': [None, 5, 7, 8, 10, 12, 14],
-                'min_samples_split': [2, 5, 10],
-                'min_samples_leaf': [1, 2, 4],
-                'max_features': ['auto'],
-            },
-            'RandomForestClassifier': {
-                'n_estimators': [100, 500],
-                'criterion': ['entropy'],
-                'max_depth': [3, 5, 7], 
-                'min_samples_split': [2, 10], 
-                'min_samples_leaf': [1, 4],
-                'max_features': ['sqrt'],
-                'bootstrap': [True],
-            },
-            'XGBClassifier': {
-                'n_estimators': [100], # suele ganar 100 
-                'learning_rate': [0.001, 0.01, 0.1], 
-                'max_depth': [3, 4, 5, 6, 10], #  15, 20
-                'gamma': [0, 0.5],
-                'min_child_weight': [1, 5, None],        # Peso mínimo del niño
-                'subsample': [0.8, 1.0],                 # Tasa de muestreo
-                'colsample_bytree': [0.8, 1.0]           # Fracción de columnas por árbol
-                # 'reg_alpha': [0, 0.1], # 0.01,
-                # 'reg_lambda': [0, 0.1], # 0.01,
-            },
-            'GradientBoostingClassifier': { # Tarda muchisimo en entrenar.
-                'n_estimators': [100], # 200
-                'learning_rate': [0.01], #  0.1
-                'max_depth': [3, 5],
-                # 'min_samples_split': [1, 5, 10],
-                # 'min_samples_leaf': [2, 4],
-                # 'subsample': [0.8, 1.0],
-                # 'max_features': ['auto'],
-                # 'loss': ['deviance']
-            },
-            'LogisticRegression': {
-                'penalty': ['l1', 'l2'], # 'l1' solo usa solver 'saga'
-                'C': [0.1, 0.5, 1], # 5
-                'solver': ['saga', 'liblinear'], #  'newton-cg', 'sag', 'lbfgs'
-                'fit_intercept': [True, False], 
-                'max_iter': [2000],
-                # 'multi_class': ['auto'],
-                # 'class_weight': ['balanced', None], # hace un under basicamente... no tiene sentido cuando hago under creo.
-            },
-            'SVC': {
-                'C': [0.1, 0.5, 1],
-                'kernel': ['rbf', 'sigmoid'], # 'poly',
-                'gamma': ['scale', 'auto'], 
-                # 'degree': [3, 5],
-                'coef0': [0.0,  0.5], # , 1.0
-                'shrinking': [True, False], # False
-                'probability': [True], # Tiene que ser True para poder usar predict.proba()
-                # 'tol': [1e-3, 1e-4, 1e-5],
-                'class_weight': ['balanced', None], # No deberia usarlo porque ya balanceo pero es que tal vez es diferente...?
-                'decision_function_shape': ['ovo', 'ovr'],
-            },
-            'MLPClassifier': {
-                'hidden_layer_sizes': [(50,), (100,)], 
-                'activation': ['logistic',  'relu'],  #  'tanh'
-                'solver': ['adam'], # 'sgd', 'lbfgs'
-                'alpha': [0.0001, 0.001], #  0.01
-                # 'learning_rate': ['constant', 'adaptive'],
-                'learning_rate_init': [0.01, 0.1],  # 0.001
-                'max_iter': [500],
-                'early_stopping': [True] # False
-            },
-            'PCA': {
-                'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
-                'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
-                'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
-                'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
-                'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
-                'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
-            },
-            'Lasso': {
-                'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
-                'fit_intercept': [True, False],  # Indica si se debe ajustar un intercepto (término independiente) en el modelo.
-                'precompute': [True, False],  # Indica si se deben precalcular las matrices de productos internos para acelerar el ajuste del modelo.
-                'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para converger durante el ajuste del modelo.
-                'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
-                'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
-            },
-            'RandomForestRegressor': {
-                'n_estimators': [100, 200, 500],  # Número de árboles en el bosque
-                # 'criterion': ['friedman_mse', 'absolute_error'],  # Criterio de división de los nodos del árbol (Mean Squared Error o Mean Absolute Error)
-                'max_depth': [3, 5, 10],  # Profundidad máxima de los árboles
-                # 'min_samples_split': [2, 10],  # Número mínimo de muestras requeridas para dividir un nodo interno
-                # 'min_samples_leaf': [1, 4],  # Número mínimo de muestras requeridas en cada hoja del árbol
-                'bootstrap': [True],  # Si se utiliza o no bootstrap para muestreo de datos
-            }
+    # Definicion de variables
+    model_name = str(model)[:str(model).find('(')]   # Obtengo el nombre del modelo para poder buscar sus hiperparametros
+    bayes, all_tuning = (False, False) if model_name == 'LogisticRegression' else (bayes, all_tuning) # Seteo Bayes a False cuando es Logistic. Evito Bayes para Logistic
+    params = space_params(model_name, bayes) if params is None else params
+    scoring = default_scoring(num_classes=len(np.unique(y_val_train))) if scoring is None else scoring
+    logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
+
+    # BayesSearch
+    if bayes or all_tuning:
+                
+        if verbose >= 1: 
+            logger.warning("BayesSearchCV...")
+        start_bayes = time.time()
+
+        if n_iter is None:
+            # Calcular iteraciones basadas en el tamaño del dataset
+            d_n_hip = {'RandomForestClassifier': 3, 'XGBClassifier': 5, 'LogisticRegression': 1, 'RandomForestRegressor': 1, 'SVC': 1} # automatizar
+            n_iter = determine_n_iter(len(X_val_train), d_n_hip[model_name], verbose=verbose)
+            # n_iter = 5
+
+        with warnings.catch_warnings():  # Logistic te vuelve loco --> no funciona.
+            warnings.simplefilter("ignore")  # Ignora todas las advertencias
+
+            # Crear el objeto BayesSearchCV
+            bayes_search = BayesSearchCV(estimator=model, search_spaces=params, cv=pds, n_iter=n_iter, n_jobs=-1, scoring=scoring)
+
+            # Ajustar el objeto BayesSearchCV a los datos de entrenamiento
+            bayes_search.fit(X_val_train, y_val_train)
+            best_search = bayes_search
+
+        end_bayes = time.time()
+        if verbose >= 1:
+            logger.info(f"Seleccion de hiperparametros optimos con Bayes en {(end_bayes - start_bayes) / 60:.1f} minutos")
+
+    # GridSearch
+    if (not bayes) or all_tuning:
+        
+        if verbose >= 1: 
+            logger.warning("GridSearchCV...")
+
+        start_grid = time.time()
+        params_grid = space_params(model_name, bayes=False)
+
+        # Crear el objeto GridSearchCV
+        with warnings.catch_warnings():  # Logistic te vuelve loco
+            warnings.simplefilter("ignore")  # Ignora todas las advertencias
+            grid_search = GridSearchCV(estimator=model, param_grid=params_grid, cv=pds, scoring=scoring)
+
+            # Ajustar el objeto GridSearchCV a los datos de entrenamiento
+            grid_search.fit(X_val_train, y_val_train)
+            best_search = grid_search
+ 
+        # Obtener los mejores hiperparámetros
+        end_grid = time.time()
+        if verbose >= 1: 
+            logger.info(f"Seleccion de hiperparametros optimos con Grid en {(end_grid - start_grid) / 60:.1f} minutos")
+
+        # Selecciono mejor modelo de todos los tunner
+        if all_tuning:
+            best_search = compare_tunners(bayes_search, grid_search, verbose=verbose)
+
+    # Obtengo el mejor modelo (ya entrenado), los mejores hiper, la mejor metrica y los resultados de todas las combinaciones de hiper
+    best_model = best_search.best_estimator_ 
+    best_params = best_search.best_params_
+    best_metric = best_search.best_score_
+    results = pd.DataFrame(data=best_search.cv_results_)
+
+    # Expansion de space de params
+    # if verbose >= 0:
+    #     check_best_params_limits(best_params, params) # probar, no funca aun.
+
+    # Mejores hiperparámetros
+    if verbose >= 1:
+        logger.info(f"Best score: {best_metric*100:.1f}. Best parameters: {best_params}")
+
+    #  Metricas para cada combinacion de hiperparametros
+    if verbose >= 2:
+        results.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")    
+
+    return best_model, best_params, best_metric, results
+
+def check_best_params_limits(best_params, space):
+    for param, value in best_params.items():
+        # Obtiene el rango del parámetro desde el espacio
+        param_space = space.get(param, None)
+        
+        if param_space:
+            # Solo verifica límites para parámetros continuos (Integer, Real)
+            if isinstance(param_space, Integer) or isinstance(param_space, Real):
+                min_val, max_val = param_space.bounds  # Límite inferior y superior del espacio
+
+                # Genera un warning si el valor del parámetro es igual al límite inferior o superior
+                if value == min_val:
+                    warnings.warn(f"El parámetro '{param}' ha tomado su valor mínimo {min_val}. "
+                                  f"Considera ampliar el espacio inferior.")
+                elif value == max_val:
+                    warnings.warn(f"El parámetro '{param}' ha tomado su valor máximo {max_val}. "
+                                  f"Considera ampliar el espacio superior.")
+            # Para Categorical, no hay un límite "numérico" pero puedes agregar alguna lógica si es necesario.
+
+def default_scoring(num_classes, verbose: int = 0):
+    """
+    Asigna un valor default a scoring
+
+    # Parameters
+        num_classes: Cantidad de clases de variable respuesta
+    
+    # Return
+        scoring: Metrica a utilizar en evaluacion para determinar mejor combinacion de hiperparametros. 
+    """
+    # Si la variable respuesta es discreta
+    if num_classes <= 5:
+        scoring = 'accuracy'
+    # Si la variable respuesta es continua
+    else:
+        scoring = 'neg_mean_squared_error'
+    
+    if verbose >= 1:
+        logger.info(f"Nº clases: {num_classes} --> Scoring: {scoring}")
+
+    return scoring
+
+def space_params(model_name, bayes, verbose: int = 0):
+    """
+    Defino hiperparametros a probar por modelo.
+
+    # Parameters
+        model_name: Nombre del modelo (e.g. LogisticRegression, SVC, etc) (str)
+        bayes: True para usar BayesSearchCV y false para usar GridSearchCV (bool)
+
+    # Return
+        params: Parametros a evaluar para el modelo dado (list o dict)
+    """
+    # Logistic
+    min_it, max_it = 100, 2000
+
+    d_params = {
+        'DecisionTreeClassifier': {
+            'criterion': ['entropy'],
+            'splitter': ['random', 'best'],
+            'max_depth': [None, 5, 7, 8, 10, 12, 14],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4],
+            'max_features': ['auto'],
+        },
+        'RandomForestClassifier': {
+            'n_estimators': Integer(100, 500) if bayes else [100, 500],
+            'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
+            'max_depth': Integer(3, 20) if bayes else [3, 5, 7, 10],
+            'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
+            # 'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
+            'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
+            'bootstrap': Categorical([True]) if bayes else [True, False] # False
+        },
+        'XGBClassifier': {
+            'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
+            'n_estimators': Integer(50, 120) if bayes else [100],  # Suele ganar con 100
+            'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
+            'max_depth': Integer(3, 20) if bayes else [3, 5, 10],
+            'gamma': Real(0, 1) if bayes else [0],
+            'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
+            'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
+            'alpha': Real(0, 10) if bayes else [0.001],
+            'lambda': Real(0, 10) if bayes else [0.001],
+            'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
+            'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
+            # 'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
+            # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
+        },
+        'GradientBoostingClassifier': { # Tarda muchisimo en entrenar a pesar de usar Bayes optimazation
+            'n_estimators': Integer(100, 300) if bayes else [100], 
+            'learning_rate': Real(0.001, 0.1) if bayes else [0.001, 0.01, 0.1],
+            'max_depth': Integer(3, 12) if bayes else [3, 5],
+            'min_samples_split': Integer(2, 8) if bayes else [2, 5, 10],  # Minimo 2.
+            'min_samples_leaf': Integer(2, 5) if bayes else [2, 4], 
+            'subsample': Real(0.7, 1.0) if bayes else [0.8, 1.0],
+            # 'max_features': ['auto'],
+            # 'loss': ['deviance']
+        },
+        'LogisticRegression': [
+            {'penalty': Categorical([None]) if bayes else [None], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}, # 'sag' --> ConvergenceWarning (talvez por la escala)
+            {'penalty': Categorical(['l2']) if bayes else ['l2'], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}, # , 'sag' --> ConvergenceWarning (talvez por la escala)
+            {'penalty': Categorical(['l1']) if bayes else ['l1'], 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [1000]},
+            {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}
+        ],
+        'SVC': {
+            'C': Real(0.1, 1) if bayes else [0.1, 0.5, 1],
+            'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'],
+            'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
+            'coef0': Real(0.0, 0.5) if bayes else [0.0, 0.5],
+            'shrinking': Categorical([True, False]) if bayes else [True, False],
+            'probability': Categorical([True]) if bayes else [True],
+            # 'class_weight': Categorical(['balanced', None]) if bayes else ['balanced', None],
+            'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
+        },
+        'MLPClassifier': {
+            # 'hidden_layer_sizes': Categorical([(50,), (100,)]) if bayes else [(50,), (100,)], # Tiene problema.
+            'hidden_layer_sizes': Categorical([50, 100]) if bayes else [50, 100], # 50 va bien
+            'activation': Categorical(['logistic', 'relu']) if bayes else ['logistic', 'relu'], # logistic va.
+            'solver': Categorical(['adam']) if bayes else ['adam'],
+            'alpha': Real(0.0001, 0.001) if bayes else [0.0001, 0.001],
+            'learning_rate_init': Real(0.01, 0.1) if bayes else [0.01, 0.1],
+            'max_iter': Integer(500, 1000) if bayes else [500, 1000],
+            'early_stopping': Categorical([True, False]) if bayes else [True, False]
+        },
+        'PCA': {
+            'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
+            'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
+            'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
+            'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
+            'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
+            'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
+        },
+        'Lasso': {
+            'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
+            'fit_intercept': [True, False],  # Indica si se debe ajustar un intercepto (término independiente) en el modelo.
+            'precompute': [True, False],  # Indica si se deben precalcular las matrices de productos internos para acelerar el ajuste del modelo.
+            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para converger durante el ajuste del modelo.
+            'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
+            'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
+        },
+        'RandomForestRegressor': {
+            'bootstrap': Categorical([True]) if bayes else [True], # False
+            'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
+            'max_depth': Integer(3, 30) if bayes else [3, 5, 10],  # 30
+            'n_estimators': Integer(100, 300) if bayes else [100, 200, 300],
+            'min_samples_split': Integer(5, 50) if bayes else [10, 50] # Mayor o igual a 2 
+            # 'verbose': Categorical([0]) if bayes else [0]
         }
-        
-        # Obtengo el nombre del modelo para poder buscar sus hiperparametros
-        model_name = str(model)[:str(model).find('(')]
-        # print(f"Hiperparametros a probar: {params[model_name]}")
+    }
 
-        # Busco hiperpamateros default a probar
-        params = d_params[model_name]
+    # Busco hiperpamateros default a probar
+    params = d_params[model_name]
 
-    # Crear el objeto GridSearchCV
-    grid_search = GridSearchCV(estimator=model, param_grid=params, cv=k)
+    if verbose >= 1:
+        logger.info(f"Hiperparametros a probar: {params}")
 
-    # Ajustar el objeto GridSearchCV a los datos de entrenamiento
-    grid_search.fit(X, y)
+    return params
 
-    # Obtener los mejores hiperparámetros
-    best_params = grid_search.best_params_
+def determine_n_iter(num_samples, num_hyperparameters, verbose: int = 0):
+    """
+    Determina el número de iteraciones para BayesSearchCV basado en el tamaño del conjunto de datos
+    y el número de hiperparámetros a optimizar.
 
-    # Actualizar los hiperparámetros de model con los mejores hiperparámetros encontrados
-    model.set_params(**best_params)
-    if _print:
-        end = time.time()
-        print("\tMejores hiperparametros:", model)
-        print(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
-    return model
+    # Parameters
+        num_samples: Número de muestras en el conjunto de datos. (int)
+        num_hyperparameters: Número de hiperparámetros a optimizar. (int)
 
-def bayer_optimization_hiperparameters(model, X, y, k): # No probada
-    # import optuna
-    # from sklearn.model_selection import train_test_split
+    # Return
+        n_iter: Número sugerido de iteraciones (n_iter).
+    """
+    mult_iter, mult_hip = 0.01, 5 # 0.05, 7
+    min_iter, max_iter = 50, 200
 
-    def objective(trial):
-        params = {
-            'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
-            'max_depth': trial.suggest_int('max_depth', 3, 15),
-            'learning_rate': trial.suggest_uniform('learning_rate', 0.01, 0.3)
-        }
+    # Determinar n_iter basado en el tamaño del conjunto de datos
+    n_iter_reg = int(mult_iter * num_samples)
 
-        # Inicializa el modelo con los hiperparámetros sugeridos por Optuna
-        model_instance = model(**params)
-        model_instance.fit(X_train, y_train)
-        
-        # Realiza predicciones en el conjunto de prueba
-        y_pred = model_instance.predict(X_test)
-        
-        # Calcula la métrica de evaluación (en este caso, precisión)
-        score = accuracy_score(y_test, y_pred)
-        return score
+    # Ajustar n_iter según el número de hiperparámetros
+    n_iter_hip = mult_hip * num_hyperparameters  # Aumentar por cada hiperparámetro
+    n_iter = n_iter_reg + n_iter_hip
 
-    # Divide los datos en conjunto de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    if verbose >= 1:
+        logger.info(f"n_reg: {n_iter_reg} (={num_samples} * {mult_iter}) + n_hip: {n_iter_hip} (={num_hyperparameters} * {mult_hip}) = {n_iter}")
 
-    # Inicializa el estudio de Optuna
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=50)  # Número de iteraciones de búsqueda
+    return min(max(n_iter, min_iter), max_iter) # Asegurarse de que n_iter sea al menos 50
 
-    # Imprime los mejores hiperparámetros encontrados
-    print("Mejores hiperparámetros:", study.best_params)
+def compare_tunners(bayes_search, grid_search, verbose: int = 0):
+    """
+    Comparacion de mejores modelos de cada search y seleccion del mejor.
 
-     # Obtiene los mejores hiperparámetros encontrados
-    best_params = study.best_params
+    # Parameters:
+        bayes_search: Elemento BayesSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (BayesSearchCV)
+        grid_search: Elemento GridSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (GridSearchCV)
+    
+    # Return
+        best_search: Elemento GridSearchCV / BayesSearchCV segun el que sea mejor. (BayesSearchCV o GridSearchCV)
+    """
+    # Hago Bayes y Grid
+    metric1 = bayes_search.best_score_
+    metric2 = grid_search.best_score_
 
-    # Inicializa el modelo con los mejores hiperparámetros
-    best_model = model(**best_params)
-    return best_model
+    # Comparacion y seleccion del mejor
+    if metric1 > metric2:
+        dif = (metric1 - metric2) / abs(metric2) * 100
+        ganador, best_search = "BayesSearch", bayes_search
+        if verbose >= 1:
+            logger.critical(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
+    else:
+        dif = (metric2 - metric1) / abs(metric1) * 100
+        ganador, best_search= "GridSearch", grid_search
+        if verbose >= 1:
+            logger.error(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
+
+    return best_search
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
     """
     Realiza cross validation para evaluar el rendimiento del modelo entrenado.
 
-    :param model: Modelo de Machine Learning. (sklearn.ensemble)
-    :param X_train: Dataframe de entrenamiento con variables predictoras. (DataFrame)
-    :param y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
-    :param k: Numero de folds. (int)
-    :return: Precision promedio de la validación cruzada. (float)
+    # Parameters
+        model: Modelo de Machine Learning. (sklearn.ensemble)
+        X_train: Dataframe de entrenamiento con variables predictoras. (DataFrame)
+        y_train: Dataframe de entrenamiento solo con variable respuesta. (DataFrame)
+        k: Numero de folds. (int)
+
+    # Return
+        cv_accuracy: Precision promedio de la validación cruzada. (float)
     """
     # Definicion de variables
     scores, rois = [], []

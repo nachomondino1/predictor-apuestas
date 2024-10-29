@@ -5,7 +5,7 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
 from random import randint
 
-def balance_dataset(X, y, bal_type: str):
+def balance_dataset(X, y, bal_type: str, verbose: int = 0):
     """
     Balanceo de datos
     # Parameters
@@ -26,10 +26,12 @@ def balance_dataset(X, y, bal_type: str):
         X_bal, y_bal = undersampler.fit_resample(X, y)
 
     else:
-        print("El bal_type ingresado para balancear los datos no es una opcion")
+        if verbose >= 0:
+            print("El bal_type ingresado para balancear los datos no es una opcion")
         raise ValueError(f"Error: El bal_type de balanceo '{bal_type}', no es una opcion")
 
-    print(f"Shape X e y antes de balanceo y despues: \n X: {X.shape} --> {X_bal.shape} \n y: {y.shape} --> {y_bal.shape} ")
+    if verbose >= 1:
+        print(f"Shape X e y antes de balanceo y despues: \n X: {X.shape} --> {X_bal.shape} \n y: {y.shape} --> {y_bal.shape} ")
     return X_bal, y_bal
 
 def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=True):

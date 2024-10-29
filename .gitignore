@@ -32,7 +32,4 @@ old_train_iterations/
 old_assess_iterations/
 # Deployment
 --missing/
-
-# Temporal
-2024-10-05/
-2024-10-03 (Sin SVC)/
+descarte/

@@ -1161,14 +1161,12 @@ if __name__ == "__main__":
     env = os.getenv('ENVIRONMENT')
 
     if env == 'dev':
-        # Definir condiciones del análisis
-        id_country = 55  # 55, 48, 167?
-        n_days = 15
+
+        n_days = 4
         n_seasons_missing = 1
         extract_missing = True
-        n_days_fill_data = 360  # Usaba 150 pero era muy largo para el inicio de la temporada y le daba demasiado peso a la formacion de la temporada anterior. 
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
@@ -1181,5 +1179,12 @@ if __name__ == "__main__":
         n_days_fill_data = 60
         directorio = "data/"
 
-    df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, extract_missing=extract_missing, n_days_fill_data=n_days_fill_data, export=d_run['export'])
-    df.to_excel(f"{directorio}/predicciones.xlsx")
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [148]
+
+    # Definir condiciones del análisis
+    for id_country in l_countries:
+        n_days_fill_data = 360 if id_country == 55 else 60  # Para FRA uso 360 porque no llega a minimos para integrar var de jugadores.
+
+        df = main(d_run, id_country, n_days, n_seasons_missing=n_seasons_missing, extract_missing=extract_missing, n_days_fill_data=n_days_fill_data, export=d_run['export'])
+        df.to_excel(f"{directorio}/predicciones.xlsx")
