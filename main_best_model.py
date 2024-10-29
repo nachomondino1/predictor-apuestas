@@ -26,7 +26,7 @@ def save_old_assess():
     directories.make_directories([directorio_destino])
     directories.mover_archivo(directorio_origen, directorio_destino)
 
-def select_best_model(df, ruta_assess_2, thr_distrib=0.35):
+def select_best_model(df, ruta_assess_2, country, thr_distrib=0.35):
     """
     Selecciona el mejor modelo
     """
@@ -41,7 +41,7 @@ def select_best_model(df, ruta_assess_2, thr_distrib=0.35):
     logger.info(df_top_rois)
 
     # 2) Selecciono modelos con ROI creciente
-    df_top_rois_filt = roi_creciente(df_top_rois)
+    df_top_rois_filt = roi_creciente(df_top_rois, country)
 
     # Analisis de distribucion
     df_best = df_top_rois_filt.copy()
@@ -83,11 +83,18 @@ def select_best_model(df, ruta_assess_2, thr_distrib=0.35):
     best_model = df_best[df_best['roi_por_partido']==df_best['roi_por_partido'].max()]
     return best_model, df_best
 
-def roi_creciente(df_top_rois):
-    # Calcular % ROI
-    col_to_use = 'roi_50'  # Para FRA: col_to_use = 'roi_50'
-    df_top_rois['% ROI 100'] = (df_top_rois['roi_por_partido'] - df_top_rois[col_to_use]) / abs(df_top_rois[col_to_use])
-    df_top_rois_filt = df_top_rois[df_top_rois['% ROI 100'] >= 0]
+def roi_creciente(df_top_rois, country):
+    """
+    Calcular % ROI
+    """
+    # Determino desde cuando calcular el % ROI
+    col_to_use = 'roi_50' if country == 'france' else 'roi_100'  # Para FRA: col_to_use = 'roi_50'
+    new_col = f'% {col_to_use}'
+    logger.info(f"Columna usada: {col_to_use}")
+
+    # Calculo % ROI
+    df_top_rois[new_col] = (df_top_rois['roi_por_partido'] - df_top_rois[col_to_use]) / abs(df_top_rois[col_to_use])
+    df_top_rois_filt = df_top_rois[df_top_rois[new_col] >= 0]
 
     # ROIpp 50 < ROIpp 100 < ROIpp 150 y asi. --> ROI creciente (en la realidad no es tan asi... no siempre son lineales...)
     '''
@@ -154,7 +161,7 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
     df_ite_test_prod = assess_models_in_prod.main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, export=export)
 
     # Selecciono el mejor modelo (mayor roi por partido en produccion)
-    best_model, df_best = select_best_model(df_ite_test_prod, ruta_assess_2)
+    best_model, df_best = select_best_model(df_ite_test_prod, ruta_assess_2, country)
     df_best.to_excel(f'{ruta_base_mod}/df_best_model.xlsx') # Los mejores modelos
     pickle.dump(best_model, open(f"{ruta_base_mod}/best_model.pkl", "wb"))
 
@@ -175,19 +182,20 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 59
+    id_country = 77
     continue_old_train = False
 
     # Determina date de la iteracion
     if continue_old_train:
         date = '2024-10-13'
     else:
-        date_con_hora = datetime.datetime.now()
+        date_con_hora = datetime.datetime.now()  # + datetime.timedelta(days=1) --> Si queres correr 2 el mismo dia. No funciona aun.
         date = date_con_hora.date()
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
+    l_modelos = [LogisticRegression(), 'neural_network', SVC()] # XGBClassifier()
+    # l_modelos = [LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
     # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier() # Pruebo red neuroanl segun precision y no recall
     # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()]
     # l_modelos = [XGBClassifier()]
@@ -214,38 +222,11 @@ if __name__ == "__main__":
         'modeling': {
             'val_size': [0.125],
             'test_size': [0.10], 
-            'bal_type': ['under'], # None,
+            'bal_type': ['under'], # None (En ger?)
             'k': [5] 
         }
     }
     rows_to_features_min = 10      # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-
-    d_params_2 = {  
-        'construct': {
-            'n_dias_ult_part': [[90], [30, 180]], 
-            'n_years_h2h': [3],
-            'segun_localia': [False, True],
-            'dif_con_against': [False, True]
-        },
-        'clean_data_2': {
-            'competencies_to_select': [d_comps['all_comp']],
-            'n_years_to_select': [5, 10], #3,  None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años)
-        },
-        'select': {
-            'thr_corr': [0.7, None], 
-            'thr_fs': [0.5, None], # Usar None y no 0 para evitar calcular importancias
-        },
-        'treat_nan': {
-            'fill_na': [None], #'ml'
-        },
-        'modeling': {
-            'val_size': [0.10],
-            'test_size': [0.10], 
-            'bal_type': ['under'],
-            'k': [10] 
-        }
-    }
-
     logger.info(f"Parametros para entrenar: {d_params}")
 
     ## Obtengo el nombre del pais segun su id
