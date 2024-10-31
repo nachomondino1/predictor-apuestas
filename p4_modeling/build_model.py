@@ -6,7 +6,7 @@ from set_up_logging import logger
 import warnings
 # Grid y Bayes
 from sklearn.model_selection import PredefinedSplit, GridSearchCV
-from sklearn.metrics import accuracy_score  # Metrica de precision
+from sklearn.metrics import make_scorer, accuracy_score, f1_score, log_loss
 from skopt import BayesSearchCV
 from skopt.space import Real, Integer, Categorical
 # Red neuronal
@@ -15,11 +15,12 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.regularizers import l2 
-from tensorflow.keras.metrics import Recall
+from tensorflow.keras.metrics import Precision, Recall
 from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 # from scikeras.wrappers import KerasClassifier
+import gc
 
 
 class TrainNeuralNetwork():
@@ -29,9 +30,28 @@ class TrainNeuralNetwork():
 
     def create_neural_network(self, input_shape, output_shape, activation='relu', hidden_layer_sizes=[50, 100], 
                           optimizer='adam', learning_rate=0.001, kernel_regularizer=0.001, 
-                          batch_normalization=False, dropout_rate=None, metrics=['accuracy']):
+                          batch_normalization=False, dropout_rate=None, metrics=['accuracy', Precision(), Recall()]):
         """
         Creación de la arquitectura de la red neuronal y del modelo.
+
+        # Parameters
+            input_shape: Número de neuronas en la capa de entrada, igual al número de variables predictoras (int).
+            output_shape: Número de neuronas en la capa de salida, generalmente 1 para regresión o igual al número de clases en clasificación (int).
+            activation: Función de activación para las capas ocultas (str, default='relu').
+                Ejemplos: 'relu', 'sigmoid', 'tanh', 'softmax', etc.
+            hidden_layer_sizes: Lista que define la cantidad de neuronas en cada capa oculta (list).
+                Ejemplo: [50, 100] crea dos capas ocultas con 50 y 100 neuronas respectivamente.
+            optimizer: Optimizador utilizado para entrenar la red (str o keras.optimizers).
+                Ejemplo: 'adam', 'sgd', 'rmsprop', o un objeto de optimizador de Keras.
+            learning_rate: Tasa de aprendizaje para el optimizador (float, default=0.001).
+            kernel_regularizer: Coeficiente de regularización L2 para reducir el sobreajuste (float, default=0.001).
+            batch_normalization: Si es True, añade capas de normalización por lotes después de cada capa oculta (bool, default=False).
+            dropout_rate: Proporción de neuronas a desactivar en cada capa durante el entrenamiento para evitar sobreajuste (float, default=None).
+                Ejemplo: dropout_rate=0.5 mantendrá el 50% de las neuronas activas en cada paso.
+            metrics: Lista de métricas para evaluar el rendimiento del modelo (list, default=['accuracy', Precision(), Recall()]).
+
+        # Return
+            model: El modelo de red neuronal compilado y listo para entrenarse.
         """
         model = Sequential()
         
@@ -72,7 +92,21 @@ class TrainNeuralNetwork():
      
     def select_best_arquitecture(self, X_train, y_train, X_val, y_val, epochs=20, batch_size=32, verbose: int = 0):
         """
-        Entrenamiento de redes neuronales y seleccion de la mejor
+        Entrena múltiples arquitecturas de redes neuronales y selecciona la mejor según su desempeño en los datos de validación.
+
+        # Parameters
+            X_train: Conjunto de entrenamiento para las variables predictoras (DataFrame o array).
+            y_train: Conjunto de entrenamiento para la variable respuesta (DataFrame o array).
+            X_val: Conjunto de validación para las variables predictoras, usado para evaluar el rendimiento (DataFrame o array).
+            y_val: Conjunto de validación para la variable respuesta (DataFrame o array).
+            epochs: Número de épocas para entrenar cada arquitectura de red (int, default=20).
+            batch_size: Tamaño de los lotes para el entrenamiento (int, default=32).
+            verbose: Nivel de detalle de la salida durante el entrenamiento; 0 = silencioso, 1 = detallado, 2 = una barra de progreso por época (int, default=0).
+
+        # Return
+            best_model: Modelo de red neuronal con el mejor rendimiento en los datos de validación.
+            best_params: Diccionario con los parámetros de la arquitectura seleccionada.
+            best_score: Mejor puntaje obtenido en los datos de validación (ej. accuracy, F1, etc., dependiendo de la métrica definida).
         """
         start = time.time()
 
@@ -81,7 +115,7 @@ class TrainNeuralNetwork():
 
         # Hiperparametros de arquitectura
         param_grid = { 
-                    'hidden_layer_sizes': [[100], [128, 64], [128, 64, 32], [256, 128, 64]], # [100], [50], [100, 50], [64, 32], [100, 100], [1024, 512, 256],  [512, 256, 128, 64] (no gana y encima creo que es la causa del kill...)
+                    'hidden_layer_sizes': [[50], [100], [64, 32], [128, 64], [128, 64, 32]], # , [100, 50], [64, 32], [100, 100], [256, 128, 64], [1024, 512, 256],  [512, 256, 128, 64] (no gana y encima creo que es la causa del kill...)
                     'learning_rate': [0.01, 0.1], # 0.001,
                     'activation': ['relu'], #  'tanh'
                     'optimizer': ['adam'], #  'sgd']
@@ -105,6 +139,7 @@ class TrainNeuralNetwork():
 
         # Iterar sobre cada combinación
         for params in param_combinations:
+            
             # Emparejar cada parámetro con su nombre desde `param_grid`
             param_dict = dict(zip(param_grid.keys(), params))
 
@@ -119,29 +154,40 @@ class TrainNeuralNetwork():
             history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
             
             # Evaluar en el set de validación
-            val_loss, val_acc = model.evaluate(X_val, y_val_categorical, verbose=0)
+            val_loss, val_acc, val_precision, val_recall = model.evaluate(X_val, y_val_categorical, verbose=verbose)
+            val_f1 = 2 * val_precision * val_recall / (val_precision + val_recall) if (val_precision + val_recall) > 0 else 0  # Accuracy NO.
 
             results.append({
                 'params': params,
                 **param_dict,
                 'val_loss': val_loss,
                 'val_acc': val_acc,
+                'val_precision': val_precision,
+                'val_recall': val_recall,
+                'val_f1': val_f1, 
                 'model': model,
                 # 'history': history # &lt;keras.src.callbacks.history.History object at 0x34f4a3e30&gt;
             })
 
+            # Limpiar recursos (x memoria RAM)
+            del model
+            gc.collect()
+
+        # Calculo metrica combinada entre f1_score y val_loss
+        results = combined_metric(results)
+
         # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
-        best_result = min(results, key=lambda x: x['val_loss'])
+        best_result = min(results, key=lambda x: x['combined_metric'])  # best_result = min(results, key=lambda x: x['val_loss'])  # best_result = max(results, key=lambda x: x['val_f1']) 
 
         # Imprimo rdos
         end = time.time()
 
         if verbose >= 0:
-            logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']}")
+            logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']} Val f1: {best_result['val_f1']}")
             logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
 
         return best_result['model'], best_result['params'], best_result['val_acc'], pd.DataFrame(results)
-
+    
 
 def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
                                 scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
@@ -186,9 +232,9 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
 
         if n_iter is None:
             # Calcular iteraciones basadas en el tamaño del dataset
-            d_n_hip = {'RandomForestClassifier': 3, 'XGBClassifier': 5, 'LogisticRegression': 1, 'RandomForestRegressor': 1, 'SVC': 1} # automatizar
-            n_iter = determine_n_iter(len(X_val_train), d_n_hip[model_name], verbose=verbose)
-            # n_iter = 5
+            # d_n_hip = {'RandomForestClassifier': 3, 'XGBClassifier': 5, 'LogisticRegression': 1, 'RandomForestRegressor': 1, 'SVC': 1} # automatizar
+            num_hyperparameters = 1 # d_n_hip[model_name]
+            n_iter = determine_n_iter(num_samples=len(X_val_train), num_hyperparameters=num_hyperparameters, verbose=verbose)
 
         with warnings.catch_warnings():  # Logistic te vuelve loco --> no funciona.
             warnings.simplefilter("ignore")  # Ignora todas las advertencias
@@ -219,7 +265,7 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
             grid_search = GridSearchCV(estimator=model, param_grid=params_grid, cv=pds, scoring=scoring)
 
             # Ajustar el objeto GridSearchCV a los datos de entrenamiento
-            grid_search.fit(X_val_train, y_val_train)
+            grid_search.fit(X_val_train, y_val_train)  # Esta ok X_val_train y y_val_train
             best_search = grid_search
  
         # Obtener los mejores hiperparámetros
@@ -251,6 +297,113 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
 
     return best_model, best_params, best_metric, results
 
+def default_scoring(num_classes, verbose: int = 0):
+    """
+    Asigna un valor default a scoring según la variable respuesta.
+
+    # Parameters
+        num_classes: Cantidad de clases de variable respuesta.
+    
+    # Return
+        scoring: Métrica a utilizar en evaluación para determinar la mejor combinación de hiperparámetros.
+    """
+    # Variable respuesta discreta
+    if num_classes <= 5:
+        scoring = 'f1_macro'  # Usar métrica combinada en clasificación multiclase con <= 5 clases
+    # Variable respuesta continua
+    else:
+        scoring = 'neg_mean_squared_error'  # Regresión con MSE para variables continuas
+    
+    if verbose >= 1:
+        logger.info(f"Nº clases: {num_classes} --> Metrica por default: {scoring}")
+
+    return scoring
+
+def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
+                                scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
+    
+    """
+    Determinar mejor scoring method para seleccionar los hiperparametros optimos
+    """
+    results = []
+    if len(np.unique(y_train)) <= 5:
+        scoring_methods = {
+            "f1_macro": "f1_macro",
+            "f1_micro": "f1_micro",
+            "f1_weighted": "f1_weighted",
+            "log_loss": "neg_log_loss",
+            "accuracy": "accuracy",
+        }
+    else:
+        scoring_methods = {"neg_mean_squared_error": "neg_mean_squared_error"}
+
+    # Por metrica
+    for name, scoring in scoring_methods.items():
+        logger.info(f"Metrica: {scoring}")
+
+        # Selecciono mejor combinacion de hiperparametros segun metrica
+        best_estim, best_params, best_score, cv_res = select_best_hiperparameters(model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=bayes, scoring=scoring, verbose=1)
+
+        # Evaluar en el conjunto de validación
+        y_val_pred = best_estim.predict(X_val)
+        y_val_pred_proba = best_estim.predict_proba(X_val)
+
+        # Calcular métricas en el conjunto de validación
+        val_f1_macro = f1_score(y_val, y_val_pred, average="macro")
+        val_f1_weighted = f1_score(y_val, y_val_pred, average="weighted")
+        val_accuracy = accuracy_score(y_val, y_val_pred)
+        val_log_loss = log_loss(y_val, y_val_pred_proba)
+        
+        # Registro de resultados
+        results.append({
+            "scoring": name,
+            'val_f1': val_f1_macro,
+            "val_f1_weighted": val_f1_weighted,
+            "val_accuracy": val_accuracy,
+            "val_loss": val_log_loss,
+            "best_score_val": best_score,
+            'best_model': best_estim,
+            "best_params": best_params
+        })
+
+    # Calculo metrica combinada entre f1_score y val_loss
+    results = combined_metric(results)
+
+    # Aquí podrías normalizar los valores o ponderar las métricas, si es necesario
+    results_df = pd.DataFrame(results)
+    logger.info("\nComparación de Métricas:\n" + results_df.to_string())
+
+    # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
+    best_scoring_row = results_df.loc[results_df["combined_metric"].idxmin()]
+
+    # Obtener el mejor modelo y parámetros
+    best_scoring = best_scoring_row['scoring']
+    logger.critical(f"Mejor Scoring: {best_scoring}")
+    best_model = best_scoring_row['best_model']
+    best_score = best_scoring_row['best_score_val']
+    best_params = best_scoring_row['best_params']
+    logger.info(f"Score: {best_score} Params: {best_params}")
+
+    # results_df.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")
+    return best_model, best_params, best_score, results_df, best_scoring
+
+def combined_metric(results):
+    # Obtener los valores mínimo y máximo de cada métrica para escalar y evitar divisiones por cero
+    min_loss, max_loss = min(r['val_loss'] for r in results), max(r['val_loss'] for r in results)
+    min_f1, max_f1 = min(r['val_f1'] for r in results), max(r['val_f1'] for r in results)
+    
+    # Si max_loss == min_loss, el rango sería cero; en tal caso, forzamos el denominador a 1
+    loss_range = max_loss - min_loss if max_loss > min_loss else 1
+    f1_range = max_f1 - min_f1 if max_f1 > min_f1 else 1
+
+    # Crear una métrica combinada normalizada en results
+    for result in results:
+        normalized_loss = (result['val_loss'] - min_loss) / loss_range
+        normalized_f1 = (result['val_f1'] - min_f1) / f1_range
+        result['combined_metric'] = normalized_loss - normalized_f1  # Minimizar esta métrica
+    
+    return results
+
 def check_best_params_limits(best_params, space):
     for param, value in best_params.items():
         # Obtiene el rango del parámetro desde el espacio
@@ -269,28 +422,6 @@ def check_best_params_limits(best_params, space):
                     warnings.warn(f"El parámetro '{param}' ha tomado su valor máximo {max_val}. "
                                   f"Considera ampliar el espacio superior.")
             # Para Categorical, no hay un límite "numérico" pero puedes agregar alguna lógica si es necesario.
-
-def default_scoring(num_classes, verbose: int = 0):
-    """
-    Asigna un valor default a scoring
-
-    # Parameters
-        num_classes: Cantidad de clases de variable respuesta
-    
-    # Return
-        scoring: Metrica a utilizar en evaluacion para determinar mejor combinacion de hiperparametros. 
-    """
-    # Si la variable respuesta es discreta
-    if num_classes <= 5:
-        scoring = 'accuracy'
-    # Si la variable respuesta es continua
-    else:
-        scoring = 'neg_mean_squared_error'
-    
-    if verbose >= 1:
-        logger.info(f"Nº clases: {num_classes} --> Scoring: {scoring}")
-
-    return scoring
 
 def space_params(model_name, bayes, verbose: int = 0):
     """
@@ -319,23 +450,23 @@ def space_params(model_name, bayes, verbose: int = 0):
             'n_estimators': Integer(100, 500) if bayes else [100, 500],
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'max_depth': Integer(3, 20) if bayes else [3, 5, 7, 10],
-            'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
+            # 'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
             # 'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
-            'bootstrap': Categorical([True]) if bayes else [True, False] # False
+            'bootstrap': Categorical([True]) if bayes else [True] # False
         },
         'XGBClassifier': {
             'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
             'n_estimators': Integer(50, 120) if bayes else [100],  # Suele ganar con 100
             'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
-            'max_depth': Integer(3, 20) if bayes else [3, 5, 10],
-            'gamma': Real(0, 1) if bayes else [0],
-            'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
-            'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
-            'alpha': Real(0, 10) if bayes else [0.001],
-            'lambda': Real(0, 10) if bayes else [0.001],
-            'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
-            'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
+            'max_depth': Integer(3, 20) if bayes else [5, 10], # 3, 
+            # 'gamma': Real(0, 1) if bayes else [0],
+            # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
+            # 'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
+            # 'alpha': Real(0, 10) if bayes else [0.001],
+            # 'lambda': Real(0, 10) if bayes else [0.001],
+            # 'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
+            # 'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
             # 'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
         },
@@ -356,11 +487,11 @@ def space_params(model_name, bayes, verbose: int = 0):
             {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}
         ],
         'SVC': {
-            'C': Real(0.1, 1) if bayes else [0.1, 0.5, 1],
+            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1],
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'],
-            'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
-            'coef0': Real(0.0, 0.5) if bayes else [0.0, 0.5],
-            'shrinking': Categorical([True, False]) if bayes else [True, False],
+            # 'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
+            # 'coef0': Real(0, 1) if bayes else [0.0, 0.5],
+            # 'shrinking': Categorical([True, False]) if bayes else [True, False],
             'probability': Categorical([True]) if bayes else [True],
             # 'class_weight': Categorical(['balanced', None]) if bayes else ['balanced', None],
             'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
@@ -394,9 +525,9 @@ def space_params(model_name, bayes, verbose: int = 0):
         'RandomForestRegressor': {
             'bootstrap': Categorical([True]) if bayes else [True], # False
             'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
-            'max_depth': Integer(3, 30) if bayes else [3, 5, 10],  # 30
-            'n_estimators': Integer(100, 300) if bayes else [100, 200, 300],
-            'min_samples_split': Integer(5, 50) if bayes else [10, 50] # Mayor o igual a 2 
+            'max_depth': Integer(3, 30) if bayes else [5, 10],  # 30 # 3
+            'n_estimators': Integer(100, 300) if bayes else [100, 300],
+            # 'min_samples_split': Integer(5, 50) if bayes else [10, 50] # Mayor o igual a 2 
             # 'verbose': Categorical([0]) if bayes else [0]
         }
     }
