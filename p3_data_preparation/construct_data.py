@@ -461,15 +461,43 @@ def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str,
 
     # Calculo diferencia entre local y visitante
     if calculate_dif:
-        not_none_condition = (df[f'mean_last_{n_days}_matches_{variable}_home'].notnull()) & (df[f'mean_last_{n_days}_matches_{variable}_away'].notnull())
-        df[f'dif_mean_last_{n_days}_matches_{variable}'] = np.where(not_none_condition, df[f'mean_last_{n_days}_matches_{variable}_home'] - df[f'mean_last_{n_days}_matches_{variable}_away'], np.nan)
-        df = df.drop(columns=[f'mean_last_{n_days}_matches_{variable}_home', f'mean_last_{n_days}_matches_{variable}_away'], axis=1)
+
+        # Crear las condiciones de no nulidad para las columnas home y away
+        not_none_condition = (
+            df[f'mean_last_{n_days}_matches_{variable}_home'].notnull() & 
+            df[f'mean_last_{n_days}_matches_{variable}_away'].notnull()
+        )
+
+         # Calcular la diferencia solo donde no hay NaN y asignarla en una columna nueva
+        df[f'dif_mean_last_{n_days}_matches_{variable}'] = np.where(
+            not_none_condition,
+            df[f'mean_last_{n_days}_matches_{variable}_home'] - df[f'mean_last_{n_days}_matches_{variable}_away'],
+            np.nan
+        )
+
+        # Hacer una copia del DataFrame antes de eliminar las columnas
+        df = df.copy()
+        df.drop(columns=[f'mean_last_{n_days}_matches_{variable}_home', f'mean_last_{n_days}_matches_{variable}_away'], inplace=True)
 
         # Calculo diferencia entre local y visitante against
         if not dif_con_against:
-            not_none_condition_2 = (df[f'mean_last_{n_days}_matches_{variable}_home_against'].notnull()) & (df[f'mean_last_{n_days}_matches_{variable}_away_against'].notnull())
-            df[f'dif_mean_last_{n_days}_matches_{variable}_against'] = np.where(not_none_condition_2, df[f'mean_last_{n_days}_matches_{variable}_home_against'] - df[f'mean_last_{n_days}_matches_{variable}_away_against'], np.nan)
-            df = df.drop(columns=[f'mean_last_{n_days}_matches_{variable}_home_against', f'mean_last_{n_days}_matches_{variable}_away_against'], axis=1)
+            
+            # Crear las condiciones de no nulidad para las columnas home y away "against"
+            not_none_condition_2 = (
+                df[f'mean_last_{n_days}_matches_{variable}_home_against'].notnull() &
+                df[f'mean_last_{n_days}_matches_{variable}_away_against'].notnull()
+            )
+            
+            # Calcular la diferencia solo donde no hay NaN y asignarla en una columna nueva
+            df[f'dif_mean_last_{n_days}_matches_{variable}_against'] = np.where(
+                not_none_condition_2,
+                df[f'mean_last_{n_days}_matches_{variable}_home_against'] - df[f'mean_last_{n_days}_matches_{variable}_away_against'],
+                np.nan
+            )
+            
+            # Hacer una copia del DataFrame antes de eliminar las columnas
+            df = df.copy()
+            df.drop(columns=[f'mean_last_{n_days}_matches_{variable}_home_against', f'mean_last_{n_days}_matches_{variable}_away_against'], inplace=True)
 
     return df
 
