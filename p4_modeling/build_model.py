@@ -13,14 +13,13 @@ from skopt.space import Real, Integer, Categorical
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input, Dropout, BatchNormalization
-from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras.optimizers import Adam, SGD, RMSprop
 from tensorflow.keras.regularizers import l2 
 from tensorflow.keras.metrics import Precision, Recall
 from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 # from scikeras.wrappers import KerasClassifier
-import gc
 
 
 class TrainNeuralNetwork():
@@ -30,7 +29,8 @@ class TrainNeuralNetwork():
 
     def create_neural_network(self, input_shape, output_shape, activation='relu', hidden_layer_sizes=[50, 100], 
                           optimizer='adam', learning_rate=0.001, kernel_regularizer=0.001, 
-                          batch_normalization=False, dropout_rate=None, metrics=['accuracy', Precision(), Recall()]):
+                          batch_normalization=False, dropout_rate=None, metrics=['accuracy', Precision(), Recall()], 
+                          verbose: int = 0):
         """
         Creación de la arquitectura de la red neuronal y del modelo.
 
@@ -54,17 +54,14 @@ class TrainNeuralNetwork():
             model: El modelo de red neuronal compilado y listo para entrenarse.
         """
         model = Sequential()
+        if verbose >= 1:
+            logger.info(f"Parametros a probar: {input_shape} {output_shape} {activation} {hidden_layer_sizes} {optimizer} {learning_rate} {kernel_regularizer} {batch_normalization} {dropout_rate} {metrics}")
         
         # First layer
         model.add(Input(shape=(input_shape,)))
-        model.add(Dense(hidden_layer_sizes[0], activation=activation, kernel_regularizer=l2(kernel_regularizer)))
-        
-        # Dropout opcional en la primera capa
-        if dropout_rate:
-            model.add(Dropout(dropout_rate))
-
-        # Hidden layers
-        for neurons in hidden_layer_sizes[1:]:
+  
+        # Por Hidden layers
+        for neurons in hidden_layer_sizes:
             model.add(Dense(neurons, activation=activation, kernel_regularizer=l2(kernel_regularizer)))
             
             # Dropout opcional en capas ocultas
@@ -81,7 +78,9 @@ class TrainNeuralNetwork():
         if optimizer == 'adam':
             opt = Adam(learning_rate=learning_rate)
         elif optimizer == 'sgd':
-            opt = SGD(learning_rate=learning_rate, momentum=0.9)  # Agregamos momentum
+            opt = SGD(learning_rate=learning_rate, momentum=0.9)
+        elif optimizer == 'rmsprop':
+            opt = RMSprop(learning_rate=learning_rate)
         else:
             raise ValueError(f"Optimizer '{optimizer}' not supported")
 
@@ -115,33 +114,34 @@ class TrainNeuralNetwork():
 
         # Hiperparametros de arquitectura
         param_grid = { 
-                    'hidden_layer_sizes': [[50], [100], [64, 32], [128, 64], [128, 64, 32]], # , [100, 50], [64, 32], [100, 100], [256, 128, 64], [1024, 512, 256],  [512, 256, 128, 64] (no gana y encima creo que es la causa del kill...)
-                    'learning_rate': [0.01, 0.1], # 0.001,
-                    'activation': ['relu'], #  'tanh'
-                    'optimizer': ['adam'], #  'sgd']
-                    'kernel_regularizer': [None, 0.01], # 0.001,
-                    'batch_normalization': [False], # True
-                    'dropout_rate': [0.2, None]
-                }
-        
+            'hidden_layer_sizes': [[50], [64, 32], [128, 64], [128, 64, 32]], # , [100, 50], [64, 32], [100, 100], [256, 128, 64], [1024, 512, 256],  [512, 256, 128, 64] (no gana y encima creo que es la causa del kill...)
+            'learning_rate': [0.01, 0.1],
+            'activation': ['relu', 'tanh'],
+            'optimizer': ['adam'],
+            'kernel_regularizer': [None, 0.01],
+            'batch_normalization': [False],
+            'dropout_rate': [0.2, None]
+        }
+
         # Generar combinaciones de parámetros automáticamente
         param_combinations = list(product(*param_grid.values()))
 
         # Convertir etiquetas a formato one-hot --> Evita error target y output con different shape. 
-        input_shape = X_train.shape[1]
-        output_shape = 3  # Estaria bueno que sea automatico
-        patience = int(epochs * 0.2)  # Por ejemplo, 20% de las épocas totales
+        input_shape, output_shape = X_train.shape[1], 3  # Estaria bueno que sea automatico
+        patience = int(epochs * 0.25)  # Por ejemplo, 20% de las épocas totales
         y_val_categorical = to_categorical(y_val, num_classes=output_shape)
         y_train_categorical = to_categorical(y_train, num_classes=output_shape)
 
         # Definir un callback de EarlyStopping
         early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+        # timeout_callback = TimeoutCallback(max_seconds=300)  # Definir el límite de tiempo (por ejemplo, 300 segundos) # No se si funciona y tampoco creo que esta sea la causa de que tarde mucho tiempo.
 
         # Iterar sobre cada combinación
         for params in param_combinations:
             
             # Emparejar cada parámetro con su nombre desde `param_grid`
             param_dict = dict(zip(param_grid.keys(), params))
+            # logger.warning(param_dict)
 
             # Creo red neuronal
             model = self.create_neural_network(
@@ -151,7 +151,7 @@ class TrainNeuralNetwork():
             )
 
             # Entrenar el modelo (usa el validation como test en vez de hacer cross val entre X_train)
-            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # verbose=0 para no imprimir epochs
+            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # timeout_callback
             
             # Evaluar en el set de validación
             val_loss, val_acc, val_precision, val_recall = model.evaluate(X_val, y_val_categorical, verbose=verbose)
@@ -169,10 +169,6 @@ class TrainNeuralNetwork():
                 # 'history': history # &lt;keras.src.callbacks.history.History object at 0x34f4a3e30&gt;
             })
 
-            # Limpiar recursos (x memoria RAM)
-            del model
-            gc.collect()
-
         # Calculo metrica combinada entre f1_score y val_loss
         results = combined_metric(results)
 
@@ -183,13 +179,31 @@ class TrainNeuralNetwork():
         end = time.time()
 
         if verbose >= 0:
-            logger.info(f"Params: {best_result['params']} =>  Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']} Val f1: {best_result['val_f1']}")
+            logger.info(f"Best arquitecture: {best_result['params']}")
+            logger.info(f"Metrics: Val loss: {best_result['val_loss']}  Val Accuracy: {best_result['val_acc']} Val f1: {best_result['val_f1']}")
             logger.info(f"\tSeleccion de hiperparametros optimos en {(end - start) / 60:.1f} minutos")
 
         return best_result['model'], best_result['params'], best_result['val_acc'], pd.DataFrame(results)
     
+class TimeoutCallback(tf.keras.callbacks.Callback):
+    def __init__(self, max_seconds):
+        super(TimeoutCallback, self).__init__()
+        self.max_seconds = max_seconds
+        self.start_time = None
 
-def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
+    def on_train_begin(self, logs=None):
+        # Registrar el tiempo de inicio del entrenamiento
+        self.start_time = time.time()
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Verificar el tiempo transcurrido
+        elapsed_time = time.time() - self.start_time
+        if elapsed_time > self.max_seconds:
+            print(f'\nEntrenamiento detenido: tiempo máximo de {self.max_seconds} segundos alcanzado.')
+            self.model.stop_training = True
+
+
+def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, 
                                 scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
     """
     Selecciona los mejores hiperparametros para un modelo.
@@ -325,7 +339,7 @@ def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: di
     """
     Determinar mejor scoring method para seleccionar los hiperparametros optimos
     """
-    results = []
+    results, models = [], []
     if len(np.unique(y_train)) <= 5:
         scoring_methods = {
             "f1_macro": "f1_macro",
@@ -361,6 +375,13 @@ def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: di
             "val_f1_weighted": val_f1_weighted,
             "val_accuracy": val_accuracy,
             "val_loss": val_log_loss,
+            # "best_score_val": best_score,
+            # 'best_model': best_estim,
+            # "best_params": best_params
+        })
+
+        models.append({
+            "scoring": name,
             "best_score_val": best_score,
             'best_model': best_estim,
             "best_params": best_params
@@ -371,21 +392,24 @@ def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: di
 
     # Aquí podrías normalizar los valores o ponderar las métricas, si es necesario
     results_df = pd.DataFrame(results)
+    results_df = results_df.sort_values(by='combined_metric', ascending=True)
+    models_df = pd.DataFrame(models)
     logger.info("\nComparación de Métricas:\n" + results_df.to_string())
 
     # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
     best_scoring_row = results_df.loc[results_df["combined_metric"].idxmin()]
-
-    # Obtener el mejor modelo y parámetros
     best_scoring = best_scoring_row['scoring']
     logger.critical(f"Mejor Scoring: {best_scoring}")
-    best_model = best_scoring_row['best_model']
-    best_score = best_scoring_row['best_score_val']
-    best_params = best_scoring_row['best_params']
-    logger.info(f"Score: {best_score} Params: {best_params}")
+
+    # Obtener el mejor modelo y parámetros
+    row = models_df[models_df['scoring'] == best_scoring].iloc[0]  # Usa iloc[0] para obtener la primera (y única) fila
+    best_model = row['best_model']
+    best_score = row['best_score_val']
+    best_params = row['best_params']
+    logger.info(f"Model: {best_model} Score: {best_score} Params: {best_params}")
 
     # results_df.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")
-    return best_model, best_params, best_score, results_df, best_scoring
+    return best_model, best_params, best_score, results_df # best_scoring
 
 def combined_metric(results):
     # Obtener los valores mínimo y máximo de cada métrica para escalar y evitar divisiones por cero
