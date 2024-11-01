@@ -604,33 +604,38 @@ class DataPreparationNew(DataPreparation):
 
         return df_sin_dup, df_fill
     
-    def fill_player_columns_with_min_value(self, df):
+    def fill_player_columns_with_min_value(self, df): # no la probé
         """
         Rellenado de emergencia de valores NaN con la media de la columna. Es ultimo recurso para poder predecir el partido. 
         """
+        # Crear una copia del DataFrame para evitar el SettingWithCopyWarning
+        df = df.copy()
+
         # Identificar las columnas de jugadores
-        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  # ('player_miss' in col)
+        player_columns = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]
         logger.info(f"Player columns to fill in emergency: {player_columns}")
         
-        # Creo datafrmame auxiliar (para ver que partidos rellené)
+        # DataFrame auxiliar para rastrear los partidos rellenados
         df_fill = pd.DataFrame(index=df.index)
         df_fill['emergency_fill'] = np.nan
 
-        # Rellenar los NaN en las filas seleccionadas con el valor mínimo de la columna correspondiente
+        # Rellenar los NaN en las filas seleccionadas con el valor medio de la columna
         for col in player_columns:
-            rows_to_fill = df[col].isna()  # Identificar las filas con NaN
-            mean_value = df[col].mean()    # Calcular el valor medio de la columna
-            df.loc[rows_to_fill, col] = mean_value  # Rellenar NaN con el valor medio
-            
-            # Guardo que valor llene de emergencia y que fila
-            df_fill.loc[rows_to_fill, col] = mean_value  # Rellenar NaN con el valor medio
-            df_fill.loc[rows_to_fill, "emergency_fill"] = 1  # Rellenar NaN con el valor medio
+            rows_to_fill = df[col].isna()  # Filas con NaN en la columna
+            mean_value = df[col].mean()    # Valor medio de la columna
+            df.loc[rows_to_fill, col] = mean_value  # Relleno de NaN con valor medio
 
+            # Guardo que valor llene de emergencia y que fila
+            df_fill.loc[rows_to_fill, col] = mean_value  # Guarda el valor relleno
+            df_fill.loc[rows_to_fill, "emergency_fill"] = 1  # Marca la fila rellenada
+
+        # Conteo de filas con relleno de emergencia
         n_rows = len(df_fill[df_fill["emergency_fill"] == 1])
         if n_rows > 0:
-            logger.warning(f"Se relleno de emergencia las variables START y SUB en {n_rows} partidos.")
+            logger.warning(f"Se rellenaron de emergencia las variables START y SUB en {n_rows} partidos.")
         
         return df, df_fill
+
     
 
 def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
@@ -1166,7 +1171,7 @@ if __name__ == "__main__":
         n_seasons_missing = 1
         extract_missing = True
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
         directorio = os.getenv('BASE_DIR_LOCAL')
 
     elif env == 'prod':
@@ -1180,7 +1185,7 @@ if __name__ == "__main__":
         directorio = "data/"
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [77]
 
     # Definir condiciones del análisis
     for id_country in l_countries:

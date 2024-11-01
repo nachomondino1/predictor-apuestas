@@ -95,7 +95,6 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
 class FeatureSelection():
 
     def __init__(self, graficar_cada_metodo: bool = False) -> None:
-        self.scoring = 'f1_macro' # accuracy --> Todavia no esta balanceado asique f1_score puede ser mejor
         self.bayes = False # Random tarda banda y Logistic +
         self.all_tuning = False
         self.verbose = 1
@@ -168,7 +167,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparámetros
-        model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, scoring=self.scoring,  
+        model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
                                                                            bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
@@ -225,7 +224,8 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelos buscando los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, scoring=self.scoring, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, 
+                                                                           all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo RFE a partir de Logistic
         rfe = RFE(estimator=model, n_features_to_select=n_features)
@@ -258,7 +258,8 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, all_tuning=self.all_tuning, scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
+                                                                           bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'lasso': model.coef_}, index=X.columns)
