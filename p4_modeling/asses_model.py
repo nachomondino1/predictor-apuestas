@@ -3,7 +3,7 @@ import numpy as np
 from sklearn import metrics
 from set_up_logging import logger
 
-def confusion_matrix(y_real, y_pred):
+def confusion_matrix(y_real, y_pred, verbose: int = 0):
     """
     Calcula matriz de confusion del modelo.
 
@@ -20,6 +20,9 @@ def confusion_matrix(y_real, y_pred):
     # Convertir el array a un DataFrame de pandas
     df_cm = pd.DataFrame(confusion_matrix)
     df_cm.index.name = "Resultado real"
+
+    if verbose >= 1:
+        print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
 # Bookies 
@@ -78,7 +81,7 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     return df_match_odds
 
 # Nosotros
-def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", verbose: int = 0):
+def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy: str = "general", verbose: int = 0):
     """
     Determine the ROI for different betting strategies.
 
@@ -92,9 +95,9 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", verb
     """
     # Definicion de variables
     l_thr_dif_prob, d_rectas = define_hiperparameters(strategy)
-    best_roi, roi_max = -100000, -100000
-    logger.info(f"Calculating ROI...")
+    best_roi = -100000
     if verbose >= 1:
+        logger.info(f"Calculating ROI...")
         logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas}")
     
     # Eliminate rows with NaN odds or missing predictions
@@ -103,7 +106,6 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", verb
 
     # Por combinacion de hiperparametros 
     for prob in l_thr_dif_prob:
-        d = {}
 
         # Determinamos el resultado a apostar (no necesariamente el resultado predicho)
         df2 = df.copy()  # esto parece boludo pero es clave sino df2 se le agrega las columnas de variacion de stake y los rdos son falsos...
@@ -116,47 +118,47 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy="general", verb
 
             for a1, a2 in value:
 
-                lst = ['linear', 'kelly']
-                m = a1 if key in lst else None  # m, b = a1, a2 if key == 'linear' else None, None
-                b = a2 if key in lst else None
-                p1 = a1 if key not in lst else None
-                p2 = a2 if key not in lst else None
+                # Definir parámetros según la clave
+                if key in ['linear', 'kelly']:
+                    m, b = a1, a2
+                    p1, p2 = None, None
+                else:
+                    m, b = None, None
+                    p1, p2 = a1, a2
+                
                 if verbose >= 1:
                     logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
 
                 # for normalized in [True, False]:
-                # Determino stake a apostar segun curva
-                df_aux = determine_stake_to_bet(df2, type_relation=key, m=m, b=b, p1=p1, p2=p2, normalized=normalized)
+                for odd_weight in [0, 1, 2, 4]: # 0 significa no afectar stake con cuotas.  # 0.5,
 
-                # Calculo roi stake a apostar segun curva
-                if strategy == 'reality':
-                    df_no_se, d_rois, = calculate_reality_roi(df_aux)
-                    roi = d_rois['roi_por_partido_r']                    
-                else: 
-                    df_no_se, d_rois, = calculate_roi(df_aux) 
-                    roi = d_rois['roi_por_partido']            
+                    for lim_sup in [0, 1]:
 
-                # roi = d_rois['roi_por_partido']                    
-                d[f'roi_stake_{key}_{a1}_{a2}'] = roi
+                        # Determino stake a apostar segun curva
+                        df_aux = determine_stake_to_bet(df2, type_relation=key, m=m, b=b, p1=p1, p2=p2, odd_weight=odd_weight, dif_prob_sup_cap=lim_sup, normalized=normalized)
 
-                if roi > roi_max:
-                    roi_max = roi
-                    d_rois_best = d_rois
-                    best_prob = prob
-                    best_key = key
-                    best_normalized = normalized
-                    best_a1, best_a2 = a1, a2
-                    df_pred_best = df_no_se.copy()
+                        # Calculo ROI
+                        df_pred, d_metrics = (calculate_reality_roi(df_aux)) if strategy == 'reality' else (calculate_roi(df_aux))
+                        roi = d_metrics['roi_por_partido_r'] if strategy == 'reality' else d_metrics['roi_por_partido']            
+                        # logger.info(f"Porcentaje de cuota {porc_cuota} --> ROI: {roi*100:.0f}")
 
-            # Si es el mejor ROI
-            if roi_max > best_roi:
-                best_roi = roi_max
-                best_df_pred = df_pred_best.copy()
-                best_d_rois = d_rois_best
+                        # Verificación si es el mejor ROI y actualización en una sola línea
+                        if roi > best_roi:
+                            best_roi = roi
+                            best_df_pred = df_pred.copy()
+                            best_d_rois = d_metrics
+                            best_d_rois.update({
+                                'thr_prob_min_best': prob, 
+                                'curva': key, 
+                                'param1': a1, 
+                                'param2': a2, 
+                                'normalized': normalized,
+                                'odd_weight': odd_weight,
+                                'dif_prob_sup_cap': lim_sup
+                            })
 
-                # Guardar hiperparametros de estrategia...
-                d_best = {'thr_prob_min_best': best_prob, 'curva': best_key, 'param1': best_a1, 'param2': best_a2, "normalized": best_normalized}
-                best_d_rois.update(d_best)
+                            if verbose >= 1:
+                                logger.info(f"Se encontró una mejor estrategia con ROI: {best_roi*100:.0f}. Metricas {best_d_rois}")
 
     return best_df_pred, best_d_rois
 
@@ -168,8 +170,8 @@ def define_hiperparameters(strategy):
         l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
         d_rectas = {
             # "equal": [[(0, 0), (1, 0)]],
-            'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
-            'linear': [[5, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],
+            # 'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
+            'linear': [[1, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]], 
             # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
         }
 
@@ -177,7 +179,7 @@ def define_hiperparameters(strategy):
         l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
         d_rectas = {
             "equal": [[(0, 0), (1, 0)]],
-            'linear': [[5, 0], [10, 0], [15, 0],[20, 0], [25, 0],[30, 0], [40, 0]],
+            'linear': [[1, 0], [5, 0], [10, 0], [15, 0],[20, 0], [25, 0],[30, 0], [40, 0]],
             # 'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
         }
     
@@ -327,7 +329,8 @@ def determine_winning_bets(df: pd.DataFrame):
 
     return df
 
-def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, normalized: bool = True):
+def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
+                           odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = True):
     """
     Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
     Cuanto mayor es la probabilidad del modelo para el resultado a apostar, mas dinero apuesto.
@@ -339,14 +342,16 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
         p2: Segundo punto (x, y) para construir curva. (float)
         m: Pendiente de la recta. Solo cuando type_relation = 'linear'. (float)
         b: Ordenada al origen de la recta. Solo cuando type_relation = 'linear'. (float)
+        odd_weight: Peso de dif_prob_result_to_bet en el stake.
+            (e.g. 0 entonces no tenemos en cuenta cuotas en stake, con 0.5 tenemos en cuenta las cuotas pero no tanto y asi. ) 
+        dif_prob_inf_cap: Minima diferencia de probabilidad con casa de apuesta para afectar el stake con cuotas. Va de -1 a 1. 
+            (e.g. si es -0.25, si la dif de proba es menor a -25% de todas maneras afecto el stake como si esta fuera de un -25%).
+        dif_prob_sup_cap: Maxima diferencia de probabilidad  con casa de apuesta para afectar el stake con cuotas. Va de -1 a 1. 
+            (e.g. si es 0.1, si la dif de proba es mayor a 10% de todas maneras afecto el stake como si esta fuera de un 10%).
 
     # Returns
         Dataframe pasado como parametro con nueva columna 'stake_to_bet'
     """
-    dif_prob_inf_cap = -0.5 # Hasta 2024-10-08 era -0.5
-    dif_prob_sup_cap = -0.1  # empiezo a reducir stake recien cuando tengo un 10% menos de certeza que la casa
-    k = 0.50  # Nuestro modelo es mas robusto por estar balanceado (x lo que, lo afecto menos)
-
     # Separo puntos en x e y
     if p1 is not None and p2 is not None:
         x1, y1 = p1
@@ -361,9 +366,7 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
         df['stake_to_bet'] = 1
 
     elif type_relation == 'kelly':
-        # df['stake_to_bet'] = (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100
-        df['stake_to_bet'] = (df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet']) / (df['odd_to_bet'] - 1) 
-        df['stake_to_bet'] = df['stake_to_bet'] * 100
+        df['stake_to_bet'] = ((df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1)  #  (= (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100)
 
         # Puntos para normalizar
         p_min, p_max = 0, 50 
@@ -372,15 +375,13 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
     elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
         if dif_prob_inf_cap != dif_prob_sup_cap:
-            df['stake_to_bet'] = (df['prob_result_to_bet'] + 
-                       k * np.where((df['dif_prob_result_to_bet'] >= dif_prob_inf_cap) & 
-                                    (df['dif_prob_result_to_bet'] <= dif_prob_sup_cap),
-                                    df['dif_prob_result_to_bet'], 0)) * m + b
+            df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+
         else:
-            df['stake_to_bet'] = df['prob_result_to_bet'] * m + b   # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+            df['stake_to_bet'] = df['prob_result_to_bet'] * m + b
         
-        # Puntos para normalizar
-        p_min, p_max = (0.55 * m + b), (0.7 * m + b) # 0.33 no tiene sentido puesto que usa stake de m_to_bet / 2 para dicha prob
+        # Puntos para normalizar --> no tiene mucho sentido. Para eso esta exponential (modificar mas el stake ante un menor cambio en proba). Incluso con el b de linear tambien puedo lograr algo parecido.
+        # p_min, p_max = (0.55 * m + b), (0.7 * m + b) # El punto min usa un stake de m_to_bet / 2. Si queres que prob=0.33 use un stake mas bajo, no tiene sentido usarlo como p_min.
 
     elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
         pass
@@ -414,10 +415,11 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
         df['stake_to_bet'] = num / (1 + np.exp(-df['stake_to_bet_norm']))
         # df = df.drop(['stake_to_bet_raw', 'stake_to_bet_normalized'], axis=1)
     
-    # Ajusto valores de stake_to_bet segun valor minimo y valor maximo
-    val_min, val_max = 0, 100  # Evito que el stake a apostar sea mayor al 100% del bank
+    # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
+    val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
     func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
     df['stake_to_bet'] = df['stake_to_bet'].apply(func)
+
     return df
 
 # Metricas
