@@ -52,7 +52,7 @@ def select_league_matches(df):
     print(f"Shape sin copas: {df.shape}")
     return df
 
-def load_preparation_hyperparameters(row_hiper):
+def load_preparation_hyperparameters(row_hiper, verbose: int = 1):
 
     d = {}
 
@@ -72,9 +72,10 @@ def load_preparation_hyperparameters(row_hiper):
     d['comp_to_select'] = load_as_list(row_hiper['comp_to_select'].values[0])
     d['selected_columns'] = load_as_list(row_hiper['X_columns'].values[0])
 
-    print("\nHiperparametros cargados:")
-    for key, value in d.items():
-        print(f'\t {key}: {value}')
+    if verbose >= 1:
+        print("\nHiperparametros cargados:")
+        for key, value in d.items():
+            print(f'\t {key}: {value}')
     return d
 
 def load_as_list(lista):
@@ -107,27 +108,31 @@ def load_trained_models(n_ite, ruta_base_mod):
     """
     Carga todos los modelos entrenados para la iteracion
     """
+    l_models, l_names = [], []
+
     # Para entrenamientos anteriores a 2024-10-10
     try:
-        return [pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_model.pkl", "rb"))], ['neural_networ'] # da igual el model name..
+        model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_model.pkl", "rb"))
+        l_models.append(model)
+        l_names.append('neural_networ') # da igual el model name..    
+    
     except FileNotFoundError:
-        pass
+        for model_name in ['LogisticRegression', 'neural_networ', 'XGBClassifier', 'GradientBoostingClassifier', 'MLPClassifier', 'SVC']:  # Podria hacer unique a df_iteration_test['model_name']:
+            try:
+                loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_{model_name}.pkl", "rb"))
 
-    l_models, l_names = [], []
-    l_model_names = ['LogisticRegression', 'neural_networ', 'XGBClassifier', 'GradientBoostingClassifier', 'MLPClassifier', 'SVC']  # Podria hacer unique a df_iteration_test['model_name']
-    for model_name in l_model_names:
-        try:
-            loaded_model = pickle.load(open(f"{ruta_base_mod}/models/{n_ite}_{model_name}.pkl", "rb"))
+                # Agrego modelo a lista
+                l_models.append(loaded_model)
+                l_names.append(model_name)
 
-            # Agrego modelo a lista
-            l_models.append(loaded_model)
-            l_names.append(model_name)
-        except FileNotFoundError:
-            pass
+            except FileNotFoundError:
+                pass
+
     return l_models, l_names
 
 ################################################### MAIN ###################################################
-def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, n_days_to_fill:int = 60, strategy = 'general'):
+def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, export: bool = True, relleno_formaciones: bool = True, 
+         n_days_to_fill:int = 60, strategy = 'general', verbose: int = 0):
     """
     Levanta los datos missing, los prepara y predice con modelo ya entrenado. 
     """
@@ -140,7 +145,9 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
     dp = DataPreparationNew(country=country, export=False)  # Creo objeto de clase DataPreparationNew
 
     #______________________________________________ DATA UNDERSTANDING ______________________________________________#  # --> Levanto dfs missing de p6_deployment
-    print("\n", "#"*120, "\n", "DATA UNDERSTANDING".center(120), "\n", "#"*120, "\n")
+    if verbose >= 0:
+        print("\n", "#"*120, "\n", "DATA UNDERSTANDING".center(120), "\n", "#"*120, "\n")
+
     # Levanto datos
     df_match_odds = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
     df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
@@ -149,7 +156,8 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
     # Determino la fecha del partido missing mas "viejo"
     df_int_missing['date'] = pd.to_datetime(df_int_missing['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime --> estoy casi seguro que no hace falta.
     initial_date = df_int_missing['date'].min()
-    print(f"Initial_date (es decir, la del partido missing mas viejo): {initial_date}")
+    if verbose >= 1:
+        print(f"Initial_date (es decir, la del partido missing mas viejo): {initial_date}")
 
     # Filtro por competencias. No quiero partidos de copas (e.g. FA cup) solo de la liga
     df_int_missing = select_league_matches(df_int_missing)
@@ -163,21 +171,25 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
         # Definicion de variables
         n_ite = row['n_iteration']
         row_hiper = df_iteration[df_iteration['n_iteration'] == n_ite]
-        print("\n", "#"*120, "\n", f"ITERATION Nº {n_ite}".center(120), "\n", "#"*120, "\n")
+        if verbose >= 0:
+            print("\n", "#"*120, "\n", f"ITERATION Nº {n_ite}".center(120), "\n", "#"*120, "\n")
 
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
         d_hiper = load_preparation_hyperparameters(row_hiper)
         tager, scaler, columns_scaled = load_models(ruta_base_dp, d_hiper)
         
         #______________________________________________ DATA PREPARATION ______________________________________________#
-        print("DATA PREPARATION".center(120, "-"))
+        if verbose >= 0:
+            print("DATA PREPARATION".center(120, "-"))
 
         # Levanto datos ya construidos
         path_cons = f'{ruta_base_mod}/assess_models_in_prod/data_preparation/df_constructed_{d_hiper['n_dias_ult_part']}_{d_hiper['n_years_h2h']}_{d_hiper['segun_localia']}_{d_hiper['dif_con_against']}.xlsx'
 
         try:
             df_cons = pd.read_excel(path_cons, index_col=0)
-            print("Evito construir datos dado que levanto dataframe ya construido")
+            
+            if verbose >= 1:
+                print("Evito construir datos dado que levanto dataframe ya construido")
 
         # Levanto df_integrated y construyo datos
         except FileNotFoundError:      
@@ -186,46 +198,50 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
             df_old_int = df_old_int.sort_values(by='date', ascending=False)  # Ordeno por fecha ascendente. Funciona? Es entendida como datetime la columna? Si.
 
             # Selecciono los ultimos partidos de los ya jugados
-            logger.info("Seleccion de ultimos partidos para construccion de variables...")
+            if verbose >= 1:
+                logger.info("Seleccion de ultimos partidos para construccion de variables...")
             n_days_max = max(d_hiper['n_dias_ult_part'])
             n_days_period = n_days_max * 2 if d_hiper['segun_localia'] == True else n_days_max
             df_last_old_matches_construct = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=n_days_period) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
             if relleno_formaciones:
                 # Selecciono los ultimos partidos de los ya jugados
-                logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
+                if verbose >= 1:
+                    logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
                 df_last_old_matches_fill = filter_dataframe_by_date(df=df_old_int, initial_date=initial_date, n_days=n_days_to_fill) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
 
                 # Relleno formaciones
-                df_fill, df_c1, df_c2 = dp.fill_data_not_available_yet(df_int, df_last_old_matches_fill)
+                df_fill, df_c1, df_c2 = dp.fill_data_not_available_yet(df_int, df_last_old_matches_fill, verbose=verbose)
                 df_int = df_fill
 
             # Construyo datos usando partidos viejos
-            df_cons = dp.construct_data_new(df_next_matches=df_int, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_old_int, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'],  columns_used=columns_scaled)
+            df_cons = dp.construct_data_new(df_next_matches=df_int, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_old_int, 
+                                            n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], 
+                                            dif_con_against=d_hiper['dif_con_against'],  columns_used=columns_scaled, verbose=verbose)
             df_cons.to_excel(path_cons, index=True)
         
         # Sigo preparando datos
-        df_tag = dp.tag_string_data_to_integer_new(df_cons, tager)
-        df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'])
-
+        df_tag = dp.tag_string_data_to_integer_new(df_cons, tager, verbose=verbose)
+        df_clean = dp.clean_data_2_new(df_tag, scaler, columns_scaled, d_hiper['comp_to_select'], verbose=verbose)
 
         # Por modelo entrenado en iteration (tienen misma preparacion hasta select_data)
         l_models, l_names = load_trained_models(n_ite, ruta_base_mod)
-        i = 0
-        for loaded_model in l_models:
-            model_name = l_names[i]
-            i += 1
-            # print("MODEL {}".center(120, "-"))
+        for loaded_model, model_name in zip(l_models, l_names):
 
-            df_sel = dp.select_data_new(df_clean, d_hiper['selected_columns'])
-            df_treat, df_emer = dp.treat_nan_values_new(df_sel)
+            # Selecciono datos + Treat nan values (c/modelo selecciona ≠ columnas)
+            df_sel = dp.select_data_new(df_clean, d_hiper['selected_columns'], verbose=verbose)
+            df_treat, df_emer = dp.treat_nan_values_new(df_sel, verbose=verbose)
 
-            print("\nShape Dataframe antes de Modeling(): ", df_treat.shape)
-            if len(df_sel) != len(df_treat):
-                logger.warning(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
+            if verbose >= 1:
+                logger.info(f"\nShape Dataframe antes de Modeling(): {df_treat.shape}")
+                if len(df_sel) != len(df_treat):
+                    logger.warning(f"WARNING! De los {len(df_sel)} proximos partidos, quedan {len(df_treat)} luego de la preparacion")
 
             #______________________________________________ MODELING ______________________________________________#
-            print("MODELING".center(120, "-"))
+            if verbose >= 0:
+                print("MODELING".center(120, "-"))
+                logger.info(f"model_name: {model_name}. loaded_model: {loaded_model}")
+
             # Realizo predicciones sobre los nuevos partidos
             try:
                 y_pred_prob = loaded_model.predict_proba(df_treat) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
@@ -236,7 +252,6 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
             # logger.info(classes)
 
             y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
-            # df_pred_proba = pd.DataFrame({'predicted_result': y_pred, f'prob_class_{loaded_model.classes_[1]}': y_pred_prob[:, 1], f'prob_class_{loaded_model.classes_[0]}': y_pred_prob[:, 0], f'prob_class_{loaded_model.classes_[2]}': y_pred_prob[:, 2]}, index=df_treat.index)
             df_pred_proba = pd.DataFrame({
                     'predicted_result': y_pred,
                     f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
@@ -251,20 +266,20 @@ def main(df_iteration, country, iteration_date, ruta_base_dp, ruta_base_mod, exp
 
             # Concateno conjunto de datos
             df_match_odds_2 = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds_2) # Caculo probabilidades segun casa de apuesta
-            # try:
             if relleno_formaciones:
                 df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_c1['copiado_formaciones'], df_emer['emergency_fill']], axis=1)
             else:
                 df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_emer['emergency_fill']], axis=1)
-            # except:
-            #     df_predicciones = pd.concat([df_match, df_match_odds_2, df_pred_proba, df_emer['emergency_fill']], axis=1)
-                
+ 
+            # Ordeno partidos predichos por fecha decreciente (x si no estaba)
             df_predicciones['date'] = pd.to_datetime(df_predicciones['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
             df_predicciones = df_predicciones.sort_values(by='date', ascending=True)  # Ordeno por fecha de menos reciente a mas reciente para calcular ROI bien.
 
             # Evaluo predicciones del modelo
-            df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy=strategy)
-            print("Metricas: ", d_roi)
+            df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones, strategy=strategy, verbose=verbose)
+            if verbose >= 1:
+                logger.info(f"Metricas: {d_roi}")
+                asses_model.confusion_matrix(y_real=df_predicciones['result'], y_pred=df_predicciones['predicted_result'], verbose=1)
 
             # Revierto etiquetas para tener nombres de equipos en vez de ids
             d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -294,17 +309,16 @@ if __name__ == "__main__":
     logger.warning("Asegurate de haber extraido nuevos partidos missing respecto del anterior assess puesto que sino será igual.")
 
     # Defino condiciones del analisis
-    l_countries = [48, 55, 59, 77, 148] 
+    l_countries = [48, 55, 59, 77, 148]
     l_countries = [77]
-    # l_countries = [55]
     only_select_best_model = False # False
     bet_strategy = 'general' # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
-        59: ["germany", "2024-10-28"], # 13
-        77: ["italy", "2024-10-29"], # 15
+        59: ["germany", "2024-10-13"], # 13
+        77: ["italy", "2024-10-03"], # 15
         148: ["spain", "2024-10-13"],  # 13
         167: ["usa", "2024-10-06"]
     }
