@@ -160,7 +160,7 @@ class DataPreparation:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
 
-    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
+    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, verbose : int = 0, export: bool = True):
         """
         Arreglo el data data_type de algunas variables.
 
@@ -202,7 +202,8 @@ class DataPreparation:
 
         return df_match, df_match_player, df_player_fifa_sofifa
 
-    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
+    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, 
+                   df_teams_sofifa: pd.DataFrame, export: bool = True, verbose : int = 0):
         """
         Limpieza inicial de los dataframes
         """
@@ -263,7 +264,8 @@ class DataPreparation:
     
         return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
 
-    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, df_teams_sofifa: pd.DataFrame, export: bool = True):
+    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, 
+                       df_teams_sofifa: pd.DataFrame, export: bool = True, verbose : int = 0):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -350,7 +352,8 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, dif_con_against: bool = True, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, 
+                       dif_con_against: bool = True, export: bool = True, verbose : int = 0):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -485,7 +488,7 @@ class DataPreparation:
 
         return df
 
-    def tag_string_data_to_integer(self, df: pd.DataFrame, export: bool = True):
+    def tag_string_data_to_integer(self, df: pd.DataFrame, verbose : int = 0, export: bool = True):
         """
         Conversion de columnas tipo "object" a "integer"
         """
@@ -493,14 +496,15 @@ class DataPreparation:
         df = df.drop(['season'], axis=1)  # Arroja error TypeError porque tiene tanto str como int en los valores originales y el label solo puede recibir un tipo (str o int). Season tiene valores como "2021" y "2020_2021", los primeros los entiende como int y los segundos como str.
         
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df, df_etiquetas = format_data.convert_columns_to_int(df)
+        df, df_etiquetas = format_data.convert_columns_to_int(df, verbose=verbose)
 
         if export:
             df_etiquetas.to_excel(f'./data/{self.country}/p3_data_preparation/df_etiquetas.xlsx', index=False)
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, _print: bool = True, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, _print: bool = True, verbose : int = 0, 
+                     export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -522,26 +526,37 @@ class DataPreparation:
         
         # (1) Eliminacion de filas 
         ## Para evitar partidos muy viejos
-        print("Eliminacion de filas...")
-        n_reg_inic = len(X)
+        if verbose >= 1:
+            print("Eliminacion de filas...")
+            n_reg_inic = len(X)
+
         if n_years_to_select is not None:
             fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
             X = X[X['date'] >= fecha_limite] 
-            print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(X)}")
+
+            if verbose >= 1:
+                print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(X)}")
+
         ## Para evitar ciertas competencias
         if competencies_to_select is not None:
             n_reg_inic_2 = len(X)
             X = X[X['id_competition'].isin(competencies_to_select)]
-            print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
+
+            if verbose >= 1:
+                print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
+
         ## con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic_3 = len(X)
         X = clean_data.delete_rows_nan(X, 0.5)
-        if _print:
+
+        if verbose >= 1:
             print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
 
         # (2) Eliminacion de columnas   
-        print("Eliminación de columnas...")
+        if verbose >= 1:
+            print("Eliminación de columnas...")
+
         ## usadas solo para construir y constantes
         cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
@@ -550,14 +565,16 @@ class DataPreparation:
         n_reg_min = int(0.15*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
         X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
 
-        if _print and len(X.columns) != len(X_sin_col_mucho_nan.columns):
+        if verbose >= 1 and len(X.columns) != len(X_sin_col_mucho_nan.columns):
             print(f"Columnas constantes eliminadas: {cols_constants}")
             print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
             l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
             logger.warning(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
 
         # (3) Escalado de datos
-        print("\nEscalado de datos...")
+        if verbose >= 1:
+            print("\nEscalado de datos...")
+
         scaler = StandardScaler()
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
@@ -576,7 +593,7 @@ class DataPreparation:
 
         return df, scaler, X_sin_col_mucho_nan.columns
     
-    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, export: bool = True):
+    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose:int = 0, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -591,7 +608,9 @@ class DataPreparation:
         if thr_corr is not None:
             l_columnas_a_eliminar, df_corr_tri_X = select_data.delete_correlated_columns(df, self.var_resp, thr_corr)
             df = df.drop(l_columnas_a_eliminar, axis=1)
-            print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
+
+            if verbose >= 1:
+                print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
 
         # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
@@ -599,9 +618,12 @@ class DataPreparation:
             l_important_features, df_normalized = select_data.select_best_features(df, self.var_resp, thr_fs, graf=export)
             l_col_eliminated = list(df.columns.difference(l_important_features))
             df = df.loc[:, l_important_features + [self.var_resp]]
-            print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas eliminadas: {l_col_eliminated}")
 
-        print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
+            if verbose >= 1:
+                print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas eliminadas: {l_col_eliminated}")
+
+        if verbose >= 1:
+            print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         
         end = time.time()
         logger.info(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
@@ -613,7 +635,7 @@ class DataPreparation:
 
         return df
     
-    def treat_nan_values(self, df: pd.DataFrame , fill_na: str = None, percentil_nan: int = 75, export: bool = True, _print: bool = True):
+    def treat_nan_values(self, df: pd.DataFrame , fill_na: str = None, percentil_nan: int = 75, export: bool = True, verbose: int = 0):
         """
         Tratamiento de nan values
 
@@ -639,7 +661,7 @@ class DataPreparation:
 
             # Elimino registros con al menos un NaN 
             X = X.dropna(subset=l_columns_poco_nan)
-            if _print:
+            if verbose >= 1:
                 print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
 
             # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
@@ -650,7 +672,7 @@ class DataPreparation:
 
             # Relleno nan de las columnas con mucho NaN
             X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
-            if _print:
+            if verbose >= 1:
                 print(f"Columnas consideradas con mucho nan (a las cuales rellenar): {l_columns_mucho_nan}")
                 print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {X.shape}")
 
@@ -806,7 +828,7 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = True, compare_tuning: bool = False, scoring: str = 'f1_macro', export: bool = True):
+                    bayes: bool = True, compare_tuning: bool = False, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         
@@ -839,7 +861,9 @@ class Modeling:
         else:
             # Train model searching for best hiper
             if params is None:
-                model_best_params, params, best_metric, results = build_model.select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=5, bayes=bayes, scoring=scoring, all_tuning=compare_tuning, verbose=1)
+                model_best_params, params, best_metric, results = build_model.select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
+                                                                                                          bayes=bayes, all_tuning=compare_tuning, verbose=1)
+                # model_best_params, params, best_metric, results = build_model.compare_scoring_methods(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=True, all_tuning=compare_tuning, verbose=1)
                 train_accuracy = best_metric # no es train_acc... es el scoring que uso, en este caso, f1_macro..
       
             # Train model with prefix params
@@ -861,7 +885,7 @@ class Modeling:
 
         return model_best_params, params, train_accuracy, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, _print: bool = True):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, verbose: int = 0):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -904,7 +928,7 @@ class Modeling:
         f1 = f1_score(y_test, y_pred, average='macro') * 100
 
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred)
+        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, verbose=verbose)
 
         # Agrego predicciones de bookmaker
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -922,8 +946,7 @@ class Modeling:
         # Calculo ROI
         df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)
-        if _print:
-            print(f"\n\nMatriz de confusion:\n {df_conf_mat}")
+        if verbose >=1:
             print(d_metrics)
 
         if export:
@@ -948,7 +971,7 @@ class Modeling:
             # Entreno modelo y evaluo su rendimiento 
             try:
                 # Entreno modelo
-                model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, bayes=True, export=False)
+                model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
 
                 # Evaluo modelo en test
                 df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)

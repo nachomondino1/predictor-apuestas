@@ -121,7 +121,7 @@ def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
             pass
     return df
 
-def convert_columns_to_int(df):
+def convert_columns_to_int(df, verbose:int = 0):
     """
     Convierte las variables string a numéricas.
 
@@ -137,7 +137,8 @@ def convert_columns_to_int(df):
     df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
     le = LabelEncoder()
     l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
-    print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
+    if verbose >= 1:
+        print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
 
     # Por variable string
     for col in l_columnas_a_codificar:
@@ -159,13 +160,15 @@ def convert_columns_to_int(df):
     return df, df_etiquetas
 
 # main_next_matches.py
-def convert_columns_to_int_already_tagged(df, df_etiquetas):
+def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
     """
     Etiquetado usando un df_etiquetas ya creado. Es para main_next_matches. Tengo en cuenta posibles nuevas etiquetas y las agrego a df_etiquetas
     """
     # Determino columnas a codificar de string a integer
     l_columnas_a_codificar = df_etiquetas['variable'].unique()
-    print("Columnas a codificar: ", l_columnas_a_codificar)
+
+    if verbose >= 1:
+        print("Columnas a codificar: ", l_columnas_a_codificar)
     
     # Por columna a codificar
     for columna in l_columnas_a_codificar:
@@ -173,7 +176,9 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas):
         # Obtengo etiquetas de la columna
         df_etiquetas_columna = df_etiquetas[df_etiquetas['variable']==columna]        
         d_mapeo = dict(zip(df_etiquetas_columna['str_value'], df_etiquetas_columna['int_value']))
-        print(f"Columna: {columna}, DF etiqeutas shape columna: {df_etiquetas_columna.shape}") 
+
+        if verbose >= 1:
+            print(f"Columna: {columna}, DF etiqeutas shape columna: {df_etiquetas_columna.shape}") 
 
         # Por partido
         for i, row in df.iterrows():
