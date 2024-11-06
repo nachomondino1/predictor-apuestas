@@ -28,6 +28,7 @@ from sklearn.neural_network import MLPClassifier
 ### Assess model
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
+from types import SimpleNamespace
 
 
 class DataUnderstanding:
@@ -216,15 +217,19 @@ class DataPreparation:
         start_date = '2012-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
         df_match = df_match[df_match['date'] >= start_date]
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)] # Es clave para eliminar jugadores y hacer una mejor integracion (tener menos falsos positivos)
-        logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
+        
+        if verbose >= 1:
+            logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
 
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
         df_match_player.drop(columns=non_object_columns, inplace=True)
-        print("Shape df_match_player: ", df_match_player.shape)
+        
+        if verbose >= 1:
+            print("Shape df_match_player: ", df_match_player.shape)
+            print("\nPreparacion de columnas string...")
 
         # Preparacion de texto
-        print("\nPreparacion de columnas string")
         ## FLASHSCORE
         columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
         df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
@@ -238,7 +243,7 @@ class DataPreparation:
         df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
         df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates() # No por id_player porque no es unico (hay 2 por fifa)
         n_players_eliminated = len_inic - len(df_player_sofifa)
-        if n_players_eliminated > 0:
+        if verbose >= 0 and n_players_eliminated > 0:
             logger.warning(f"Se eliminaron {n_players_eliminated} jugadores de los {len_inic} de Sofifa que habia.")
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
@@ -246,7 +251,8 @@ class DataPreparation:
         df_teams_sofifa = clean_data.prepare_text_columns(df_teams_sofifa, l_cols_to_process=['team_name'])
 
         # Correcion de valores
-        print("\nCorrecion de valores")
+        if verbose >= 1:
+            print("\nCorrecion de valores")
         df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     
         # Verificar que no haya outliers
@@ -283,38 +289,22 @@ class DataPreparation:
         start = time.time()
         logger.info("\nIntegrating data...")
 
-        '''
-        # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
-        print("\nIntegrating team's data to df_match...")
-        # Si ya hice el mapeo
-        try:
-            df_map_teams_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx')
-            print("No vuelvo a mapear sino que levanto df_map ")
-        # Si aun no hice el mapeo
-        except FileNotFoundError:
-            # Matcheo equipos de Sofifa y Flashscore
-            print("Mapeo equipos de Sofifa y Flashscore")
-            df_teams = create_df_teams(df_match)
-            df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
-
-            if export:
-                df_teams.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx", index=True)
-                df_map_teams_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx")
-        
-        # Integro datos de equipos a df_match usando el mapeo       
-        df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
-        '''
+        # (Temporalmente) Obtengo el listado de equipos unicos de Flashscore
+        df_teams = create_df_teams(df_match)
+        if export:
+            df_teams.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx", index=True)
 
         # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
         print("\nIntegrating player's data to df_match...")
         # Si ya hice el mapeo
         try:
-            df_map_players_fs_so = pd.read_excel(f'data/df_map_players_fs_so.xlsx', index_col=0)
+            path_map = 'data/all/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx' # data/df_map_players_fs_so.xlsx
+            df_map_players_fs_so = pd.read_excel(path_map, index_col=0)
             logger.info("No vuelvo a mapear sino que levanto df_map general ")
 
             # Reemplazo los df_player de Sofifa del pais por los completos
-            df_player_sofifa = pd.read_excel(f'data/df_player_sofifa.xlsx', index_col=0)
-            df_player_fifa_sofifa = pd.read_excel(f'data/df_player_fifa_sofifa.xlsx', index_col=0)
+            df_player_sofifa = pd.read_excel('data/all/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0) #'data/df_player_sofifa.xlsx'
+            df_player_fifa_sofifa = pd.read_excel('data/all/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0) # 'data/df_player_fifa_sofifa.xlsx'
             
             logger.critical("Integración usando el df_map completo!")
 
@@ -558,7 +548,8 @@ class DataPreparation:
             print("Eliminación de columnas...")
 
         ## usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        # cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_for_construct = ['venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
@@ -576,6 +567,7 @@ class DataPreparation:
             print("\nEscalado de datos...")
 
         scaler = StandardScaler()
+        X_sin_col_mucho_nan = X_sin_col_mucho_nan.select_dtypes(exclude=['datetime64[ns]'])  # The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
@@ -927,8 +919,9 @@ class Modeling:
         recall = recall_score(y_test, y_pred, average='macro') * 100
         f1 = f1_score(y_test, y_pred, average='macro') * 100
 
-        # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, verbose=verbose)
+        if verbose >= 1:
+            # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
+            df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, verbose=verbose)
 
         # Agrego predicciones de bookmaker
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -992,24 +985,32 @@ class Modeling:
                 
         return df_metrics
 
+def crear_variables(diccionario):
+    return SimpleNamespace(**diccionario)
+
 ##################################################### MAIN #####################################################
-def main(id_country, d_run, export: bool = True):
+def main(id_country, d_run, d_params, modelo, export: bool = True):
     """
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
+    d_par = crear_variables(d_params)
+    d_run = crear_variables(d_run)     # data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
-    df_countries = pd.read_excel('./data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
-    
+
+    if id_country > 0:
+        df_countries = pd.read_excel('./data/df_countries.xlsx')
+        country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
+    else:
+        country = 'all'
+
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
     dp = DataPreparation(country) # Creo objeto de clase DataPreparation
     mo = Modeling(var_resp=var_resp, var_pred=var_pred, country=country)  # Creo objeto de clase Modeling
 
     #------------------------------------------- DATA UNDERSTANDING -------------------------------------------#
-    if data_unders:
+    if d_run.data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
         df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = du.collect_initial_data(export=export)
@@ -1017,7 +1018,7 @@ def main(id_country, d_run, export: bool = True):
         # Describo datos
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
-    elif data_prep:
+    elif d_run.data_prep:
         # Levanto datos ya extraidos
         df_match = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_player.xlsx', index_col=0)
@@ -1029,16 +1030,10 @@ def main(id_country, d_run, export: bool = True):
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
     #------------------------------------------- DATA PREPARATION -------------------------------------------#
-    if data_prep:
+    if d_run.data_prep:
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
-        d_comps = select_data.determine_country_competitions(id_country)
-        l_days, n_years_h2h, segun_localia, dif_con_against = [30, 180], 3, False, False
-        thr_corr, thr_fs = 0.85, 0.5
-        n_years_to_select, comp_to_select = 3, d_comps['comp_sin_b']
-        fill_na = None
-        df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'dif_con_against': [dif_con_against], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
-        
+ 
         # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
         # print(df.head(2))
 
@@ -1046,78 +1041,66 @@ def main(id_country, d_run, export: bool = True):
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=export)
-        df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
-        df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
-        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-        df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
+       
+        if not d_run.until_integrate:
+            df = dp.construct_data(df, l_days=d_par.l_days, n_years_h2h=d_par.n_years_h2h, segun_localia=d_par.segun_localia, dif_con_against=d_par.dif_con_against, export=export)
+            df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
+            df, scaler, columns_used = dp.clean_data_2(df, d_par.n_years_to_select, d_par.comp_to_select, export=export)
+            df = dp.select_data(df, thr_corr=d_par.thr_corr, thr_fs=d_par.thr_fs, export=export)
+            df = dp.treat_nan_values(df, fill_na=d_par.fill_na, export=export)
         
-        if export:
-            df_hiper_prep.to_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx', index=False)
+        # if export:
+        #     df_hiper_prep.to_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx', index=False)
 
-    elif not data_unders:
+    elif not d_run.data_unders:
         # Levanto dataset para prueba
         df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_selected_nan.xlsx', index_col=0)
         print(df.head(3), df.shape)
 
     #------------------------------------------- MODELING -------------------------------------------#
-    if modeling:
+    if d_run.modeling:
         print(" Modeling ".center(120, "#"))
-        # Hiperparametros
-        val_size, test_size = 0.125, 0.125
-        bal_type = None
-        k = 10
-        d_hiper_mod = {'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}
-
-        modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
-        model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
-
-        build_specific_model = False
-        if build_specific_model:
-
-            # LogisticRegression(C=0.1, fit_intercept=False, penalty='l1', solver='saga')
-            d_params = {
-                'RandomForestClassifier': {
-                    'n_estimators': 500,
-                    'criterion': 'entropy',
-                    'max_depth': 3,
-                    'min_samples_split': 2, 
-                    'min_samples_leaf': 4, 
-                    'max_features': 'sqrt',
-                    'bootstrap': True,
-                },
-                'LogisticRegression': {
-                    'penalty': 'l1',
-                    'C': 10,
-                    'solver': 'liblinear',
-                    'fit_intercept': True,
-                    'max_iter': 10000, 
-                    'multi_class': 'auto',
-                },
-            }
-            hiperparametros = d_params[model_name]
-        else:
-            hiperparametros = None
-
-        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, val_size, test_size, export=export)
+        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, d_par.bal_type, d_par.val_size, d_par.test_size, export=export)
 
         # Analizo datos con un modelo
-        model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
+        model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=d_par.k, export=export)
         df_pred, d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
         # Construyo dataframe con hiperparametros de Modeling() (incluyendo los de la estrategia de apuesta)
-        d_hiper_mod.update(d_metrics)
-        df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
+        # d_hiper_mod.update(d_metrics)
+        # df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
 
         if export:
-            df_hiper_mod.to_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx', index=True)
+            # df_hiper_mod.to_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx', index=True)
             pickle.dump(model, open(f"./data/{country}/p4_modeling/modeling/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 167 # 55, 59, 77, 148
-    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+    id_country = -1 # 55, 59, 77, 148, 167 -1
+    d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': True}
 
-    main(id_country, d_params, export=True)
+    # Hiperparametros
+    d_comps = select_data.determine_country_competitions(id_country)
+    modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
+    d_params = {
+        'l_days': [30, 180], 
+        'n_years_h2h': 3,
+        'segun_localia': False,
+        'dif_con_against': False,
+        'thr_corr': 0.85,
+        'thr_fs': 0.5,
+        'n_years_to_select': 3, 
+        'comp_to_select': d_comps['comp_sin_b'],
+        'fill_na': None,
+        'val_size':  0.125,
+        'test_size': 0.125,
+        'bal_type': None,
+        'k': 10
+    }
+
+    # df_hiper_prep = pd.DataFrame(data=d_params) # df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'dif_con_against': [dif_con_against], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
+    # d_hiper_mod = {'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}
+
+    main(id_country, d_run, d_params, modelo, export=True)

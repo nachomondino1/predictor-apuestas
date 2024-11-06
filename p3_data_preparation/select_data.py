@@ -96,6 +96,7 @@ class FeatureSelection():
 
     def __init__(self, graficar_cada_metodo: bool = False) -> None:
         self.bayes = False # Random tarda banda y Logistic +
+        self.scoring = 'f1_macro' # Pues el dataset no esta balanceado.
         self.all_tuning = False
         self.verbose = 1
         self.graficar_cada_metodo = graficar_cada_metodo
@@ -168,7 +169,7 @@ class FeatureSelection():
 
         # Entreno modelo con los mejores hiperparámetros
         model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
-                                                                           bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+                                                                           bayes=self.bayes, all_tuning=self.all_tuning, scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)   # AttributeError: 'BayesSearchCV' object has no attribute 'feature_importances_'
@@ -224,8 +225,8 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelos buscando los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, 
-                                                                           all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
+                                                                           bayes=self.bayes, all_tuning=self.all_tuning,  scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo RFE a partir de Logistic
         rfe = RFE(estimator=model, n_features_to_select=n_features)
@@ -258,7 +259,7 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
+        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k,  scoring=self.scoring,
                                                                            bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
@@ -375,12 +376,14 @@ def determine_country_competitions(id_country):
     """
     Determina los grupos de competencias para el pais.
     """
-
     # Levanto competencias
     df_comp = pd.read_excel('./data/df_competencies.xlsx')
 
-    # Selecciono las del pais
-    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+    if id_country == -1:
+        df_comp_country = df_comp[(df_comp['id_country'].isin([48, 55, 59, 77, 148]))]
+    else:
+        # Selecciono las del pais
+        df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
 
     # Filtro
     df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]

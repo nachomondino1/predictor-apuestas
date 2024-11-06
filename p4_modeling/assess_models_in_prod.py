@@ -310,10 +310,12 @@ if __name__ == "__main__":
 
     # Defino condiciones del analisis
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [-1]
+
     only_select_best_model = False # False
     bet_strategy = 'general' # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
+        -1: ["all", "2024-11-06"],
         6: ["argentina", "2024-05-07"],
         48: ["england", '2024-10-02'],
         55: ["france", "2024-10-03"], 
