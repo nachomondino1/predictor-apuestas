@@ -3,7 +3,7 @@ import numpy as np
 from sklearn import metrics
 from set_up_logging import logger
 
-def confusion_matrix(y_real, y_pred, verbose: int = 0):
+def confusion_matrix(y_real, y_pred):
     """
     Calcula matriz de confusion del modelo.
 
@@ -20,9 +20,7 @@ def confusion_matrix(y_real, y_pred, verbose: int = 0):
     # Convertir el array a un DataFrame de pandas
     df_cm = pd.DataFrame(confusion_matrix)
     df_cm.index.name = "Resultado real"
-
-    if verbose >= 1:
-        print(f"\n\nMatriz de confusion:\n {df_cm}")
+    print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
 # Bookies 
@@ -171,7 +169,7 @@ def define_hiperparameters(strategy):
         d_rectas = {
             # "equal": [[(0, 0), (1, 0)]],
             # 'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
-            'linear': [[1, 0], [10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]], 
+            'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
             # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
         }
 
@@ -330,7 +328,7 @@ def determine_winning_bets(df: pd.DataFrame):
     return df
 
 def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
-                           odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = True):
+                           odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
     """
     Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
     Cuanto mayor es la probabilidad del modelo para el resultado a apostar, mas dinero apuesto.
