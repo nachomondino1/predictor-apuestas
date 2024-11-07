@@ -12,7 +12,7 @@ import time
 
 # from itertools import product
 
-def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, rows_to_features_min, continue_old_train: bool = False, 
+def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_modelos, rows_to_features_min, continue_old_train: bool = False, retrain: bool = False,
          verbose: int = 0, export:bool = True):
     """
     Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
@@ -62,6 +62,7 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                 avoid_construct = True
 
         if not avoid_construct:
+
             # Construyo datos
             path_1 = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
             path_construct = f'{ruta_base_dp}/df_constructed_{path_1}.xlsx'
@@ -70,7 +71,12 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                 # print("\n DF_CONSTRUCTED \n", df_constructed.head(2))
             except FileNotFoundError:
                 # Levanto dataset formateado e integrado (estos no cambian entre iteraciones)
-                df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
+                if retrain:
+                    df_integrated = pd.read_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index_col=0)
+                    logger.warning(f"Se levanto el df_integrated con los missing. Shape: {df_integrated.shape}")
+                else:
+                    df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
+                
                 # print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
 
                 df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
@@ -141,7 +147,7 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                                 logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
 
                             # Generar el diseño de la prueba
-                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, export=False)
+                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel_treated, bal_type=bal_type, val_size=val_size, test_size=test_size, retrain=retrain, export=False)
                             rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
                             if verbose >= 0:
                                 logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
@@ -149,7 +155,7 @@ def main(country, ruta_base_dp, ruta_base_mod, ruta_base_mod_seg, d_params, l_mo
                             # Si hay suficientes datos
                             if rows_to_features >= rows_to_features_min: # len(X_test) >= 50 and 
                                 
-                                df_metrics = mo.train_models(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, export=False)
+                                df_metrics = mo.train_models(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain=retrain, export=False)
                                 df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
                                 # Guardo datos en dataframe
                                 row_data = {'n_iteration': cont_iter, 

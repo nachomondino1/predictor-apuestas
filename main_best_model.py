@@ -138,7 +138,7 @@ def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
 
 
-def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train: bool = False, export: bool = True):
+def main(l_modelos, d_params, rows_to_features_min: int = 10, retrain: bool = False, continue_old_train: bool = False, export: bool = True):
     """
     Entrena modelos segun las combinaciones de hiperparametros deseadas. Luego los evalua en produccion y selecciona el mejor.
     """
@@ -155,7 +155,7 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
         directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_modelos, ruta_assess, ruta_assess_2])
     
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_ite_train, df_ite_test = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_modelos, d_params, l_modelos, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train, export=export)
+    df_ite_train, df_ite_test = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_modelos, d_params, l_modelos, rows_to_features_min=rows_to_features_min, retrain=retrain, continue_old_train=continue_old_train, export=export)
 
     # Preparo datos missing y evaluo modelos en produccion
     df_ite_test_prod = assess_models_in_prod.main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, export=export)
@@ -176,13 +176,17 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
     df_ite = pd.merge(df_ite_train, df_concat, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
     df_ite.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
     # logger.info(df_merged)
+
+    # Actualizar df_best_models.xlsx autoamticamente
+    # ...
     return df_ite
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = -1
+    id_country = 77
+    retrain = True
     continue_old_train = False
 
     # Determina date de la iteracion
@@ -200,7 +204,7 @@ if __name__ == "__main__":
     # 1728 iteraciones
     d_params = {  
         'construct': {
-            'n_dias_ult_part': [[30], [30, 180], [60, 240]], # [90], [30]
+            'n_dias_ult_part': [[30, 180], [60, 240]], # [90], [30]
             'n_years_h2h': [3],
             'segun_localia': [True, False], # False
             'dif_con_against': [True, False] # False
@@ -217,12 +221,13 @@ if __name__ == "__main__":
             'fill_na': [None, 'ml'],
         },
         'modeling': {
-            'val_size': [0.125],
-            'test_size': [0.10], 
+            'val_size': [0.10],
+            'test_size': [0.15], 
             'bal_type': ['under'], # None (ni con f1_score..)
             'k': [5] 
         }
     }
+    
     rows_to_features_min = 10      # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
     logger.info(f"Parametros para entrenar: {d_params}")
         
@@ -234,4 +239,4 @@ if __name__ == "__main__":
         country = 'all'
 
     # Entreno modelos y los evaluo en produccion.
-    df = main(l_modelos, d_params, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train)
+    df = main(l_modelos, d_params, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train, retrain=retrain)

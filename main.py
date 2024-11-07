@@ -567,7 +567,7 @@ class DataPreparation:
             print("\nEscalado de datos...")
 
         scaler = StandardScaler()
-        X_sin_col_mucho_nan = X_sin_col_mucho_nan.select_dtypes(exclude=['datetime64[ns]'])  # The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
+        X_sin_col_mucho_nan = X_sin_col_mucho_nan.select_dtypes(exclude=['datetime64[ns]'])  # Excluy escalado de columnas datetime -->  The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
@@ -713,7 +713,91 @@ class Modeling:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
         
-    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, export: bool = True):
+    def select_test_set(self, df, test_size, retrain, n_years_to_select = 0.25, n_max_reg = 100, verbose: int = 1):
+        """
+        Determina qué registros pueden ser utilizados en el test
+        Requisitos para el test
+            -1: Que id_competition sea publica (lo mismo que hago en assess) --> Nuevo
+            -2: Que sean partidos del ultimo año? --> Nuevo
+                # Podria levantar df_match y ver para tal id_match su valor en id_competition y su fecha.
+            -3: Que no este rellenado
+
+        # Parameters
+            df: Dataframe.
+            test_size: Porcentaje maximo del total de datos que iran al test.
+            n_years_to_select: Numero de años para seleccionar los ultimos partidos los cuales iran al df_test.
+            n_max_reg: Numero maximo de registros para X_test. (int)
+            verbose: 
+
+        # Return
+            X_test: Dataframe de testeo sin variable respuesta.
+            y_test: Dataframe de testeo solo la variable respuesta.
+        """
+        # Levanto df_match del pais
+        if retrain:
+            df_match = pd.read_excel(f'data/{self.country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
+            df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+            logger.warning(f"Se levanto el df_match con los missing pues retrain=True. Shape: {df_match.shape}")
+        else:
+            df_match = pd.read_excel(f"data/{self.country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
+        df_match = df_match.sort_values(by='date', ascending=False)
+        if verbose >= 2:
+            logger.info(df_match)
+
+        # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
+        from p4_modeling.assess_models_in_prod import select_league_matches
+        df1 = select_league_matches(df_match)
+        index_comp = df1.index
+
+        # Requisito 2: Last matches (6 meses?) 
+        fecha_limite = df_match.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+        df2 = df_match[df_match['date'] >= fecha_limite] 
+        index_last_matches = df2.index
+
+        # Requisito 3: En caso de haber rellenado, evitar partidos rellenados. # En df obtengo rellenado por match y determino posibles id_matches
+        if 'rellenado' in df.columns:
+            index_no_rellenado = df[~df['rellenado']].index  # Obtengo indice de filas no rellenadas
+            df = df.drop('rellenado', axis=1)  # Elimino columna "rellenado" que agregue en treat_nan_values()
+        else: 
+            index_no_rellenado = df.index
+
+        if verbose >= 1:
+            logger.warning(f"Hay {len(df1)} que pertenecen a la competicion evaluada en el assess.")
+            logger.warning(f"Solo hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
+            logger.warning(f"Hay {len(index_no_rellenado)} que no han sido rellenados.")
+
+        # Selecciono registros que cumplen los 3 requisitos
+        df_filt = df[df.index.isin(index_comp) & df.index.isin(index_no_rellenado) & df.index.isin(index_last_matches)]
+        if verbose >= 1:
+            logger.critical(f"Hay {len(df_filt)} registros que cumplen con los 3 requisitos al mismo tiempo")
+
+        # if verbose >= 2:
+        #     df_filt_1 = df[df.index.isin(df1.index)]
+        #     logger.info(len(df_filt_1))
+        #     df_filt_2 = df[df.index.isin(df1.index) & df.index.isin(index_no_rellenado)]
+        #     logger.info(len(df_filt_2))
+        #     df_filt_3 = df[df.index.isin(df1.index) & df.index.isin(index_no_rellenado) & df.index.isin(df3.index)]
+        #     logger.info(len(df_filt_3))
+
+        # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
+        n_reg_test = min(int(len(df) * test_size), n_max_reg) # Defino numero de registros necesarios
+        n_reg_test_max = len(df_filt)
+
+        if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
+            # Ajusta n para tomar todas las filas no rellenadas disponibles
+            n_reg_test_old = n_reg_test
+            n_reg_test = n_reg_test_max
+            
+            if verbose >= 0:
+                logger.warning(f"Reduzo la cantidad de registros en test debido a que no hay los suficientes que satisfagan los requisitos. Necesito {n_reg_test_old} pero hay solo {n_reg_test_max} registros posibles.")
+
+        # Construyo el dataset de testeo a partir de registros que no han sido rellenados
+        df_test = df_filt.sample(n_reg_test, random_state=42)
+        X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
+
+        return X_test, y_test
+        
+    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, retrain: bool = False, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -731,77 +815,23 @@ class Modeling:
         if verbose >= 0:
             print("\nSeparating data in train, val and test...")
 
-        # Si rellené NaN values
+        # Selecciono test set
+        X_test, y_test = self.select_test_set(df, test_size, retrain=retrain)
+    
+        # Elimino columna rellenado
         if 'rellenado' in df.columns:
-
-            if verbose >= 1:
-                print("\tDejo registros no rellenados en df_test y df_val")
-
-            # Obtengo indice de filas no rellenadas
-            index_no_rellenado = df[~df['rellenado']].index
             df = df.drop('rellenado', axis=1)
-            if verbose >= 1:
-                print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
 
-            # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
-            n_reg_test = int(len(df) * test_size)
-            n_reg_test_max = len(index_no_rellenado)
-            if verbose >= 1:
-                print(f"Numero de registros para df_test: {n_reg_test}")
-            if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
-                # Ajusta n para tomar todas las filas no rellenadas disponibles
-                if verbose >= 1:
-                    print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
-                n_reg_test = n_reg_test_max
+        # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
+        df_train_val = df[~df.index.isin(X_test.index)]
+        X_train_val, y_train_val = df_train_val.drop(self.var_resp, axis=1), df_train_val[self.var_resp]
 
-            # Construyo el dataset de testeo a partir de registros que no han sido rellenados
-            df_test = df.loc[index_no_rellenado].sample(n_reg_test, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
-            X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
-            if verbose >= 1:
-                print(f"Shape df_test: {df_test.shape}")
+        # Calcula el tamaño relativo del conjunto de validación
+        test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
+        val_size_ratio = val_size / (1 - test_size_ratio) 
 
-            # Eliminar los índices de df_test de index_no_rellenado
-            indices_a_eliminar = df_test.index
-            index_no_rellenado_sin_test = index_no_rellenado.drop(indices_a_eliminar)
-            if verbose >= 1:
-                print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
-
-            # Determino si hay suficientes registros no rellenados para poner en el dataframe de validacion
-            n_reg_val = int(len(df) * val_size)
-            n_reg_val_max = len(index_no_rellenado_sin_test)
-            if verbose >= 1:
-                print(f"Numero de registros para df_val: {n_reg_val}")
-            if n_reg_val > n_reg_val_max: # Si no hay suficientes filas no rellenadas disponibles
-                # Ajusta n para tomar todas las filas no rellenadas disponibles
-                if verbose >= 1:
-                    print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
-                n_reg_val = n_reg_val_max
-
-            # Construyo train y val a partir de las filas que quedan
-            df_train_val = df[~df.index.isin(df_test.index)]
-            df_val = df_train_val.loc[index_no_rellenado_sin_test].sample(n_reg_val, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
-            X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]
-
-            # Construyo train con los registros que quedan
-            df_train = df_train_val[~df_train_val.index.isin(df_val.index)]
-            X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
-            if verbose >= 1:
-                print(f"Shape df_train_val: {df_train_val.shape}")
-                print(f"Shape df_val: {df_val.shape}")
-                print(f"Shape df_train: {df_train.shape}")
-
-        # Si no rellene nan values
-        else:
-            # Separo test y train_val
-            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
-            X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
-
-            # Calcula el tamaño relativo del conjunto de validación
-            test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
-            val_size_ratio = val_size / (1 - test_size_ratio) 
-
-            # Separo en train y validation
-            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
+        # Separo en train y validation
+        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
 
         # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
         if bal_type is not None:
@@ -809,6 +839,7 @@ class Modeling:
 
         if verbose >= 0:
             print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
+
         if export:
             X_train.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_train.xlsx', index=True)
             X_val.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_val.xlsx', index=True)
@@ -877,7 +908,7 @@ class Modeling:
 
         return model_best_params, params, train_accuracy, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, verbose: int = 0):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False, verbose: int = 0):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -885,17 +916,25 @@ class Modeling:
             model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
             X_test: Dataframe de prueba con variables predictoras. (DataFrame)
             y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
+            retrain: Boolean para definir si es un reentrenamiento de modelos con missing o no. (bool)
             export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
 
         # Returns:
             Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluating trained model with test sets...")
-        # Levanto df_match_odds (solo los partidos en X_test)
-        df_match_odds = pd.read_excel(f'./data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
+        self.var_pred_bm = 'bookmaker_result'  
+
+        # Levanto df_match_odds 
+        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
+        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
+        if verbose >= 2:
+            logger.info(f"Path odds: {path_match_odds}")
+            logger.info(df_match_odds)
+
+        # Filtro df_match_odds dejando solo los partidos de X_test
         df_match_odds = df_match_odds[df_match_odds.index.isin(X_test.index)]  # Selecciono los partidos que estan en df_test
         df_match_odds = df_match_odds.reindex(X_test.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-        self.var_pred_bm = 'bookmaker_result'  
 
         # Predecir las etiquetas para los datos de prueba
         try:
@@ -921,7 +960,9 @@ class Modeling:
 
         if verbose >= 1:
             # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-            df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, verbose=verbose)
+            df_conf_mat = asses_model.confusion_matrix(y_test, y_pred)
+            if export:
+                df_conf_mat.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
         # Agrego predicciones de bookmaker
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -943,12 +984,11 @@ class Modeling:
             print(d_metrics)
 
         if export:
-            df_conf_mat.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_conf_matrix.xlsx')
             df_predicciones.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_predicciones.xlsx')
 
         return df_predicciones, d_metrics
     
-    def train_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, export=True):
+    def train_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -967,7 +1007,7 @@ class Modeling:
                 model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
 
                 # Evaluo modelo en test
-                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
+                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain)
 
                 # Hiperparametros del modelo y Metricas en testeo y train
                 new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params}
@@ -1026,7 +1066,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
         df_player_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx') #  index_col=0 --> si lo uso falla la integracion porque pone 'id_player' como index
         df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
-
+        
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
     #------------------------------------------- DATA PREPARATION -------------------------------------------#
