@@ -235,7 +235,9 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
     bayes, all_tuning = (False, False) if model_name == 'LogisticRegression' else (bayes, all_tuning) # Seteo Bayes a False cuando es Logistic. Evito Bayes para Logistic
     params = space_params(model_name, bayes) if params is None else params
     scoring = default_scoring(num_classes=len(np.unique(y_val_train))) if scoring is None else scoring
-    logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
+    
+    if verbose >= 1:
+        logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
 
     # BayesSearch
     if bayes or all_tuning:

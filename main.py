@@ -535,13 +535,15 @@ class DataPreparation:
             if verbose >= 1:
                 print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
 
-        ## con mucho NaN (filas sin estadisticas ni formaciones)
+        '''
+        ## con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
         n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, 0.5)
+        X = clean_data.delete_rows_nan(X, 0.75)
 
         if verbose >= 1:
             print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+        '''
 
         # (2) Eliminacion de columnas   
         if verbose >= 1:
@@ -585,7 +587,7 @@ class DataPreparation:
 
         return df, scaler, X_sin_col_mucho_nan.columns
     
-    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose:int = 0, export: bool = True):
+    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose: int = 0, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -740,20 +742,46 @@ class Modeling:
             logger.warning(f"Se levanto el df_match con los missing pues retrain=True. Shape: {df_match.shape}")
         else:
             df_match = pd.read_excel(f"data/{self.country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
+        
+        # Ordeno por fecha descendiente
         df_match = df_match.sort_values(by='date', ascending=False)
+        
         if verbose >= 2:
-            logger.info(df_match)
+            logger.info(df_match.columns) # No quiero "unnamed"
+            logger.info(df_match['date'].head(10))
 
         # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
         from p4_modeling.assess_models_in_prod import select_league_matches
         df1 = select_league_matches(df_match)
         index_comp = df1.index
 
-        # Requisito 2: Last matches (6 meses?) 
-        fecha_limite = df_match.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+        if verbose >= 1:
+            # logger.warning(f"Hay {len(df1)} que pertenecen a la competicion evaluada en el assess.")
+            df_filt_1 = df[df.index.isin(index_comp)]
+            logger.info(f"Registros que pasan el requisito 1: {len(df_filt_1)}")
+        
+        # Requisito 2: Last matches (6 meses?)
+        fecha_last_match = df_match.iloc[0]['date']
+        fecha_limite = fecha_last_match - datetime.timedelta(days=n_years_to_select*365)
         df2 = df_match[df_match['date'] >= fecha_limite] 
         index_last_matches = df2.index
 
+        if verbose >= 1:
+            # logger.info(f"Partido mas reciente: {fecha_last_match} ({max(df_match['date'])}). Fecha limite: {fecha_limite}")
+            # logger.warning(f"Hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
+            df_aux = df[df.index.isin(index_last_matches)]
+            print(f"Registros que pasan requisito 2 (todas las competiciones): {len(df_aux)}")
+
+            # Si se han eliminado "ultimos partidos" en treat_nan_values() o clean_data_2()
+            if len(df_aux) != len(index_last_matches):
+                logger.warning(f"(1 de 3) PROBLEMA DE NAN EN ULTIMOS PARTIDOS. De los {len(index_last_matches)}, solo hay {len(df_aux)} en el df que recibe select_test_data(). Deberian ser iguales --> {len(index_last_matches)} = {len(df_aux)}")
+                logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
+                logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
+
+            df_filt_2 = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
+            logger.info(f"Registros que pasan requisitos 1 y 2: {len(df_filt_2)}")
+
+        ''' Para SPA no sirve porque los ultimos partidos tienen nan y fill_na los elimina en treat_nan_values y fill_na=ml los rellena pero si pongo como requisito que no este llene, los elimina aca.
         # Requisito 3: En caso de haber rellenado, evitar partidos rellenados. # En df obtengo rellenado por match y determino posibles id_matches
         if 'rellenado' in df.columns:
             index_no_rellenado = df[~df['rellenado']].index  # Obtengo indice de filas no rellenadas
@@ -762,22 +790,20 @@ class Modeling:
             index_no_rellenado = df.index
 
         if verbose >= 1:
-            logger.warning(f"Hay {len(df1)} que pertenecen a la competicion evaluada en el assess.")
-            logger.warning(f"Solo hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
-            logger.warning(f"Hay {len(index_no_rellenado)} que no han sido rellenados.")
+            print(f"Registros que pasan requisito 3: {len(index_no_rellenado)}")
 
         # Selecciono registros que cumplen los 3 requisitos
         df_filt = df[df.index.isin(index_comp) & df.index.isin(index_no_rellenado) & df.index.isin(index_last_matches)]
-        if verbose >= 1:
-            logger.critical(f"Hay {len(df_filt)} registros que cumplen con los 3 requisitos al mismo tiempo")
 
-        # if verbose >= 2:
-        #     df_filt_1 = df[df.index.isin(df1.index)]
-        #     logger.info(len(df_filt_1))
-        #     df_filt_2 = df[df.index.isin(df1.index) & df.index.isin(index_no_rellenado)]
-        #     logger.info(len(df_filt_2))
-        #     df_filt_3 = df[df.index.isin(df1.index) & df.index.isin(index_no_rellenado) & df.index.isin(df3.index)]
-        #     logger.info(len(df_filt_3))
+        if verbose >= 1:
+            logger.info(f'Registros que pasan requisito 1, 2 y 3. {len(df_filt)}')
+        '''   
+        # Si evito el requisito 3, igual tengo que eliminar "rellenado"
+        if 'rellenado' in df.columns:
+            df = df.drop('rellenado', axis=1)  # Elimino columna "rellenado" que agregue en treat_nan_values()
+
+        # Selecciono registros que cumplen los 3 requisitos
+        df_filt = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
 
         # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
         n_reg_test = min(int(len(df) * test_size), n_max_reg) # Defino numero de registros necesarios
@@ -789,7 +815,7 @@ class Modeling:
             n_reg_test = n_reg_test_max
             
             if verbose >= 0:
-                logger.warning(f"Reduzo la cantidad de registros en test debido a que no hay los suficientes que satisfagan los requisitos. Necesito {n_reg_test_old} pero hay solo {n_reg_test_max} registros posibles.")
+                logger.warning(f"ACHICO DF_TEST. Reduzco la cantidad de registros en test debido a que no hay los suficientes que satisfagan los requisitos. Necesito {n_reg_test_old} pero hay solo {n_reg_test_max} registros posibles.")
 
         # Construyo el dataset de testeo a partir de registros que no han sido rellenados
         df_test = df_filt.sample(n_reg_test, random_state=42)

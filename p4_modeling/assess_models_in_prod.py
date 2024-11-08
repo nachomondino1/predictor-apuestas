@@ -46,6 +46,8 @@ def select_league_matches(df, verbose: int = 0):
 
     # Selecciono solo las ligas del pais
     l_leagues = list(df_comp[(df_comp['is_cup']==0) & (df_comp['is_second_division']==0)]['id_competition'].values) 
+    
+    # Filtro dataset segun ligas
     df = df[df['id_competition'].isin(l_leagues)]
     
     if verbose >=0:

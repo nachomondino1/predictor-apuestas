@@ -149,18 +149,20 @@ class DataUnderstandingNew():
             if raise_error:
                 raise ValueError("El dataframe no tiene columnas")
             
-    def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame):
-
+    def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, verbose: int = 1):
+        """
+        Descripción de dataframes en terminos de dtypes, nan values, registros unicos, etc.
+        """
         logger.info("Describing data... ")
         logger.info("DF_MATCH")
-        describe_data.getting_to_know_data(df_match, print_all=False)
+        describe_data.getting_to_know_data(df_match, verbose=verbose)
         describe_data.verificar_unicidad_registros(df_match) # Verifico unicidad de registros segun campos id
 
         logger.info("DF_MATCH_PLAYER")
-        describe_data.getting_to_know_data(df_match_player, print_all=False)
+        describe_data.getting_to_know_data(df_match_player, verbose=verbose)
 
         logger.info("DF_MATCH_ODDS")
-        describe_data.getting_to_know_data(df_match_odds, print_all=False)
+        describe_data.getting_to_know_data(df_match_odds, verbose=verbose)
 
 class DataPreparationNew(DataPreparation):
 
@@ -776,7 +778,7 @@ def load_data_preparation_hyperparameters(country, n_model, BASE_DIR, verbose: i
             logger.info(f'\t {key}: {value}')
     return d
 
-def load_modeling_hyperparameters(country, n_model, model_name, BASE_DIR, verbose: int = 0): # Probar
+def load_modeling_hyperparameters(country, n_model, model_name, BASE_DIR, verbose: int = 1): # Probar
     """
     Cargo hiperparametros de Modeling()
     """
@@ -790,8 +792,6 @@ def load_modeling_hyperparameters(country, n_model, model_name, BASE_DIR, verbos
        
         except FileNotFoundError:
             df_iteration = pd.read_excel(f"{BASE_DIR}/df_iteration_test.xlsx")
-            if verbose >= 2:
-                logger.info(df_iteration)
 
         rows_ite = df_iteration[df_iteration['n_iteration'] == n_model]
 
@@ -815,17 +815,29 @@ def load_modeling_hyperparameters(country, n_model, model_name, BASE_DIR, verbos
         row_hiper_bet_strat = pd.read_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx')
         logger.error("Se levantan los hiperparametros de Modeling desde de main.py")
 
-    d['thr_prob_min'] = load_with_fallback(row_hiper_bet_strat, 'thr_prob_min_best_prod', 'thr_prob_min_best', float)
-    d['curva'] = load_with_fallback(row_hiper_bet_strat, 'curva_prod', 'curva', str)
-    param1 = load_with_fallback(row_hiper_bet_strat, 'param1_prod', 'param1', int)
-    param2 = load_with_fallback(row_hiper_bet_strat, 'param2_prod', 'param2', int)
+    d['thr_prob_min'] = float(load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
+    d['curva'] = load_value_from_series(row_hiper_bet_strat, 'curva') # str
+    param1 = load_value_from_series(row_hiper_bet_strat, 'param1')  # int?
+    param2 = load_value_from_series(row_hiper_bet_strat, 'param2') 
     d['curva_m'] = param1 if d['curva'] in l_curvas else None
     d['curva_b'] = param2 if d['curva'] in l_curvas else None
     d['curva_p1'] = eval(str(param1)) if d['curva'] not in l_curvas else None
     d['curva_p2'] = eval(str(param2)) if d['curva'] not in l_curvas else None
-    d['odd_weight'] = load_with_fallback(row_hiper_bet_strat, 'odd_weight_prod', 'odd_weight', int)
-    d['dif_prob_sup_cap'] = load_with_fallback(row_hiper_bet_strat, 'dif_prob_sup_cap_prod', 'dif_prob_sup_cap', float)
-    d['normalized'] = load_with_fallback(row_hiper_bet_strat, 'normalized_prod', 'normalized', bool)
+    d['odd_weight'] = int(load_value_from_series(row_hiper_bet_strat, 'odd_weight'))
+    d['dif_prob_sup_cap'] = float(load_value_from_series(row_hiper_bet_strat, 'dif_prob_sup_cap'))
+    d['normalized'] = load_value_from_series(row_hiper_bet_strat, 'normalized')
+
+    # d['thr_prob_min'] = load_with_fallback(row_hiper_bet_strat, 'thr_prob_min_best_prod', 'thr_prob_min_best', float)
+    # d['curva'] = load_with_fallback(row_hiper_bet_strat, 'curva_prod', 'curva', str)
+    # param1 = load_with_fallback(row_hiper_bet_strat, 'param1_prod', 'param1', int)
+    # param2 = load_with_fallback(row_hiper_bet_strat, 'param2_prod', 'param2', int)
+    # d['curva_m'] = param1 if d['curva'] in l_curvas else None
+    # d['curva_b'] = param2 if d['curva'] in l_curvas else None
+    # d['curva_p1'] = eval(str(param1)) if d['curva'] not in l_curvas else None
+    # d['curva_p2'] = eval(str(param2)) if d['curva'] not in l_curvas else None
+    # d['odd_weight'] = load_with_fallback(row_hiper_bet_strat, 'odd_weight_prod', 'odd_weight', int)
+    # d['dif_prob_sup_cap'] = load_with_fallback(row_hiper_bet_strat, 'dif_prob_sup_cap_prod', 'dif_prob_sup_cap', float)
+    # d['normalized'] = load_with_fallback(row_hiper_bet_strat, 'normalized_prod', 'normalized', bool)
 
     if verbose >= 0:
         logger.info("Hiperparametros cargados:")
@@ -842,12 +854,14 @@ def load_with_fallback(row, primary_key, fallback_key, data_type):
     except KeyError:
         return data_type(load_value_from_series(row, fallback_key))
 
-def load_value_from_series(row, col_name):
+def load_value_from_series(row, col_name, verbose: int = 0):
     try:
         val = row[col_name].values[0]
     except IndexError:
         val = row[col_name]
-    logger.warning(f'{col_name}: {val}')
+    
+    if verbose >= 1:
+        logger.warning(f'{col_name}: {val}')
     return val
     
 def load_models(country, n_model, model_name, BASE_DIR_dp, BASE_DIR_mod, d): # Probar
@@ -1058,7 +1072,8 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
         df_teams_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)
 
-        du.describe_data_new(df_match, df_match_player, df_match_odds)
+        if verbose >= 1:
+            du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
     
     elif d_run['data_prep']:
         logger.warning("Se evitó por comando la extraccion de proximos partidos.")
@@ -1067,17 +1082,19 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df_match_player = pd.read_excel(f'./data/{country}/p6_deployment/data_understanding/df_match_player_next.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'./data/{country}/p6_deployment/data_understanding/df_match_next_odds.xlsx', index_col=0)
         
-        du.describe_data_new(df_match, df_match_player, df_match_odds)
-        # print("\n DF MATCH \n", df_match.head(2))
-        # print("\n DF MATCH PLAYER \n", df_match_player.head(2))
-
+        if verbose >= 1:
+            du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
+            
         # SOFIFA
         df_player_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
         df_teams_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)
-        # print("\n df_player_sofifa \n", df_player_sofifa.head(2))
-        # print("\n df_player_fifa_sofifa \n", df_player_fifa_sofifa.head(2))
 
+        if verbose >= 2:
+            print("\n DF MATCH \n", df_match.head(2))
+            print("\n DF MATCH PLAYER \n", df_match_player.head(2))
+            print("\n df_player_sofifa \n", df_player_sofifa.head(2))
+            print("\n df_player_fifa_sofifa \n", df_player_fifa_sofifa.head(2))
 
     # _____________________________________________________________ DATA PREPARATION _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "DATA PREPARATION".center(120) + "\n" + "+"*120 + "\n")
@@ -1174,7 +1191,7 @@ def main(d_run:dict, id_country:int, n_days_max_next_matches:int = 7, n_seasons_
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
         # Vario el stake segun curva especifica
-        m_to_use = d_hiper_mod['curva_m'] * 0.5
+        m_to_use = d_hiper_mod['curva_m'] * 0.25
         df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'],normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
         logger.critical(f"m_to_use: {m_to_use}") # logger.info(f"m_to_use: {d_hiper_mod['curva_m']}")
 
@@ -1224,7 +1241,7 @@ if __name__ == "__main__":
         directorio = "data/"
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    # l_countries = [48]
 
     # Definir condiciones del análisis
     for id_country in l_countries:

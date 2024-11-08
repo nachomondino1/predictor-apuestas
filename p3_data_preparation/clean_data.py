@@ -265,7 +265,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
 
     # Progress bar
     if verbose >= 0:
-        logger.warning(f"Se rellenaran {len(l_columns_to_fill)} columnas.")
+        logger.info(f"Se rellenaran {len(l_columns_to_fill)} columnas.")
         progress_bar = tqdm(total=len(l_columns_to_fill), ncols=80)  # Inicializo barra de progreso
 
     # Por columna a rellenar
