@@ -95,7 +95,9 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
 class FeatureSelection():
 
     def __init__(self, graficar_cada_metodo: bool = False) -> None:
+        self.k = 5 # Cantidad de Folds
         self.bayes = False # Random tarda banda y Logistic +
+        self.scoring = 'f1_macro' # Pues el dataset no esta balanceado.
         self.all_tuning = False
         self.verbose = 1
         self.graficar_cada_metodo = graficar_cada_metodo
@@ -105,12 +107,11 @@ class FeatureSelection():
         Calculo de importancia de cada variable segun los modelos estadisticos.
 
         # Parameters
-        X: Dataframe con variables predictoras. (DataFrame)
-        y: Dataframe solo con variable respuesta. (DataFrame)
-        graf: Boolean. True para graficar importancia por variable. (bool)
+            X: Dataframe con variables predictoras. (DataFrame)
+            y: Dataframe solo con variable respuesta. (DataFrame)
 
         # Returns
-        Dataframe. Importancia por variable. (Dataframe)
+            Dataframe. Importancia por variable. (Dataframe)
         """
         # Definicion de variables
         l_features, l_scores = [], []
@@ -151,24 +152,23 @@ class FeatureSelection():
 
         return df_importance
 
-    def random_forest(self, X, y, k: int = 5):
+    def random_forest(self, X, y):
         """
         Calculo de importancia de cada variable segun modelo de random forest.
 
         # Parameters
-        X: Dataframe con variables predictoras. (DataFrame)
-        y: Dataframe solo con variable respuesta. (DataFrame)
-        graf: Boolean. True para graficar importancia por variable. (bool)
-        
+            X: Dataframe con variables predictoras. (DataFrame)
+            y: Dataframe solo con variable respuesta. (DataFrame)
+            
         # Returns
-        Dataframe. Importancia por variable. (Dataframe)
+            Dataframe. Importancia por variable. (Dataframe)
         """
         # Separo en train y val (para que select_best_hiperparameters() no tarde tanto)
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparámetros
-        model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
-                                                                           bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=self.k, 
+                                                                           bayes=self.bayes, all_tuning=self.all_tuning, scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)   # AttributeError: 'BayesSearchCV' object has no attribute 'feature_importances_'
@@ -204,13 +204,12 @@ class FeatureSelection():
 
         return df_importance
 
-    def rfe(self, X, y, k: int = 5):
+    def rfe(self, X, y):
         """
         Calculo de importancia de cada variable segun rfe.
 
         :param X: Dataframe con variables predictoras. (DataFrame)
         :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
         :return: Dataframe. Importancia por variable. (Dataframe)
         """
         # Definicion de variables
@@ -224,8 +223,8 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelos buscando los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=self.bayes, 
-                                                                           all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=self.k, 
+                                                                           bayes=self.bayes, all_tuning=self.all_tuning,  scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo RFE a partir de Logistic
         rfe = RFE(estimator=model, n_features_to_select=n_features)
@@ -245,20 +244,19 @@ class FeatureSelection():
 
         return df_importance
 
-    def lasso_selection(self, X, y, k: int = 5):
+    def lasso_selection(self, X, y):
         """
         Calculo de importancia de cada variable segun lasso.
 
         :param X: Dataframe con variables predictoras. (DataFrame)
         :param y: Dataframe solo con variable respuesta. (DataFrame)
-        :param graf: Boolean. True para graficar importancia por variable. (bool)
         :return: Dataframe. Importancia por variable. (Dataframe)
         """
         # Separo en train y val
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
+        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=self.k,  scoring=self.scoring,
                                                                            bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
@@ -334,7 +332,6 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
     print('\n Feature Selection...')
     # Definicion de variables
     fs = FeatureSelection(graficar_cada_metodo=False)
-    k = 10
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
@@ -349,8 +346,8 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
     df_importance = pd.DataFrame(index=X.columns)
     # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
     df_importance = df_importance.merge(fs.via(X, y), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.random_forest(X, y, k=k), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.rfe(X, y, k=k), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.random_forest(X, y), left_index=True, right_index=True)
+    df_importance = df_importance.merge(fs.rfe(X, y), left_index=True, right_index=True)
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)
@@ -375,12 +372,14 @@ def determine_country_competitions(id_country):
     """
     Determina los grupos de competencias para el pais.
     """
-
     # Levanto competencias
     df_comp = pd.read_excel('./data/df_competencies.xlsx')
 
-    # Selecciono las del pais
-    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
+    if id_country == -1:
+        df_comp_country = df_comp[(df_comp['id_country'].isin([48, 55, 59, 77, 148]))]
+    else:
+        # Selecciono las del pais
+        df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
 
     # Filtro
     df_comp_country_sin_sec_div = df_comp_country[(df_comp_country['is_second_division'] == 0)]

@@ -138,7 +138,7 @@ def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
 
 
-def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train: bool = False, export: bool = True):
+def main(l_modelos, d_params, rows_to_features_min: int = 10, retrain: bool = False, continue_old_train: bool = False, export: bool = True):
     """
     Entrena modelos segun las combinaciones de hiperparametros deseadas. Luego los evalua en produccion y selecciona el mejor.
     """
@@ -155,7 +155,7 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
         directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_modelos, ruta_assess, ruta_assess_2])
     
     # Preparao datos, entreno modelos y evaluo en df_test
-    df_ite_train, df_ite_test = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_modelos, d_params, l_modelos, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train, export=export)
+    df_ite_train, df_ite_test = train_models.main(country, ruta_base_dp, ruta_base_mod, ruta_base_modelos, d_params, l_modelos, rows_to_features_min=rows_to_features_min, retrain=retrain, continue_old_train=continue_old_train, export=export)
 
     # Preparo datos missing y evaluo modelos en produccion
     df_ite_test_prod = assess_models_in_prod.main(df_ite_train, country, date, ruta_base_dp, ruta_base_mod, export=export)
@@ -176,6 +176,9 @@ def main(l_modelos, d_params, rows_to_features_min: int = 10, continue_old_train
     df_ite = pd.merge(df_ite_train, df_concat, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
     df_ite.to_excel(f'{ruta_base_mod}/df_iteration.xlsx')
     # logger.info(df_merged)
+
+    # Actualizar df_best_models.xlsx autoamticamente
+    # ...
     return df_ite
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
@@ -183,22 +186,20 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 77
+    retrain = True
     continue_old_train = False
 
     # Determina date de la iteracion
     if continue_old_train:
-        date = '2024-10-13'
+        date = '2024-10-30'
     else:
         date_con_hora = datetime.datetime.now()  # + datetime.timedelta(days=1) --> Si queres correr 2 el mismo dia. No funciona aun.
         date = date_con_hora.date()
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), 'neural_network', SVC()] # XGBClassifier()
-    # l_modelos = [LogisticRegression(), 'neural_network']  #  --> Va a la clase mayoritaria. Por eso le va bien en ITA pq dice todo Empate. #RandomForestClassifier(), XGBClassifier(), GradientBoostingClassifier(),  MLPClassifier()
-    # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier() # Pruebo red neuroanl segun precision y no recall
-    # l_modelos = [LogisticRegression(), 'neural_network', XGBClassifier(), GradientBoostingClassifier(), MLPClassifier()]
-    # l_modelos = [XGBClassifier()]
+    l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] #  GradientBoostingClassifier(), MLPClassifier()]
+    # l_modelos = [SVC(), XGBClassifier()] #  GradientBoostingClassifier(), MLPClassifier()]
 
     # 1728 iteraciones
     d_params = {  
@@ -209,8 +210,8 @@ if __name__ == "__main__":
             'dif_con_against': [True, False] # False
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_b'] solo para USA 
-            'n_years_to_select': [3, 5, 10], # None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
+            'competencies_to_select': [d_comps['comp_sin_b'], d_comps['all_comp']], # d_comps['comp_sin_b'] solo para USA 
+            'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -220,18 +221,22 @@ if __name__ == "__main__":
             'fill_na': [None, 'ml'],
         },
         'modeling': {
-            'val_size': [0.125],
-            'test_size': [0.10], 
-            'bal_type': ['under'], # None (En ger?)
+            'val_size': [0.10],
+            'test_size': [0.15], 
+            'bal_type': ['under'], # None (ni con f1_score..)
             'k': [5] 
         }
     }
+    
     rows_to_features_min = 10      # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
     logger.info(f"Parametros para entrenar: {d_params}")
-
+        
     ## Obtengo el nombre del pais segun su id
-    df_countries = pd.read_excel('./data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    if id_country > 0:
+        df_countries = pd.read_excel('./data/df_countries.xlsx')
+        country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
+    else:
+        country = 'all'
 
     # Entreno modelos y los evaluo en produccion.
-    df = main(l_modelos, d_params, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train)
+    df = main(l_modelos, d_params, rows_to_features_min=rows_to_features_min, continue_old_train=continue_old_train, retrain=retrain)

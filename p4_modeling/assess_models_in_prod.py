@@ -37,7 +37,7 @@ def save_assess(ruta_base):
     l_dirs = [f'{ruta_base}/assess_models_in_prod/data_preparation', f'{ruta_base}/assess_models_in_prod/modeling']
     directories.make_directories(l_directorios=l_dirs)
 
-def select_league_matches(df):
+def select_league_matches(df, verbose: int = 0):
     """
     Filtra partidos seleccionado solo aquellos que son de liga (eliminando partidos de copa)
     """
@@ -46,10 +46,14 @@ def select_league_matches(df):
 
     # Selecciono solo las ligas del pais
     l_leagues = list(df_comp[(df_comp['is_cup']==0) & (df_comp['is_second_division']==0)]['id_competition'].values) 
-    print("Ligas: ", l_leagues)
-
+    
+    # Filtro dataset segun ligas
     df = df[df['id_competition'].isin(l_leagues)]
-    print(f"Shape sin copas: {df.shape}")
+    
+    if verbose >=0:
+        print("Ligas: ", l_leagues)
+        print(f"Shape sin copas: {df.shape}")
+
     return df
 
 def load_preparation_hyperparameters(row_hiper, verbose: int = 1):
@@ -310,12 +314,14 @@ if __name__ == "__main__":
 
     # Defino condiciones del analisis
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [48]
+
     only_select_best_model = False # False
     bet_strategy = 'general' # Si queres saber el ROI de la realidad, usar 'reality'
     d = {
+        -1: ["all", "2024-11-06"],
         6: ["argentina", "2024-05-07"],
-        48: ["england", '2024-10-02'],
+        48: ["england", '2024-11-06'], # 10-02
         55: ["france", "2024-10-03"], 
         59: ["germany", "2024-10-13"], # 13
         77: ["italy", "2024-10-03"], # 15

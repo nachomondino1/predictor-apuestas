@@ -28,6 +28,7 @@ from sklearn.neural_network import MLPClassifier
 ### Assess model
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
+from types import SimpleNamespace
 
 
 class DataUnderstanding:
@@ -216,15 +217,19 @@ class DataPreparation:
         start_date = '2012-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
         df_match = df_match[df_match['date'] >= start_date]
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)] # Es clave para eliminar jugadores y hacer una mejor integracion (tener menos falsos positivos)
-        logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
+        
+        if verbose >= 1:
+            logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
 
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
         df_match_player.drop(columns=non_object_columns, inplace=True)
-        print("Shape df_match_player: ", df_match_player.shape)
+        
+        if verbose >= 1:
+            print("Shape df_match_player: ", df_match_player.shape)
+            print("\nPreparacion de columnas string...")
 
         # Preparacion de texto
-        print("\nPreparacion de columnas string")
         ## FLASHSCORE
         columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
         df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
@@ -238,7 +243,7 @@ class DataPreparation:
         df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
         df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates() # No por id_player porque no es unico (hay 2 por fifa)
         n_players_eliminated = len_inic - len(df_player_sofifa)
-        if n_players_eliminated > 0:
+        if verbose >= 0 and n_players_eliminated > 0:
             logger.warning(f"Se eliminaron {n_players_eliminated} jugadores de los {len_inic} de Sofifa que habia.")
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
@@ -246,7 +251,8 @@ class DataPreparation:
         df_teams_sofifa = clean_data.prepare_text_columns(df_teams_sofifa, l_cols_to_process=['team_name'])
 
         # Correcion de valores
-        print("\nCorrecion de valores")
+        if verbose >= 1:
+            print("\nCorrecion de valores")
         df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     
         # Verificar que no haya outliers
@@ -283,38 +289,22 @@ class DataPreparation:
         start = time.time()
         logger.info("\nIntegrating data...")
 
-        '''
-        # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
-        print("\nIntegrating team's data to df_match...")
-        # Si ya hice el mapeo
-        try:
-            df_map_teams_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx')
-            print("No vuelvo a mapear sino que levanto df_map ")
-        # Si aun no hice el mapeo
-        except FileNotFoundError:
-            # Matcheo equipos de Sofifa y Flashscore
-            print("Mapeo equipos de Sofifa y Flashscore")
-            df_teams = create_df_teams(df_match)
-            df_map_teams_fs_so = match_dataframes_by_str_column(df1=df_teams, df2=df_teams_sofifa, column_to_match1='team_name', column_to_match2='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
-
-            if export:
-                df_teams.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx", index=True)
-                df_map_teams_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_teams_fs_so.xlsx")
-        
-        # Integro datos de equipos a df_match usando el mapeo       
-        df = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
-        '''
+        # (Temporalmente) Obtengo el listado de equipos unicos de Flashscore
+        df_teams = create_df_teams(df_match)
+        if export:
+            df_teams.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx", index=True)
 
         # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
         print("\nIntegrating player's data to df_match...")
         # Si ya hice el mapeo
         try:
-            df_map_players_fs_so = pd.read_excel(f'data/df_map_players_fs_so.xlsx', index_col=0)
+            path_map = 'data/all/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx' # data/df_map_players_fs_so.xlsx
+            df_map_players_fs_so = pd.read_excel(path_map, index_col=0)
             logger.info("No vuelvo a mapear sino que levanto df_map general ")
 
             # Reemplazo los df_player de Sofifa del pais por los completos
-            df_player_sofifa = pd.read_excel(f'data/df_player_sofifa.xlsx', index_col=0)
-            df_player_fifa_sofifa = pd.read_excel(f'data/df_player_fifa_sofifa.xlsx', index_col=0)
+            df_player_sofifa = pd.read_excel('data/all/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0) #'data/df_player_sofifa.xlsx'
+            df_player_fifa_sofifa = pd.read_excel('data/all/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0) # 'data/df_player_fifa_sofifa.xlsx'
             
             logger.critical("Integración usando el df_map completo!")
 
@@ -545,20 +535,23 @@ class DataPreparation:
             if verbose >= 1:
                 print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
 
-        ## con mucho NaN (filas sin estadisticas ni formaciones)
+        '''
+        ## con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
         n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, 0.5)
+        X = clean_data.delete_rows_nan(X, 0.75)
 
         if verbose >= 1:
             print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
+        '''
 
         # (2) Eliminacion de columnas   
         if verbose >= 1:
             print("Eliminación de columnas...")
 
         ## usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        # cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_for_construct = ['venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
@@ -576,6 +569,7 @@ class DataPreparation:
             print("\nEscalado de datos...")
 
         scaler = StandardScaler()
+        X_sin_col_mucho_nan = X_sin_col_mucho_nan.select_dtypes(exclude=['datetime64[ns]'])  # Excluy escalado de columnas datetime -->  The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
         scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
@@ -593,7 +587,7 @@ class DataPreparation:
 
         return df, scaler, X_sin_col_mucho_nan.columns
     
-    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose:int = 0, export: bool = True):
+    def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose: int = 0, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
 
@@ -721,7 +715,115 @@ class Modeling:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
         
-    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, export: bool = True):
+    def select_test_set(self, df, test_size, retrain, n_years_to_select = 0.25, n_max_reg = 100, verbose: int = 1):
+        """
+        Determina qué registros pueden ser utilizados en el test
+        Requisitos para el test
+            -1: Que id_competition sea publica (lo mismo que hago en assess) --> Nuevo
+            -2: Que sean partidos del ultimo año? --> Nuevo
+                # Podria levantar df_match y ver para tal id_match su valor en id_competition y su fecha.
+            -3: Que no este rellenado
+
+        # Parameters
+            df: Dataframe.
+            test_size: Porcentaje maximo del total de datos que iran al test.
+            n_years_to_select: Numero de años para seleccionar los ultimos partidos los cuales iran al df_test.
+            n_max_reg: Numero maximo de registros para X_test. (int)
+            verbose: 
+
+        # Return
+            X_test: Dataframe de testeo sin variable respuesta.
+            y_test: Dataframe de testeo solo la variable respuesta.
+        """
+        # Levanto df_match del pais
+        if retrain:
+            df_match = pd.read_excel(f'data/{self.country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
+            df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+            logger.warning(f"Se levanto el df_match con los missing pues retrain=True. Shape: {df_match.shape}")
+        else:
+            df_match = pd.read_excel(f"data/{self.country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
+        
+        # Ordeno por fecha descendiente
+        df_match = df_match.sort_values(by='date', ascending=False)
+        
+        if verbose >= 2:
+            logger.info(df_match.columns) # No quiero "unnamed"
+            logger.info(df_match['date'].head(10))
+
+        # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
+        from p4_modeling.assess_models_in_prod import select_league_matches
+        df1 = select_league_matches(df_match)
+        index_comp = df1.index
+
+        if verbose >= 1:
+            # logger.warning(f"Hay {len(df1)} que pertenecen a la competicion evaluada en el assess.")
+            df_filt_1 = df[df.index.isin(index_comp)]
+            logger.info(f"Registros que pasan el requisito 1: {len(df_filt_1)}")
+        
+        # Requisito 2: Last matches (6 meses?)
+        fecha_last_match = df_match.iloc[0]['date']
+        fecha_limite = fecha_last_match - datetime.timedelta(days=n_years_to_select*365)
+        df2 = df_match[df_match['date'] >= fecha_limite] 
+        index_last_matches = df2.index
+
+        if verbose >= 1:
+            # logger.info(f"Partido mas reciente: {fecha_last_match} ({max(df_match['date'])}). Fecha limite: {fecha_limite}")
+            # logger.warning(f"Hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
+            df_aux = df[df.index.isin(index_last_matches)]
+            print(f"Registros que pasan requisito 2 (todas las competiciones): {len(df_aux)}")
+
+            # Si se han eliminado "ultimos partidos" en treat_nan_values() o clean_data_2()
+            if len(df_aux) != len(index_last_matches):
+                logger.warning(f"(1 de 3) PROBLEMA DE NAN EN ULTIMOS PARTIDOS. De los {len(index_last_matches)}, solo hay {len(df_aux)} en el df que recibe select_test_data(). Deberian ser iguales --> {len(index_last_matches)} = {len(df_aux)}")
+                logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
+                logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
+
+            df_filt_2 = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
+            logger.info(f"Registros que pasan requisitos 1 y 2: {len(df_filt_2)}")
+
+        ''' Para SPA no sirve porque los ultimos partidos tienen nan y fill_na los elimina en treat_nan_values y fill_na=ml los rellena pero si pongo como requisito que no este llene, los elimina aca.
+        # Requisito 3: En caso de haber rellenado, evitar partidos rellenados. # En df obtengo rellenado por match y determino posibles id_matches
+        if 'rellenado' in df.columns:
+            index_no_rellenado = df[~df['rellenado']].index  # Obtengo indice de filas no rellenadas
+            df = df.drop('rellenado', axis=1)  # Elimino columna "rellenado" que agregue en treat_nan_values()
+        else: 
+            index_no_rellenado = df.index
+
+        if verbose >= 1:
+            print(f"Registros que pasan requisito 3: {len(index_no_rellenado)}")
+
+        # Selecciono registros que cumplen los 3 requisitos
+        df_filt = df[df.index.isin(index_comp) & df.index.isin(index_no_rellenado) & df.index.isin(index_last_matches)]
+
+        if verbose >= 1:
+            logger.info(f'Registros que pasan requisito 1, 2 y 3. {len(df_filt)}')
+        '''   
+        # Si evito el requisito 3, igual tengo que eliminar "rellenado"
+        if 'rellenado' in df.columns:
+            df = df.drop('rellenado', axis=1)  # Elimino columna "rellenado" que agregue en treat_nan_values()
+
+        # Selecciono registros que cumplen los 3 requisitos
+        df_filt = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
+
+        # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
+        n_reg_test = min(int(len(df) * test_size), n_max_reg) # Defino numero de registros necesarios
+        n_reg_test_max = len(df_filt)
+
+        if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
+            # Ajusta n para tomar todas las filas no rellenadas disponibles
+            n_reg_test_old = n_reg_test
+            n_reg_test = n_reg_test_max
+            
+            if verbose >= 0:
+                logger.warning(f"ACHICO DF_TEST. Reduzco la cantidad de registros en test debido a que no hay los suficientes que satisfagan los requisitos. Necesito {n_reg_test_old} pero hay solo {n_reg_test_max} registros posibles.")
+
+        # Construyo el dataset de testeo a partir de registros que no han sido rellenados
+        df_test = df_filt.sample(n_reg_test, random_state=42)
+        X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
+
+        return X_test, y_test
+        
+    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, retrain: bool = False, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -739,77 +841,23 @@ class Modeling:
         if verbose >= 0:
             print("\nSeparating data in train, val and test...")
 
-        # Si rellené NaN values
+        # Selecciono test set
+        X_test, y_test = self.select_test_set(df, test_size, retrain=retrain)
+    
+        # Elimino columna rellenado
         if 'rellenado' in df.columns:
-
-            if verbose >= 1:
-                print("\tDejo registros no rellenados en df_test y df_val")
-
-            # Obtengo indice de filas no rellenadas
-            index_no_rellenado = df[~df['rellenado']].index
             df = df.drop('rellenado', axis=1)
-            if verbose >= 1:
-                print(f"Cantidad de registros no rellenados: {len(index_no_rellenado)}")
 
-            # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
-            n_reg_test = int(len(df) * test_size)
-            n_reg_test_max = len(index_no_rellenado)
-            if verbose >= 1:
-                print(f"Numero de registros para df_test: {n_reg_test}")
-            if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
-                # Ajusta n para tomar todas las filas no rellenadas disponibles
-                if verbose >= 1:
-                    print(f"Tamaño que deberia tener df_test: {n_reg_test} pero hay solo {n_reg_test_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
-                n_reg_test = n_reg_test_max
+        # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
+        df_train_val = df[~df.index.isin(X_test.index)]
+        X_train_val, y_train_val = df_train_val.drop(self.var_resp, axis=1), df_train_val[self.var_resp]
 
-            # Construyo el dataset de testeo a partir de registros que no han sido rellenados
-            df_test = df.loc[index_no_rellenado].sample(n_reg_test, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
-            X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
-            if verbose >= 1:
-                print(f"Shape df_test: {df_test.shape}")
+        # Calcula el tamaño relativo del conjunto de validación
+        test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
+        val_size_ratio = val_size / (1 - test_size_ratio) 
 
-            # Eliminar los índices de df_test de index_no_rellenado
-            indices_a_eliminar = df_test.index
-            index_no_rellenado_sin_test = index_no_rellenado.drop(indices_a_eliminar)
-            if verbose >= 1:
-                print(f"Cantidad de registros no rellenados disponibles para validacion: {len(index_no_rellenado_sin_test)}")
-
-            # Determino si hay suficientes registros no rellenados para poner en el dataframe de validacion
-            n_reg_val = int(len(df) * val_size)
-            n_reg_val_max = len(index_no_rellenado_sin_test)
-            if verbose >= 1:
-                print(f"Numero de registros para df_val: {n_reg_val}")
-            if n_reg_val > n_reg_val_max: # Si no hay suficientes filas no rellenadas disponibles
-                # Ajusta n para tomar todas las filas no rellenadas disponibles
-                if verbose >= 1:
-                    print(f"Tamaño que deberia tener df_val: {n_reg_val} pero hay solo {n_reg_val_max} registros disponibles (pues son solo los registros que no han sido rellenados)")
-                n_reg_val = n_reg_val_max
-
-            # Construyo train y val a partir de las filas que quedan
-            df_train_val = df[~df.index.isin(df_test.index)]
-            df_val = df_train_val.loc[index_no_rellenado_sin_test].sample(n_reg_val, random_state=42) # df_test = df[~df_rellenado['rellenado']].sample(n, random_state=42)
-            X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]
-
-            # Construyo train con los registros que quedan
-            df_train = df_train_val[~df_train_val.index.isin(df_val.index)]
-            X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
-            if verbose >= 1:
-                print(f"Shape df_train_val: {df_train_val.shape}")
-                print(f"Shape df_val: {df_val.shape}")
-                print(f"Shape df_train: {df_train.shape}")
-
-        # Si no rellene nan values
-        else:
-            # Separo test y train_val
-            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
-            X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=test_size, random_state=randint(1, 1000), shuffle=True)
-
-            # Calcula el tamaño relativo del conjunto de validación
-            test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
-            val_size_ratio = val_size / (1 - test_size_ratio) 
-
-            # Separo en train y validation
-            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
+        # Separo en train y validation
+        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
 
         # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
         if bal_type is not None:
@@ -817,6 +865,7 @@ class Modeling:
 
         if verbose >= 0:
             print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
+
         if export:
             X_train.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_train.xlsx', index=True)
             X_val.to_excel(f'./data/{self.country}/p4_modeling/generate_test_design/X_val.xlsx', index=True)
@@ -885,7 +934,7 @@ class Modeling:
 
         return model_best_params, params, train_accuracy, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, export: bool = False, verbose: int = 0):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False, verbose: int = 0):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -893,17 +942,25 @@ class Modeling:
             model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
             X_test: Dataframe de prueba con variables predictoras. (DataFrame)
             y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
+            retrain: Boolean para definir si es un reentrenamiento de modelos con missing o no. (bool)
             export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
 
         # Returns:
             Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluating trained model with test sets...")
-        # Levanto df_match_odds (solo los partidos en X_test)
-        df_match_odds = pd.read_excel(f'./data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
+        self.var_pred_bm = 'bookmaker_result'  
+
+        # Levanto df_match_odds 
+        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
+        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
+        if verbose >= 2:
+            logger.info(f"Path odds: {path_match_odds}")
+            logger.info(df_match_odds)
+
+        # Filtro df_match_odds dejando solo los partidos de X_test
         df_match_odds = df_match_odds[df_match_odds.index.isin(X_test.index)]  # Selecciono los partidos que estan en df_test
         df_match_odds = df_match_odds.reindex(X_test.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-        self.var_pred_bm = 'bookmaker_result'  
 
         # Predecir las etiquetas para los datos de prueba
         try:
@@ -927,8 +984,11 @@ class Modeling:
         recall = recall_score(y_test, y_pred, average='macro') * 100
         f1 = f1_score(y_test, y_pred, average='macro') * 100
 
-        # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-        df_conf_mat = asses_model.confusion_matrix(y_test, y_pred, verbose=verbose)
+        if verbose >= 1:
+            # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
+            df_conf_mat = asses_model.confusion_matrix(y_test, y_pred)
+            if export:
+                df_conf_mat.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
         # Agrego predicciones de bookmaker
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -950,12 +1010,11 @@ class Modeling:
             print(d_metrics)
 
         if export:
-            df_conf_mat.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_conf_matrix.xlsx')
             df_predicciones.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_predicciones.xlsx')
 
         return df_predicciones, d_metrics
     
-    def train_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, export=True):
+    def train_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -974,7 +1033,7 @@ class Modeling:
                 model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
 
                 # Evaluo modelo en test
-                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test)
+                df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain)
 
                 # Hiperparametros del modelo y Metricas en testeo y train
                 new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params}
@@ -992,24 +1051,32 @@ class Modeling:
                 
         return df_metrics
 
+def crear_variables(diccionario):
+    return SimpleNamespace(**diccionario)
+
 ##################################################### MAIN #####################################################
-def main(id_country, d_run, export: bool = True):
+def main(id_country, d_run, d_params, modelo, export: bool = True):
     """
     Extraction, processing and analysis of matches to predict match results.
     """
     # Definicion de variables
-    data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
+    d_par = crear_variables(d_params)
+    d_run = crear_variables(d_run)     # data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
     var_resp, var_pred = 'result', 'predicted_result'
-    df_countries = pd.read_excel('./data/df_countries.xlsx')
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
-    
+
+    if id_country > 0:
+        df_countries = pd.read_excel('./data/df_countries.xlsx')
+        country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
+    else:
+        country = 'all'
+
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
     dp = DataPreparation(country) # Creo objeto de clase DataPreparation
     mo = Modeling(var_resp=var_resp, var_pred=var_pred, country=country)  # Creo objeto de clase Modeling
 
     #------------------------------------------- DATA UNDERSTANDING -------------------------------------------#
-    if data_unders:
+    if d_run.data_unders:
         print(" Data understanding ".center(120, "#"))
         # Extriago datos o los levanto
         df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = du.collect_initial_data(export=export)
@@ -1017,7 +1084,7 @@ def main(id_country, d_run, export: bool = True):
         # Describo datos
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
-    elif data_prep:
+    elif d_run.data_prep:
         # Levanto datos ya extraidos
         df_match = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_player.xlsx', index_col=0)
@@ -1025,20 +1092,14 @@ def main(id_country, d_run, export: bool = True):
         df_player_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx') #  index_col=0 --> si lo uso falla la integracion porque pone 'id_player' como index
         df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
-
+        
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
     #------------------------------------------- DATA PREPARATION -------------------------------------------#
-    if data_prep:
+    if d_run.data_prep:
         print(" Data preparation ".center(120, "#"))
         # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
-        d_comps = select_data.determine_country_competitions(id_country)
-        l_days, n_years_h2h, segun_localia, dif_con_against = [30, 180], 3, False, False
-        thr_corr, thr_fs = 0.85, 0.5
-        n_years_to_select, comp_to_select = 3, d_comps['comp_sin_b']
-        fill_na = None
-        df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'dif_con_against': [dif_con_against], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
-        
+ 
         # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
         # print(df.head(2))
 
@@ -1046,78 +1107,66 @@ def main(id_country, d_run, export: bool = True):
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
         df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-        df = dp.construct_data(df, l_days=l_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=export)
-        df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
-        df, scaler, columns_used = dp.clean_data_2(df, n_years_to_select, comp_to_select, export=export)
-        df = dp.select_data(df, thr_corr=thr_corr, thr_fs=thr_fs, export=export)
-        df = dp.treat_nan_values(df, fill_na=fill_na, export=export)
+       
+        if not d_run.until_integrate:
+            df = dp.construct_data(df, l_days=d_par.l_days, n_years_h2h=d_par.n_years_h2h, segun_localia=d_par.segun_localia, dif_con_against=d_par.dif_con_against, export=export)
+            df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
+            df, scaler, columns_used = dp.clean_data_2(df, d_par.n_years_to_select, d_par.comp_to_select, export=export)
+            df = dp.select_data(df, thr_corr=d_par.thr_corr, thr_fs=d_par.thr_fs, export=export)
+            df = dp.treat_nan_values(df, fill_na=d_par.fill_na, export=export)
         
-        if export:
-            df_hiper_prep.to_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx', index=False)
+        # if export:
+        #     df_hiper_prep.to_excel(f'./data/{country}/p3_data_preparation/df_hiper_prep.xlsx', index=False)
 
-    elif not data_unders:
+    elif not d_run.data_unders:
         # Levanto dataset para prueba
         df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_selected_nan.xlsx', index_col=0)
         print(df.head(3), df.shape)
 
     #------------------------------------------- MODELING -------------------------------------------#
-    if modeling:
+    if d_run.modeling:
         print(" Modeling ".center(120, "#"))
-        # Hiperparametros
-        val_size, test_size = 0.125, 0.125
-        bal_type = None
-        k = 10
-        d_hiper_mod = {'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}
-
-        modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
-        model_name = str(modelo)[:str(modelo).find('(')]  # Defino el name del modelo (e.g. "RandomForest")
-
-        build_specific_model = False
-        if build_specific_model:
-
-            # LogisticRegression(C=0.1, fit_intercept=False, penalty='l1', solver='saga')
-            d_params = {
-                'RandomForestClassifier': {
-                    'n_estimators': 500,
-                    'criterion': 'entropy',
-                    'max_depth': 3,
-                    'min_samples_split': 2, 
-                    'min_samples_leaf': 4, 
-                    'max_features': 'sqrt',
-                    'bootstrap': True,
-                },
-                'LogisticRegression': {
-                    'penalty': 'l1',
-                    'C': 10,
-                    'solver': 'liblinear',
-                    'fit_intercept': True,
-                    'max_iter': 10000, 
-                    'multi_class': 'auto',
-                },
-            }
-            hiperparametros = d_params[model_name]
-        else:
-            hiperparametros = None
-
-        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, bal_type, val_size, test_size, export=export)
+        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df, d_par.bal_type, d_par.val_size, d_par.test_size, export=export)
 
         # Analizo datos con un modelo
-        model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=k, params=hiperparametros, export=export)
+        model, d_hiper_model, cv_accuracy = mo.build_model(modelo, X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, k=d_par.k, export=export)
         df_pred, d_metrics = mo.assess_model(model, X_test, y_test, export=export)
 
         # Construyo dataframe con hiperparametros de Modeling() (incluyendo los de la estrategia de apuesta)
-        d_hiper_mod.update(d_metrics)
-        df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
+        # d_hiper_mod.update(d_metrics)
+        # df_hiper_mod = pd.DataFrame(data=d_hiper_mod, index=[0])        
 
         if export:
-            df_hiper_mod.to_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx', index=True)
+            # df_hiper_mod.to_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx', index=True)
             pickle.dump(model, open(f"./data/{country}/p4_modeling/modeling/modelo.pkl", "wb"))
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 167 # 55, 59, 77, 148
-    d_params = {'data_unders': False, 'data_prep': True, 'modeling': False}
+    id_country = -1 # 55, 59, 77, 148, 167 -1
+    d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': True}
 
-    main(id_country, d_params, export=True)
+    # Hiperparametros
+    d_comps = select_data.determine_country_competitions(id_country)
+    modelo = LogisticRegression()  # LogisticRegression(), RandomForestClassifier()
+    d_params = {
+        'l_days': [30, 180], 
+        'n_years_h2h': 3,
+        'segun_localia': False,
+        'dif_con_against': False,
+        'thr_corr': 0.85,
+        'thr_fs': 0.5,
+        'n_years_to_select': 3, 
+        'comp_to_select': d_comps['comp_sin_b'],
+        'fill_na': None,
+        'val_size':  0.125,
+        'test_size': 0.125,
+        'bal_type': None,
+        'k': 10
+    }
+
+    # df_hiper_prep = pd.DataFrame(data=d_params) # df_hiper_prep = pd.DataFrame(data={'n_dias_ult_part': [l_days], 'n_anios_hist': [n_years_h2h], 'segun_localia': [segun_localia], 'dif_con_against': [dif_con_against], 'thr_corr': [thr_corr], 'thr_fs': [thr_fs], 'fill_na': [fill_na], 'n_years_to_select': [n_years_to_select], 'comp_to_select': [comp_to_select]}, index=[0])
+    # d_hiper_mod = {'val_size': [val_size], 'test_size': [test_size], 'bal_type': [bal_type], 'k': [k]}
+
+    main(id_country, d_run, d_params, modelo, export=True)

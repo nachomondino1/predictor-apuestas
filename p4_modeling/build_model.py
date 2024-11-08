@@ -134,7 +134,7 @@ class TrainNeuralNetwork():
 
         # Definir un callback de EarlyStopping
         early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-        # timeout_callback = TimeoutCallback(max_seconds=300)  # Definir el límite de tiempo (por ejemplo, 300 segundos) # No se si funciona y tampoco creo que esta sea la causa de que tarde mucho tiempo.
+        # timeout_callback = TimeoutCallback(max_seconds=100)  # Definir el límite de tiempo (por ejemplo, 300 segundos) # No se si funciona y tampoco creo que esta sea la causa de que tarde mucho tiempo.
 
         # Iterar sobre cada combinación
         for params in param_combinations:
@@ -235,7 +235,9 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
     bayes, all_tuning = (False, False) if model_name == 'LogisticRegression' else (bayes, all_tuning) # Seteo Bayes a False cuando es Logistic. Evito Bayes para Logistic
     params = space_params(model_name, bayes) if params is None else params
     scoring = default_scoring(num_classes=len(np.unique(y_val_train))) if scoring is None else scoring
-    logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
+    
+    if verbose >= 1:
+        logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
 
     # BayesSearch
     if bayes or all_tuning:
@@ -246,8 +248,7 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
 
         if n_iter is None:
             # Calcular iteraciones basadas en el tamaño del dataset
-            # d_n_hip = {'RandomForestClassifier': 3, 'XGBClassifier': 5, 'LogisticRegression': 1, 'RandomForestRegressor': 1, 'SVC': 1} # automatizar
-            num_hyperparameters = 1 # d_n_hip[model_name]
+            num_hyperparameters = len(params.keys())
             n_iter = determine_n_iter(num_samples=len(X_val_train), num_hyperparameters=num_hyperparameters, verbose=verbose)
 
         with warnings.catch_warnings():  # Logistic te vuelve loco --> no funciona.
@@ -484,14 +485,14 @@ def space_params(model_name, bayes, verbose: int = 0):
             'n_estimators': Integer(50, 120) if bayes else [100],  # Suele ganar con 100
             'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
             'max_depth': Integer(3, 20) if bayes else [5, 10], # 3, 
-            # 'gamma': Real(0, 1) if bayes else [0],
-            # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
-            # 'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
-            # 'alpha': Real(0, 10) if bayes else [0.001],
-            # 'lambda': Real(0, 10) if bayes else [0.001],
-            # 'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
-            # 'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
-            # 'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
+            'gamma': Real(0, 1) if bayes else [0],
+            'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
+            'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
+            'alpha': Real(0, 10) if bayes else [0.001],
+            'lambda': Real(0, 10) if bayes else [0.001],
+            'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
+            'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
+            'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
         },
         'GradientBoostingClassifier': { # Tarda muchisimo en entrenar a pesar de usar Bayes optimazation
@@ -513,9 +514,9 @@ def space_params(model_name, bayes, verbose: int = 0):
         'SVC': {
             'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1],
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'],
-            # 'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
-            # 'coef0': Real(0, 1) if bayes else [0.0, 0.5],
-            # 'shrinking': Categorical([True, False]) if bayes else [True, False],
+            'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
+            'coef0': Real(0, 1) if bayes else [0.0, 0.5],
+            'shrinking': Categorical([True, False]) if bayes else [True, False],
             'probability': Categorical([True]) if bayes else [True],
             # 'class_weight': Categorical(['balanced', None]) if bayes else ['balanced', None],
             'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
@@ -564,7 +565,7 @@ def space_params(model_name, bayes, verbose: int = 0):
 
     return params
 
-def determine_n_iter(num_samples, num_hyperparameters, verbose: int = 0):
+def determine_n_iter(num_samples, num_hyperparameters, min_iter: int = 20, max_iter:int = 100, verbose: int = 0):
     """
     Determina el número de iteraciones para BayesSearchCV basado en el tamaño del conjunto de datos
     y el número de hiperparámetros a optimizar.
@@ -576,18 +577,17 @@ def determine_n_iter(num_samples, num_hyperparameters, verbose: int = 0):
     # Return
         n_iter: Número sugerido de iteraciones (n_iter).
     """
-    mult_iter, mult_hip = 0.01, 5 # 0.05, 7
-    min_iter, max_iter = 50, 200
+    mult_iter, mult_hip = 0.01, 200
 
     # Determinar n_iter basado en el tamaño del conjunto de datos
     n_iter_reg = int(mult_iter * num_samples)
 
     # Ajustar n_iter según el número de hiperparámetros
-    n_iter_hip = mult_hip * num_hyperparameters  # Aumentar por cada hiperparámetro
+    n_iter_hip = int(mult_hip / num_hyperparameters)
     n_iter = n_iter_reg + n_iter_hip
 
     if verbose >= 1:
-        logger.info(f"n_reg: {n_iter_reg} (={num_samples} * {mult_iter}) + n_hip: {n_iter_hip} (={num_hyperparameters} * {mult_hip}) = {n_iter}")
+        logger.info(f"n_reg: {n_iter_reg} (={num_samples} * {mult_iter}) + n_hip: {n_iter_hip} (={mult_hip} / {num_hyperparameters} ) = {n_iter}")
 
     return min(max(n_iter, min_iter), max_iter) # Asegurarse de que n_iter sea al menos 50
 
