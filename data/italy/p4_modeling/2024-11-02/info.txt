@@ -1,2 +1,0 @@
-XGB 33-33-33 x f1_score?
-Hay algunos modelos de XGB a los que no les pasa... Tal vaz ya estaban pero ahora salieron por la estrategia de apuesta.
