@@ -78,6 +78,45 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
 
     return df_match_odds
 
+def determine_distribution(df, var_resp: str = 'result', var_pred: str = 'predicted_result'):
+    """
+    Determina la cantidad de predicciones por resultado y las compara con la distribucion de resultados reales.
+
+    # Parameters
+        df: Nuestas predicciones y el resultado real. (DataFrame)
+
+    # Return
+        d: Diccionario con la distribucion de nuestras predicciones, las de los resultados reales y la variacion.
+    """
+    # Calculo distribucion de nuestros resultados
+    n_loc, n_emp, n_vis = count_results(df, col=var_pred)
+    n_loc_r, n_emp_r, n_vis_r = count_results(df, col=var_resp)
+
+    # Calculo variacion por resultado
+    var_loc = calculate_variation(end=n_loc, ini=n_loc_r)
+    var_emp = calculate_variation(end=n_emp, ini=n_emp_r)
+    var_vis = calculate_variation(end=n_vis, ini=n_vis_r)
+    
+    # Crear el diccionario con los resultados
+    d = {
+        'n_loc': n_loc, 'n_emp': n_emp, 'n_vis': n_vis,
+        'n_loc_r': n_loc_r, 'n_emp_r': n_emp_r, 'n_vis_r': n_vis_r,
+        'dif_loc': var_loc, 'dif_emp': var_emp, 'dif_vis': var_vis
+    }
+    return d
+
+def count_results(df, col):
+    """
+    Cuenta la cantidad de cada resultado.
+    """
+    n_local = len(df[df[col] == 1])
+    n_empate = len(df[df[col] == 0])
+    n_vis = len(df[df[col] == 2])
+    return n_local, n_empate, n_vis
+
+def calculate_variation(end, ini):
+    return (end - ini) / abs(ini)
+
 # Nosotros
 def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy: str = "general", verbose: int = 0):
     """

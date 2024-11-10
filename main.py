@@ -493,7 +493,7 @@ class DataPreparation:
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, _print: bool = True, verbose : int = 0, 
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, fill_na: str = None, verbose : int = 0, 
                      export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
@@ -535,44 +535,30 @@ class DataPreparation:
             if verbose >= 1:
                 print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
 
-        '''
-        ## con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
-        n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, 0.75)
-
-        if verbose >= 1:
-            print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
-            logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(X)}")
-        '''
-
         # (2) Eliminacion de columnas   
-        if verbose >= 1:
-            print("Eliminación de columnas...")
-
         ## usadas solo para construir y constantes
-        # cols_for_construct = ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        cols_for_construct = ['venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles) # ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
-        ## con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(0.15*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
-        X_sin_col_mucho_nan = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
-
-        if verbose >= 1 and len(X.columns) != len(X_sin_col_mucho_nan.columns):
+        if verbose >= 1:
+            print("Eliminación de columnas...")
             print(f"Columnas constantes eliminadas: {cols_constants}")
-            print(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape}")
-            l_col_eliminated = list(X.columns.difference(X_sin_col_mucho_nan.columns))
-            logger.warning(f"Se han tenido que eliminar {len(X.columns) - len(X_sin_col_mucho_nan.columns)} columnas de {len(X.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
 
-        # (3) Escalado de datos
+        # (3) Tratamiento de NaN values
+        shape_inicial = X.shape
+        X = self.treat_nan_values(X=X, fill_na=fill_na)
+        if verbose >= 1:
+            print(f"Tras fill_na={fill_na}. Shape X_sin_col_mucho_nan: {shape_inicial} --> {X.shape}")
+
+        # (4) Escalado de datos
         if verbose >= 1:
             print("\nEscalado de datos...")
 
         scaler = StandardScaler()
-        X_sin_col_mucho_nan = X_sin_col_mucho_nan.select_dtypes(exclude=['datetime64[ns]'])  # Excluy escalado de columnas datetime -->  The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
-        scaler.fit(X_sin_col_mucho_nan) # Paso 1: Ajusta el StandardScaler a tus datos
-        X_scaled = scaler.transform(X_sin_col_mucho_nan) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
-        X_scaled_df = pd.DataFrame(X_scaled, columns=X_sin_col_mucho_nan.columns, index=X_sin_col_mucho_nan.index)
+        # X_sin_col_mucho_nan = X.select_dtypes(exclude=['datetime64[ns]'])  # Excluy escalado de columnas datetime -->  The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
+        scaler.fit(X) # Paso 1: Ajusta el StandardScaler a tus datos
+        X_scaled = scaler.transform(X) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
+        X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
 
         # Concateno X e y
         y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
@@ -582,11 +568,134 @@ class DataPreparation:
         logger.info(f"Clean data 2 en {(end - start)/60:.1f} minutos")
 
         if export: 
-            joblib.dump((scaler, X_sin_col_mucho_nan.columns), f"./data/{self.country}/p3_data_preparation/scaler_model.pkl")       
+            joblib.dump((scaler, X.columns), f"./data/{self.country}/p3_data_preparation/scaler_model.pkl")       
             df.to_excel(f'./data/{self.country}/p3_data_preparation/df_constructed_clean.xlsx', index=True)
 
-        return df, scaler, X_sin_col_mucho_nan.columns
+        return df, scaler, X.columns
     
+    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_min_no_nan: float = 0.8, percentil_nan: int = 75, export: bool = True, verbose: int = 0):
+        """
+        Tratamiento de nan values
+
+        # Para ENG y SPA usé porc_min_no_nan = 0.5. Pero para FRA tengo que usar 0.8 porque sino X_test queda vacio.
+        Tan alto puede tirar error porque elimina todas las columnas.
+
+        # Parameters
+            df: Dataframe a tratar nan values. (DataFrame)
+            fill_na: Tipo de rellenado de NaN values.
+            porc_min_no_nan: Porcentaje minimo de no NaN value que debe tener una columna para evitar ser eliminada. (float)
+            percentil_nan: Percentil para definir que columnas son consideradas con mucho nan y cuales con poco nan. Solo cuando haces fillna.
+            export: 
+            _print:
+
+        # Returns
+            Dataframe sin NaN values
+        """ 
+        start = time.time()
+        if verbose >= 1:
+            print("\nTreating NaN values to avoid input=NaN in Modeling...")
+            logger.info(f"1. Datos de entrada a treat_nan: {self.number_of_last_matches(X)}")
+
+        # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
+        n_reg_inic_3 = len(X)
+        X = clean_data.delete_rows_nan(X, porc_min_no_nan)
+
+        if verbose >= 1:
+            print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+            logger.warning(f"Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
+            logger.critical(f"2. Luego de eliminar FILAS con mucho NaN: {self.number_of_last_matches(X)}")
+
+        # (2) Eliminacion de columnas con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
+        n_reg_min = int(porc_min_no_nan*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
+        X_sin_col_mucho_nan = X.copy()
+        X = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
+
+        if verbose >= 0 and len(X.columns) != len(X_sin_col_mucho_nan.columns):
+            l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(X.columns))
+            logger.warning(f"Se han tenido que eliminar {len(X_sin_col_mucho_nan.columns) - len(X.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
+        
+        if verbose >= 1:
+            print(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {X.shape} ")
+            logger.info(f"3. Luego de eliminar COLUMNAS con mucho NaN: {self.number_of_last_matches(X_sin_col_mucho_nan)}")
+
+        # (3) Eliminacion de todo NaN ya sea drop o fill_na
+        # Determino las columns con mucho NaN (mas de nan_threshold%)
+        if fill_na is not None:
+            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=percentil_nan)
+
+            # Elimino registros con al menos un NaN 
+            X = X.dropna(subset=l_columns_poco_nan)
+            if verbose >= 1:
+                print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
+                logger.info(f"4. Luego de dropna de columnas con 'poco' nan: {self.number_of_last_matches(X)}")
+
+            # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
+            df_rellenado = pd.DataFrame(index=X.index)
+            df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
+            df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/df_rellenado.xlsx', index=True)
+
+            # Relleno nan de las columnas con mucho NaN
+            X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
+            if verbose >= 1:
+                print(f"Columnas consideradas con mucho nan (a las cuales rellenar): {l_columns_mucho_nan}")
+                print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {X.shape}")
+
+        else:
+            # Elimino registros con al menos un NaN 
+            X = X.dropna(subset=X.columns)
+
+        if verbose >= 0:
+            logger.warning(f"5. Luego de eliminar todo NaN: {self.number_of_last_matches(X)}")
+
+        end = time.time()
+        print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
+
+        if export:
+            X.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
+        
+        return X
+    
+    def number_of_last_matches(self, X):
+        """
+        Imprime por pantalla cuantos registros quedarian en df_test segun los requisitos exigidos.
+        """
+        # Para ver donde se eliminan los ultimos partidos.
+        df_match = pd.read_excel(f'data/{self.country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
+        df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+        df_match = df_match.sort_values(by='date', ascending=False)
+
+        # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
+        from p3_data_preparation.select_data import select_league_matches
+        df1 = select_league_matches(df_match)
+        index_comp = df1.index
+
+        # Requisito 2: Last matches (6 meses?)
+        fecha_last_match = df_match.iloc[0]['date']
+        fecha_limite = fecha_last_match - datetime.timedelta(days=0.25*365)
+        df2 = df_match[df_match['date'] >= fecha_limite] 
+        index_last_matches = df2.index
+
+        # Cantidad de registros que pasan 1 y 2 en df_match
+        df_match_filt = df_match[df_match.index.isin(index_comp) & df_match.index.isin(index_last_matches)] # "ultimos partidos de id_competition en df_match"
+        n_part_expected = len(df_match_filt)
+
+        '''
+        # Requisito 3:
+        if df_rellenado is not None:
+            index_no_rellenado = df_rellenado[~df_rellenado['rellenado']].index  # Obtengo indice de filas no rellenadas
+            print(f"Registros que pasan requisito 3: {len(index_no_rellenado)}")
+            filters = X.index.isin(index_comp) & X.index.isin(index_last_matches) & X.index.isin(index_no_rellenado)
+        else:
+            filters = X.index.isin(index_comp) & X.index.isin(index_last_matches)
+        '''
+
+        filters = X.index.isin(index_comp) & X.index.isin(index_last_matches)
+        df_filt_2 = X[filters]
+        n_part_final = len(df_filt_2)
+
+        # logger.info(f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}")
+        return f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}"
+
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose: int = 0, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
@@ -596,7 +705,7 @@ class DataPreparation:
         :return: Dataframe con las variables seleccionadas. (DataFrame)
         """
         start = time.time()
-        logger.info("\nSelecting data...")
+        logger.info("Selecting data...")
 
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
@@ -604,6 +713,7 @@ class DataPreparation:
             df = df.drop(l_columnas_a_eliminar, axis=1)
 
             if verbose >= 1:
+                print('\n Eliminando columnas correlacionadas...')
                 print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
 
         # Elimino variables menos importantes (feature selection)
@@ -614,6 +724,7 @@ class DataPreparation:
             df = df.loc[:, l_important_features + [self.var_resp]]
 
             if verbose >= 1:
+                print('\n Feature Selection...')
                 print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas eliminadas: {l_col_eliminated}")
 
         if verbose >= 1:
@@ -629,70 +740,10 @@ class DataPreparation:
 
         return df
     
-    def treat_nan_values(self, df: pd.DataFrame , fill_na: str = None, percentil_nan: int = 75, export: bool = True, verbose: int = 0):
-        """
-        Tratamiento de nan values
-
-        # Parameters
-            df: Dataframe a tratar nan values. (DataFrame)
-            fill_na: Tipo de rellenado de NaN values.
-            percentil_nan: Percentil para definir que columnas son consideradas con mucho nan y cuales con poco nan. Solo cuando haces fillna.
-            export: 
-            _print:
-
-        # Returns
-            Dataframe sin NaN values
-        """ 
-        print("\nTreating NaN values to avoid input=NaN in Modeling...")
-        start = time.time()
-
-        # Separo en X e y
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]
-
-        # Determino las columns con mucho NaN (mas de nan_threshold%)
-        if fill_na is not None:
-            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=percentil_nan)
-
-            # Elimino registros con al menos un NaN 
-            X = X.dropna(subset=l_columns_poco_nan)
-            if verbose >= 1:
-                print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
-
-            # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
-            df_rellenado = pd.DataFrame(index=X.index)
-            df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
-            if export:
-                df_rellenado.to_excel(f'./data/{self.country}/p3_data_preparation/treat_nan/df_rellenado.xlsx', index=True)
-
-            # Relleno nan de las columnas con mucho NaN
-            X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
-            if verbose >= 1:
-                print(f"Columnas consideradas con mucho nan (a las cuales rellenar): {l_columns_mucho_nan}")
-                print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {X.shape}")
-
-            # Agrego columna rellenado a X (post fill puesto que no quiero limpiar la columna "rellenado")
-            X['rellenado'] = df_rellenado['rellenado']
-
-        else:
-            # Elimino registros con al menos un NaN 
-            X = X.dropna(subset=X.columns)
-
-        # Concateno X e y
-        y = y[y.index.isin(X.index)]
-        df = pd.concat([X, y], axis=1)
-
-        end = time.time()
-        logger.info(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
-
-        if export:
-            df.to_excel(f'./data/{self.country}/p3_data_preparation/df_selected_nan.xlsx', index=True)
-        
-        return df
-
 
 class Modeling:
 
-    def __init__(self, var_resp: str, var_pred: str, country: str):
+    def __init__(self, country: str, var_resp: str = 'result', var_pred: str = 'predicted_result'):
         if not isinstance(var_resp, str) or not isinstance(var_pred, str):
             raise TypeError("Los parámetros var_resp y var_pred deben ser cadenas de texto.")
         if not isinstance(country, str):
@@ -751,14 +802,13 @@ class Modeling:
             logger.info(df_match['date'].head(10))
 
         # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
-        from p4_modeling.assess_models_in_prod import select_league_matches
+        from p3_data_preparation.select_data import select_league_matches
         df1 = select_league_matches(df_match)
         index_comp = df1.index
 
-        if verbose >= 1:
-            # logger.warning(f"Hay {len(df1)} que pertenecen a la competicion evaluada en el assess.")
+        if verbose >= 2:
             df_filt_1 = df[df.index.isin(index_comp)]
-            logger.info(f"Registros que pasan el requisito 1: {len(df_filt_1)}")
+            logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
         
         # Requisito 2: Last matches (6 meses?)
         fecha_last_match = df_match.iloc[0]['date']
@@ -767,10 +817,22 @@ class Modeling:
         index_last_matches = df2.index
 
         if verbose >= 1:
-            # logger.info(f"Partido mas reciente: {fecha_last_match} ({max(df_match['date'])}). Fecha limite: {fecha_limite}")
-            # logger.warning(f"Hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
+
+            df_match_filt = df_match[df_match.index.isin(index_comp) & df_match.index.isin(index_last_matches)] # "ultimos partidos de id_competition en df_match"
+            n_part_expected = len(df_match_filt)
+
+            df_filt_2 = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
+            n_part_final = len(df_filt_2)
+
+            logger.info(f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}")
+            # logger.info(f"Registros que pasan requisitos 1 y 2: {len(df_filt_2)}")
+
+        if verbose >= 2:
+            logger.info(f"Partido mas reciente: {fecha_last_match} ({max(df_match['date'])}). Fecha limite: {fecha_limite}")
+            logger.warning(f"Hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
+
             df_aux = df[df.index.isin(index_last_matches)]
-            print(f"Registros que pasan requisito 2 (todas las competiciones): {len(df_aux)}")
+            logger.info(f"Registros que pasan requisito 2 (todas las competiciones): {len(df_aux)}")
 
             # Si se han eliminado "ultimos partidos" en treat_nan_values() o clean_data_2()
             if len(df_aux) != len(index_last_matches):
@@ -778,32 +840,9 @@ class Modeling:
                 logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
                 logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
 
-            df_filt_2 = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
-            logger.info(f"Registros que pasan requisitos 1 y 2: {len(df_filt_2)}")
-
-        ''' Para SPA no sirve porque los ultimos partidos tienen nan y fill_na los elimina en treat_nan_values y fill_na=ml los rellena pero si pongo como requisito que no este llene, los elimina aca.
-        # Requisito 3: En caso de haber rellenado, evitar partidos rellenados. # En df obtengo rellenado por match y determino posibles id_matches
-        if 'rellenado' in df.columns:
-            index_no_rellenado = df[~df['rellenado']].index  # Obtengo indice de filas no rellenadas
-            df = df.drop('rellenado', axis=1)  # Elimino columna "rellenado" que agregue en treat_nan_values()
-        else: 
-            index_no_rellenado = df.index
-
-        if verbose >= 1:
-            print(f"Registros que pasan requisito 3: {len(index_no_rellenado)}")
-
         # Selecciono registros que cumplen los 3 requisitos
-        df_filt = df[df.index.isin(index_comp) & df.index.isin(index_no_rellenado) & df.index.isin(index_last_matches)]
-
-        if verbose >= 1:
-            logger.info(f'Registros que pasan requisito 1, 2 y 3. {len(df_filt)}')
-        '''   
-        # Si evito el requisito 3, igual tengo que eliminar "rellenado"
-        if 'rellenado' in df.columns:
-            df = df.drop('rellenado', axis=1)  # Elimino columna "rellenado" que agregue en treat_nan_values()
-
-        # Selecciono registros que cumplen los 3 requisitos
-        df_filt = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
+        filters = df.index.isin(index_comp) & df.index.isin(index_last_matches) # df.index.isin(index_comp) & df.index.isin(index_last_matches)& df.index.isin(index_no_rellenado) 
+        df_filt = df[filters]
 
         # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
         n_reg_test = min(int(len(df) * test_size), n_max_reg) # Defino numero de registros necesarios
@@ -843,10 +882,6 @@ class Modeling:
 
         # Selecciono test set
         X_test, y_test = self.select_test_set(df, test_size, retrain=retrain)
-    
-        # Elimino columna rellenado
-        if 'rellenado' in df.columns:
-            df = df.drop('rellenado', axis=1)
 
         # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
         df_train_val = df[~df.index.isin(X_test.index)]
@@ -1006,6 +1041,11 @@ class Modeling:
         # Calculo ROI
         df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)
+
+        # Calculo distribucion en df_predicciones? .... lo guardo en df_metrics pues luego va a df_test.
+        d_distrib = asses_model.determine_distribution(df_predicciones)
+        d_metrics.update(d_distrib)
+
         if verbose >=1:
             print(d_metrics)
 
@@ -1014,7 +1054,7 @@ class Modeling:
 
         return df_predicciones, d_metrics
     
-    def train_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
+    def train_and_assess_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -1049,7 +1089,7 @@ class Modeling:
             except KeyboardInterrupt as e:
                 logger.warning(f"Se evitó entrenar este modelo mediante {e}")
                 
-        return df_metrics
+        return df_metrics  # return model, results, df_predicciones, df_metrics
 
 def crear_variables(diccionario):
     return SimpleNamespace(**diccionario)
@@ -1062,7 +1102,6 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
     # Definicion de variables
     d_par = crear_variables(d_params)
     d_run = crear_variables(d_run)     # data_unders, data_prep, modeling = d_run['data_unders'], d_run['data_prep'], d_run['modeling']
-    var_resp, var_pred = 'result', 'predicted_result'
 
     if id_country > 0:
         df_countries = pd.read_excel('./data/df_countries.xlsx')
@@ -1073,7 +1112,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
     dp = DataPreparation(country) # Creo objeto de clase DataPreparation
-    mo = Modeling(var_resp=var_resp, var_pred=var_pred, country=country)  # Creo objeto de clase Modeling
+    mo = Modeling(country=country)  # Creo objeto de clase Modeling
 
     #------------------------------------------- DATA UNDERSTANDING -------------------------------------------#
     if d_run.data_unders:
