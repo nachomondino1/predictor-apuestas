@@ -96,12 +96,21 @@ def determine_distribution(df, var_resp: str = 'result', var_pred: str = 'predic
     var_loc = calculate_variation(end=n_loc, ini=n_loc_r)
     var_emp = calculate_variation(end=n_emp, ini=n_emp_r)
     var_vis = calculate_variation(end=n_vis, ini=n_vis_r)
+
+    # Calcular variaciones absolutas
+    var_loc_abs = abs(var_loc)
+    var_emp_abs = abs(var_emp)
+    var_vis_abs = abs(var_vis)
+
+    # Promedio de variaciones absolutas
+    var = (var_loc_abs + var_emp_abs + var_vis_abs) / 3
+
     
     # Crear el diccionario con los resultados
     d = {
         'n_loc': n_loc, 'n_emp': n_emp, 'n_vis': n_vis,
         'n_loc_r': n_loc_r, 'n_emp_r': n_emp_r, 'n_vis_r': n_vis_r,
-        'dif_loc': var_loc, 'dif_emp': var_emp, 'dif_vis': var_vis
+        'dif_loc': var_loc, 'dif_emp': var_emp, 'dif_vis': var_vis, '%_dif': var
     }
     return d
 
