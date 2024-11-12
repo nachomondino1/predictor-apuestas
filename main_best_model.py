@@ -40,6 +40,7 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
         start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC
     
     # Defino rutas segun country y date
+    ruta_base_du = f"./data/{country}/p4_modeling/{date}/p2_data_understanding"
     ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
     ruta_base_modelos = f"./data/{country}/p4_modeling/{date}/models" 
     directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_modelos])
@@ -91,7 +92,10 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
             if retrain:
                 df_integrated = pd.read_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index_col=0)
                 logger.warning(f"Se levanto el df_integrated con los missing. Shape: {df_integrated.shape}")
-        
+
+                directories.copy_directory(origen=f'./data/{country}/p6_deployment/missing/old_updated', destino=ruta_base_du)
+                # df_integrated.to_excel(f'{ruta_base_dp}/df_integrated.xlsx') 
+
             else:
                 df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
             
@@ -105,6 +109,9 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
                 shape_inicial_2 = df_integrated.shape
                 df_integrated = fillna_with_mean_in_last_matches(df_integrated, cols_to_fill=l_player_cols, country=country)
                 logger.info(f"Luego de rellenar formaciones: {shape_inicial_2} --> {df_integrated.shape}")
+                
+                # Exporto el dataset con missing tal como cuando entrené
+                df_integrated.to_excel(f'{ruta_base_dp}/df_integrated_filled.xlsx') 
 
             df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
             if export:
@@ -282,7 +289,7 @@ def define_params_space(id_country):
         'clean_data_2': {
             'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # Probar ENG sin b y sin cups. d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b'],  d_comps['all_comp']
             'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
-            'fill_na': ['ml'] if id_country in [55, 148] else [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+            'fill_na': [None, 'ml'], # ['ml'] if id_country in [55, 148] else [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -304,8 +311,8 @@ def define_params_space(id_country):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 55
-    only_select_best_model = True
+    id_country = 77
+    only_select_best_model = False
     # continue_old_train, date_old_train = False, '2024-10-30'
     
     # Determino date y country
