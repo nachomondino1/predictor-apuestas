@@ -51,7 +51,7 @@ def copy_directory(origen, destino):
         
         # Eliminar el destino si existe
         shutil.rmtree(destino)
-        print(f"El directorio '{destino}' contiene: {os.listdir(destino)}")
+        # print(f"El directorio '{destino}' contiene: {os.listdir(destino)}")
 
     # Copiar el directorio completo
     shutil.copytree(origen, destino)

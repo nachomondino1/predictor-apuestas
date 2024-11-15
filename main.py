@@ -645,7 +645,7 @@ class DataPreparation:
             X = X.dropna(subset=X.columns)
 
         if verbose >= 0:
-            logger.warning(f"5. Luego de eliminar todo NaN: {self.number_of_last_matches(X)}")
+            logger.info(f"Luego de eliminar todo NaN: {self.number_of_last_matches(X)}")
 
         end = time.time()
         print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
@@ -655,7 +655,7 @@ class DataPreparation:
         
         return X
     
-    def number_of_last_matches(self, X):
+    def number_of_last_matches(self, X, verbose: int = 0):
         """
         Imprime por pantalla cuantos registros quedarian en df_test segun los requisitos exigidos.
         """
@@ -666,7 +666,7 @@ class DataPreparation:
 
         # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
         from p3_data_preparation.select_data import select_league_matches
-        df1 = select_league_matches(df_match)
+        df1 = select_league_matches(df_match, verbose=-1)
         index_comp = df1.index
 
         # Requisito 2: Last matches (6 meses?)
@@ -693,8 +693,10 @@ class DataPreparation:
         df_filt_2 = X[filters]
         n_part_final = len(df_filt_2)
 
-        # logger.info(f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}")
-        return f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}"
+        if verbose >= 0:
+            logger.info(f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}")
+
+        return n_part_final
 
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose: int = 0, export: bool = True):
         """

@@ -43,7 +43,7 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
     ruta_base_du = f"./data/{country}/p4_modeling/{date}/p2_data_understanding"
     ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
     ruta_base_modelos = f"./data/{country}/p4_modeling/{date}/models" 
-    directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_modelos])
+    directories.make_directories(l_directorios=[ruta_base_du, ruta_base_dp, ruta_base_modelos])
     # if not continue_old_train: 
     #     directories.make_directories(l_directorios=[ruta_base_dp, ruta_base_modelos])
   
@@ -137,90 +137,101 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
             df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, competencies_to_select=comp_to_select, 
                                                                     fill_na=fill_na, export=False)
             joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_1}_{path_2}.pkl')
-        
+
+            # Verifico tamaño de df_test (evito select en caso que el test vaya a ser chico.)
+            rows_for_test = dp.number_of_last_matches(X=df_cons_clean.drop(dp.var_resp, axis=1), verbose=-1)
+            
             if verbose >= 2:
                 df_cons_clean.to_excel(path_clean_data, index=True)
+                logger.info(f"Luego de eliminar todo NaN: {rows_for_test}")
 
-            # Select data
-            for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
+            if (rows_for_test >= min_row_test):
 
-                # Asigno valor a cada hiperpametro
-                thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                path_3 = f'{thr_corr}_{thr_fs}'
-                if verbose >= 0:
-                    logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
-                    print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
+                # Select data
+                for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
-                # Selecciono datos
-                path_select = f'{ruta_base_dp}/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
-                try:
-                    df_sel = pd.read_excel(path_select, index_col=0)
-                except FileNotFoundError:
-                    df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
-
-                    if verbose >= 2:
-                        df_sel.to_excel(path_select, index=True)
-        
-                # Modeling
-                for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-                    
-                    # Asigno valor a cada hiperparametro
-                    val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                    # Asigno valor a cada hiperpametro
+                    thr_corr, thr_fs = param_values_4[0], param_values_4[1]
+                    path_3 = f'{thr_corr}_{thr_fs}'
                     if verbose >= 0:
-                        cont_iter += 1
-                        logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                        print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
-                        logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} {cont_iter/n_iter:.0f}%")
+                        logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
+                        print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
-                    # Generar el diseño de la prueba
-                    X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, test_size=test_size, retrain=retrain, export=False)
-                    
-                    rows_test = len(X_test)
-                    rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-                    if verbose >= 0:
-                        logger.info(f"Rows X_test: {rows_test}")
-                        logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
+                    # Selecciono datos
+                    path_select = f'{ruta_base_dp}/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
+                    try:
+                        df_sel = pd.read_excel(path_select, index_col=0)
+                    except FileNotFoundError:
+                        df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
 
-                    # Si hay suficientes datos
-                    if (rows_test >= min_row_test) and (rows_to_features >= rows_to_features_min):
+                        if verbose >= 2:
+                            df_sel.to_excel(path_select, index=True)
+            
+                    # Modeling
+                    for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                         
-                        df_metrics = mo.train_and_assess_models(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_modelos, cont_iter, retrain=retrain, export=False)
+                        # Asigno valor a cada hiperparametro
+                        val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                        if verbose >= 0:
+                            cont_iter += 1
+                            logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
+                            print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                            logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                        # Guardo datos en dataframe
-                        row_data = {'n_iteration': cont_iter, 
-                                    'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
-                                    'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                    'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
-                                    'fill_na': fill_na, 'bal_type': bal_type,
-                                    'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
-                                    'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
-                                    'k': k}
+                        # Generar el diseño de la prueba
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, test_size=test_size, retrain=retrain, export=False)
                         
-                        # Concateno y exporto datos
-                        df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                        df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
-                        df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                        rows_test = len(X_test)
+                        rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
+                        if verbose >= 0:
+                            logger.info(f"Rows X_test: {rows_test}")
+                            logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
 
-                        if export:    
-                            df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
-                            df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
-                            df_iteration_comp.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=False)
+                        # Si hay suficientes datos
+                        if (rows_test >= min_row_test) and (rows_to_features >= rows_to_features_min):
+                            
+                            df_metrics = mo.train_and_assess_models(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_modelos, cont_iter, retrain=retrain, export=False)
 
-                    else:
-                        if rows_to_features >= rows_to_features_min:
-                            logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
+                            # Guardo datos en dataframe
+                            row_data = {'n_iteration': cont_iter, 
+                                        'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
+                                        'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                                        'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
+                                        'fill_na': fill_na, 'bal_type': bal_type,
+                                        'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                        'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                                        'k': k}
+                            
+                            # Concateno y exporto datos
+                            df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
+                            df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
+                            df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+
+                            if export:    
+                                df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
+                                df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
+                                df_iteration_comp.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=False)
+
                         else:
-                            logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
+                            if rows_to_features >= rows_to_features_min:
+                                logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
+                            else:
+                                logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
-                    if verbose >= 0:
-                        current_train = time.time()
-                        ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
-                        ite_restantes = n_iter - cont_iter
-                        horas_restantes = ite_restantes / ritmo
-                        min_restantes = horas_restantes * 60
-                        horas_train = n_iter / ritmo
-                        logger.info(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
-                        logger.info(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
+                        if verbose >= 0:
+                            current_train = time.time()
+                            ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
+                            ite_restantes = n_iter - cont_iter
+                            horas_restantes = ite_restantes / ritmo
+                            min_restantes = horas_restantes * 60
+                            horas_train = n_iter / ritmo
+                            logger.info(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
+                            logger.info(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
+                            print()
+
+            else:
+                logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_for_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
+                print()
 
     if verbose >= 0:
         end_train = time.time()
@@ -266,7 +277,7 @@ def select_best_model(df, ruta_base_mod, roi_quantile=0.8, umbral=0.35, export: 
 
     # Exporto df_best_models y el mejor modelo?
     if export:
-        df_filtered.to_excel(f'{ruta_base_mod}/df_best_models.xlsx')
+        df_filtered.to_excel(f'{ruta_base_mod}/df_best_models.xlsx', index=False)
 
     return best_model
 
@@ -281,13 +292,13 @@ def define_params_space(id_country):
     # 1728 iteraciones
     d_params = {  
         'construct': {
-            'n_dias_ult_part': [[30, 180], [60, 240]], # [90], [30]
+            'n_dias_ult_part': [[45], [30, 180]], # [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
             'n_years_h2h': [3],
             'segun_localia': [True, False], 
             'dif_con_against': [True, False] 
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # Probar ENG sin b y sin cups. d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b'],  d_comps['all_comp']
+            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b'], d_comps['all_comp']], #  d_comps['all_comp'] # Probar ENG sin b y sin cups. d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b'],  d_comps['all_comp']
             'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
             'fill_na': [None, 'ml'], # ['ml'] if id_country in [55, 148] else [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
         },
@@ -311,25 +322,34 @@ def define_params_space(id_country):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
+    id_country = 55
     only_select_best_model = False
     # continue_old_train, date_old_train = False, '2024-10-30'
-    
-    # Determino date y country
-    date = datetime.datetime.now().date() # date_old_train if continue_old_train else datetime.datetime.now().date()
+
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
-    ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
-    logger.info(f"Country: {country} Date: {date}")
 
-    # Defino hiperparametros a probar
-    d_params, l_modelos = define_params_space(id_country)
-        
     # Preparao datos, entreno modelos y evaluo en df_test
     if only_select_best_model:
+
+        # Determino date 
+        d_dates = {48: "2024-11-09", 55: "2024-11-08", 59: "2024-11-10", 77: "2024-11-10", 148: "2024-11-10"}
+        date = d_dates[id_country]
+        ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
+        logger.info(f"Country: {country} Date: {date}")
+
         df_iteration_comp = pd.read_excel(f'{ruta_base_mod}/df_iteration.xlsx', index_col=0)
         
     else:  
+        # Determino date 
+        date = datetime.datetime.now().date() # date_old_train if continue_old_train else datetime.datetime.now().date()
+        ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
+        logger.info(f"Country: {country} Date: {date}")
+
+        # Defino hiperparametros a probar
+        d_params, l_modelos = define_params_space(id_country)
+        
+        # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
         df_iteration_comp = comprehensive_search(country, ruta_base_mod, d_params, l_modelos)
 
     # Selecciono el mejor modelo
