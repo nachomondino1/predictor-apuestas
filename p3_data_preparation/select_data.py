@@ -355,10 +355,6 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
-
-    # Trato NaN values para evitar input=NaN puesto que uso algoritmos de ML para seleccionar variables mas importanetes
-    # X = clean_data.drop_and_fill_nan_values(X, percentil_nan=75, verbose=0)
-    # y = y[y.index.isin(X.index)]
     # print(np.any(np.isinf(X))) # Tiene que dar False
 
     # Detemino importancia de cada variable para cada modelo

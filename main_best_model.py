@@ -292,7 +292,7 @@ def define_params_space(id_country):
     # 1728 iteraciones
     d_params = {  
         'construct': {
-            'n_dias_ult_part': [[45], [30, 180]], # [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
+            'n_dias_ult_part': [[180], [30, 180]], # [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
             'n_years_h2h': [3],
             'segun_localia': [True, False], 
             'dif_con_against': [True, False] 
@@ -322,8 +322,8 @@ def define_params_space(id_country):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 55
-    only_select_best_model = False
+    id_country = 148
+    only_select_best_model = True
     # continue_old_train, date_old_train = False, '2024-10-30'
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
@@ -333,12 +333,12 @@ if __name__ == "__main__":
     if only_select_best_model:
 
         # Determino date 
-        d_dates = {48: "2024-11-09", 55: "2024-11-08", 59: "2024-11-10", 77: "2024-11-10", 148: "2024-11-10"}
+        d_dates = {48: "2024-11-09", 55: "2024-11-14", 59: "2024-11-10", 77: "2024-11-10", 148: "2024-11-14"}
         date = d_dates[id_country]
         ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
         logger.info(f"Country: {country} Date: {date}")
 
-        df_iteration_comp = pd.read_excel(f'{ruta_base_mod}/df_iteration.xlsx', index_col=0)
+        df_iteration_comp = pd.read_excel(f'{ruta_base_mod}/df_iteration.xlsx') # index_col=0
         
     else:  
         # Determino date 
