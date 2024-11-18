@@ -17,7 +17,26 @@ import plotly.graph_objects as go
 import numpy as np
 
 
-def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float = 0.7, _print: bool = False) -> list:
+def select_league_matches(df, verbose: int = 0):
+    """
+    Filtra partidos seleccionado solo aquellos que son de liga (eliminando partidos de copa)
+    """
+    # Levanto df_competencies
+    df_comp = pd.read_excel('data/df_competencies.xlsx')
+
+    # Selecciono solo las ligas del pais
+    l_leagues = list(df_comp[(df_comp['is_cup']==0) & (df_comp['is_second_division']==0)]['id_competition'].values) 
+    
+    # Filtro dataset segun ligas
+    df = df[df['id_competition'].isin(l_leagues)]
+    
+    if verbose >=0:
+        print("Ligas: ", l_leagues)
+        print(f"Shape sin copas: {df.shape}")
+
+    return df
+
+def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float = 0.7, verbose: int = 0) -> list:
     """
     Identificación de las columnas con una alta correlacion.
    
@@ -29,7 +48,9 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
     # Returns
     Columnas a eliminar por alta correlacion. (List)
     """
-    print('\nEliminacion de columnas correlacionadas:')
+    if verbose >= 1:
+        print('\nEliminacion de columnas correlacionadas:')
+
     # Definicion de variables
     columnas_eliminar = set()  # Conjunto para almacenar las columnas a eliminar
 
@@ -42,7 +63,7 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
 
     # Obtener matriz triangular superior de correlacion (pues la matriz de correlacion es una matriz simetrica respecto de la diagonal)
     df_corr_tri_X = df_corr_X.where(np.triu(np.ones(df_corr_X.shape), k=1).astype(bool))
-    if _print:
+    if verbose >= 1:
         import os
         from dotenv import load_dotenv
         load_dotenv() # Cargar las variables de entorno desde el archivo .env
@@ -80,7 +101,7 @@ def delete_correlated_columns(df: pd.DataFrame, var_resp: str, thr_corr: float =
                         # Eliminar aquella columna con menor correlacion con la variable objetivo
                         col_to_eliminate = col1 if corr_col2_y > corr_col1_y else col2
                         columnas_eliminar.add(col_to_eliminate)
-                        if _print:
+                        if verbose >= 1:
                             print(f"\n Columna 1: {col1} y Columna 2: {col2} Correlacion: {corr*100:.0f}%")
                             print(f"Busco la mayor correlacion con y: Corr col 1 e y: {corr_col1_y*100:.0f}% ; Corr col 2 e y: {corr_col2_y*100:.0f}%")
                             print(f"Columna eliminada: {col_to_eliminate}")
@@ -329,20 +350,14 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
     :param graf: Boolean. True para graficar variables y sus importancias. De lo contrario, False.
     :return: Lista de variables mas importantes. (list)
     """
-    print('\n Feature Selection...')
     # Definicion de variables
     fs = FeatureSelection(graficar_cada_metodo=False)
 
     # Separo en X e y
     X, y = df.drop(var_resp, axis=1), df[var_resp]
-
-    # Trato NaN values para evitar input=NaN puesto que uso algoritmos de ML para seleccionar variables mas importanetes
-    X = clean_data.drop_and_fill_nan_values(X, percentil_nan=75, verbose=0)
-    y = y[y.index.isin(X.index)]
     # print(np.any(np.isinf(X))) # Tiene que dar False
 
     # Detemino importancia de cada variable para cada modelo
-    print("\t Calculando importancias de variables segun varios modelos...")
     df_importance = pd.DataFrame(index=X.columns)
     # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
     df_importance = df_importance.merge(fs.via(X, y), left_index=True, right_index=True)

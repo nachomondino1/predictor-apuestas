@@ -6,6 +6,8 @@ from set_up_logging import logger
 import string
 import requests
 import json
+import datetime
+
 
 # 1) Preparacion de columnas string
 class TextPreparation:
@@ -214,14 +216,14 @@ def determine_columns_to_fill(df, percentil_nan, porc_max: float = 0.3, _print: 
 
     return l_columns_con_poco_nan, l_columns_con_mucho_nan
 
-def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, _print: bool = False):
+def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_min: int = 100, verbose: int = 0):
     """
     Elimina columnas con mucho nan hasta que el dataframe tenga al menos un registro para poder entrenar el modelo
     Es clave hacerlo en nan para no eliminar columnas en el modeling. 
     """
     # Elimino filas con al menos un nan (tal como lo haria en Modeling)
     df_drop_na = delete_rows_nan(df, 0, _print=False)
-    if _print:
+    if verbose >= 1:
         print("\n Cantidad de filas df: ", df_drop_na.shape[0])
 
     # Si quedan menos registros que n_reg_min
@@ -231,12 +233,97 @@ def drop_columns_until_drop_na_min_rows(df, porc_nan_max: float = 0.95, n_reg_mi
 
         # Elimino columnas con mucho nan
         df = delete_columns_nan(df, porc_nan_max)
-        if _print:
+        if verbose >= 1:
             print("porc_nan_max: ", porc_nan_max)
             print("Columnas restantes en df", df.shape[1])
 
         # Vuelvo a verificar si quedan filas nan          
         df = drop_columns_until_drop_na_min_rows(df, porc_nan_max, n_reg_min=n_reg_min)
+
+    return df
+
+def calculate_nan_values(df, columna):
+    """
+    Imprime porcentaje de nan values de una columna.
+    """
+    # Cantidad de registros NaN
+    cantidad_nan = df[columna].isna().sum()
+    # print(f"Cantidad de NaN en {columna}: {cantidad_nan}")
+
+    # Porcentaje de registros NaN
+    porcentaje_nan = (cantidad_nan / len(df)) * 100
+    print(f"Porcentaje de NaN en {columna}: {porcentaje_nan:.2f}%")
+    
+def fillna_with_mean_in_last_matches(df: pd.DataFrame, cols_to_fill, country:str, n_days: int = 60, verbose: int = 0): # no tengo idea si funciona ok. Es la de mnm pero modificada.
+    """
+    Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
+
+    # Parameters
+        df_new: Dataframe con los proximos partidos. (DataFrame)
+        df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
+        cols_to_fill: Columnas a reemplazar valores NaN. (list)
+
+    # Returns
+        Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
+    """
+    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df.index)
+
+    # Por variable mean_player 
+    for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
+        col_sin_suffix = variable.replace("_home", "").replace("_away", "")
+
+        if verbose >= 0:
+            logger.info(f"Columna a rellenar: {variable}")   
+            calculate_nan_values(df, variable)
+
+        # Por partido nuevo
+        for id_match, row in df.iterrows():
+
+            # Si el valor es nan en el partido
+            if pd.isna(row[variable]):
+
+                team = row['id_team_home'] if "_home" in variable else row['id_team_away']
+
+                # Filtro df por fecha para obtener solo los "ultimos partidos" 
+                match_date = row['date']
+                limit_date = match_date - datetime.timedelta(days=n_days) 
+                df_to_fill = df[(df['date'] >= limit_date) & (df['date'] < match_date) ]
+
+                # Busco promedio en ultimos partidos
+                df_matches_home_team = df_to_fill[df_to_fill['id_team_home'] == team]
+                df_matches_away_team = df_to_fill[df_to_fill['id_team_away'] == team]
+                if verbose >=1:
+                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
+                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
+
+                # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
+                values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
+
+                # Remover los valores NaN
+                values_home_clean = values_home[~np.isnan(values_home)]
+                values_away_clean = values_away[~np.isnan(values_away)]
+
+                # Calcular el número total de partidos
+                total_partidos = (len(values_home_clean) + len(values_away_clean))
+                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
+
+                # Si hay al menos un valor que promediar, guardo promedio
+                if total_partidos > 0:
+                    df.loc[id_match, variable] = suma / total_partidos
+                    df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
+                    df_copiado_form.loc[id_match, variable] = suma / total_partidos
+                    if verbose >=1:
+                        print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
+
+        # Imprimo nan values luego de rellenar.
+        print("Luego de rellenar...")
+        calculate_nan_values(df, variable)
+
+    if verbose >= 0:
+        df_copiado_form.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_copiado_formaciones.xlsx", index=True)
+        df.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_filled.xlsx", index=True)
 
     return df
 
