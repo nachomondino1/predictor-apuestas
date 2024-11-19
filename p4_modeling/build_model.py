@@ -482,18 +482,22 @@ def space_params(model_name, bayes, verbose: int = 0):
         },
         'XGBClassifier': {
             'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
-            'n_estimators': Integer(50, 120) if bayes else [100],  # Suele ganar con 100
+            'n_estimators': Integer(5, 120) if bayes else [100],  # Suele ganar con 100
             'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
             'max_depth': Integer(3, 20) if bayes else [5, 10], # 3, 
-            'gamma': Real(0, 1) if bayes else [0],
-            'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
-            'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
-            'alpha': Real(0, 10) if bayes else [0.001],
-            'lambda': Real(0, 10) if bayes else [0.001],
-            'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
-            'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
+            # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
             'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
+
+            # Evitar si los datos ya estan balanceados
+            # 'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
+            # 'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
+            # 'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
+
+            # Demasiada regularizacion puede llevar a predicciones uniformes 33-33-33.
+            'gamma': Real(0, 1) if bayes else [0],
+            'alpha': Real(0.001, 1) if bayes else [0.001],
+            'lambda': Real(0.001, 1) if bayes else [0.001],
         },
         'GradientBoostingClassifier': { # Tarda muchisimo en entrenar a pesar de usar Bayes optimazation
             'n_estimators': Integer(100, 300) if bayes else [100], 
