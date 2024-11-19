@@ -281,26 +281,24 @@ def select_best_model(df, ruta_base_mod, roi_quantile=0.8, umbral=0.35, export: 
 
     return best_model
 
-def define_params_space(id_country):
+def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] #  GradientBoostingClassifier(), MLPClassifier()]
-    l_modelos = [LogisticRegression()]  # XGB tarda mucho en seleccion de hiper con Bayes + Predicciones 33-33-33. Neural network se corta x memoria. SVC() nunca ganó.
-    # l_modelos = [SVC(), XGBClassifier()] #  GradientBoostingClassifier(), MLPClassifier()]
+    l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
 
     # 1728 iteraciones
     d_params = {  
         'construct': {
-            'n_dias_ult_part': [[180], [30, 180]], # [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
+            'n_dias_ult_part': [[180], [30, 180]], 
             'n_years_h2h': [3],
-            'segun_localia': [True, False], 
+            'segun_localia': [True, False],
             'dif_con_against': [True, False] 
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b'], d_comps['all_comp']], #  d_comps['all_comp'] # Probar ENG sin b y sin cups. d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b'],  d_comps['all_comp']
+            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
             'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
-            'fill_na': [None, 'ml'], # ['ml'] if id_country in [55, 148] else [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+            'fill_na': [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -314,6 +312,35 @@ def define_params_space(id_country):
             # scoring : ['accuracy', 'f1_macro'] 
         }
     }
+
+    if fast:
+        # l_modelos = [LogisticRegression()]  # Neural network se corta x memoria. SVC() nunca ganó.
+        # l_modelos = [XGBClassifier()]  
+
+        d_params = {  
+            'construct': {
+                'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
+                'n_years_h2h': [3],
+                'segun_localia': [False], # True
+                'dif_con_against': [True, False] 
+            },
+            'clean_data_2': {
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']],  # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
+                'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
+                'fill_na': [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+            },
+            'select': {
+                'thr_corr': [0.7, 0.85, None],
+                'thr_fs': [None, 0.25, 0.5, 0.75],
+            },
+            'modeling': {
+                'val_size': [0.10],
+                'test_size': [0.15], 
+                'bal_type': ['under'], # None (ni con f1_score..)
+                'k': [5] 
+                # scoring : ['accuracy', 'f1_macro'] 
+            }
+        }
  
     logger.info(f"Parametros para entrenar: {d_params}")
     return d_params, l_modelos
@@ -323,7 +350,7 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 148
-    only_select_best_model = True
+    only_select_best_model = False
     # continue_old_train, date_old_train = False, '2024-10-30'
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
@@ -347,7 +374,7 @@ if __name__ == "__main__":
         logger.info(f"Country: {country} Date: {date}")
 
         # Defino hiperparametros a probar
-        d_params, l_modelos = define_params_space(id_country)
+        d_params, l_modelos = define_params_space(id_country, fast=True)
         
         # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
         df_iteration_comp = comprehensive_search(country, ruta_base_mod, d_params, l_modelos)
