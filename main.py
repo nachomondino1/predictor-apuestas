@@ -1002,6 +1002,11 @@ class Modeling:
         # Predecir las etiquetas para los datos de prueba
         try:
             y_pred_prob = model.predict_proba(X_test) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
+            
+            if verbose >= 1:
+                class_distribution = y_pred_prob.mean(axis=0)
+                print("Distribución promedio de probabilidades por clase:", class_distribution)
+                
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
             y_pred_prob = model.predict(X_test)
             
