@@ -3,7 +3,7 @@ from fuzzywuzzy import fuzz
 import time
 from tqdm import tqdm
 import datetime
-from set_up_logging import logger
+from utils.set_up_logging import logger
 
 def create_df_teams(df: pd.DataFrame):
     """

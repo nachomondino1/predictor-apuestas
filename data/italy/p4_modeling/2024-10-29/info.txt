@@ -1,2 +1,0 @@
-Tardaba una eternidad la seleccion de hiperparametros optimos en fill_na, en feature selection y en modeling.
-Lo corte debido al tiempo, llevaba mas de un dia y le faltaba la mitad.

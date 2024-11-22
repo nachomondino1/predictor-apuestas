@@ -6,7 +6,7 @@ from p2_data_understanding.collect_initial_data.web_scraping_selenium import Cra
 from tqdm import tqdm
 from datetime import datetime, timedelta
 import re
-from set_up_logging import logger
+from utils.set_up_logging import logger
 from time import sleep
 
 class FlashscoreCrawler(Crawler):

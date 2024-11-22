@@ -1,6 +1,6 @@
 # Importo librerias
 import pandas as pd
-from set_up_logging import logger
+from utils.set_up_logging import logger
 
 def getting_to_know_data(df, verbose: int = 1):
     """

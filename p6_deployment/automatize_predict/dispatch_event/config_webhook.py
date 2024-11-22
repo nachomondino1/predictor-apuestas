@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from set_up_logging import logger
+from utils.set_up_logging import logger
 
 # Configura tus variables
 OWNER = "nachomondino1"  # Cambia esto al nombre de tu usuario u organización en GitHub

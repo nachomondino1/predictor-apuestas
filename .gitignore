@@ -15,21 +15,25 @@ prueba.py
 *.pyc
 __pycache__/
 
+# Carpetas
+descarte/
+desuso/
+
 # Data
 *.csv
 *.pkl
 data_seg/
 old/
 
-## Data preparation
---integrate_data/
---modeling/
-# Main_find_best_hiper
-data/*/p4_modeling/*/data_seg/*.xlsx
-data/*/p4_modeling/*/models/*.xlsx
-assess_models_in_prod/
-old_train_iterations/
-old_assess_iterations/
-# Deployment
---missing/
-descarte/
+# Ignorar todo el contenido de la carpeta data
+data/*
+
+# Asegurarse de no ignorar la carpeta data
+!data/
+
+# Excepciones: incluir estos archivos específicos
+!data/df_best_models.xlsx
+!data/df_countries.xlsx
+!data/df_competencies.xlsx
+!data/historial_predicciones.xlsx
+!data/predicciones.xlsx

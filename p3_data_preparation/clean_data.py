@@ -2,7 +2,7 @@ import sys
 sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import string
 import requests
 import json

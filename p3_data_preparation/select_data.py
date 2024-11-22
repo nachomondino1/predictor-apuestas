@@ -1,7 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('/Users/nachomondino/Documents/GitHub/predictor-apuestas')  # Fallaba el import de p4_modeling
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from p3_data_preparation import clean_data

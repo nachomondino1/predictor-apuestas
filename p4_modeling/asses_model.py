@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn import metrics
-from set_up_logging import logger
+from utils.set_up_logging import logger
 
 def confusion_matrix(y_real, y_pred):
     """
