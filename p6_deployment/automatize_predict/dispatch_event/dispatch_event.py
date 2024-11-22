@@ -1,6 +1,6 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import requests
 import json
 import os

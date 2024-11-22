@@ -1,7 +1,7 @@
 # Importo librerias
 import sys
 sys.path.append('.')  # Fallaba el import de main
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import pandas as pd
 import datetime
 from sklearn.tree import DecisionTreeClassifier
@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 from p3_data_preparation.select_data import determine_country_competitions
-import directories
+import utils.directories as directories
 import pickle
 from itertools import product
 from main import DataPreparation, Modeling
@@ -324,8 +324,8 @@ def define_params_space(id_country, fast: bool = False):
             'construct': {
                 'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
                 'n_years_h2h': [3],
-                'segun_localia': [True, False], # Para SPA, evitar TRUE.
-                'dif_con_against': [True, False] 
+                'segun_localia': [False, True], # Para SPA, evitar TRUE.
+                'dif_con_against': [False, True] 
             },
             'clean_data_2': {
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']],  # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     # Parametros de ejecucion
     id_country = 59
     only_select_best_model = False
-    continue_old_train, date_old_train = True, '2024-11-20'
+    continue_old_train, date_old_train = False, '2024-11-20'
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
@@ -385,15 +385,3 @@ if __name__ == "__main__":
     # Selecciono el mejor modelo
     best_model = select_best_model(df_iteration_comp, ruta_base_mod)
     logger.info(best_model)
-
-    '''
-    # Actualizo df_best_models.xlsx
-    df_bm = pd.read_excel("data/df_best_models.xlsx")
-    logger.info(df_bm)
-    idx = df_bm[df_bm['id_country'] == id_country].index
-
-    df_bm.loc[idx, 'n_model'] = best_model.index
-    df_bm.loc[idx, 'model_name'] = best_model['model_name'].values[0]
-    df_bm.loc[idx, 'iteration_date'] = str(date)
-    df_bm.to_excel("data/df_best_models_2.xlsx", index=False)
-    '''

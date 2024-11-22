@@ -4,7 +4,7 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 import datetime
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import re
 import os
 import json

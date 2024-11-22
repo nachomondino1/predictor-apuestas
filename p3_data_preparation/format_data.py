@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
-from set_up_logging import logger
+from utils.set_up_logging import logger
 
 # main.py
 def convert_ball_possession_to_int(df):
@@ -97,7 +97,10 @@ def convert_capacity_to_int(df):
                 df[col] = df[col].str.replace(' ', '')
 
                 # Convertir la columna al tipo de datos correcto (entero)
-                df[col] = df[col].astype(float) # Pues si tiene nan, es float.
+                try: 
+                    df[col] = df[col].astype(float) # Pues si tiene nan, es float.
+                except ValueError: #ValueError: could not convert string to float: ''
+                    pass
             else:
                 print(f"Fallo la conversion de la columna {col} a float")
     return df

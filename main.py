@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import datetime
-from set_up_logging import logger
+from utils.set_up_logging import logger
 ## Data understanding
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data

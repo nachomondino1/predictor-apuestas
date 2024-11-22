@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import time
 from itertools import product
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import warnings
 # Grid y Bayes
 from sklearn.model_selection import PredefinedSplit, GridSearchCV

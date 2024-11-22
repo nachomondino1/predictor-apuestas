@@ -1,6 +1,6 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
-from set_up_logging import logger
+from utils.set_up_logging import logger
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager

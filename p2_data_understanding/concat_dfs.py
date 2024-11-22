@@ -1,10 +1,10 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
-from set_up_logging import logger
+from utils.set_up_logging import logger
 import os
 from dotenv import load_dotenv
-import directories
+import utils.directories as directories
 
 
 def concat_raw_data_by_competition(id_country, country, l_dataframes, export=True):
