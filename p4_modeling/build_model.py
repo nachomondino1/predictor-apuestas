@@ -20,6 +20,8 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 # from scikeras.wrappers import KerasClassifier
+import joblib
+from joblib import parallel_backend
 
 
 class TrainNeuralNetwork():
@@ -151,8 +153,10 @@ class TrainNeuralNetwork():
             )
 
             # Entrenar el modelo (usa el validation como test en vez de hacer cross val entre X_train)
-            history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # timeout_callback
-            
+            joblib.parallel.DEFAULT_BACKEND = "loky"
+            with parallel_backend('threading'):
+                history = model.fit(X_train, y_train_categorical, validation_data=(X_val, y_val_categorical), epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=[early_stopping]) # timeout_callback
+
             # Evaluar en el set de validación
             val_loss, val_acc, val_precision, val_recall = model.evaluate(X_val, y_val_categorical, verbose=verbose)
             val_f1 = 2 * val_precision * val_recall / (val_precision + val_recall) if (val_precision + val_recall) > 0 else 0  # Accuracy NO.
@@ -277,12 +281,12 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
         # Crear el objeto GridSearchCV
         with warnings.catch_warnings():  # Logistic te vuelve loco
             warnings.simplefilter("ignore")  # Ignora todas las advertencias
-            grid_search = GridSearchCV(estimator=model, param_grid=params_grid, cv=pds, scoring=scoring)
+            grid_search = GridSearchCV(estimator=model, param_grid=params_grid, cv=pds, scoring=scoring,  n_jobs=-1) # el n_jons -1 evitaria el error  "warnings.warn(f"resource_tracker: {name}: {e!r}")"" (AUN NO LO PROBÉ, NO SE SI FUNCIONA)
 
             # Ajustar el objeto GridSearchCV a los datos de entrenamiento
             grid_search.fit(X_val_train, y_val_train)  # Esta ok X_val_train y y_val_train
-            best_search = grid_search
- 
+            best_search = grid_search         
+
         # Obtener los mejores hiperparámetros
         end_grid = time.time()
         if verbose >= 1: 
