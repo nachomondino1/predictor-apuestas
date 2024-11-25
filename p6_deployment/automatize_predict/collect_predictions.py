@@ -64,12 +64,9 @@ if __name__ == "__main__":
     if env == 'dev':
         # Definir condiciones del análisis
         n_days = 5
-        l_countries = [48, 55, 59, 77, 148]
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
-        # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
-
-        d_run_missing = {'n_seasons_missing': 1, 'extract_missing': True, 'predict_missing': False} 
-        d_run.update(d_run_missing)
+        l_countries = [59] # [48, 55, 59, 77, 148]
+        # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)

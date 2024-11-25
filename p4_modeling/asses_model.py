@@ -461,6 +461,12 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
         df['stake_to_bet'] = num / (1 + np.exp(-df['stake_to_bet_norm']))
         # df = df.drop(['stake_to_bet_raw', 'stake_to_bet_normalized'], axis=1)
     
+    # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
+    if 'emergency_fill' in df.columns:
+        logger.warning("Disminución de stakes por copiado de emergencia.")
+        # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
+        df.loc[df['emergency_fill'] == 1, 'stake_to_bet'] *= 0.5
+
     # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
     val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
     func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
