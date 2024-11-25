@@ -573,7 +573,7 @@ def space_params(model_name, bayes, verbose: int = 0):
 
     return params
 
-def determine_n_iter(num_samples, num_hyperparameters, min_iter: int = 20, max_iter:int = 100, verbose: int = 0):
+def determine_n_iter(num_samples, num_hyperparameters, min_iter: int = 20, max_iter: int = 50, verbose: int = 0):
     """
     Determina el número de iteraciones para BayesSearchCV basado en el tamaño del conjunto de datos
     y el número de hiperparámetros a optimizar.

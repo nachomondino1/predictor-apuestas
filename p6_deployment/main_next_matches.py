@@ -854,6 +854,9 @@ class TrainingDataLoader():
 
 # Missing data
 def load_last_version_extracted_matches(country):
+    """
+    No lo pongo en la clase puesto que no son datos usados durante el entrenamiento.
+    """
     # Esta bien levantar df_integrated aca tambien. para asegurarme que todos los missing estan en df_integrated tambien.
     # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
     try:
@@ -938,7 +941,8 @@ def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_
 def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int = 0):
     """
     Cargo datos de Flashscore a preparar.
-
+    No lo pongo en la clase puesto que no son datos usados durante el entrenamiento.
+    
     # Parameters:
         predict_missing: True para levantar los partidos missing con los que no se entrenó. False, para levantar los proximos partidos ya extraidos.
     """  
@@ -1059,7 +1063,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
     # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    # n_model, model_name, iteration_date_dt = 68, "XGBClassifier", "2024-11-22" # XGBClassifier, neural_networ, SVC, LogisticRegression
+    # n_model, model_name, iteration_date_dt = 11, "SVC", "2024-11-19" # XGBClassifier, neural_networ, SVC, LogisticRegression
     n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)  # m_to_use
   
     if verbose >= 0:
@@ -1299,17 +1303,17 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
 if __name__ == "__main__":    
 
     l_countries = [48, 55, 59, 77, 148]  # 48, 55, 
-    l_countries = [48]
+    l_countries = [77]
 
-    n_days = 15
+    n_days = 1
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     # Definir condiciones del análisis
     for id_country in l_countries:
         n_days_fill_data = 360 if id_country == 55 else 60  # Para FRA uso 360 porque no llega a minimos para integrar var de jugadores.
 
-        df = main(d_run, id_country, n_days, n_days_fill_data=n_days_fill_data, predict_missing=True, export=d_run['export'])
+        df = main(d_run, id_country, n_days, n_days_fill_data=n_days_fill_data, predict_missing=False, export=d_run['export'])
     
         df.to_excel(f"{directorio}/predicciones.xlsx")
