@@ -22,10 +22,59 @@ import re
 from p3_data_preparation.clean_data import fillna_with_mean_in_last_matches
 
 
-def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: bool = True, fill_column_players: bool = True, 
-                         continue_old_train: bool = False, verbose: int = 0, export: bool = True):
+def comprehensive_search(
+    country, 
+    ruta_base_mod, 
+    d_params, 
+    l_modelos, 
+    retrain: bool = True, 
+    fill_column_players: bool = False, 
+    continue_old_train: bool = False, 
+    verbose: int = 0, 
+    export: bool = True
+):
     """
-    Busco los hiperparametros optimos en DataPreparation y Modeling de main.py
+    Busca los hiperparámetros óptimos en las etapas de DataPreparation y Modeling de main.py.
+    
+    Parámetros:
+    ----------
+    country : str
+        Nombre del país sobre el cual se realizará la búsqueda de hiperparámetros.
+        
+    ruta_base_mod : str
+        Ruta base donde se guardarán los datos generados durante la ejecución de la función.
+        
+    d_params : dict
+        Diccionario con los hiperparámetros a probar. Estos hiperparámetros se aplican tanto
+        a la preparación de datos como al modelado.
+        
+    l_modelos : list
+        Lista de modelos que se entrenarán. Puede incluir instancias como `SVC`, 
+        `LogisticRegression`, etc.
+        
+    retrain : bool, opcional (por defecto True)
+        Si es True, los modelos se entrenarán utilizando tanto los datos extraídos como 
+        los datos missing con información de los últimos partidos jugados.
+        
+    continue_old_train : bool, opcional (por defecto False)
+        Si es True, permite continuar un entrenamiento que se interrumpió previamente. 
+        Retoma desde la última construcción completada.
+        
+    verbose : int, opcional (por defecto 0)
+        Nivel de detalle de los mensajes impresos en la consola.
+        - 0: Sin mensajes.
+        - 1: Mensajes básicos.
+        - 2 o mayor: Mensajes detallados para depuración.
+        
+    export : bool, opcional (por defecto True)
+        Si es True, exporta los DataFrames generados durante la ejecución de la función
+        a la ubicación especificada en `ruta_base_mod`.
+
+    Return:
+    ----------
+    df_iteration_comp: DataFrame
+        Una fila por modelos entrenado detallando los hiperparametros usados al entrenar y su 
+        evaluacion en el testeo.
     """
     # Definicion de variables
     one_time, avoid_construct = True, False
@@ -63,7 +112,7 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
         df_iteration, df_ite_test = pd.DataFrame(), pd.DataFrame()
         directories.make_directories(l_directorios=[ruta_base_du, ruta_base_dp, ruta_base_modelos])
 
-    # Por combinacion de parametros de construct_data
+    # Construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
         # Asigno valor a cada hiperpametro
@@ -101,21 +150,7 @@ def comprehensive_search(country, ruta_base_mod, d_params, l_modelos, retrain: b
 
                 else:
                     df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-                
-                # print("\n DF_INTEGRATED \n", df_integrated.shape, df_integrated.head(2))
-
-                # Iria al final de integrate pero no train_models.py parte de integrate_data...  --> ESto es para evitar eliminar variable de jugadores por nan en treat_nan_values()
-                # Rellenar columna de jugadores...???? --> Usar esto para rellenar todas las variables? como mode o ml que sea una opcion tipo 'mean_last_matches'
-                if fill_column_players:
-                    logger.warning("Se estan rellenando las columnas jugadores con la media en los ultimos partidos. Aun la funcion no fue revisada.")
-                    l_player_cols = [col for col in df_integrated.columns if re.search(r'_player_', col)]  # Selecciono las variables que corresponden a jugadores
-                    shape_inicial_2 = df_integrated.shape
-                    df_integrated = fillna_with_mean_in_last_matches(df_integrated, cols_to_fill=l_player_cols, country=country)
-                    logger.info(f"Luego de rellenar formaciones: {shape_inicial_2} --> {df_integrated.shape}")
-                    
-                    # Exporto el dataset con missing tal como cuando entrené
-                    df_integrated.to_excel(f'{ruta_base_dp}/df_integrated_filled.xlsx') 
-
+                                
                 df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
                 if export:
                     df_constructed.to_excel(path_construct, index=True)
@@ -288,7 +323,8 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
+    # l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
+    l_modelos = [LogisticRegression(), SVC(), XGBClassifier(), MLPClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
 
     # 1728 iteraciones
     d_params = {  
@@ -325,7 +361,7 @@ def define_params_space(id_country, fast: bool = False):
                 'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
                 'n_years_h2h': [3],
                 'segun_localia': [False, True], # Para SPA, evitar TRUE.
-                'dif_con_against': [False, True] 
+                'dif_con_against': [True, False] 
             },
             'clean_data_2': {
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']],  # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
@@ -352,9 +388,9 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 59
+    id_country = 148
     only_select_best_model = False
-    continue_old_train, date_old_train = False, '2024-11-20'
+    continue_old_train, date_old_train = False, '2024-11-22'
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
