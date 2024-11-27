@@ -24,11 +24,10 @@ from p3_data_preparation.clean_data import fillna_with_mean_in_last_matches
 
 def comprehensive_search(
     country, 
-    ruta_base_mod, 
+    date, 
     d_params, 
     l_modelos, 
     retrain: bool = True, 
-    fill_column_players: bool = False, 
     continue_old_train: bool = False, 
     verbose: int = 0, 
     export: bool = True
@@ -82,30 +81,35 @@ def comprehensive_search(
     dp, mo = DataPreparation(country), Modeling(country) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
-    n_iter = define_n_iterations(d_params)
+    n_iter = define_n_iterations(d_params)    
     if verbose >= 0:
         logger.info(f"Numero de iteraciones totales: {n_iter}")
         start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC
     
     # Defino rutas segun country y date
-    ruta_base_du = f"./data/{country}/p4_modeling/{date}/p2_data_understanding"
-    ruta_base_dp = f"./data/{country}/p4_modeling/{date}/p3_data_preparation"
-    ruta_base_modelos = f"./data/{country}/p4_modeling/{date}/models" 
+    BASE_DIR = f"./data/{country}/p4_modeling/{date}"
+    ruta_base_du, ruta_base_dp, ruta_base_modelos = f"{BASE_DIR}/p2_data_understanding", f"{BASE_DIR}/p3_data_preparation", f"{BASE_DIR}/models" 
     # directories.make_directories(l_directorios=[ruta_base_du, ruta_base_dp, ruta_base_modelos])
     
     # Defino otras variables
     if continue_old_train:
-        df_ite_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_train.xlsx')
-        df_ite_test_old = pd.read_excel(f'{ruta_base_mod}/df_iteration_test.xlsx')
+        
+        # Defino dataframes a devolver como copia de los que ya habia generado
+        df_ite_old = pd.read_excel(f'{BASE_DIR}/df_iteration_train.xlsx')
+        df_ite_test_old = pd.read_excel(f'{BASE_DIR}/df_iteration_test.xlsx')
+        df_iteration = df_ite_old.copy()
+        df_ite_test = df_ite_test_old.copy()
 
+        # Determino hiperparametros de construccion de la ultima iteracion entrenada
         row = df_ite_old[df_ite_old['n_iteration'] == df_ite_old['n_iteration'].max()]
         idx = row.index[0]
         n_last_model, lm_n_dias_ult_part, lm_n_anios_hist, lm_segun_localia, lm_dif_con_against = row.loc[idx, 'n_iteration'], eval(row.loc[idx, 'n_dias_ult_part']), row.loc[idx, 'n_anios_hist'], row.loc[idx, 'segun_localia'], row.loc[idx, 'dif_con_against']
         logger.warning("Se esta continuando el entrenamiento anterior dado que continue_old_train=True.")
 
-        df_iteration = df_ite_old.copy()
-        df_ite_test = df_ite_test_old.copy()
+        # Determino numero de iteracion desde la que se sigue
         cont_iter = n_last_model
+        # n_comb_construct = d_params['construct']
+        # frecuencia_construct = n_iter / n_comb_construct
     
     else:
         cont_iter = 0
@@ -246,9 +250,9 @@ def comprehensive_search(
                                 df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
 
                                 if export:    
-                                    df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
-                                    df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
-                                    df_iteration_comp.to_excel(f'{ruta_base_mod}/df_iteration.xlsx', index=False)
+                                    df_iteration.to_excel(f'{BASE_DIR}/df_iteration_train.xlsx', index=False)
+                                    df_ite_test.to_excel(f'{BASE_DIR}/df_iteration_test.xlsx', index=False)
+                                    df_iteration_comp.to_excel(f'{BASE_DIR}/df_iteration.xlsx', index=False)
 
                             else:
                                 if rows_to_features >= rows_to_features_min:
@@ -277,16 +281,20 @@ def comprehensive_search(
 
     # Guardo datos de todas las iteraciones
     if export:
-        df_iteration.to_excel(f'{ruta_base_mod}/df_iteration_train.xlsx', index=False)
-        df_ite_test.to_excel(f'{ruta_base_mod}/df_iteration_test.xlsx', index=False)
+        df_iteration.to_excel(f'{BASE_DIR}/df_iteration_train.xlsx', index=False)
+        df_ite_test.to_excel(f'{BASE_DIR}/df_iteration_test.xlsx', index=False)
 
     return df_iteration_comp
 
 def define_n_iterations(d_params):
     """
     Calcula el numero de iteraciones y el tiempo estimado para terminar
-    :param l_dicts: Lista de diccionarios de hiperparametros. (list)
-    :return: Numero de iteraciones y tiempo estimado (int y float)
+
+    Parameteres
+        d_params: Diccionario con hiperparametros a probar (dict)
+    
+    Return
+        n_iter: Numero de iteraciones. (int)
     """
     # Cuidado con el nro de iteraciones sobretodo en select. nº comb = producto de posibles comb de cada hiper  EJ: {'thr_corr': [0.5, 0.6, 0.7], 'thr_fs': [0.25, 0.2, 0.15, 0.1, 0.05], 'thr_nan_col': [0.2, 0.5, None]} --> nºcomb = 3x5x3=45
     # n comb totales = 3 x 45 x 6 = 810 --> 90 iteraciones en 17 horas --> 5,35 iter/hora => 810 iteraciones = 151 horas  # n comb totales = 1 x 18 x 6 = 108 --> 90 iteraciones en 17 horas --> 5,35 iter/hora => 216 iteraciones = 151 horas
@@ -354,14 +362,13 @@ def define_params_space(id_country, fast: bool = False):
 
     if fast:
         # l_modelos = [LogisticRegression()]  # Neural network se corta x memoria. SVC() nunca ganó.
-        # l_modelos = [XGBClassifier()]  
 
         d_params = {  
             'construct': {
                 'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
                 'n_years_h2h': [3],
                 'segun_localia': [False, True], # Para SPA, evitar TRUE.
-                'dif_con_against': [True, False] 
+                'dif_con_against': [False, True] 
             },
             'clean_data_2': {
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']],  # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
@@ -390,34 +397,33 @@ if __name__ == "__main__":
     # Parametros de ejecucion
     id_country = 148
     only_select_best_model = False
-    continue_old_train, date_old_train = False, '2024-11-22'
+    continue_old_train, date_old_train = False, '2024-11-27'
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
 
     # Preparao datos, entreno modelos y evaluo en df_test
-    if only_select_best_model:
+    if not only_select_best_model:
 
-        # Determino date 
-        d_dates = {48: "2024-11-09", 55: "2024-11-14", 59: "2024-11-10", 77: "2024-11-10", 148: "2024-11-14"}
-        date = d_dates[id_country]
-        ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
-        logger.info(f"Country: {country} Date: {date}")
-
-        df_iteration_comp = pd.read_excel(f'{ruta_base_mod}/df_iteration.xlsx') # index_col=0
-        
-    else:  
         # Determino date 
         date = date_old_train if continue_old_train else datetime.datetime.now().date() # datetime.datetime.now().date() 
-        ruta_base_mod = f"./data/{country}/p4_modeling/{date}" 
         logger.info(f"Country: {country} Date: {date}")
 
         # Defino hiperparametros a probar
         d_params, l_modelos = define_params_space(id_country, fast=True)
         
         # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-        df_iteration_comp = comprehensive_search(country, ruta_base_mod, d_params, l_modelos, continue_old_train=continue_old_train)
+        df_iteration_comp = comprehensive_search(country, date, d_params, l_modelos, continue_old_train=continue_old_train)
 
+    else:
+        # Determino date 
+        d_dates = {48: "2024-11-09", 55: "2024-11-14", 59: "2024-11-10", 77: "2024-11-10", 148: "2024-11-14"}
+        date = d_dates[id_country]
+        logger.info(f"Country: {country} Date: {date}")
+
+        df_iteration_comp = pd.read_excel(f'./data/{country}/p4_modeling/{date}/df_iteration.xlsx') # index_col=0
+         
     # Selecciono el mejor modelo
-    best_model = select_best_model(df_iteration_comp, ruta_base_mod)
+    BASE_DIR = f"./data/{country}/p4_modeling/{date}" 
+    best_model = select_best_model(df_iteration_comp, BASE_DIR)
     logger.info(best_model)

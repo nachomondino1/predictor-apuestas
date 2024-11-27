@@ -417,29 +417,43 @@ class DataPreparationNew(DataPreparation):
 
         return df_new, df_copiado
 
-    def emergency_fill_player_columns(self, df, cols_to_fill, verbose: int = 1):
+    def emergency_fill_player_columns(self, df, cols_to_fill, n_days=360, verbose: int = 1):
         """
-        Rellenado de emergencia de valores NaN con la media de la columna. Es ultimo recurso para poder predecir el partido. 
+        Rellenado de emergencia de valores NaN con la media de la columna. Es el último recurso para poder predecir el partido.
         """
         logger.warning("Relleno de emergencia...")
-   
-        # Filtro df por fecha para obtener solo los "ultimos partidos" 
-        df_integrated = pd.read_excel(f'data/{self.country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index_col=0)        
-        # match_date = datetime.datetime.now()
-        # limit_date = match_date - datetime.timedelta(days=n_days) 
-        # df_to_fill = df_integrated[(df_integrated['date'] >= limit_date) & (df_integrated['date'] < match_date)]
-        # logger.info(df_integrated)
+    
+        # Filtro df por fecha para obtener solo los "últimos partidos" 
+        df_integrated = pd.read_excel(
+            f'data/{self.country}/p6_deployment/missing/old_updated/df_integrated.xlsx', 
+            index_col=0
+        )        
+        match_date = datetime.datetime.now()
+        limit_date = match_date - datetime.timedelta(days=n_days) 
+        df_to_fill = df_integrated[
+            (df_integrated['date'] >= limit_date) & (df_integrated['date'] < match_date)
+        ]
 
-        # Copio formaciones usando un n_days altisimo para rellenar si o si.
-        df, df_fill = self.fillna_with_mean_in_last_matches(df, df_integrated, cols_to_fill=cols_to_fill)
+        # Copio formaciones usando un n_days altísimo para rellenar si o si.
+        df, df_fill = self.fillna_with_mean_in_last_matches(
+            df, df_to_fill, cols_to_fill=cols_to_fill
+        )
         df_fill = df_fill.rename(columns={"copiado_formaciones": "emergency_fill"})
-        # logger.info(df_fill)
 
         # Conteo de filas con relleno de emergencia
         n_rows = len(df_fill[df_fill["emergency_fill"] == 1])
         logger.warning(f"Se han rellenado {n_rows} partidos de emergencia por NaN en las columnas player START y SUB.")
 
+        # Paso final: rellenar valores restantes con la media de la columna
+        for col in cols_to_fill:
+            if df[col].isna().any():  # Verifica si quedan NaN en la columna
+                media = df[col].mean()
+                df[col].fillna(media, inplace=True)
+                if verbose > 0:
+                    logger.error(f"Se han rellenado valores NaN restantes en '{col}' con la media: {media:.2f}")
+
         return df, df_fill
+
     
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: list, n_years_h2h: int, 
                            segun_localia: bool, columns_used: list, dif_con_against: bool = True, verbose: int = 0):
@@ -804,7 +818,7 @@ class TrainingDataLoader():
 
             rows_ite = df_iteration[df_iteration['n_iteration'] == self.n_model]
 
-            if self.verbose >= 1:
+            if self.verbose >= 2:
                 logger.info(df_iteration)
                 logger.info(rows_ite)
 
@@ -1042,6 +1056,7 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
 ########################################################################## MAIN #######################################################################
 def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7, 
          n_seasons_missing : int = 1, extract_missing: bool = True, predict_missing: bool = False, n_days_fill_data: int = 60, 
+         porc_m: float = 0.3,
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1063,7 +1078,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
     # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    # n_model, model_name, iteration_date_dt = 11, "SVC", "2024-11-19" # XGBClassifier, neural_networ, SVC, LogisticRegression
+    # n_model, model_name, iteration_date_dt = 207, "LogisticRegression", "2024-11-09" # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
     n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)  # m_to_use
   
     if verbose >= 0:
@@ -1241,7 +1256,15 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         # Levanto hiperparametros de modeling
         loaded_model = lo.load_model()
         d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = 0.1 if id_country == 55 else 0.25  # Uso un m mas bajo en FRA debido a resultados historicos.
+
+        # Defino el % del m del test (define el m_to_use) --> habria que automatizarlo. Tal vez pasarle como argumento l_models_change_model y l_models_new_train algo asi.
+        # if id_country in [48]:
+        #     # Mismo entrenamiento pero cambio de modelo (ENG)
+        #     porc_m = porc_m * 2/3
+        if id_country in [55, 148]:
+            # Nuevo entrenamiento o Ligas historicamente malas (FRA) 
+            porc_m =  porc_m / 3
+
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1302,18 +1325,16 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    l_countries = [48, 55, 59, 77, 148]  # 48, 55, 
-    l_countries = [77]
-
-    n_days = 1
+    n_days = 7
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
+
+    l_countries = [48, 55, 59, 77, 148]  # 48, 55, 
+    l_countries = [48]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
-        n_days_fill_data = 360 if id_country == 55 else 60  # Para FRA uso 360 porque no llega a minimos para integrar var de jugadores.
 
-        df = main(d_run, id_country, n_days, n_days_fill_data=n_days_fill_data, predict_missing=False, export=d_run['export'])
-    
+        df = main(d_run, id_country, n_days, predict_missing=False, export=d_run['export'])
         df.to_excel(f"{directorio}/predicciones.xlsx")
