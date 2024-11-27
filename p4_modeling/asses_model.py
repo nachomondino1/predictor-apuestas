@@ -376,6 +376,7 @@ def determine_winning_bets(df: pd.DataFrame):
     return df
 
 def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
+                           porc_emergency: float = 0.75,
                            odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
     """
     Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
@@ -465,7 +466,7 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
     if 'emergency_fill' in df.columns:
         logger.warning("Disminución de stakes por copiado de emergencia.")
         # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
-        df.loc[df['emergency_fill'] == 1, 'stake_to_bet'] *= 0.5
+        df.loc[df['emergency_fill'] == 1, 'stake_to_bet'] *= porc_emergency
 
     # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
     val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
