@@ -6,29 +6,30 @@ on:
     # Todos los dias a la medianoche
     - cron: "00 22 * * *" # 19.00 hs
     
-    # Viernes (16:00 hs, 18:00 hs, 18:30 hs)
-    - cron: "0 19 * * 5" # 16 ARG (partidos de las 14 hs)
-    - cron: "0 21 * * 5" # 18 ARG (partidos de las 16 hs)
+    # Viernes
+    # - cron: "0 19 * * 5" # 16hs ARG
+    # - cron: "0 21 * * 5" # 18hs ARG
 
-    # Sabado (10:30 hs, 12:30 hs, 13:00 hs, 14:00 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
-    - cron: "30 13 * * 6"
-    - cron: "30 15 * * 6"
-    - cron: "0 16 * * 6"
-    - cron: "0 17 * * 6"
-    - cron: "30 18 * * 6"
-    - cron: "0 19 * * 6"
-    - cron: "0 21 * * 6"
+    # Sabado
+    # - cron: "30 13 * * 6" # 10:30 hs ARG
+    # - cron: "30 15 * * 6" # 12:30 hs ARG
+    - cron: "0 16 * * 6" # 13:00 hs ARG
+    - cron: "0 17 * * 6" #  14:00 hs ARG
+    # - cron: "30 18 * * 6" # 15:30 hs ARG
+    - cron: "45 19 * * 6" #  16:45 hs ARG
+    - cron: "30 21 * * 6" # 18:30 hs ARG
 
-    # Domingo (12:00 hs, 12:30 hs, 14:00 hs, 14:30 hs, 15:30 hs, 16:00 hs, 18:00 hs, 18:30 hs)
-    - cron: "30 15 * * 0"
-    - cron: "0 17 * * 0"
-    - cron: "30 18 * * 0"
-    - cron: "0 19 * * 0"
-    - cron: "0 21 * * 0"
+    # Domingo
+    - cron: "30 13 * * 0" # 10:30 hs ARG
+    - cron: "00 16 * * 0" # 13:00 hs ARG
+    # - cron: "0 17 * * 0" #  14:00 hs ARG
+    - cron: "0 18 * * 0"  # 15:00 hs ARG
+    - cron: "15 19 * * 0"  # 16:15 hs ARG
+    - cron: "30 21 * * 0" # 18:30 hs ARG
   
-    # Lunes (15:30 hs, 18:00 hs, 18:30 hs)
-    - cron: "30 18 * * 1"
-    - cron: "00 21 * * 1"
+    # Lunes
+    # - cron: "30 18 * * 1" # 15:30 hs ARG
+    # - cron: "00 21 * * 1" # 18:00 hs ARG
 
   # push: # Para hacer que se ejecute la action
   #   branches:
