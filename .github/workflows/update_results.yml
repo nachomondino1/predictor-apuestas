@@ -31,9 +31,9 @@ on:
     # - cron: "30 18 * * 1" # 15:30 hs ARG
     - cron: "00 22 * * 1" # 19:00 hs ARG
 
-  push: # Para hacer que se ejecute la action
-    branches:
-      - staging
+  # push: # Para hacer que se ejecute la action
+  #   branches:
+  #     - staging
 
 jobs:
   collect_results:
