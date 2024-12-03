@@ -322,7 +322,6 @@ class DataPreparation:
                 df_map_players_fs_so, df_player = pd.DataFrame(), pd.DataFrame()
 
                 # Seleccionar ligas
-                # df_comp = pd.read_excel('data/df_competencies.xlsx')
                 d_comps = select_data.determine_country_competitions(id_country)            
                 print(f"Competiciones: {d_comps['comp_sin_cups']}")
 
@@ -366,15 +365,6 @@ class DataPreparation:
                 if export:
                     df_player.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player.xlsx", index=True)
                     df_map_players_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx")
-                
-                '''
-                df_player = create_df_player(df_match_player)
-                df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
-
-                if export:
-                    df_player.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player.xlsx", index=True)
-                    df_map_players_fs_so.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx")
-                '''
 
         # Integro datos de jugadores a df_match usando el mapeo
         df, df_aux = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
