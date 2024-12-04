@@ -1052,11 +1052,22 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
 
     return df_filt
 
+def define_porc_m_to_use(id_country, porc_m, l_new_model_same_train, l_new_train):
+
+    # Defino el % del m del test (define el m_to_use) --> habria que automatizarlo. Tal vez pasarle como argumento l_models_change_model y l_models_new_train algo asi.
+    if id_country in l_new_model_same_train:
+        # Mismo entrenamiento pero cambio de modelo (ENG)
+        porc_m = porc_m / 2
+    if id_country in l_new_train:
+        # Nuevo entrenamiento o Ligas historicamente malas (FRA) 
+        porc_m =  porc_m / 3
+    
+    return porc_m
 
 ########################################################################## MAIN #######################################################################
 def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7, 
          n_seasons_missing : int = 1, extract_missing: bool = True, predict_missing: bool = False, n_days_fill_data: int = 60, 
-         porc_m: float = 0.3,
+         porc_m: float = 0.25,
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1078,8 +1089,8 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
     # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    # n_model, model_name, iteration_date_dt = 207, "LogisticRegression", "2024-11-09" # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
-    n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)  # m_to_use
+    # n_model, model_name, iteration_date_dt = 28, "LogisticRegression", "2024-12-04" # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
   
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
@@ -1172,7 +1183,9 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
     
     else:
         logger.warning("Se evitó por comando la extraccion de proximos partidos.")
-        df_match, df_match_player, df_match_odds = load_data_to_prepare(country=country, iteration_date=iteration_date_dt, predict_missing=predict_missing)
+
+        if d_run['data_prep'] or d_run['modeling']:
+            df_match, df_match_player, df_match_odds = load_data_to_prepare(country=country, iteration_date=iteration_date_dt, predict_missing=predict_missing)
         
     # Si no hay proximos partidos
     if len(df_match) == 0:
@@ -1256,15 +1269,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         # Levanto hiperparametros de modeling
         loaded_model = lo.load_model()
         d_hiper_mod = lo.load_modeling_hyperparameters()
-
-        # Defino el % del m del test (define el m_to_use) --> habria que automatizarlo. Tal vez pasarle como argumento l_models_change_model y l_models_new_train algo asi.
-        # if id_country in [48]:
-        #     # Mismo entrenamiento pero cambio de modelo (ENG)
-        #     porc_m = porc_m * 2/3
-        if id_country in [55, 148]:
-            # Nuevo entrenamiento o Ligas historicamente malas (FRA) 
-            porc_m =  porc_m / 3
-
+        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[], l_new_model_same_train=[55, 148])
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1326,15 +1331,15 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
 if __name__ == "__main__":    
 
     n_days = 7
-    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
-    l_countries = [48, 55, 59, 77, 148]  # 48, 55, 
-    l_countries = [48]
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [55]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
 
-        df = main(d_run, id_country, n_days, predict_missing=False, export=d_run['export'])
+        df = main(d_run, id_country, n_days, predict_missing=False, n_seasons_missing=2, export=d_run['export'])
         df.to_excel(f"{directorio}/predicciones.xlsx")
