@@ -105,7 +105,7 @@ def convert_capacity_to_int(df):
                 print(f"Fallo la conversion de la columna {col} a float")
     return df
 
-def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
+def convert_columns_to_float(df: pd.DataFrame, verbose: int = 0):
     """
     Intenta convertir las columnas object a float
     """
@@ -118,7 +118,7 @@ def convert_columns_to_float(df: pd.DataFrame, _print: bool = False):
         # Intento convertirla a float
         try:
             df[col] = df[col].astype(float)
-            if _print:
+            if verbose >= 1:
                 print(f"Se convirtio la columna {col} a float!")
         except:
             pass

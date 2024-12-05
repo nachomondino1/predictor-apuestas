@@ -185,7 +185,9 @@ class SofifaCrawler(Crawler):
         """
 
         # Clickeo en boton "Next" para recorrer todas las paginas
-        boton_next = super().extract_tag(xpath='.//div[@class="pagination"]/a[text()="Next "]', sec_wait=self.SEC_WAIT_MAX)
+        # boton_next = super().extract_tag(xpath='.//div[@class="pagination"]/a[text()="Next "]', sec_wait=self.SEC_WAIT_MAX)
+        boton_next = super().extract_tag(xpath='.//div[@class="pagination"]/a[starts-with(text(), "Next")]', sec_wait=self.SEC_WAIT_MAX)
+
         if super().click_boton(boton_next) is False:
             print('Ya no hay mas boton "Next". Es decir, ya no hay mas players en la league.')
             return False
@@ -387,7 +389,7 @@ if __name__ == "__main__":
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
     # Seleccionar pais  
-    id_country = 59
+    id_country = 55
 
     # Levanto dataframes
     df_countries = pd.read_excel('./data/df_countries.xlsx')
@@ -399,13 +401,16 @@ if __name__ == "__main__":
     df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]  # Solo segunda division: df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0) & (df_comp['is_second_division']==1)]
     print(f' COUNTRY: {country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
+    from main import DataUnderstanding
+    du = DataUnderstanding(id_country=id_country, country=country) # para crear directorios donde guardar los datos.
+
     # POR COMPETITION
     for i, row in df_comp_country.iterrows():
         print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
         # Extraigo datos de players de Sofifa 
         ## Player
-        df_player_sofifa, df_player_fifa_sofifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], n_seasons=2, export=True)
+        df_player_sofifa, df_player_fifa_sofifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], n_seasons=1, export=True)
         df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
         df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
 
@@ -417,22 +422,6 @@ if __name__ == "__main__":
         # df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
 
         # df_teams_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
-
-        '''
-        # Player
-        df_player, df_player_fifa = extract_players(id_country, country, row['id_competition'], row['competition_sofifa'], export=True)
-        df_player.to_excel(f'{BASE_DIR_LOCAL}/df_player_{country}_{row['competition_sofifa']}.xlsx', index=True)
-        df_player_fifa.to_excel(f'{BASE_DIR_LOCAL}/df_player_fifa_{country}_{row['competition_sofifa']}.xlsx', index=False)
-        
-        df_player_concat = pd.concat([df_player_concat, df_player], axis=0)
-        df_player_fifa_concat = pd.concat([df_player_fifa_concat, df_player_fifa], axis=0)
-
-        # Teams
-        df_teams = extract_teams(id_country, country, row['competition_sofifa'])
-        df_teams.to_excel(f'{BASE_DIR_LOCAL}/df_teams_{country}_{row['competition_sofifa']}.xlsx', index=True)
-
-        df_teams_concat = pd.concat([df_teams_concat, df_teams], axis=0)
-        '''
 
     # Exporto datos a Desktop
     df_player_sofifa_concat.to_excel(f'{BASE_DIR_LOCAL}/df_player_sofifa_{country}.xlsx', index=True)

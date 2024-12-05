@@ -301,6 +301,14 @@ def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = 
     home_columns = [f"{col}_home" for col in l_columns if f"{col}_home" in df.columns]
     away_columns = [f"{col}_away" for col in l_columns if f"{col}_away" in df.columns]
     
+    # Verificar y convertir las columnas '_home' a tipo numérico
+    if home_columns:
+        df[home_columns] = df[home_columns].apply(pd.to_numeric, errors='coerce')
+    
+    # Verificar y convertir las columnas '_away' a tipo numérico
+    if away_columns:
+        df[away_columns] = df[away_columns].apply(pd.to_numeric, errors='coerce')
+    
     # Sumar las columnas con sufijo '_home'
     df[f'{column_name}_home'] = df[home_columns].sum(axis=1) if home_columns else None
     
@@ -308,6 +316,7 @@ def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = 
     df[f'{column_name}_away'] = df[away_columns].sum(axis=1) if away_columns else None
     
     return df
+
 
 def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str=None, laplace: bool = False):
     """

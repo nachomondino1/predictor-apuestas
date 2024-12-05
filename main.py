@@ -318,8 +318,49 @@ class DataPreparation:
             except FileNotFoundError:
                 # Matcheo jugadores de Sofifa y Flashscore
                 logger.info("Mapeo jugadores de Sofifa y Flashscore")
-                df_player = create_df_player(df_match_player)
-                df_map_players_fs_so = match_dataframes_by_str_column(df1=df_player, df2=df_player_sofifa, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+
+                df_map_players_fs_so, df_player = pd.DataFrame(), pd.DataFrame()
+
+                # Seleccionar ligas
+                d_comps = select_data.determine_country_competitions(id_country)            
+                print(f"Competiciones: {d_comps['comp_sin_cups']}")
+
+                # Por Liga:
+                for id_comp in d_comps['comp_sin_cups']:
+                    print(f"Competicion: {id_comp}")
+
+                    # filtrar df_match y df_match_player y df_player_sofifa
+                    ## Flashscore
+                    print(f"AA: {len(df_match)} {len(df_match_player)}")
+                    df_match_league = df_match[df_match['id_competition'] == id_comp]
+                    df_match_player_league = df_match_player[df_match_player.index.isin(df_match_league.index)]
+                    df_player_league = create_df_player(df_match_player_league)
+                    print(f"BB: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
+
+                    ## Sofifa
+                    print(f"FF: {len(df_player_sofifa)} {len(df_player_fifa_sofifa)}")
+                    df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
+                    ids_players = df_player_fifa_sofifa_league['id_player'].unique()
+                    df_player_sofifa_league = df_player_sofifa[df_player_sofifa.index.isin(ids_players)]
+                    print(f"GG: {len(df_player_sofifa_league)} {len(df_player_fifa_sofifa_league)}")
+
+                    # Mapeo jugadores...
+                    df_map_players_fs_so_league = match_dataframes_by_str_column(df1=df_player_league, df2=df_player_sofifa_league, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+
+                    # Concateno mapeos de ligas
+                    df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_league], axis=0)
+                    df_player = pd.concat([df_player, df_player_league], axis=0)
+                    print(f"ZZ: {len(df_map_players_fs_so)}")
+
+                    # df_map_players_fs_so.drop_duplicates()
+                    if export:
+                        df_player_league.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player_{id_comp}.xlsx", index=True)
+                        df_map_players_fs_so_league.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so_{id_comp}.xlsx")
+                
+                print(f"Final: {len(df_map_players_fs_so)}")
+                 # Eliminar jugadores duplicados (x jugar en ambas competicioens)
+                df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
+                print(f"Final sin dup: {len(df_map_players_fs_so)}")
 
                 if export:
                     df_player.to_excel(f"./data/{self.country}/p3_data_preparation/integrate_data/df_player.xlsx", index=True)
@@ -768,7 +809,7 @@ class Modeling:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
         
-    def select_test_set(self, df, test_size, retrain, n_years_to_select = 0.25, n_max_reg = 100, verbose: int = 1):
+    def select_test_set(self, df, test_size, retrain, n_months: int = 3, n_max_reg: int = 100, verbose: int = 1):
         """
         Determina qué registros pueden ser utilizados en el test
         Requisitos para el test
@@ -814,7 +855,8 @@ class Modeling:
         
         # Requisito 2: Last matches (6 meses?)
         fecha_last_match = df_match.iloc[0]['date']
-        fecha_limite = fecha_last_match - datetime.timedelta(days=n_years_to_select*365)
+        n_days = n_months * 30
+        fecha_limite = fecha_last_match - datetime.timedelta(days=n_days)
         df2 = df_match[df_match['date'] >= fecha_limite] 
         index_last_matches = df2.index
 
@@ -1190,7 +1232,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = -1 # 55, 59, 77, 148, 167 -1
+    id_country = 59 # 55, 59, 77, 148, 167 -1
     d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': True}
 
     # Hiperparametros
@@ -1204,7 +1246,7 @@ if __name__ == "__main__":
         'thr_corr': 0.85,
         'thr_fs': 0.5,
         'n_years_to_select': 3, 
-        'comp_to_select': d_comps['comp_sin_b'],
+        'comp_to_select': d_comps['all_comp'],
         'fill_na': None,
         'val_size':  0.125,
         'test_size': 0.125,

@@ -59,46 +59,60 @@ def concat_raw_data_by_competition(id_country, country, l_dataframes, export=Tru
         if export:
             df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/{dataframe}.xlsx', index=True)
 
-def concat_raw_data_by_season(country, competition, l_dataframes, l_filenames, export=True):
+def concat_raw_data_by_season(country, l_dataframes, export=True):
     """
-    Concatena dfs de distintas temporadas
-    :return: Dataframe. Contiene todas las temporadas especificadas.
+    Concatena DataFrames de distintas temporadas automáticamente.
+    
+    :param country: str, País correspondiente a los datos.
+    :param l_dataframes: list, Lista de nombres de subcarpetas donde están los archivos por temporada.
+    :param export: bool, Si es True, exporta el resultado como archivo Excel.
+    :return: None
     """
-    # competition = l_filenames[0][:l_filenames[0].find("_") + 1] + country
-
     for dataframe in l_dataframes:
-
-        print(f"\nDataframe: {dataframe}")
+        print(f"\nProcesando dataframe: {dataframe}")
         df_concat = pd.DataFrame()
         ruta_base = f'./data/{country}/p2_data_understanding/data_seg/per_season/{dataframe}'
 
-        # Por dataframe a concatenar
-        for filename in l_filenames:
-            print(f"Filename: {filename}")
+        # Obtener automáticamente todos los archivos dentro de la ruta
+        try:
+            l_filenames = [f for f in os.listdir(ruta_base) if f.endswith('.xlsx')]
+        except FileNotFoundError:
+            print(f"Ruta no encontrada: {ruta_base}")
+            continue
+        
+        print(f"Archivos encontrados ({len(l_filenames)}): {l_filenames}")
 
+        # Concatenar todos los archivos
+        for filename in l_filenames:
+            print(f"Procesando archivo: {filename}")
             try:
-                # Levanto el dataframe
-                if dataframe == "df_player":
-                    df = pd.read_excel(f'{ruta_base}/{filename}')  
+                filepath = os.path.join(ruta_base, filename)
+                
+                # Cargar el archivo Excel
+                if dataframe == "df_player_sofifa":
+                    df = pd.read_excel(filepath)  
                 else:
-                    df = pd.read_excel(f'{ruta_base}/{filename}', index_col=0)  
-            
+                    df = pd.read_excel(filepath, index_col=0)
+                
                 print(df.head(1))
                 print(f"Shape df: {df.shape}")
 
-                # Concateno
+                # Concatenar al DataFrame final
                 df_concat = pd.concat([df_concat, df], axis=0)
-                print(f"Shape df_concat: {df_concat.shape}")
+                print(f"Shape acumulado: {df_concat.shape}")
+            except Exception as e:
+                print(f"Falló procesando {filename}: {e}")
 
-            except:
-                print("Falló")
-
-        # Me fijo si hay duplicados (no deberia)
+        # Eliminar duplicados
         df_sin_duplicados = df_concat.drop_duplicates()
-        print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
+        print(f"\n\nNº de filas repetidas eliminadas: {len(df_concat) - len(df_sin_duplicados)}")
 
+        # Exportar el resultado si se requiere
         if export:
-            df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/{dataframe}/{competition}.xlsx', index=False)
+            export_path = f'./data/{country}/p2_data_understanding/{dataframe}_{country}.xlsx'
+            os.makedirs(os.path.dirname(export_path), exist_ok=True)  # Crear directorios si no existen
+            df_sin_duplicados.to_excel(export_path, index=True)
+            print(f"Archivo exportado: {export_path}")
 
 def concat_raw_data_by_country(d_countries, verbose: int = 1):
     """
@@ -203,7 +217,7 @@ def concat_integrate_data_by_country(l_countries):
 if __name__ == "__main__":
 
     # Definicion de parametros
-    raw_data, integrate_data, missing_data = False, True, False
+    raw_data, integrate_data, missing_data = False, False, False
     d_countries = {6: 'argentina', 48: 'england', 55: 'france', 59: 'germany', 77: 'italy', 148: 'spain', 167: 'usa'}
     d_countries = {48: 'england', 55: 'france', 59: 'germany', 77: 'italy', 148: 'spain'}
 
@@ -236,13 +250,14 @@ if __name__ == "__main__":
         df_match_odds_miss.to_excel('data/all/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx')
         df_integrated_miss.to_excel('data/all/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx')
 
-    '''
+
+    # CONCATENACION DE DATA SEG X SEASON O COMPETICION
     # Definicion de variables
     competicion, temporada = False, False
     id_country = 148
     export = True
 
-        # Levento df_countries y obtengo id
+    # Levento df_countries y obtengo id
     df_countries = pd.read_excel(f'./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
     print(country)
@@ -254,8 +269,6 @@ if __name__ == "__main__":
 
     # Concateno temporadas de una misma competition del country
     if temporada:
-        l_dataframes = ["df_match", "df_match_player", 'df_match_odds']  # ["df_player"]
-        l_filenames =  ["FIFA 18_24.xlsx", "FIFA 07_17.xlsx"]   # l_files = [col for col in df_last_old_matches.columns if re.search(r'_player_', col) and "_miss" not in col]  # Selecciono las variables que corresponden a jugadores
-        competition = "premier_league"
-        concat_raw_data_by_season(country, competition, l_dataframes, l_filenames, export)  
-    '''
+        l_dataframes = ['df_player_sofifa', 'df_player_fifa_sofifa']  # ["df_match", "df_match_player", 'df_match_odds']
+        concat_raw_data_by_season(country, l_dataframes, export)  
+    
