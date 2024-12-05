@@ -1067,7 +1067,7 @@ def define_porc_m_to_use(id_country, porc_m, l_new_model_same_train, l_new_train
 ########################################################################## MAIN #######################################################################
 def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7, 
          n_seasons_missing : int = 1, extract_missing: bool = True, predict_missing: bool = False, n_days_fill_data: int = 60, 
-         porc_m: float = 0.25,
+         porc_m: float = 0.3,
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1089,7 +1089,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
     # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    # n_model, model_name, iteration_date_dt = 28, "LogisticRegression", "2024-12-04" # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    # n_model, model_name, iteration_date_dt = 386, "LogisticRegression", "2024-12-05" # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
     n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
   
     if verbose >= 0:
@@ -1269,7 +1269,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         # Levanto hiperparametros de modeling
         loaded_model = lo.load_model()
         d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[], l_new_model_same_train=[55, 148])
+        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[], l_new_model_same_train=[55])
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1331,15 +1331,15 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
 if __name__ == "__main__":    
 
     n_days = 7
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55]
+    l_countries = [59]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
 
-        df = main(d_run, id_country, n_days, predict_missing=False, n_seasons_missing=2, export=d_run['export'])
+        df = main(d_run, id_country, n_days, predict_missing=False, export=d_run['export'])
         df.to_excel(f"{directorio}/predicciones.xlsx")
