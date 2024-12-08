@@ -29,27 +29,69 @@ def determine_result(df: pd.DataFrame, var_resp: str):
     df[var_resp] = pd.Series(np.select(condiciones, valores, default=0), index=df.index)
     return df
 
-def determine_expected_result(df: pd.DataFrame, col_name="expected_result"):
+def determine_expected_result(df: pd.DataFrame, thr_expected: int = 0.3, col_name="expected_result"):
     """
-    Se determina el 'result' a partir de los expected goals que hizo cada team
-    :param df: Dataframe. Unidad de analisis: match. Columnas: entre ellas expected_goals_(xg)_home y expected_goals_(xg)_away
-    :return: Dataframe pasado por parametro con nueva columna, 'result', que detalla el resultado del match.
+    Determina el 'expected_result' a partir de los expected goals de cada equipo.
+    :param df: DataFrame con columnas 'expected_goals_(xg)_home' y 'expected_goals_(xg)_away'.
+    :param thr_expected: Umbral para determinar el resultado.
+    :param col_name: Nombre de la columna de resultado esperado.
+    :return: DataFrame con la nueva columna 'expected_result'.
     """
-    # Calcular dif_expected_goals solo dentro de las condiciones, sin crear una nueva columna
+    # Calcular la diferencia de expected goals
     dif_expected_goals = df['expected_goals_(xg)_home'] - df['expected_goals_(xg)_away']
 
-    # Condiciones para determinar el ganador
+    # Seleccionar filas válidas (ignorar NaN en expected_goals)
+    filas_validas = dif_expected_goals.notna()
+
+    # Definir condiciones y valores
     condiciones = [
-        dif_expected_goals > 1,
-        dif_expected_goals < -1,
+        dif_expected_goals[filas_validas] > thr_expected,
+        dif_expected_goals[filas_validas] < -thr_expected,
     ]
+    valores = [1, 2]  # 1: Local, 2: Visitante
 
-    # Valores correspondientes a las condiciones
-    valores = [1, 2]
+    # Crear una columna con valores por defecto para todas las filas
+    df[col_name] = np.nan  # Asignar NaN inicialmente
+    df.loc[filas_validas, col_name] = np.select(condiciones, valores, default=0)
 
-    # Usar numpy.select para aplicar las condiciones y asignar directamente a col_name
-    df[col_name] = pd.Series(np.select(condiciones, valores, default=0), index=df.index)
+    # Comparar distribuciones de expected result y result
+    compare_distributions(df)
+
     return df
+
+def compare_distributions(df: pd.DataFrame, col_expected="expected_result", col_result="result", tolerance=0.05):
+    """
+    Compara la distribución de valores en 'expected_result' y 'result'.
+    Imprime un warning si las distribuciones no son similares.
+    
+    :param df: DataFrame con las columnas a comparar.
+    :param col_expected: Nombre de la columna de resultados esperados.
+    :param col_result: Nombre de la columna de resultados reales.
+    :param tolerance: Tolerancia máxima para la diferencia en las proporciones.
+    """
+    # Contar valores en ambas columnas
+    expected_counts = df[col_expected].value_counts(normalize=True, dropna=True).sort_index()
+    result_counts = df[col_result].value_counts(normalize=True, dropna=True).sort_index()
+
+    # Imprimir los conteos absolutos y proporciones
+    print("Distribución de valores en expected_result:")
+    print(expected_counts)
+    print("\nDistribución de valores en result:")
+    print(result_counts)
+    
+    # Comparar distribuciones
+    warning = False
+    for value in [0, 1, 2]:
+        expected_ratio = expected_counts.get(value, 0)
+        result_ratio = result_counts.get(value, 0)
+        diff = abs(expected_ratio - result_ratio)
+        
+        if diff > tolerance:
+            warning = True
+            logger.warning(f"\n⚠️ WARNING: La proporción de {value} difiere significativamente (Diff: {diff:.2%}).")
+
+    if not warning:
+        logger.critical("\n✅ Las distribuciones son similares dentro del rango de tolerancia.")
 
 def determine_number_matches_last_days(df: pd.DataFrame, n_days):
 
