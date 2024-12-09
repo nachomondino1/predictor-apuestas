@@ -1067,7 +1067,7 @@ def define_porc_m_to_use(id_country, porc_m, l_new_model_same_train, l_new_train
 def main(d_run: dict, id_country: int, d_model: dict = None,                # Params
          n_seasons_missing : int = 1, extract_missing: bool = True,         # missing
          n_days_max_next_matches: int = 7, predict_missing: bool = False,   # Data unders
-         n_days_fill_data: int = 60, porc_m: float = 0.3,                   # Data prep y Modeling
+         n_days_fill_data: int = 60, porc_m: float = 0.35,                   # Data prep y Modeling
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1284,26 +1284,14 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         except KeyError:
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'
  
-
-
         # Realizo predicciones sobre los nuevos partidos
         y_pred_prob, y_pred = mo.predict(model=loaded_model, X_test=df)
-        # try:
-        #     y_pred_prob = loaded_model.predict_proba(df) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
-        #     classes = loaded_model.classes_
-        # except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
-        #     y_pred_prob = loaded_model.predict(df)
-        #     classes = [0, 1, 2]
-
-        # y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
         df_pred_proba = pd.DataFrame({
                 'predicted_result': y_pred,
                 f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
                 f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
                 f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=df.index)
-
-
 
         # Concateno conjunto de datos
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -1314,7 +1302,7 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
         # Vario el stake segun curva especifica
-        df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'],normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
+        df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
