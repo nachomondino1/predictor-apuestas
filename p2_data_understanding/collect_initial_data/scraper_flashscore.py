@@ -15,13 +15,13 @@ class FlashscoreCrawler(Crawler):
     normal, scraper de fields especificos poro falla y scraper de proximos partidos...
     Contiene todo los xpath.
     """
-    def __init__(self, headless: bool = True, browser: str = "Chrome", _print: bool = False):
+    def __init__(self, headless: bool = True, browser: str = "Chrome", verbose: int = 0):
         super().__init__(headless, browser)
         self.child_driver = self.driver
         self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
         self.SEC_WAIT_MED = 1.5  # Espera para elementos que casi siempre estan
         self.SEC_WAIT_MAX = 5  # Espera para elementos que casi siempre estan
-        self._print = _print # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
+        self.verbose =  verbose # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
 
     def accept_cookies(self):
         """
@@ -91,16 +91,20 @@ class FlashscoreCrawler(Crawler):
             
         # Extraigo partidos (items) y sus ids --> NO PUDE EXTRAER LOS SVG.. PERO SI EL DIV DE EVENT_TIME... VER 
         l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[@class="sportName soccer"]//div[contains(@class, "event__match--scheduled")]', sec_wait=self.SEC_WAIT_MAX)
-        # print(f"Cantidad de proximos partidos en total: {len(l_items)}")
+        if self.verbose >= 1:
+            print(f"Cantidad de proximos partidos en total: {len(l_items)}")
 
         # Filtro partidos por fecha
         l_items_filt = self.select_items_by_date(l_items, n_days)
-        # print(f"Cantidad de proximos partidos dentro de {n_days}: {len(l_items_filt)}")
+        if self.verbose >= 1:
+            print(f"Cantidad de proximos partidos dentro de {n_days}: {len(l_items_filt)}")
 
         # Obtengo ids
         l_ids = [item.get_attribute('id') for item in l_items_filt]
         l_ids_clean = clean_id(l_ids)
-        # print(f"Cantidad de ids extraidos dentro de {n_days}: {len(l_ids_clean)}")
+        if self.verbose >= 1:
+            print(f"Cantidad de ids extraidos dentro de {n_days}: {len(l_ids_clean)}")
+
         return l_ids_clean
 
     def extract_match_data(self, next_matches:bool = False):
@@ -168,7 +172,7 @@ class FlashscoreCrawler(Crawler):
             value = super().extract_tag(xpath=xpath, text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
             d_row[field] = value
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting match information: {d_row}")
         return d_row
 
@@ -197,7 +201,7 @@ class FlashscoreCrawler(Crawler):
                 id_team_away = extract_id_from_href(url_team_away)
                 d_row.update({"id_team_away": id_team_away, "team_away": team_away}) #  "url_team": url_team_away
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting teams: {d_row}")
         return d_row
 
@@ -213,7 +217,7 @@ class FlashscoreCrawler(Crawler):
             value = super().extract_tag(xpath=xpath, text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
             d_row[field] = value    
     
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting goals: {d_row}")
         return d_row
     
@@ -233,7 +237,7 @@ class FlashscoreCrawler(Crawler):
 
             # Si existe dicha formation
             tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True)
-            if self._print:
+            if self.verbose >= 1:
                 print(formation, SEC_WAIT)
 
             if tag_lineup:
@@ -263,7 +267,7 @@ class FlashscoreCrawler(Crawler):
                     for i, url in enumerate(l_urls_away):
                         d_row.update({f'id_player_{titularidad}_away_{i + 1}': l_ids_away[i], f'player_name_{titularidad}_away_{i + 1}': l_names_away[i]}) #  "player_url": url
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting lineups: {d_row}")
         return d_row
         
@@ -297,7 +301,7 @@ class FlashscoreCrawler(Crawler):
                 coach_away = extract_name_from_href(url_coach_away)
                 d_row.update({"id_coach_away": id_coach_away, "coach_away": coach_away}) #  "url_coach": url_coach_away
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting coaches: {d_row}")
         return d_row
 
@@ -310,7 +314,7 @@ class FlashscoreCrawler(Crawler):
 
         # Extraigo tags de stats
         l_tags_stats = super().extract_tags(xpath=f'.//div[@data-testid="wcl-statistics"]', sec_wait=self.SEC_WAIT_MAX, print_fail=True)
-        if self._print:
+        if self.verbose >= 1:
             print("Cantidad de stats a recolectar", len(l_tags_stats))
 
         # Por stat
@@ -319,14 +323,14 @@ class FlashscoreCrawler(Crawler):
             # Extraigo el name de la stat
             name_stat = super().extract_tag(tag_inicial=tag, xpath='.//div[@data-testid="wcl-statistics-category"]', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
             name_stat_form = name_stat.lower().replace(" ", "_").replace('á', 'a').replace('é', 'e').replace('í', 'i').replace("ó", "o").replace('ú', 'u')
-            if self._print:
+            if self.verbose >= 1:
                 print(f"Stat a recolectar: {name_stat} --> Name formateado: {name_stat_form}")
 
             # Extraigo valores de la stat para el local y para el visitante
             d_row[f'{name_stat_form}_home'] = super().extract_tag(tag_inicial=tag, xpath=f'.//div[contains(@class, "homeValue") and @data-testid="wcl-statistics-value"]', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
             d_row[f'{name_stat_form}_away'] = super().extract_tag(tag_inicial=tag, xpath=f'.//div[contains(@class, "awayValue") and @data-testid="wcl-statistics-value"]', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting stats: {d_row}")
         return d_row
 
@@ -351,7 +355,7 @@ class FlashscoreCrawler(Crawler):
             except IndexError:
                 pass
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting odds: {d_row}")
         return d_row
 
@@ -391,8 +395,9 @@ class FlashscoreCrawler(Crawler):
                 for i, url in enumerate(l_urls_away):
                     d_row.update({f'id_player_miss_away_{i + 1}': l_ids_away[i], f'player_name_miss_away_{i + 1}': l_names_away[i]}) #  "player_url": url
 
-        if self._print:
+        if self.verbose >= 1:
             print(f"Extracting lineups: {d_row}")
+
         return d_row
 
     def select_items_by_date(self, l_items, n_days):
@@ -405,19 +410,30 @@ class FlashscoreCrawler(Crawler):
         # Determino fecha umbral y año actual
         fecha_umbral = datetime.now() + timedelta(days=n_days)
         anio_actual = datetime.now().year
+        anio_siguiente = anio_actual + 1
+        if self.verbose >= 1:
+            logger.info(f"Fecha umbral: {fecha_umbral}. Año actual: {anio_actual}.")
 
         # Por partido
         for item in l_items:
 
             # Obtengo su fecha 
-            fecha_str = super().extract_tag(tag_inicial=item, xpath='./div[@class="event__time"]', text=True, sec_wait=1)
+            fecha_str = super().extract_tag(tag_inicial=item, xpath='./div[@class="event__time"]', text=True, sec_wait=1) # (e.g 03.01. 17:00)
+            if self.verbose >= 1:
+                logger.info(f"Fecha extraida del partido: {fecha_str}")
 
             # Si el partido tiene div con fecha
             if fecha_str is not None:
-
-                # Formateo fecha de str a datetime (agregandole el año pues sino toma 1900)
-                fecha_str = f"{anio_actual}.{fecha_str}"
                 
+                # Formateo fecha de str a datetime (agregandole el año pues sino toma 1900)
+                mes_str = fecha_str[3:5]
+                anio = anio_siguiente if mes_str == '01' else anio_actual
+                fecha_str = f"{anio}.{fecha_str}"
+                
+                if self.verbose >= 1:
+                    logger.info(f'Mes extraido del partido: {mes_str}')
+                    logger.info(f"Fecha del partido con año: {fecha_str}")
+
                 try:
                     # Intento convertir la fecha usando el formato especificado
                     fecha_objeto = datetime.strptime(fecha_str, "%Y.%d.%m. %H:%M")
@@ -425,8 +441,13 @@ class FlashscoreCrawler(Crawler):
                     # Si el partido es dentro de los proximos días
                     if fecha_objeto <= fecha_umbral:
                         l_items_filt.append(item)
+                        
+                        if self.verbose >= 1:
+                            logger.critical(f"Partido dentro de umbral de fechas!")
+
                     else:
                         # Dejo de extraer partidos puesto que luego del primer partido que es posterior a fecha_umbral, todos lo son (estan ordenados por fecha en Flashscore)
+                        logger.warning(f"Partido fuera del umbral de fechas!")
                         break
                 except ValueError as e:
                     # Si hay un error en la conversión, imprimo el mensaje de error

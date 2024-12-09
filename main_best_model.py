@@ -20,7 +20,7 @@ import time
 # from itertools import product
 import re
 from p3_data_preparation.clean_data import fillna_with_mean_in_last_matches
-
+import numpy as np
 
 def comprehensive_search(
     country, 
@@ -81,7 +81,9 @@ def comprehensive_search(
     dp, mo = DataPreparation(country), Modeling(country) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
-    n_iter = define_n_iterations(d_params)    
+    n_iter = define_n_iterations(d_params)
+    modeling_params = d_params['modeling'].values() # Extraer los valores de 'modeling'
+    num_combinations = np.prod([len(v) for v in modeling_params]) # Calcular el número total de combinaciones posibles
     if verbose >= 0:
         logger.info(f"Numero de iteraciones totales: {n_iter}")
         start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC
@@ -181,7 +183,7 @@ def comprehensive_search(
                 joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_1}_{path_2}.pkl')
 
                 # Verifico tamaño de df_test (evito select en caso que el test vaya a ser chico.)
-                rows_for_test = dp.number_of_last_matches(X=df_cons_clean.drop(dp.var_resp, axis=1), verbose=-1)
+                rows_for_test = dp.n_rows_to_test(X=df_cons_clean.drop(dp.var_resp, axis=1), verbose=-1)
                 
                 if verbose >= 2:
                     df_cons_clean.to_excel(path_clean_data, index=True)
@@ -274,6 +276,7 @@ def comprehensive_search(
                 else:
                     logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_for_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
                     print()
+                    cont_iter += num_combinations # Sumo la cantidad de iteraciones de modeling que me ahorré.
 
     if verbose >= 0:
         end_train = time.time()
@@ -332,15 +335,15 @@ def define_params_space(id_country, fast: bool = False):
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
     # l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
-    l_modelos = [LogisticRegression(), SVC(), XGBClassifier(), MLPClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
+    l_modelos = [LogisticRegression()]
 
     # 1728 iteraciones
-    d_params = {  
+    d_params = {
         'construct': {
-            'n_dias_ult_part': [[180], [30, 180]], 
+            'n_dias_ult_part': [[30, 180], [60]], # [30, 180] 
             'n_years_h2h': [3],
             'segun_localia': [True, False],
-            'dif_con_against': [True, False] 
+            'dif_con_against': [False, True] 
         },
         'clean_data_2': {
             'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
@@ -361,13 +364,13 @@ def define_params_space(id_country, fast: bool = False):
     }
 
     if fast:
-        # l_modelos = [LogisticRegression()]  # Neural network se corta x memoria. SVC() nunca ganó.
+        l_modelos = [LogisticRegression()]  # Neural network se corta x memoria. SVC() nunca ganó.
 
         d_params = {  
             'construct': {
-                'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
+                'n_dias_ult_part': [[60], [30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
                 'n_years_h2h': [3],
-                'segun_localia': [False, True], # Para SPA, evitar TRUE.
+                'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
@@ -382,20 +385,24 @@ def define_params_space(id_country, fast: bool = False):
             'modeling': {
                 'val_size': [0.10],
                 'test_size': [0.15], 
-                'bal_type': ['under'], # None (ni con f1_score..)
+                'bal_type': [None, 'under'], # (ni con f1_score..)
                 'k': [5] 
                 # scoring : ['accuracy', 'f1_macro'] 
             }
         }
  
     logger.info(f"Parametros para entrenar: {d_params}")
+
+    # Exportar un archivo .txt con los hiperparametros probados. --> Asi tengo que hiper probe en cada entrenamiento...
+    # ...
+
     return d_params, l_modelos
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 148
+    id_country = 77
     only_select_best_model = False
     continue_old_train, date_old_train = False, '2024-11-27'
 
@@ -417,7 +424,7 @@ if __name__ == "__main__":
 
     else:
         # Determino date 
-        d_dates = {48: "2024-11-09", 55: "2024-11-14", 59: "2024-11-10", 77: "2024-11-10", 148: "2024-11-14"}
+        d_dates = {48: "2024-12-04", 55: "2024-11-14", 59: "2024-12-05", 77: "2024-11-10", 148: "2024-12-03"}
         date = d_dates[id_country]
         logger.info(f"Country: {country} Date: {date}")
 

@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
-from main import DataPreparation
+from main import DataPreparation, Modeling
 from p3_data_preparation import format_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
@@ -453,7 +453,6 @@ class DataPreparationNew(DataPreparation):
                     logger.error(f"Se han rellenado valores NaN restantes en '{col}' con la media: {media:.2f}")
 
         return df, df_fill
-
     
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: list, n_years_h2h: int, 
                            segun_localia: bool, columns_used: list, dif_con_against: bool = True, verbose: int = 0):
@@ -1065,9 +1064,10 @@ def define_porc_m_to_use(id_country, porc_m, l_new_model_same_train, l_new_train
     return porc_m
 
 ########################################################################## MAIN #######################################################################
-def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7, 
-         n_seasons_missing : int = 1, extract_missing: bool = True, predict_missing: bool = False, n_days_fill_data: int = 60, 
-         porc_m: float = 0.3,
+def main(d_run: dict, id_country: int, d_model: dict = None,                # Params
+         n_seasons_missing : int = 1, extract_missing: bool = True,         # missing
+         n_days_max_next_matches: int = 7, predict_missing: bool = False,   # Data unders
+         n_days_fill_data: int = 60, porc_m: float = 0.35,                   # Data prep y Modeling
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1089,9 +1089,11 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
     # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    # n_model, model_name, iteration_date_dt = 386, "LogisticRegression", "2024-12-05" # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
     n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
-  
+    if d_model is not None:
+        logger.warning("Se usa modelo especificado como parametro y no necesariamente es el que se esta usando en produccion.")
+        n_model, model_name, iteration_date_dt = d_model['n_model'], d_model['model_name'], d_model['iteration_date']
+
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
         logger.info(f'Competencias: \n {df_comp_country}  \n Competencias publicas: {comp_public}')
@@ -1100,6 +1102,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
     dp = DataPreparationNew(country=country, export=export) # Creo objeto de clase DataPreparation
+    mo = Modeling(country=country) # Creo objeto de clase DataPreparation
     lo = TrainingDataLoader(country=country, n_model=n_model, model_name=model_name, iteration_date=iteration_date_dt)
 
 
@@ -1193,10 +1196,10 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         logger.error("No hay próximos partidos para los cuales predecir su resultado.")
         return ValueError
 
-    if verbose >= 1:
+    if verbose >= 2:
         du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
     
-    if verbose >= 2:
+    if verbose >= 3:
         print("\n DF MATCH \n", df_match.head(2))
         print("\n DF MATCH PLAYER \n", df_match_player.head(2))
         print("\n df_player_sofifa \n", df_player_sofifa.head(2))
@@ -1268,8 +1271,9 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
 
         # Levanto hiperparametros de modeling
         loaded_model = lo.load_model()
+        classes = [0, 1, 2] # loaded_model.classes_
         d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[], l_new_model_same_train=[55])
+        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[55], l_new_model_same_train=[148])
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1281,14 +1285,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'
  
         # Realizo predicciones sobre los nuevos partidos
-        try:
-            y_pred_prob = loaded_model.predict_proba(df) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
-            classes = loaded_model.classes_
-        except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
-            y_pred_prob = loaded_model.predict(df)
-            classes = [0, 1, 2]
-
-        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad 
+        y_pred_prob, y_pred = mo.predict(model=loaded_model, X_test=df)
         df_pred_proba = pd.DataFrame({
                 'predicted_result': y_pred,
                 f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
@@ -1305,7 +1302,7 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
         df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
         # Vario el stake segun curva especifica
-        df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'],normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
+        df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids
         d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
@@ -1330,16 +1327,18 @@ def main(d_run: dict, id_country: int, n_days_max_next_matches: int = 7,
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    n_days = 7
+    n_days = 2
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_model = {'n_model': 519, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-04"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
+    l_countries = [77]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
 
-        df = main(d_run, id_country, n_days, predict_missing=False, export=d_run['export'])
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=False, export=d_run['export']) # Prod
+        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) # Probar un modelo
         df.to_excel(f"{directorio}/predicciones.xlsx")

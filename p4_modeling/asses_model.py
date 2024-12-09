@@ -141,6 +141,8 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy: str = "general
     """
     # Definicion de variables
     l_thr_dif_prob, d_rectas = define_hiperparameters(strategy)
+    l_odd_weight = [0, 1, 2, 4]
+    l_lim_sup = [0, 1]
     best_roi = -100000
     if verbose >= 1:
         logger.info(f"Calculating ROI...")
@@ -176,9 +178,9 @@ def calculate_roi_by_betting_strategy(df: pd.DataFrame, strategy: str = "general
                     logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
 
                 # for normalized in [True, False]:
-                for odd_weight in [0, 1, 2, 4]: # 0 significa no afectar stake con cuotas.  # 0.5,
+                for odd_weight in l_odd_weight: # 0 significa no afectar stake con cuotas.  # 0.5,
 
-                    for lim_sup in [0, 1]:
+                    for lim_sup in l_lim_sup:
 
                         # Determino stake a apostar segun curva
                         df_aux = determine_stake_to_bet(df2, type_relation=key, m=m, b=b, p1=p1, p2=p2, odd_weight=odd_weight, dif_prob_sup_cap=lim_sup, normalized=normalized)
@@ -213,11 +215,11 @@ def define_hiperparameters(strategy):
     Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
     """
     if strategy=="general":
-        l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+        l_thr_dif_prob = [-0.5, -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
         d_rectas = {
             # "equal": [[(0, 0), (1, 0)]],
             # 'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
-            'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [70, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
+            'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
             # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
         }
 
@@ -329,7 +331,7 @@ def calculate_odd_double_chance(row, result_to_bet):
 
     return odd_to_bet
 
-def determine_winning_bets(df: pd.DataFrame):
+def determine_winning_bets(df: pd.DataFrame, name_extension=''):
     """
     Determina si el resultado apostado fue el resultado real del partido o no.
     
@@ -340,37 +342,40 @@ def determine_winning_bets(df: pd.DataFrame):
         Dataframe pasado como parametro con una nueva columna, 'acerte' indicando si se acertó el resultado apostado o no.
     """
     # inicializo columna "acerte"
-    df['acerte'] = 0
+    var_result=f'{name_extension}result'
+    var_acerte=f'{name_extension}acerte'
+
+    df[var_acerte] = 0
 
     # Por partido
     for id_match, row in df.iterrows():
 
         # Si el resultado a apostar es Home, Draw o Away
         if row['result_to_bet'] >= 0:
-            if row['result'] == row['result_to_bet']:
-                df.loc[id_match, 'acerte'] = 1
+            if row[var_result] == row['result_to_bet']:
+                df.loc[id_match, var_acerte] = 1
 
         # Si el resultado a apostar es doble oportunidad sin Home
         elif row['result_to_bet'] == -1:
-            if (row['result'] == 0) or (row['result'] == 2):
-                df.loc[id_match, 'acerte'] = 1
+            if (row[var_result] == 0) or (row[var_result] == 2):
+                df.loc[id_match, var_acerte] = 1
 
         # Si el resultado a apostar es doble oportunidad sin Away
         elif row['result_to_bet'] == -2:
-            if (row['result'] == 0) or (row['result'] == 1):
-                df.loc[id_match, 'acerte'] = 1
+            if (row[var_result] == 0) or (row[var_result] == 1):
+                df.loc[id_match, var_acerte] = 1
         
         # Si el resultado a apostar es doble oportunidad sin Draw
         elif row['result_to_bet'] == -0:
-            if (row['result'] == 2) or (row['result'] == 1):
-                df.loc[id_match, 'acerte'] = 1
+            if (row[var_result] == 2) or (row[var_result] == 1):
+                df.loc[id_match, var_acerte] = 1
 
         # Si fallo la prediccion
         else:
-            df.loc[id_match, 'acerte'] = np.nan
+            df.loc[id_match, var_acerte] = np.nan
 
     # Imprimo warning si supuestamente acerté el 100% de partidos
-    if len(df[df['acerte']==1]) == len(df):
+    if len(df[df[var_acerte]==1]) == len(df):
         logger.warning(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
 
     return df
@@ -476,7 +481,7 @@ def determine_stake_to_bet(df, type_relation: str = 'equal', p1: tuple = (0, 0),
     return df
 
 # Metricas
-def calculate_roi(df: pd.DataFrame):
+def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
 
@@ -502,21 +507,21 @@ def calculate_roi(df: pd.DataFrame):
 
         # Defino stake a apostar en pesos (a partir del stake como porcentaje del bank)
         stake_a_apostar =  bank_final * row['stake_to_bet'] / 100
-        df.loc[idx, 'bank_inicial'] = bank_final
-        df.loc[idx, 'stake_to_bet_en_$'] = stake_a_apostar
+        df.loc[idx, f'{name_extension}bank_inicial'] = bank_final
+        df.loc[idx, f'{name_extension}stake_to_bet_en_$'] = stake_a_apostar
 
         # Determino ganancias / perdidas 
-        ingresos = stake_a_apostar * row['odd_to_bet'] if row['acerte'] == 1 else 0
+        ingresos = stake_a_apostar * row['odd_to_bet'] if row[f'{name_extension}acerte'] == 1 else 0
         ganancia = ingresos - stake_a_apostar
         bank_final += ganancia
-        df.loc[idx, 'G/P'] = ganancia
-        df.loc[idx, 'bank_final'] = bank_final
+        df.loc[idx, f'{name_extension}G/P'] = ganancia
+        df.loc[idx, f'{name_extension}bank_final'] = bank_final
 
         # Guardo ROI en partidos especificados
         if cont in l_rois_partido:
             roi_partido = (bank_final - bank_inicial) / bank_inicial * 100
-            d_rois[f'roi_{cont}'] = roi_partido / cont
-            df.loc[idx, 'roi_partido'] = roi_partido / cont
+            d_rois[f'{name_extension}roi_{cont}'] = roi_partido / cont
+            df.loc[idx, f'{name_extension}roi_partido'] = roi_partido / cont
 
         # Raise error si perdi todo el dinero de las apuestas
         if bank_final <= 0:
@@ -526,8 +531,8 @@ def calculate_roi(df: pd.DataFrame):
     # Calculo el ROI
     roi = (bank_final - bank_inicial) / bank_inicial * 100
     roi_por_partido = roi / n_apuestas  # No quiero el ROI mas alto sino el ROI / partido mas alto
-    d_rois['roi'] = roi
-    d_rois['roi_por_partido'] = roi_por_partido
+    d_rois[f'{name_extension}roi'] = roi
+    d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
 
 def calculate_reality_roi(df: pd.DataFrame):

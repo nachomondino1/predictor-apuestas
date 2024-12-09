@@ -578,7 +578,7 @@ class DataPreparation:
 
         # (2) Eliminacion de columnas   
         ## usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles) # ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  
+        cols_for_construct = ['date', 'venue'] # 'id_team_home', 'id_team_away' # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles) # ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         X.drop(columns=cols_for_construct+cols_constants, inplace=True)
         if verbose >= 1:
@@ -614,7 +614,7 @@ class DataPreparation:
 
         return df, scaler, X.columns
     
-    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_min_no_nan: float = 0.8, percentil_nan: int = 75, export: bool = True, verbose: int = 0):
+    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_min_no_nan: float = 0.7, percentil_nan: int = 75, export: bool = True, verbose: int = 0):
         """
         Tratamiento de nan values
 
@@ -635,7 +635,7 @@ class DataPreparation:
         start = time.time()
         if verbose >= 1:
             print("\nTreating NaN values to avoid input=NaN in Modeling...")
-            logger.info(f"1. Datos de entrada a treat_nan: {self.number_of_last_matches(X)}")
+            logger.info(f"1. Datos de entrada a treat_nan: {self.n_rows_to_test(X)}")
 
         # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
         n_reg_inic_3 = len(X)
@@ -644,7 +644,7 @@ class DataPreparation:
         if verbose >= 1:
             print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
-            logger.critical(f"2. Luego de eliminar FILAS con mucho NaN: {self.number_of_last_matches(X)}")
+            logger.critical(f"2. Luego de eliminar FILAS con mucho NaN: {self.n_rows_to_test(X)}")
 
         # (2) Eliminacion de columnas con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
         n_reg_min = int(porc_min_no_nan*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
@@ -657,7 +657,7 @@ class DataPreparation:
         
         if verbose >= 1:
             print(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {X.shape} ")
-            logger.info(f"3. Luego de eliminar COLUMNAS con mucho NaN: {self.number_of_last_matches(X_sin_col_mucho_nan)}")
+            logger.info(f"3. Luego de eliminar COLUMNAS con mucho NaN: {self.n_rows_to_test(X_sin_col_mucho_nan)}")
 
         # (3) Eliminacion de todo NaN ya sea drop o fill_na
         # Determino las columns con mucho NaN (mas de nan_threshold%)
@@ -668,7 +668,7 @@ class DataPreparation:
             X = X.dropna(subset=l_columns_poco_nan)
             if verbose >= 1:
                 print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
-                logger.info(f"4. Luego de dropna de columnas con 'poco' nan: {self.number_of_last_matches(X)}")
+                logger.info(f"4. Luego de dropna de columnas con 'poco' nan: {self.n_rows_to_test(X)}")
 
             # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
             df_rellenado = pd.DataFrame(index=X.index)
@@ -686,7 +686,7 @@ class DataPreparation:
             X = X.dropna(subset=X.columns)
 
         if verbose >= 0:
-            logger.info(f"Luego de eliminar todo NaN: {self.number_of_last_matches(X)}")
+            logger.info(f"Luego de eliminar todo NaN: {self.n_rows_to_test(X)}")
 
         end = time.time()
         print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
@@ -696,7 +696,7 @@ class DataPreparation:
         
         return X
     
-    def number_of_last_matches(self, X, verbose: int = 0):
+    def n_rows_to_test(self, X, verbose: int = 0):
         """
         Imprime por pantalla cuantos registros quedarian en df_test segun los requisitos exigidos.
         """
@@ -719,16 +719,6 @@ class DataPreparation:
         # Cantidad de registros que pasan 1 y 2 en df_match
         df_match_filt = df_match[df_match.index.isin(index_comp) & df_match.index.isin(index_last_matches)] # "ultimos partidos de id_competition en df_match"
         n_part_expected = len(df_match_filt)
-
-        '''
-        # Requisito 3:
-        if df_rellenado is not None:
-            index_no_rellenado = df_rellenado[~df_rellenado['rellenado']].index  # Obtengo indice de filas no rellenadas
-            print(f"Registros que pasan requisito 3: {len(index_no_rellenado)}")
-            filters = X.index.isin(index_comp) & X.index.isin(index_last_matches) & X.index.isin(index_no_rellenado)
-        else:
-            filters = X.index.isin(index_comp) & X.index.isin(index_last_matches)
-        '''
 
         filters = X.index.isin(index_comp) & X.index.isin(index_last_matches)
         df_filt_2 = X[filters]
@@ -1028,19 +1018,32 @@ class Modeling:
             Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluating trained model with test sets...")
-        self.var_pred_bm = 'bookmaker_result'  
+        
+        # Predigo sobre X_test
+        y_pred_prob, y_pred = self.predict(model, X_test, verbose=verbose)
 
-        # Levanto df_match_odds 
-        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
-        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
-        if verbose >= 2:
-            logger.info(f"Path odds: {path_match_odds}")
-            logger.info(df_match_odds)
+        # Crear el DataFrame con las probabilidades
+        df_pred_proba = pd.DataFrame({
+                self.var_resp: y_test,
+                self.var_pred: y_pred,
+                f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
+                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
+                f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
+            }, index=X_test.index)
+        
 
-        # Filtro df_match_odds dejando solo los partidos de X_test
-        df_match_odds = df_match_odds[df_match_odds.index.isin(X_test.index)]  # Selecciono los partidos que estan en df_test
-        df_match_odds = df_match_odds.reindex(X_test.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+        # Calculo metricas
+        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export, verbose=verbose)
 
+        if export:
+            df_predicciones.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_predicciones.xlsx')
+
+        return df_predicciones, d_metrics
+    
+    def predict(self, model, X_test: pd.DataFrame, verbose: int = 0):
+        """
+        Predigo sobre X_test
+        """
         # Predecir las etiquetas para los datos de prueba
         try:
             y_pred_prob = model.predict_proba(X_test) # Te da las probabilidad de cada clase. Funciona para todos los modelos? # AttributeError: predict_proba is not available when probability=False
@@ -1052,17 +1055,30 @@ class Modeling:
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
             y_pred_prob = model.predict(X_test)
             
-        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array
-
-        # Crear el DataFrame con las probabilidades
-        df_pred_proba = pd.DataFrame({
-                self.var_resp: y_test,
-                self.var_pred: y_pred,
-                f'prob_class_{self.classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
-                f'prob_class_{self.classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
-                f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
-            }, index=X_test.index)
+        y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array      
+        return y_pred_prob, y_pred
     
+    def calculate_metrics(self, df_pred_proba: pd.DataFrame, retrain: bool = False, export: bool = False, verbose: int = 0):
+        """
+        Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
+        """
+        self.var_pred_bm = 'bookmaker_result'  
+
+        # Levanto df_match_odds 
+        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
+        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
+        if verbose >= 2:
+            logger.info(f"Path odds: {path_match_odds}")
+            logger.info(df_match_odds)
+
+        # Filtro df_match_odds dejando solo los partidos de X_test
+        df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]  # Selecciono los partidos que estan en df_test
+        df_match_odds = df_match_odds.reindex(df_pred_proba.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+
+        # Defino variables
+        y_test = df_pred_proba[self.var_resp].values  # Etiquetas reales
+        y_pred = df_pred_proba[self.var_pred].values  # Predicciones del modelo
+
         # Calculo metricas
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100
@@ -1098,11 +1114,8 @@ class Modeling:
         if verbose >=1:
             print(d_metrics)
 
-        if export:
-            df_predicciones.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_predicciones.xlsx')
-
         return df_predicciones, d_metrics
-    
+
     def train_and_assess_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
         """
         Pruebo varios modelos 
