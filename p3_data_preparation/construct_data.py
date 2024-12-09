@@ -10,7 +10,7 @@ from p3_data_preparation.clean_data import replace_nan_with_zero
 
 # MAIN.PY
 ## Variable respuesta y otras
-def determine_result(df: pd.DataFrame, var_resp: str):
+def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     """
     Se determina el 'result' a partir de los goles que hizo cada team
     :param df: Dataframe. Unidad de analisis: match. Columnas: entre ellas goals_home y goals_away
