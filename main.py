@@ -13,7 +13,7 @@ from p3_data_preparation.integrate_sofifa_to_flashscore import *
 from sklearn.preprocessing import StandardScaler
 import joblib
 ## Modeling
-from p4_modeling import generate_test_design, build_model, asses_model
+from p4_modeling import generate_test_design, build_model, asses_model, betting_strategy
 ### Generate test design
 from random import randint
 from sklearn.model_selection import train_test_split
@@ -1062,20 +1062,9 @@ class Modeling:
         """
         Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
         """
-        self.var_pred_bm = 'bookmaker_result'  
-
-        # Levanto df_match_odds 
-        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
-        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
-        if verbose >= 2:
-            logger.info(f"Path odds: {path_match_odds}")
-            logger.info(df_match_odds)
-
-        # Filtro df_match_odds dejando solo los partidos de X_test
-        df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]  # Selecciono los partidos que estan en df_test
-        df_match_odds = df_match_odds.reindex(df_pred_proba.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-
         # Defino variables
+        bs = betting_strategy.BettingStrategy()
+        self.var_pred_bm = 'bookmaker_result'  
         y_test = df_pred_proba[self.var_resp].values  # Etiquetas reales
         y_pred = df_pred_proba[self.var_pred].values  # Predicciones del modelo
 
@@ -1083,12 +1072,32 @@ class Modeling:
         test_accuracy = accuracy_score(y_test, y_pred) * 100
         recall = recall_score(y_test, y_pred, average='macro') * 100
         f1 = f1_score(y_test, y_pred, average='macro') * 100
-
+        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1}
         if verbose >= 1:
             # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
             df_conf_mat = asses_model.confusion_matrix(y_test, y_pred)
             if export:
                 df_conf_mat.to_excel(f'./data/{self.country}/p4_modeling/modeling/df_conf_matrix.xlsx')
+
+
+        ## df_match --> # Podria levantar el df_match para agregar equipos y saber que partido es cada cual en el df_predicciones... tal como hago en produccion.
+        path_match = f'data/{self.country}/p6_deployment/missing/old_updated/df_match.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match.xlsx'
+        df_match = pd.read_excel(path_match, index_col=0) # --> missing no lo necesita y el otro si?
+        df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']] 
+        # Determino expected ROI --> Lo uso en calculate_roi...
+        df_match = df_match[df_match.index.isin(df_pred_proba.index)]
+        # df_match = df_match.reindex(df_pred_proba.index
+
+        # Df_match_odds
+        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
+        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
+        # Filtro df_match_odds dejando solo los partidos de X_test
+        df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]  # Selecciono los partidos que estan en df_test
+        df_match_odds = df_match_odds.reindex(df_pred_proba.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+        
+        if verbose >= 2:
+            logger.info(f"Path odds: {path_match_odds}")
+            logger.info(df_match_odds)
 
         # Agrego predicciones de bookmaker
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -1098,23 +1107,43 @@ class Modeling:
         # Calculo precision de casa de apuesta
         test_precision_bookmaker = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
         dif_prec = test_accuracy - test_precision_bookmaker
-        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1, 'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec}
+        d_metrics.update({'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec})
         
-        # Concateno dfs
-        df_predicciones = pd.concat([df_pred_proba, df_match_odds], axis=1)
-        
-        # Calculo ROI
-        df_predicciones, d_roi = asses_model.calculate_roi_by_betting_strategy(df_predicciones)
-        d_metrics.update(d_roi)
 
         # Calculo distribucion en df_predicciones? .... lo guardo en df_metrics pues luego va a df_test.
-        d_distrib = asses_model.determine_distribution(df_predicciones)
+        d_distrib = asses_model.determine_distribution(df_pred_proba)
         d_metrics.update(d_distrib)
+
+
+        # Concateno dfs --> Concateno antes de calcular ROI porque alli uso cuotas y expected result de df_match_odds y de df_match respectivamente
+        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba], axis=1)
+
+
+        # Calculo ROI
+        df_predicciones = construct_data.determine_expected_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
+        df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones, strategy='train', save_strategy=False)
+        d_metrics.update(d_roi)
+
+       # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
+        df_predicciones = self.map_teams(df_predicciones)
 
         if verbose >=1:
             print(d_metrics)
 
         return df_predicciones, d_metrics
+
+    def map_teams(self, df):
+        """
+        Convierto id_team_home e id_team_away de ids a nombre de equipos.
+        """
+        # Levanto df_teams
+        df_teams = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
+
+        # Revierto etiquetas para tener nombres de equipos en vez de ids
+        d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
+        df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
+        df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
+        return df
 
     def train_and_assess_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
         """
