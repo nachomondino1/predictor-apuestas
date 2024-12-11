@@ -17,7 +17,7 @@ from main import DataPreparation, Modeling
 from p3_data_preparation import format_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 # Modeling
-from p4_modeling import asses_model
+from p4_modeling import asses_model, betting_strategy
 import pickle
 import joblib
 
@@ -811,7 +811,8 @@ class TrainingDataLoader():
         if self.n_model is not None:
             try:
                 df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
-        
+                # df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_with_strategy.xlsx")  # desde que separé estrategia de apuesta de entrenamiento...
+
             except FileNotFoundError:
                 df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
 
@@ -1089,10 +1090,11 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
     # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
     if d_model is not None:
         logger.warning("Se usa modelo especificado como parametro y no necesariamente es el que se esta usando en produccion.")
         n_model, model_name, iteration_date_dt = d_model['n_model'], d_model['model_name'], d_model['iteration_date']
+    else:
+        n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
 
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
@@ -1270,15 +1272,14 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
     if d_run['modeling']:
 
         # Levanto hiperparametros de modeling
+        bs = betting_strategy.BettingStrategy()
         loaded_model = lo.load_model()
         classes = [0, 1, 2] # loaded_model.classes_
         d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[55], l_new_model_same_train=[148])
+        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[55], l_new_model_same_train=[148]) # Hacerlos argumetnos de la funcion o algo...
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
-        # Levanto datasets
-        df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
         try:
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']] 
         except KeyError:
@@ -1298,16 +1299,19 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones'], df_fill['emergency_fill']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
 
         # Determino estrategia de apuesta
-        df = asses_model.calculate_dif_proba_in_predicted_result(df_predicciones)
-        df = asses_model.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
+        df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
+        df = bs.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
         # Vario el stake segun curva especifica
-        df = asses_model.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
+        df = bs.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
 
-        # Revierto etiquetas para tener nombres de equipos en vez de ids
-        d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
-        df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
-        df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
+        # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
+        df = mo.map_teams(df) # Ver si funciona... y si funciona, sacar codigo de abajo.
+        # Levanto datasets
+        # df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
+        # d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
+        # df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
+        # df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
 
         # Filtro partidos para quedarme solo con los de competencias publicas.
         df = df[df['id_competition'].isin(comp_public)]
@@ -1327,10 +1331,9 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    n_days = 2
+    n_days = 12
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
-    d_model = {'n_model': 519, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-04"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
@@ -1339,6 +1342,11 @@ if __name__ == "__main__":
     # Definir condiciones del análisis
     for id_country in l_countries:
 
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=False, export=d_run['export']) # Prod
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) # Probar un modelo
+        # Probar un modelo
+        d_model = {'n_model': 1122, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-08"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
+
+        # Prod
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=False, export=d_run['export']) 
+
         df.to_excel(f"{directorio}/predicciones.xlsx")
