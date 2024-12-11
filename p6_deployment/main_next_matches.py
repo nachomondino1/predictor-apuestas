@@ -810,24 +810,33 @@ class TrainingDataLoader():
         # Si se levanta de main_find_best_hyper.py
         if self.n_model is not None:
             try:
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
-                # df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_with_strategy.xlsx")  # desde que separé estrategia de apuesta de entrenamiento...
+                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_with_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
+                
+                df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
+                df_iteration.rename(columns={'index': 'n_iteration'}, inplace=True)  # Renombra la columna creada
+                df_iteration
 
             except FileNotFoundError:
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
+                try:
+                    logger.warning("No está df_iteration_with_strategy")
+                    df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
 
-            rows_ite = df_iteration[df_iteration['n_iteration'] == self.n_model]
+                except FileNotFoundError:
+                    logger.warning("No está df_iteration_with_strategy ni df_iteration")
+                    df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
+
+            row_ite = df_iteration[df_iteration['n_iteration'] == self.n_model]
 
             if self.verbose >= 2:
                 logger.info(df_iteration)
-                logger.info(rows_ite)
+                logger.info(row_ite)
 
-            if len(rows_ite) > 1:
+            if len(row_ite) > 1:
                 col_model = 'model_name' if 'model_name' in df_iteration.columns else 'model_name_test'
-                row_hiper_bet_strat = rows_ite[rows_ite[col_model] == self.model_name]
+                row_hiper_bet_strat = row_ite[row_ite[col_model] == self.model_name]
                 logger.warning(len(row_hiper_bet_strat))
             else:
-                row_hiper_bet_strat = rows_ite
+                row_hiper_bet_strat = row_ite
 
             # Verificacion de que se selecciono una sola row
             if self.verbose >= 0 and len(row_hiper_bet_strat) != 1:
@@ -1306,12 +1315,7 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         df = bs.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
-        df = mo.map_teams(df) # Ver si funciona... y si funciona, sacar codigo de abajo.
-        # Levanto datasets
-        # df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
-        # d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
-        # df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
-        # df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
+        df = mo.map_teams(df)
 
         # Filtro partidos para quedarme solo con los de competencias publicas.
         df = df[df['id_competition'].isin(comp_public)]
@@ -1333,17 +1337,17 @@ if __name__ == "__main__":
 
     n_days = 12
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [148]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
 
         # Probar un modelo
-        d_model = {'n_model': 1122, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-08"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 1, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-03"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
 
         # Prod
