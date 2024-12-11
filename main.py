@@ -408,7 +408,8 @@ class DataPreparation:
 
             # VARIABLES DERIVADAS
             # Expected Result and Expected Points (xPts) (from Expected Goals)
-            df = construct_data.determine_expected_result(df)
+            thr_ajustado = construct_data.adjust_thr_to_match_distributions(df, initial_thr=0.3, tolerance=0.04)
+            df = construct_data.determine_expected_result(df, thr_expected=thr_ajustado)
             df = construct_data.determine_expected_points(df)
             df = df.drop(['expected_result'], axis=1) 
 
@@ -1120,6 +1121,7 @@ class Modeling:
 
 
         # Calculo ROI
+        # thr_ajustado = construct_data.adjust_thr_to_match_distributions(df, initial_thr=0.3, tolerance=0.05)
         df_predicciones = construct_data.determine_expected_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
         df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones, strategy='train', save_strategy=False)
         d_metrics.update(d_roi)

@@ -29,7 +29,95 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     df[var_resp] = pd.Series(np.select(condiciones, valores, default=0), index=df.index)
     return df
 
-def determine_expected_result(df: pd.DataFrame, thr_expected: int = 0.3, col_name="expected_result"):
+def compare_distributions(
+    df: pd.DataFrame, 
+    col_expected: str = "expected_result", 
+    col_result: str = "result", 
+    tolerance: float = 0.05
+) -> float:
+    """
+    Compara la distribución de valores en 'col_expected' y 'col_result' por valor individual.
+    Devuelve la diferencia máxima entre proporciones.
+    
+    :param df: DataFrame con las columnas a comparar.
+    :param col_expected: Nombre de la columna de resultados esperados.
+    :param col_result: Nombre de la columna de resultados reales.
+    :param tolerance: Tolerancia máxima permitida para la diferencia en las proporciones.
+    :return: Diferencia máxima entre las proporciones.
+    """
+    # Normalizar los conteos de valores
+    expected_counts = df[col_expected].value_counts(normalize=True, dropna=True).sort_index()
+    result_counts = df[col_result].value_counts(normalize=True, dropna=True).sort_index()
+
+    # Imprimir las distribuciones
+    print("Distribución de valores en expected_result:")
+    print(expected_counts)
+    print("\nDistribución de valores en result:")
+    print(result_counts)
+    
+    # Comparar distribuciones por valor
+    max_diff = 0
+    warnings = []
+    for value in sorted(set(expected_counts.index).union(result_counts.index)):
+        expected_ratio = expected_counts.get(value, 0)
+        result_ratio = result_counts.get(value, 0)
+        diff = abs(expected_ratio - result_ratio)
+        max_diff = max(max_diff, diff)
+        
+        if diff > tolerance:
+            warnings.append(
+                f"⚠️ WARNING: La proporción de {value} difiere significativamente (Diff: {diff:.2%})."
+            )
+
+    # Mostrar resultado de la comparación
+    if warnings:
+        for warning in warnings:
+            logger.warning(warning)
+    else:
+        logger.critical("\n✅ Las distribuciones son similares dentro del rango de tolerancia.") 
+    
+    return max_diff
+
+def adjust_thr_to_match_distributions(
+    df: pd.DataFrame,
+    initial_thr: float = 0.3,
+    tolerance: float = 0.05,
+    max_iterations: int = 50,
+    col_expected="expected_result",
+    col_actual="result"
+) -> float:
+    """
+    Ajusta el umbral para que las distribuciones de las columnas sean similares.
+    :param df: DataFrame con las columnas 'expected_goals_(xg)_home' y 'expected_goals_(xg)_away'.
+    :param initial_thr: Umbral inicial.
+    :param tolerance: Diferencia máxima permitida entre distribuciones (en porcentaje).
+    :param max_iterations: Número máximo de iteraciones.
+    :param col_expected: Nombre de la columna de resultados esperados.
+    :param col_actual: Nombre de la columna de resultados reales.
+    :return: Umbral ajustado.
+    """
+    thr = initial_thr
+    step = 0.02  # Paso para ajustar el umbral
+
+    for _ in range(max_iterations):
+        # Calcular la columna de resultados esperados
+        df = determine_expected_result(df, thr_expected=thr, col_name=col_expected)
+        
+        # Comparar las distribuciones
+        diff = compare_distributions(df, col_expected, col_actual, tolerance=tolerance)
+        
+        if diff <= tolerance:
+            print(f"Umbral ajustado: {thr:.2f}, Diferencia: {diff:.2f}%")
+            return thr
+        
+        # Ajustar el umbral
+        thr += step if diff > tolerance else -step
+        print(f"Umbral a probar: {thr:.2f}%")
+
+    print(f"Umbral final tras {max_iterations} iteraciones: {thr:.2f}, Diferencia: {diff:.2f}%")
+    return thr
+
+def determine_expected_result(df: pd.DataFrame, thr_expected: float = 0.3, col_name="expected_result"):
     """
     Determina el 'expected_result' a partir de los expected goals de cada equipo.
     :param df: DataFrame con columnas 'expected_goals_(xg)_home' y 'expected_goals_(xg)_away'.
@@ -51,14 +139,11 @@ def determine_expected_result(df: pd.DataFrame, thr_expected: int = 0.3, col_nam
     valores = [1, 2]  # 1: Local, 2: Visitante
 
     # Crear una columna con valores por defecto para todas las filas
-    df[col_name] = np.nan  # Asignar NaN inicialmente
+    df[col_name] = np.nan
     df.loc[filas_validas, col_name] = np.select(condiciones, valores, default=0)
-
-    # Comparar distribuciones de expected result y result
-    compare_distributions(df)
-
     return df
 
+'''
 def compare_distributions(df: pd.DataFrame, col_expected="expected_result", col_result="result", tolerance=0.05):
     """
     Compara la distribución de valores en 'expected_result' y 'result'.
@@ -92,6 +177,7 @@ def compare_distributions(df: pd.DataFrame, col_expected="expected_result", col_
 
     if not warning:
         logger.critical("\n✅ Las distribuciones son similares dentro del rango de tolerancia.")
+'''
 
 def determine_number_matches_last_days(df: pd.DataFrame, n_days):
 
