@@ -21,6 +21,8 @@ import time
 import re
 from p3_data_preparation.clean_data import fillna_with_mean_in_last_matches
 import numpy as np
+from p4_modeling.select_model_for_prod import SelectBestModel
+
 
 def comprehensive_search(
     country, 
@@ -156,7 +158,7 @@ def comprehensive_search(
 
                 else:
                     df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-                                
+                    
                 df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=False)
                 if export:
                     df_constructed.to_excel(path_construct, index=True)
@@ -307,29 +309,6 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def select_best_model(df, ruta_base_mod, roi_quantile=0.8, umbral=0.35, export: bool = True):
-    """
-    Selecciona el mejor modelo
-    """
-    # Descarte segun ROI (Selecciono Top 20% modelos (Pareto))
-    df = df.sort_values(by='roi_por_partido', ascending=False)
-    percentile_value = df['roi_por_partido'].quantile(roi_quantile)
-    df = df[df['roi_por_partido'] >= percentile_value]
-    # logger.info(df_best_models)
-
-    # Descarte segun distribucion
-    df_filtered = df[(df["dif_loc"].abs() <= umbral) & (df["dif_emp"].abs() <= umbral) & (df["dif_vis"].abs() <= umbral)]
-
-    # De los mejores, el que mas ROIpp tiene
-    logger.info(df_filtered)
-    best_model = df_filtered[df_filtered['roi_por_partido']==df_filtered['roi_por_partido'].max()]
-
-    # Exporto df_best_models y el mejor modelo?
-    if export:
-        df_filtered.to_excel(f'{ruta_base_mod}/df_best_models.xlsx', index=False)
-
-    return best_model
-
 def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
@@ -340,14 +319,14 @@ def define_params_space(id_country, fast: bool = False):
     # 1728 iteraciones
     d_params = {
         'construct': {
-            'n_dias_ult_part': [[30, 180], [60]], # [30, 180] 
+            'n_dias_ult_part': [[60], [30, 180]], # [30, 180] 
             'n_years_h2h': [3],
             'segun_localia': [True, False],
             'dif_con_against': [False, True] 
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
-            'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
+            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']], # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
+            'n_years_to_select': [2, 3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
             'fill_na': [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
         },
         'select': {
@@ -357,7 +336,7 @@ def define_params_space(id_country, fast: bool = False):
         'modeling': {
             'val_size': [0.10],
             'test_size': [0.15], 
-            'bal_type': ['under'], # None (ni con f1_score..)
+            'bal_type': [None, 'under'], # None (ni con f1_score..)
             'k': [5] 
             # scoring : ['accuracy', 'f1_macro'] 
         }
@@ -368,15 +347,15 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'construct': {
-                'n_dias_ult_part': [[60], [30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
+                'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
                 'n_years_h2h': [3],
                 'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']],  # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
-                'n_years_to_select': [3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
-                'fill_na': [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+                'n_years_to_select': [2, 3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
+                'fill_na': [None, 'ml'], #   # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
@@ -385,7 +364,7 @@ def define_params_space(id_country, fast: bool = False):
             'modeling': {
                 'val_size': [0.10],
                 'test_size': [0.15], 
-                'bal_type': [None, 'under'], # (ni con f1_score..)
+                'bal_type': [None, 'under'], # (ni con f1_score..) # ,
                 'k': [5] 
                 # scoring : ['accuracy', 'f1_macro'] 
             }
@@ -429,8 +408,7 @@ if __name__ == "__main__":
         logger.info(f"Country: {country} Date: {date}")
 
         df_iteration_comp = pd.read_excel(f'./data/{country}/p4_modeling/{date}/df_iteration.xlsx') # index_col=0
-         
+
     # Selecciono el mejor modelo
-    BASE_DIR = f"./data/{country}/p4_modeling/{date}" 
-    best_model = select_best_model(df_iteration_comp, BASE_DIR)
-    logger.info(best_model)
+    sbm = SelectBestModel(id_country=id_country, country=country, iteration_date=date)
+    sbm.main(df_iteration_comp)
