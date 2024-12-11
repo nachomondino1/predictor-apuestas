@@ -1,3 +1,5 @@
+import sys
+sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
@@ -6,11 +8,10 @@ from p4_modeling import asses_model
 
 class BettingStrategy:
 
-    def __init__(self):
-        # self.child_driver = self.driver
-        pass
+    def __init__(self, verbose: int = 1):
+        self.verbose = verbose
 
-    def calculate_roi_by_betting_strategy(self, df: pd.DataFrame, strategy: str = "train", save_strategy: bool = True, verbose: int = 0):
+    def calculate_roi_by_betting_strategy(self, df: pd.DataFrame, strategy: str = "train", save_strategy: bool = True):
         """
         Determine the ROI for different betting strategies.
 
@@ -24,11 +25,8 @@ class BettingStrategy:
         """
         # Definicion de variables
         l_thr_dif_prob, d_rectas, l_odd_weight, l_lim_sup = self.define_hiperparameters(strategy)
-        best_roi = -100000
-        if verbose >= 1:
-            logger.info(f"Calculating ROI...")
-            logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas}")
-        
+        best_metric = -100000
+  
         # Eliminate rows with NaN odds or missing predictions
         df = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])
         df = self.calculate_dif_proba_in_predicted_result(df)  # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
@@ -56,7 +54,7 @@ class BettingStrategy:
                         m, b = None, None
                         p1, p2 = a1, a2
                     
-                    if verbose >= 1:
+                    if self.verbose >= 2:
                         logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
 
                     # for normalized in [True, False]:
@@ -69,23 +67,26 @@ class BettingStrategy:
 
                             # Calculo ROI
                             df_pred, d_metrics = asses_model.calculate_roi(df_aux)   # (calculate_reality_roi(df_aux)) if strategy == 'reality' else (calculate_roi(df_aux))
-                            roi = d_metrics['roi_por_partido']  # d_metrics['roi_por_partido_r'] if strategy == 'reality' else d_metrics['roi_por_partido']       
 
                             # Calculo expected ROI
                             df_pred_2, d_expected_roi = asses_model.calculate_roi(df_aux, name_extension='expected_')     
                             missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
                             df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
                             d_metrics.update(d_expected_roi)
-                            # logger.info(f"Porcentaje de cuota {porc_cuota} --> ROI: {roi*100:.0f}")
+
+                            # Suma de ROI por partido y expected roi por partido  --> Ojo cuando uno de los terminos es negativo o ambos.
+                            metric = d_metrics['roi_por_partido'] * d_metrics['expected_roi_por_partido'] # es dificil normalizar antes... pero el * no la veo mal...
+                            d_metrics.update({'metric': metric})
+
+                            if self.verbose >= 1:
+                                logger.info(f"thr_prob_min: {prob} ; recta: {key} con m={m} ; odd_weight: {odd_weight} y lim_sup: {lim_sup} --> {d_metrics['roi_por_partido']:.1f} (ROI) * {d_metrics['expected_roi_por_partido']:.1f} (Expected ROI) = {metric:.1f}")
 
                             # Verificación si es el mejor ROI y actualización en una sola línea
-                            if roi > best_roi:
-                                best_roi = roi
+                            if metric > best_metric:
+                                best_metric = metric
                                 best_df_pred = df_pred.copy()
                                 best_d_rois = d_metrics
-
-                                if save_strategy:
-                                    best_d_rois.update({
+                                best_d_hyper = {
                                         'thr_prob_min_best': prob, 
                                         'curva': key, 
                                         'param1': a1, 
@@ -93,10 +94,19 @@ class BettingStrategy:
                                         'normalized': normalized,
                                         'odd_weight': odd_weight,
                                         'dif_prob_sup_cap': lim_sup
-                                    })
+                                    }
+                                
+                                if self.verbose >= 1:
+                                    logger.critical(f"Se encontró una mejor estrategia. Metrica final: {best_metric:.2f}")
 
-                                if verbose >= 1:
-                                    logger.info(f"Se encontró una mejor estrategia con ROI: {best_roi*100:.0f}. Metricas {best_d_rois}")
+                                    if self.verbose >= 2:
+                                        logger.critical(f'Metricas: {best_d_rois}.')
+                                        logger.critical(f'Hiper: {best_d_hyper}.')
+
+                                if save_strategy:
+                                    best_d_rois.update(best_d_hyper)
+        if self.verbose >= 0:
+            logger.info(f'Metricas: {best_d_rois}.')
 
         return best_df_pred, best_d_rois
 
@@ -130,6 +140,9 @@ class BettingStrategy:
                 'linear': [[1, 0], [5, 0], [10, 0], [15, 0],[20, 0], [25, 0],[30, 0], [40, 0]],
                 # 'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
             }
+
+        if self.verbose >= 1:
+            logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas} \n- Pesos cuotas: {l_odd_weight} \n- Limite para afectar stake con cuotas: {l_lim_sup}")
         
         return l_thr_dif_prob, d_rectas, l_odd_weight, l_lim_sup
 
@@ -380,47 +393,28 @@ class BettingStrategy:
 
         return df
 
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
     # Defino parametros
     id_country = 148
     iteration_date = '2024-12-10'
-    n_models = 20  # Ver cuantos. suma > 0? Pareto?
+    n_model = 1001
+    model_name = 'LogisticRegression'
 
     # Defino variables
     bs = BettingStrategy()
     d_countries = {6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
+    BASE_PATH = f'data/{country}/p4_modeling/{iteration_date}'
 
     # Obtengo listado de todos los modelos entrenados
-    df_iteration = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
+    # df_iteration = pd.read_excel(f'/df_iteration.xlsx')
 
-    # Determino metrica para seleccionar modelos
-    from sklearn.preprocessing import MinMaxScaler
-    scaler = MinMaxScaler()    # Crear el escalador
-    columns_to_normalize = ['roi_por_partido', 'expected_roi_por_partido']    # Seleccionar las columnas a normalizar
-    df_iteration[columns_to_normalize] = scaler.fit_transform(df_iteration[columns_to_normalize])    # Normalizar las columnas
-    df_iteration['metric'] = df_iteration['roi_por_partido'] + df_iteration['expected_roi_por_partido']    # Sumar las columnas normalizadas
+    # Obtengo predicciones del modelo
+    df_predicciones = pd.read_excel(f"{BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx")
 
-    # Selecciono los mejors n modelos segun roi_por_partido
-    df_iteration = df_iteration.sort_values(by='metric', ascending=False)  # Ordenar por roi por partido decreciente
-    df_iteration_filt = df_iteration.head(n_models) # Seleccionar los primeros n registros
-
-    # Por modelo
-    for idx, row in df_iteration_filt.iterrows():
-
-        n_model = row['n_iteration']
-        model_name = row['model_name']
-
-        # Levanto df_predicciones
-        df = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
-
-        # Determino la mejor estrategia de apuesta
-        best_df_pred, best_d_rois = bs.calculate_roi_by_betting_strategy(df, strategy = "general", save_strategy=True)
-
-        # Guardar los mejores hiperparametros de apuesta en df_best_models.xlsx
-        # best_d_rois['thr_prob_min_best'] # 'curva', 'param1', 'param2' 'normalized', 'odd_weight', 'dif_prob_sup_cap'
-
-        # Exporto datos
-        best_df_pred.to_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration_with_strategy.xlsx')
+    # Construyo variable expected result
+    df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones, strategy='general', save_strategy=False)
+    print(d_roi)
