@@ -408,8 +408,9 @@ class DataPreparation:
 
             # VARIABLES DERIVADAS
             # Expected Result and Expected Points (xPts) (from Expected Goals)
-            thr_ajustado = construct_data.adjust_thr_to_match_distributions(df, initial_thr=0.3, tolerance=0.04)
-            df = construct_data.determine_expected_result(df, thr_expected=thr_ajustado)
+            # thr_ajustado = construct_data.adjust_thr_to_match_distributions(df, initial_thr=0.3, tolerance=0.04)
+            # df = construct_data.determine_expected_result(df, thr_expected=thr_ajustado)
+            df = construct_data.determine_expected_result(df)
             df = construct_data.determine_expected_points(df)
             df = df.drop(['expected_result'], axis=1) 
 
