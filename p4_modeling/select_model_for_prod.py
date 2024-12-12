@@ -6,6 +6,7 @@ from utils.set_up_logging import logger
 from utils.directories import make_directories
 from p4_modeling.betting_strategy import BettingStrategy
 from p6_deployment.assess_models_in_prod import assess_model_in_prod
+from tqdm import tqdm
 
 
 class SelectBestModel():
@@ -15,12 +16,15 @@ class SelectBestModel():
         self.country = country
         self.iteration_date = iteration_date
         self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
+        self.PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_models'
+        make_directories(l_directorios=[self.PATH_sbm])
         self.verbose = verbose
+        self.bs = BettingStrategy()
 
     # Paso 1
-    def select_models_best_roi(self, df, perc_cutoff:float = 0.02, verbose: int = 0):
+    def select_models_best_roi(self, df, perc_cutoff, verbose: int = 0):
         """
-        Seleccionar los modelos con mejor retorno de inversión (ROI) basado en una métrica combinada de ROI y ROI esperado (expected ROI)
+        Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
 
         # Parameters
         df: Un DataFrame que contiene información sobre los modelos, incluyendo las columnas roi_por_partido y expected_roi_por_partido.
@@ -32,11 +36,10 @@ class SelectBestModel():
         # Return 
         La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
         """
-        # Normalizar las columnas roi_por_partido y expected_roi_por_partido
-        df = self.normalize_metrics(df, columns_to_normalize=['roi_por_partido', 'expected_roi_por_partido'])
-        
-        # Sumar las columnas normalizadas
-        df['metric'] = df['roi_por_partido'] + df['expected_roi_por_partido']    
+        logger.info("Paso 1: Descartando modelos con bajo ROI en df_test")
+
+        # Calculo metrica combinada
+        df = self.bs.calculate_metric(df)
 
         # Eliminar registros con 'metric' < 0
         df = df[df['metric'] >= 0]
@@ -48,35 +51,31 @@ class SelectBestModel():
         cutoff = int(len(df) * perc_cutoff)  # Calcular el 20% superior
         df_filt = df.iloc[:cutoff]
 
-        if verbose >= 0:
+        if verbose >= 1:
             logger.info(f"Descarte por ROI: {len(df)} --> {len(df_filt)}")
             logger.info(df_filt.head())
-            
+        
+        df_filt.to_excel(f'{self.PATH_sbm}/df_p1.xlsx', index=False)
         return df_filt
-
-    def normalize_metrics(self, df, columns_to_normalize):
-        """
-        Normalizo columnas de dataframe
-        """
-        # Crear el escalador
-        scaler = MinMaxScaler()    
-
-        # Normalizar las columnas
-        df[columns_to_normalize] = scaler.fit_transform(df[columns_to_normalize])
-        return df
 
     # Paso 2
     def define_betting_strategy_per_model(self, df, with_assess: bool = False, verbose: int = 0):
+        """
+        Determina la estrategia de apuesta optima para cada modelo.
+        """
+        # Lista para almacenar los resultados
+        results = []
+        logger.info("Paso 2: Definiendo la estrategia de apuesta optima por modelo...")
+        progress_bar = tqdm(total=len(df), ncols=80)  # Inicializo barra de progreso
 
-        # Defino variables
-        bs = BettingStrategy(verbose=verbose)
-        df_final = pd.DataFrame()
+        path_predic = f'{self.PATH_sbm}/predicciones/'
+        make_directories(l_directorios=[path_predic])
 
         # Por modelo
         for idx, row in df.iterrows():
 
             n_model, model_name = row['n_iteration'], row['model_name']
-            if verbose >= 0:
+            if verbose >= 1:
                 logger.info(f'n_model: {n_model} model_name: {model_name}')
 
             # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
@@ -97,55 +96,82 @@ class SelectBestModel():
                 logger.info(f"Se concatenó las predicciones de los partidos missing: {len_inic} --> {len(df_pred)}")
 
                 # Exporto predicciones concatenado
-                path_country = f'{self.BASE_PATH}/best_model'
-                make_directories(l_directorios=[path_country])
-                df_pred.to_excel(f"{path_country}/predicciones_{n_model}_{model_name}.xlsx") # df_predicciones???
+                df_pred.to_excel(f"{path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
 
             # Determino la mejor estrategia de apuesta
-            best_df_pred, best_d_rois = bs.calculate_roi_by_betting_strategy(df_pred, strategy="general", save_strategy=True)
+            d_hiper, best_df_pred, best_d_rois = self.bs.calculate_roi_by_betting_strategy(df_pred, strategy="general")
 
             # Concateno datos y guardo
-            df_ct = pd.DataFrame(best_d_rois, index=[n_model])
-            df_ct.loc[n_model, 'model_name'] = model_name
-            df_final = pd.concat([df_final, df_ct], axis=0)
-            # Guardar los mejores hiperparametros de apuesta en df_best_models.xlsx
-            # best_d_rois['thr_prob_min_best'] # 'curva', 'param1', 'param2' 'normalized', 'odd_weight', 'dif_prob_sup_cap'
-            # Exporto datos
-            # best_df_pred.to_excel(f'{BASE_PATH}/df_iteration_with_strategy.xlsx')
-            df_final.to_excel(f'{self.BASE_PATH}/df_iteration_with_strategy.xlsx')
+            d_ct = {**d_hiper, **best_d_rois}  # Combinar los dos diccionarios
+            d_ct['model_name'] = model_name
+            d_ct['n_model'] = n_model
 
+            # Añadir el resultado al DataFrame final
+            results.append(d_ct)
+            progress_bar.update(1)
+
+            # Exporto datos
+            best_df_pred.to_excel(f'{path_predic}/predicciones_{n_model}_{model_name}.xlsx')
+
+        progress_bar.close()
+
+        # Convertir la lista de resultados en un DataFrame
+        df_final = pd.DataFrame(results)
+        df_final.set_index('n_model', inplace=True)
+        
+        # Exportar el DataFrame final a un archivo Excel
+        df_final.to_excel(f'{self.PATH_sbm}/df_p2.xlsx', index=True)
+    
         return df_final
 
-    # Paso 3? 
-    def algo():
+    # Paso 3
+    def select_best_model_with_strategy(self, df):
+        """
+        Selecciona el mejor modelo ya teniendo la estrategia de apuesta optima para cada uno.
+        """
         # DETERMINAR QUE MODELO ES EL MEJOR CON LA ESTRATEGIA (QUEREMOS MAXIMIZAR EL ROI PERO TAMBIEN EL EXPECTED ROI)
         # habria que calcular los roi nuevamente pero ahora aplicando la estrategia de apuesta...
         # ... Ordenar segun metric y tomar el que la maximiza? En SPA me gusto mas el 1001 que tiene mayor ROI pero no asi expected. Con el tiempo sabré cual fue mejor.
-        pass
+        logger.info("Paso 3: Seleccionando mejor modelo ya habiendo aplicado la estrategia de apuesta optima a cada uno.")
 
-    def main(self, df, verbose: int = 0):
+        # Calculo metrica combinada (con ROIpp y ExpectedRoipp habianedo aplicado la estrategia de apuesta)
+        df = self.bs.calculate_metric(df)
+
+        # Ordenar los registros por 'metric' en orden descendente
+        df = df.sort_values(by='metric', ascending=False)
+        df.to_excel(f'{self.PATH_sbm}/df_p3.xlsx', index=True)
+
+        return df
+
+    # Main
+    def main(self, df, perc_cutoff:float = 0.05, with_assess=False, verbose: int = 0):
         """
         Determino el modelo a usar en produccion
         """
         # INPUT? --> ASSESS ? --> Lo estaria haciendo dentro del paso 2... Aun no se si funciona.
         
-        # PASO 1: DESCARTE POR ROI
-        df_filt = self.select_models_best_roi(df, verbose=verbose)
+        # PASO 1: DESCARTE POR ROI (sin estrategia de apuesta)
+        df_filt = self.select_models_best_roi(df, perc_cutoff=perc_cutoff,verbose=verbose)
 
         # PASO 2: Definir mejor combinación de hiperparametros de apuesta por modelo
-        df_filt_strategy = self.define_betting_strategy_per_model(df_filt, with_assess=False)
+        df_filt_strategy = self.define_betting_strategy_per_model(df_filt, with_assess=with_assess)
         
         # PASO 3: Seleccionar el modelo que maximiza ROI y expected ROI con la estrategia de apuesta
-        # self.algo()
+        df = self.select_best_model_with_strategy(df_filt_strategy)
 
-        # return n_model ?
+        # Imprimo por pantalla el mejor modelo
+        row = df.head(1) # Selecciono la primera fila
+        logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]}")
+
+        # Concateno dataframes y exporto
+        # df_concat = 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 148
-    iteration_date = '2024-12-10'
+    id_country = 55
+    iteration_date = '2024-12-12'
 
     # Defino variables
     d_countries = {6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
