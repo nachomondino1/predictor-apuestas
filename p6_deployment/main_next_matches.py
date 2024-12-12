@@ -810,11 +810,18 @@ class TrainingDataLoader():
         # Si se levanta de main_find_best_hyper.py
         if self.n_model is not None:
             try:
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_with_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
+                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_models/df_p3.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
                 
+                if self.verbose >= 2:
+                    print("AAAA")
+                    print(df_iteration)
+
                 df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
-                df_iteration.rename(columns={'index': 'n_iteration'}, inplace=True)  # Renombra la columna creada
-                df_iteration
+                df_iteration.rename(columns={'n_model': 'n_iteration'}, inplace=True)  # Renombra la columna creada
+
+                if self.verbose >= 2:
+                    print("BBB")
+                    print(df_iteration)
 
             except FileNotFoundError:
                 try:
@@ -847,7 +854,11 @@ class TrainingDataLoader():
             row_hiper_bet_strat = pd.read_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx')
             logger.error("Se levantan los hiperparametros de Modeling desde de main.py")
 
-        d['thr_prob_min'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
+        try:
+            d['thr_prob_min'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
+        except:
+            d['thr_prob_min'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min'))
+
         d['curva'] = self.load_value_from_series(row_hiper_bet_strat, 'curva') # str
         param1 = self.load_value_from_series(row_hiper_bet_strat, 'param1')  # int?
         param2 = self.load_value_from_series(row_hiper_bet_strat, 'param2') 
@@ -1341,13 +1352,13 @@ if __name__ == "__main__":
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [48]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
 
         # Probar un modelo
-        d_model = {'n_model': 1, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-03"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 186, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-11"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
 
         # Prod
