@@ -84,8 +84,6 @@ def comprehensive_search(
 
     # Imprimo largo de iteraciones
     n_iter = define_n_iterations(d_params)
-    modeling_params = d_params['modeling'].values() # Extraer los valores de 'modeling'
-    num_combinations = np.prod([len(v) for v in modeling_params]) # Calcular el número total de combinaciones posibles
     if verbose >= 0:
         logger.info(f"Numero de iteraciones totales: {n_iter}")
         start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC
@@ -276,9 +274,14 @@ def comprehensive_search(
                                 print()
 
                 else:
+                    select_params = d_params['select'].values()
+                    modeling_params = d_params['modeling'].values() # Extraer los valores de 'modeling'
+                    num_combinations_1 = np.prod([len(v) for v in select_params]) # Calcular el número total de combinaciones posibles
+                    num_combinations_2 = np.prod([len(v) for v in modeling_params]) # Calcular el número total de combinaciones posibles
+
                     logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_for_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
                     print()
-                    cont_iter += num_combinations # Sumo la cantidad de iteraciones de modeling que me ahorré.
+                    cont_iter += num_combinations_1 + num_combinations_2 # Sumo la cantidad de iteraciones de modeling que me ahorré.
 
     if verbose >= 0:
         end_train = time.time()
@@ -381,7 +384,7 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
+    id_country = 55
     only_select_best_model = False
     continue_old_train, date_old_train = False, '2024-11-27'
 
@@ -409,6 +412,6 @@ if __name__ == "__main__":
 
         df_iteration_comp = pd.read_excel(f'./data/{country}/p4_modeling/{date}/df_iteration.xlsx') # index_col=0
 
-    # Selecciono el mejor modelo
+    # Selecciono el mejor modelo --> Ver si funca...
     sbm = SelectBestModel(id_country=id_country, country=country, iteration_date=date)
     sbm.main(df_iteration_comp)
