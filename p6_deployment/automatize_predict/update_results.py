@@ -7,7 +7,8 @@ import pandas as pd
 import datetime
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_matches_result
 from p3_data_preparation.construct_data import determine_result
-from p4_modeling.asses_model import determine_winning_bets
+from p4_modeling.betting_strategy import BettingStrategy
+
 
 def determine_last_matches(df: pd.DataFrame, n_days: float = 1):
     """
@@ -28,6 +29,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
     """
     # Definicion de variables
     df_results = pd.DataFrame()
+    bs = BettingStrategy()
 
     # Por competicion
     for idx, row in df_comp_public.iterrows():
@@ -61,7 +63,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
 
         # Determino ganador y si acerté
         df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
-        df_pred_with_result = determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
+        df_pred_with_result = bs.determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
         df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
 
         # Exportar dataset
@@ -93,7 +95,7 @@ if __name__ == "__main__":
     # Cargo variables entorno
     load_dotenv()
     env = os.getenv('ENVIRONMENT')
-
+    
     # Parametros de ejecución
     if env == 'dev':
         n_days = 5
