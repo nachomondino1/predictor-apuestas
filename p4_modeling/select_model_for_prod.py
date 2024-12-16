@@ -3,11 +3,11 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from utils.set_up_logging import logger
-from utils.directories import make_directories
+from utils import directories
 from p4_modeling.betting_strategy import BettingStrategy, calculate_metric
 from p6_deployment.assess_models_in_prod import assess_model_in_prod
 from tqdm import tqdm
-
+import datetime
 
 class SelectBestModel():
 
@@ -26,8 +26,11 @@ class SelectBestModel():
         country = d_countries[id_country]
 
         self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
-        self.PATH_sbm = f'data/{country}/p4_modeling/{self.iteration_date}/best_models' # {datetime.datetime.now().date()} --> joderia en mnm.py
-        make_directories(l_directorios=[self.PATH_sbm])
+        self.PATH_sbm = f'data/{country}/p4_modeling/{self.iteration_date}/best_models' 
+        self.path_old_sbm = f'{self.PATH_sbm}/{datetime.datetime.now().date()}' 
+        self.path_predic = f'{self.PATH_sbm}/predicciones/'
+        directories.copy_directory(origen=self.PATH_sbm, destino=self.path_old_sbm)
+        directories.make_directories(l_directorios=[self.PATH_sbm, self.path_predic])
 
     # Paso 1
     def filter_models_by_roi(self, df, perc_cutoff):
@@ -111,9 +114,6 @@ class SelectBestModel():
         progress_bar = tqdm(total=len(df), ncols=80)  # Inicializo barra de progreso
         results = []
 
-        path_predic = f'{self.PATH_sbm}/predicciones/'
-        make_directories(l_directorios=[path_predic])
-
         # Por modelo
         for idx, row in df.iterrows():
 
@@ -139,7 +139,7 @@ class SelectBestModel():
 
                 if self.verbose >= 2:
                     # Exporto predicciones concatenado
-                    df_pred.to_excel(f"{path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
+                    df_pred.to_excel(f"{self.path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
             
             # Determino la mejor estrategia de apuesta
             if self.verbose >= 1:
@@ -156,7 +156,7 @@ class SelectBestModel():
             progress_bar.update(1)
 
             # Exporto datos
-            best_df_pred.to_excel(f'{path_predic}/predicciones_{n_model}_{model_name}.xlsx')
+            best_df_pred.to_excel(f'{self.path_predic}/predicciones_{n_model}_{model_name}.xlsx')
 
         progress_bar.close()
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
     # Selecciono el mejor modelo
-    sbm.main(df_ite, perc_cutoff=0.01, with_assess=True)
+    sbm.main(df_ite, perc_cutoff=0.01, with_assess=False)
 
 
 
