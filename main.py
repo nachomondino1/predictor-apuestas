@@ -412,7 +412,7 @@ class DataPreparation:
             # df = construct_data.determine_expected_result(df, goals_to_xg_ratio=goals_to_xg_ratio_ajustado)
             df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.3, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
             df = construct_data.determine_expected_points(df)
-            # df = df.drop(['expected_result'], axis=1) 
+            df = df.drop(['expected_result'], axis=1) # si no lo borras, la tenes que construir como variable historica (para FRA y no se GER no la borré...)
 
             ## OFENSIVE
             ## Goal ratio
@@ -616,7 +616,7 @@ class DataPreparation:
 
         return df, scaler, X.columns
     
-    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_min_no_nan: float = 0.7, percentil_nan: int = 75, export: bool = True, verbose: int = 0):
+    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_min_no_nan: float = 0.7, percentil_nan: int = 75, export: bool = True, verbose: int = 1):
         """
         Tratamiento de nan values
 
@@ -635,9 +635,10 @@ class DataPreparation:
             Dataframe sin NaN values
         """ 
         start = time.time()
+        df_test_index = self.rows_for_test(X)
         if verbose >= 1:
             print("\nTreating NaN values to avoid input=NaN in Modeling...")
-            logger.info(f"1. Datos de entrada a treat_nan: {self.n_rows_to_test(X)}")
+            logger.info(f" (1) Datos de entrada a treat_nan: {self.n_rows_to_test(X, df_test_index)}")
 
         # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
         n_reg_inic_3 = len(X)
@@ -646,7 +647,7 @@ class DataPreparation:
         if verbose >= 1:
             print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
-            logger.critical(f"2. Luego de eliminar FILAS con mucho NaN: {self.n_rows_to_test(X)}")
+            logger.critical(f" (2) Luego de eliminar FILAS con mucho NaN: {self.n_rows_to_test(X, df_test_index)}")
 
         # (2) Eliminacion de columnas con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
         n_reg_min = int(porc_min_no_nan*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
@@ -659,18 +660,22 @@ class DataPreparation:
         
         if verbose >= 1:
             print(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {X.shape} ")
-            logger.info(f"3. Luego de eliminar COLUMNAS con mucho NaN: {self.n_rows_to_test(X_sin_col_mucho_nan)}")
+            logger.info(f" (3) Luego de eliminar COLUMNAS con mucho NaN: {self.n_rows_to_test(X, df_test_index, verbose=verbose)}")
 
         # (3) Eliminacion de todo NaN ya sea drop o fill_na
-        # Determino las columns con mucho NaN (mas de nan_threshold%)
+        X = self.emergency_fill_for_test(X, df_test_index)
+
         if fill_na is not None:
+            
+            # Determino las columns con mucho NaN (mas de nan_threshold%)
             l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=percentil_nan)
 
             # Elimino registros con al menos un NaN 
+            largo_inic = len(X)
             X = X.dropna(subset=l_columns_poco_nan)
             if verbose >= 1:
-                print(f"De las {len(df)} filas, se han eliminado {len(df)-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
-                logger.info(f"4. Luego de dropna de columnas con 'poco' nan: {self.n_rows_to_test(X)}")
+                print(f"De las {largo_inic} filas, se han eliminado {largo_inic-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
+                logger.info(f" (4.a.1) Luego de dropna de columnas con 'poco' nan: {self.n_rows_to_test(X, df_test_index)}")
 
             # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
             df_rellenado = pd.DataFrame(index=X.index)
@@ -682,13 +687,17 @@ class DataPreparation:
             if verbose >= 1:
                 print(f"Columnas consideradas con mucho nan (a las cuales rellenar): {l_columns_mucho_nan}")
                 print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {X.shape}")
+                logger.info(f" (4.a.2) Luego de fill_na: {self.n_rows_to_test(X, df_test_index)}")
 
         else:
             # Elimino registros con al menos un NaN 
-            X = X.dropna(subset=X.columns)
+            X = X.dropna(subset=X.columns)  # Elimina filas de df_test.
+
+            if verbose >= 1:
+                logger.info(f" (4.b) Luego de dropna: {self.n_rows_to_test(X, df_test_index)}")
 
         if verbose >= 0:
-            logger.info(f"Luego de eliminar todo NaN: {self.n_rows_to_test(X)}")
+            logger.info(f" (5) Luego de tratamiento de NaN values: {self.n_rows_to_test(X, df_test_index)}")
 
         end = time.time()
         print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
@@ -698,9 +707,12 @@ class DataPreparation:
         
         return X
     
-    def n_rows_to_test(self, X, verbose: int = 0):
+    def rows_for_test(self, X, n_reg_test: int = 100, verbose: int = 0):
         """
-        Imprime por pantalla cuantos registros quedarian en df_test segun los requisitos exigidos.
+        Crear dataframe auxiliar con 1 y 0 indicando que registro va al df_test de manera de poder tratar su nan values ≠. 
+        Ademas, facilita el contado de cuantos registros quedan...
+
+        # Return dataframe indicando que id_match va a df_test.
         """
         # Para ver donde se eliminan los ultimos partidos.
         df_match = pd.read_excel(f'data/{self.country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
@@ -712,11 +724,12 @@ class DataPreparation:
         df1 = select_league_matches(df_match, verbose=-1)
         index_comp = df1.index
 
-        # Requisito 2: Last matches (6 meses?)
-        fecha_last_match = df_match.iloc[0]['date']
-        fecha_limite = fecha_last_match - datetime.timedelta(days=0.25*365)
-        df2 = df_match[df_match['date'] >= fecha_limite] 
+        # Requisito 2: Last matches
+        # Seleccionar los últimos 100 registros más recientes
+        df_match_comp = df_match[df_match.index.isin(df1.index)]  # Dejo solo las comp publicas
+        df2 = df_match_comp.head(n_reg_test)
         index_last_matches = df2.index
+        logger.info(df2['date'])
 
         # Cantidad de registros que pasan 1 y 2 en df_match
         df_match_filt = df_match[df_match.index.isin(index_comp) & df_match.index.isin(index_last_matches)] # "ultimos partidos de id_competition en df_match"
@@ -726,11 +739,49 @@ class DataPreparation:
         df_filt_2 = X[filters]
         n_part_final = len(df_filt_2)
 
-        if verbose >= 0:
-            logger.info(f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}")
+        df = pd.DataFrame({"for_test": 1}, index=df_filt_2.index)
 
-        return n_part_final
+        if verbose >= 1:
+            logger.info(f"Nº partidos para test esperados: {n_part_expected}. Nº partidos para test que pasaron: {n_part_final}")
+            # df_filt_2.to_excel("/Users/nachomondino/Desktop/df_test.xlsx")
 
+        return df
+
+    def n_rows_to_test(self, df, df_test, verbose: int = 0):
+        """
+        Imprime por pantalla cuantos registros quedarian en df_test segun los requisitos exigidos.
+        """
+        df_for_test = df[df.index.isin(df_test.index)]
+
+        if verbose >= 1:
+            # logger.warning("Exporto df_test...")
+            # df_for_test.to_excel("/Users/nachomondino/Desktop/df_test.xlsx")
+            logger.info(f"Nº partidos para test esperados: {len(df_test)}. Nº partidos para test que pasaron: {len(df_for_test)}")
+
+        return len(df_for_test)
+
+    def emergency_fill_for_test(self, X, df_test_index):
+
+        """
+        Relleno de emergencia de df_test para evitar su eliminado y, por ende, 
+            (1) predecir todo partido tal como hago en prod 
+            (2) tener un df_test del mismo tamaño siempre para poder comparar ROIs
+        """
+
+        # Calcula las columnas afectadas y el porcentaje inicial de NaN
+        affected_columns = X.columns[X.loc[df_test_index.index].isna().any()].tolist()
+        nan_percentages = X.loc[df_test_index.index, affected_columns].isna().mean() * 100
+
+        # Realizar el relleno
+        X.loc[df_test_index.index] = X.loc[df_test_index.index].fillna(0)  # En producción, relleno con 0 también.
+
+        # Loggear el warning
+        logger.warning(
+            f"Columnas afectadas: {', '.join(affected_columns)}\n"
+            f"Porcentaje inicial de NaN por columna: {nan_percentages.to_dict()}"
+        )
+        return X
+        
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, verbose: int = 0, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
@@ -801,18 +852,15 @@ class Modeling:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
         
-    def select_test_set(self, df, test_size, retrain, n_months: int = 3, n_max_reg: int = 100, verbose: int = 1):
+    def select_test_set(self, df, retrain: bool = True, n_reg_test: int = 100, verbose: int = 1):
         """
         Determina qué registros pueden ser utilizados en el test
         Requisitos para el test
-            -1: Que id_competition sea publica (lo mismo que hago en assess) --> Nuevo
-            -2: Que sean partidos del ultimo año? --> Nuevo
-                # Podria levantar df_match y ver para tal id_match su valor en id_competition y su fecha.
-            -3: Que no este rellenado
+            -1: Que id_competition sea publica (lo mismo que hago en assess).
+            -2: Que sean partidos jugados en los ultimos meses.
 
         # Parameters
             df: Dataframe.
-            test_size: Porcentaje maximo del total de datos que iran al test.
             n_years_to_select: Numero de años para seleccionar los ultimos partidos los cuales iran al df_test.
             n_max_reg: Numero maximo de registros para X_test. (int)
             verbose: 
@@ -845,60 +893,34 @@ class Modeling:
             df_filt_1 = df[df.index.isin(index_comp)]
             logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
         
-        # Requisito 2: Last matches (6 meses?)
-        fecha_last_match = df_match.iloc[0]['date']
-        n_days = n_months * 30
-        fecha_limite = fecha_last_match - datetime.timedelta(days=n_days)
-        df2 = df_match[df_match['date'] >= fecha_limite] 
+        # Requisito 2: Last matches 
+        df_match_comp = df_match[df_match.index.isin(df1.index)]  # Dejo solo las comp publicas
+        df2 = df_match_comp.head(n_reg_test)
         index_last_matches = df2.index
 
-        if verbose >= 1:
-
-            df_match_filt = df_match[df_match.index.isin(index_comp) & df_match.index.isin(index_last_matches)] # "ultimos partidos de id_competition en df_match"
-            n_part_expected = len(df_match_filt)
-
-            df_filt_2 = df[df.index.isin(index_comp) & df.index.isin(index_last_matches)]
-            n_part_final = len(df_filt_2)
-
-            logger.info(f"Nº partidos expected: {n_part_expected}. Nº partidos que pasaron: {n_part_final}")
-            # logger.info(f"Registros que pasan requisitos 1 y 2: {len(df_filt_2)}")
-
         if verbose >= 2:
-            logger.info(f"Partido mas reciente: {fecha_last_match} ({max(df_match['date'])}). Fecha limite: {fecha_limite}")
-            logger.warning(f"Hay {len(index_last_matches)} partidos en los ultimos {n_years_to_select*365/30:.1f} meses.")
-
-            df_aux = df[df.index.isin(index_last_matches)]
-            logger.info(f"Registros que pasan requisito 2 (todas las competiciones): {len(df_aux)}")
-
-            # Si se han eliminado "ultimos partidos" en treat_nan_values() o clean_data_2()
-            if len(df_aux) != len(index_last_matches):
-                logger.warning(f"(1 de 3) PROBLEMA DE NAN EN ULTIMOS PARTIDOS. De los {len(index_last_matches)}, solo hay {len(df_aux)} en el df que recibe select_test_data(). Deberian ser iguales --> {len(index_last_matches)} = {len(df_aux)}")
-                logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
-                logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
-
-        # Selecciono registros que cumplen los 3 requisitos
-        filters = df.index.isin(index_comp) & df.index.isin(index_last_matches) # df.index.isin(index_comp) & df.index.isin(index_last_matches)& df.index.isin(index_no_rellenado) 
+            df_filt_2 = df[df.index.isin(index_last_matches)]
+            logger.info(f"Registros que pasan el requisito 2 (solo last matches): {len(df_filt_2)}")
+        
+        # Selecciono registros que cumplen los requisitos
+        filters = df.index.isin(index_comp) & df.index.isin(index_last_matches)
         df_filt = df[filters]
 
-        # Determino si hay suficientes registros no rellenados para poner en el dataframe de testeo
-        n_reg_test = min(int(len(df) * test_size), n_max_reg) # Defino numero de registros necesarios
-        n_reg_test_max = len(df_filt)
-
-        if n_reg_test > n_reg_test_max: # Si no hay suficientes filas no rellenadas disponibles
-            # Ajusta n para tomar todas las filas no rellenadas disponibles
-            n_reg_test_old = n_reg_test
-            n_reg_test = n_reg_test_max
-            
-            if verbose >= 0:
-                logger.warning(f"ACHICO DF_TEST. Reduzco la cantidad de registros en test debido a que no hay los suficientes que satisfagan los requisitos. Necesito {n_reg_test_old} pero hay solo {n_reg_test_max} registros posibles.")
+        '''
+        df_aux = df_match[df_match.index.isin(index_last_matches)]
+        if len(df_filt) != len(df_aux):
+            logger.warning(f"(1 de 3) PROBLEMA DE NAN EN ULTIMOS PARTIDOS. De los {len(index_last_matches)}, solo hay {len(df_aux)} en el df que recibe select_test_data(). Deberian ser iguales --> {len(index_last_matches)} = {len(df_aux)}")
+            logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
+            logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
+        '''
 
         # Construyo el dataset de testeo a partir de registros que no han sido rellenados
-        df_test = df_filt.sample(n_reg_test, random_state=42)
-        X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
+        # df_test = df_filt.sample(random_state=42) --> no hace falta y ademas es peor.
+        X_test, y_test = df_filt.drop(self.var_resp, axis=1), df_filt[self.var_resp]
 
         return X_test, y_test
         
-    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, test_size: float = 0.15, verbose: int = 0, retrain: bool = False, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type, val_size: float = 0.15, n_reg_test: float = 100, verbose: int = 0, retrain: bool = False, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -906,7 +928,6 @@ class Modeling:
             df: Dataframe a dividir en test, validation y train. (Dataframe)
             bal_type: Tipo de balanceo de clases a realizar. (String)
             val_size: Porcentaje del total de datos destinado a validacion. (Float)
-            test_size:  Porcentaje del total de datos destinado a test. (Float)
             export: Booleano para indicar si se debe exportar el dataframe seleccionado. True para exportar, False de lo contrario. (Bool)
             
         # Returns
@@ -917,7 +938,7 @@ class Modeling:
             print("\nSeparating data in train, val and test...")
 
         # Selecciono test set
-        X_test, y_test = self.select_test_set(df, test_size, retrain=retrain)
+        X_test, y_test = self.select_test_set(df, retrain=retrain, n_reg_test=n_reg_test)
 
         # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
         df_train_val = df[~df.index.isin(X_test.index)]

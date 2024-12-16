@@ -183,8 +183,9 @@ def comprehensive_search(
                 joblib.dump((scaler, columns_used), f'{ruta_base_dp}/scaler_model_{path_1}_{path_2}.pkl')
 
                 # Verifico tamaño de df_test (evito select en caso que el test vaya a ser chico.)
-                rows_for_test = dp.n_rows_to_test(X=df_cons_clean.drop(dp.var_resp, axis=1), verbose=-1)
-                
+                # rows_for_test = dp.n_rows_to_test(X=df_cons_clean.drop(dp.var_resp, axis=1), verbose=-1)
+                rows_for_test = len(dp.rows_for_test(X=df_cons_clean.drop(dp.var_resp, axis=1), verbose=-1))
+
                 if verbose >= 2:
                     df_cons_clean.to_excel(path_clean_data, index=True)
                     logger.info(f"Luego de eliminar todo NaN: {rows_for_test}")
@@ -215,15 +216,15 @@ def comprehensive_search(
                         for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                             
                             # Asigno valor a cada hiperparametro
-                            val_size, test_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                            val_size, n_reg_test, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
                             if verbose >= 0:
                                 cont_iter += 1
                                 logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                                print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; test_size: {test_size}; bal_type: {bal_type} ; k: {k}')
+                                print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                                 logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
                             # Generar el diseño de la prueba
-                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, test_size=test_size, retrain=retrain, export=False)
+                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
                             
                             rows_test = len(X_test)
                             rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
@@ -242,7 +243,7 @@ def comprehensive_search(
                                             'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                             'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
                                             'fill_na': fill_na, 'bal_type': bal_type,
-                                            'val_size': val_size, 'test_size': test_size, 'X_train': X_train.shape,
+                                            'val_size': val_size, 'n_reg_test': n_reg_test, 'X_train': X_train.shape,
                                             'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
                                             'k': k}
                                 
@@ -330,7 +331,7 @@ def define_params_space(id_country, fast: bool = False):
         'clean_data_2': {
             'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']], # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
             'n_years_to_select': [2, 3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
-            'fill_na': [None, 'ml'], # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+            'fill_na': [None, 'ml'],  # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -338,7 +339,7 @@ def define_params_space(id_country, fast: bool = False):
         },
         'modeling': {
             'val_size': [0.10],
-            'test_size': [0.15], 
+            'n_reg_test': [100], 
             'bal_type': [None, 'under'], # None (ni con f1_score..)
             'k': [5] 
             # scoring : ['accuracy', 'f1_macro'] 
@@ -365,8 +366,8 @@ def define_params_space(id_country, fast: bool = False):
                 'thr_fs': [None, 0.25, 0.5, 0.75],
             },
             'modeling': {
-                'val_size': [0.10],
-                'test_size': [0.15], 
+                'val_size': [0.1],
+                'n_reg_test': [100], # 100 partidos son aprox los ultimos 3 meses.
                 'bal_type': [None, 'under'], # (ni con f1_score..) # ,
                 'k': [5] 
                 # scoring : ['accuracy', 'f1_macro'] 
@@ -384,7 +385,7 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 55
+    id_country = 48
     only_select_best_model = False
     continue_old_train, date_old_train = False, '2024-11-27'
 
@@ -413,5 +414,5 @@ if __name__ == "__main__":
         df_iteration_comp = pd.read_excel(f'./data/{country}/p4_modeling/{date}/df_iteration.xlsx') # index_col=0
 
     # Selecciono el mejor modelo --> Ver si funca...
-    sbm = SelectBestModel(id_country=id_country, country=country, iteration_date=date)
-    sbm.main(df_iteration_comp)
+    # sbm = SelectBestModel(id_country=id_country, country=country, iteration_date=date)
+    # sbm.main(df_iteration_comp)
