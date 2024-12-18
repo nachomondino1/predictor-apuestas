@@ -30,10 +30,12 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     return df
 
 def compare_distributions(
-    df: pd.DataFrame, 
-    col_expected: str = "expected_result", 
-    col_result: str = "result", 
-    tolerance: float = 0.05
+    df: pd.DataFrame,
+    col_expected: str = "expected_result",
+    col_result: str = "result",
+    tolerance: float = 0.05,
+    exclude_classes: list = None,
+    verbose: int = 1
 ) -> float:
     """
     Compara la distribución de valores en 'col_expected' y 'col_result' por valor individual.
@@ -43,39 +45,49 @@ def compare_distributions(
     :param col_expected: Nombre de la columna de resultados esperados.
     :param col_result: Nombre de la columna de resultados reales.
     :param tolerance: Tolerancia máxima permitida para la diferencia en las proporciones.
+    :param exclude_classes: Lista de valores a excluir de la comparación.
     :return: Diferencia máxima entre las proporciones.
     """
+    if exclude_classes is None:
+        exclude_classes = []
+
     # Normalizar los conteos de valores
     expected_counts = df[col_expected].value_counts(normalize=True, dropna=True).sort_index()
     result_counts = df[col_result].value_counts(normalize=True, dropna=True).sort_index()
 
     # Imprimir las distribuciones
-    print("Distribución de valores en expected_result:")
-    print(expected_counts)
-    print("\nDistribución de valores en result:")
-    print(result_counts)
-    
+    if verbose >= 1:
+        print("Distribución de valores en expected_result:")
+        print(expected_counts)
+        print("\nDistribución de valores en result:")
+        print(result_counts)
+
     # Comparar distribuciones por valor
     max_diff = 0
     warnings = []
     for value in sorted(set(expected_counts.index).union(result_counts.index)):
+        if value in exclude_classes:
+            continue  # Saltar las clases excluidas
+
         expected_ratio = expected_counts.get(value, 0)
         result_ratio = result_counts.get(value, 0)
         diff = abs(expected_ratio - result_ratio)
         max_diff = max(max_diff, diff)
-        
-        if diff > tolerance:
-            warnings.append(
-                f"⚠️ WARNING: La proporción de {value} difiere significativamente (Diff: {diff:.2%})."
-            )
+
+        if verbose >= 0:
+            if diff > tolerance:
+                warnings.append(
+                    f"⚠️ WARNING: La proporción de {value} difiere significativamente (Diff: {diff:.2%})."
+                )
 
     # Mostrar resultado de la comparación
-    if warnings:
-        for warning in warnings:
-            logger.warning(warning)
-    else:
-        logger.critical("\n✅ Las distribuciones son similares dentro del rango de tolerancia.") 
-    
+    if verbose >= 0:
+        if warnings:
+            for warning in warnings:
+                logger.warning(warning)
+        else:
+            logger.critical("\n✅ Las distribuciones son similares dentro del rango de tolerancia.") 
+
     return max_diff
 
 def adjust_ratio_to_match_distributions(

@@ -267,7 +267,7 @@ class DataPreparationNew(DataPreparation):
         Podria guardar el nuevo mapeo para jugadores nuevo o no hace falta? No hace falta creo.
         """
         # Uso integracion de main.py
-        df = self.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, verbose=verbose, export=False) 
+        df = self.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
 
         if self.export:
             df.to_excel(f'{self.BASE_DIR}/df_integrated.xlsx')
@@ -290,7 +290,7 @@ class DataPreparationNew(DataPreparation):
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos
         self.l_player_cols  = [col for col in df_last_old_matches.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
         # self.l_player_cols = [col for col in df_last_old_matches.columns if re.search(r'_player_', col)]  # Selecciono las variables que corresponden a jugadores
-        df_next_matches, df_copiado_formaciones = self.fillna_with_mean_in_last_matches(df_next_matches, df_last_old_matches, cols_to_fill=self.l_player_cols)            
+        df_next_matches, df_copiado_formaciones = clean_data.fillna_with_mean_in_last_matches_with_df(df_to_fill=df_next_matches, df=df_last_old_matches, cols_to_fill=self.l_player_cols)            
         
         # Si todavia tengo NaN values en formaciones, uso un n_days mayor
         # Verificar si quedan valores NaN en las columnas seleccionadas
@@ -314,70 +314,6 @@ class DataPreparationNew(DataPreparation):
 
         return df_next_matches, df_copiado_formaciones, df_emergency_fill, df_copiado
     
-    def fillna_with_mean_in_last_matches(self, df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill, verbose: int = 0): 
-        """
-        Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
-
-        # Parameters
-            df_new: Dataframe con los proximos partidos. (DataFrame)
-            df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
-            cols_to_fill: Columnas a reemplazar valores NaN. (list)
-
-        # Returns
-            Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
-        """
-        logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
-        df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_new.index)
-        
-        # Por variable mean_player 
-        for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
-
-            # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondiente
-            if variable not in df_new.columns:
-                df_new[variable] = np.nan
-            
-            if verbose >=1: 
-                print(f"\nVariable a promediar: {variable}")
-            
-            col_sin_suffix = variable.replace("_home", "").replace("_away", "")
-
-            # Por partido nuevo
-            for id_match, row in df_new.iterrows():
-
-                # Si el valor es nan en el partido
-                if pd.isna(row[variable]):
-
-                    team = row['id_team_home'] if "_home" in variable else row['id_team_away']
-
-                    # Busco promedio en ultimos partidos
-                    df_matches_home_team = df[df['id_team_home'] == team]
-                    df_matches_away_team = df[df['id_team_away'] == team]
-                    if verbose >=1:
-                        print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
-                        print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
-
-                    # Obtener los valores de la variable para los partidos en casa y fuera de casa
-                    values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
-                    values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
-
-                    # Remover los valores NaN
-                    values_home_clean = values_home[~np.isnan(values_home)]
-                    values_away_clean = values_away[~np.isnan(values_away)]
-
-                    # Calcular el número total de partidos
-                    total_partidos = (len(values_home_clean) + len(values_away_clean))
-                    suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
-
-                    # Si hay al menos un valor que promediar, guardo promedio
-                    if total_partidos > 0:
-                        df_new.loc[id_match, variable] = suma / total_partidos
-                        df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
-                        df_copiado_form.loc[id_match, variable] = suma / total_partidos
-                        if verbose >=1:
-                            print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
-
-        return df_new, df_copiado_form
-
     def fillna_with_last_match_value(self, df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list):
         """
         En los partidos nuevos, rellena los datos no disponibles con los datos de partidos anteriores.
@@ -430,14 +366,12 @@ class DataPreparationNew(DataPreparation):
         )        
         match_date = datetime.datetime.now()
         limit_date = match_date - datetime.timedelta(days=n_days) 
-        df_to_fill = df_integrated[
+        df_use_for_fill = df_integrated[
             (df_integrated['date'] >= limit_date) & (df_integrated['date'] < match_date)
         ]
 
         # Copio formaciones usando un n_days altísimo para rellenar si o si.
-        df, df_fill = self.fillna_with_mean_in_last_matches(
-            df, df_to_fill, cols_to_fill=cols_to_fill
-        )
+        df, df_fill = clean_data.fillna_with_mean_in_last_matches_with_df(df, df_use_for_fill, cols_to_fill=cols_to_fill)
         df_fill = df_fill.rename(columns={"copiado_formaciones": "emergency_fill"})
 
         # Conteo de filas con relleno de emergencia
@@ -481,8 +415,7 @@ class DataPreparationNew(DataPreparation):
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             n_rows_inic = len(df_next_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, with_h2h=False, 
-                                                 dif_con_against=dif_con_against, verbose=verbose, export=False)
+            df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
             if len(df_next_matches) > n_rows_inic:
                 logger.error("En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)")
@@ -1072,23 +1005,11 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
 
     return df_filt
 
-def define_porc_m_to_use(id_country, porc_m, l_new_model_same_train, l_new_train):
-
-    # Defino el % del m del test (define el m_to_use) --> habria que automatizarlo. Tal vez pasarle como argumento l_models_change_model y l_models_new_train algo asi.
-    if id_country in l_new_model_same_train:
-        # Mismo entrenamiento pero cambio de modelo (ENG)
-        porc_m = porc_m / 2
-    if id_country in l_new_train:
-        # Nuevo entrenamiento o Ligas historicamente malas (FRA) 
-        porc_m =  porc_m / 3
-    
-    return porc_m
-
 ########################################################################## MAIN #######################################################################
 def main(d_run: dict, id_country: int, d_model: dict = None,                # Params
          n_seasons_missing : int = 1, extract_missing: bool = True,         # missing
          n_days_max_next_matches: int = 7, predict_missing: bool = False,   # Data unders
-         n_days_fill_data: int = 60, porc_m: float = 0.35,                   # Data prep y Modeling
+         n_days_fill_data: int = 60, porc_m: float = 0.35, no_strategy: bool = False,                 # Data prep y Modeling
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1295,8 +1216,11 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         bs = betting_strategy.BettingStrategy()
         loaded_model = lo.load_model()
         classes = [0, 1, 2] # loaded_model.classes_
-        d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = define_porc_m_to_use(id_country, porc_m, l_new_train=[55], l_new_model_same_train=[148]) # Hacerlos argumetnos de la funcion o algo...
+        if no_strategy:
+            d_hiper_mod = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False}
+        else:
+            d_hiper_mod = lo.load_modeling_hyperparameters()
+        porc_m = porc_m / 2 if id_country in [55] else porc_m
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1346,22 +1270,26 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    n_days = 12
+    n_days = 15
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [148]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
 
         # Probar un modelo
-        d_model = {'n_model': 186, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-11"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 254, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-16"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
 
+        # Predict missing
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=True, no_strategy=True, export=d_run['export']) 
+        
         # Prod
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=False, export=d_run['export']) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
+
 
         df.to_excel(f"{directorio}/predicciones.xlsx")

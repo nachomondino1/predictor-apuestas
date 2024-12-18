@@ -145,7 +145,7 @@ def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
 
     return df
 
-# 3) Tratamiento de NaN values
+# 3) TRATAMIENTO DE NAN VALUES
 def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False):
     """
     Elimina las rows de un DataFrame que contienen un percentage alto de valores NaN.
@@ -254,79 +254,6 @@ def calculate_nan_values(df, columna):
     porcentaje_nan = (cantidad_nan / len(df)) * 100
     print(f"Porcentaje de NaN en {columna}: {porcentaje_nan:.2f}%")
     
-def fillna_with_mean_in_last_matches(df: pd.DataFrame, cols_to_fill, country:str, n_days: int = 60, verbose: int = 0): # no tengo idea si funciona ok. Es la de mnm pero modificada.
-    """
-    Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
-
-    # Parameters
-        df_new: Dataframe con los proximos partidos. (DataFrame)
-        df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
-        cols_to_fill: Columnas a reemplazar valores NaN. (list)
-
-    # Returns
-        Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
-    """
-    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
-    df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df.index)
-
-    # Por variable mean_player 
-    for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
-        col_sin_suffix = variable.replace("_home", "").replace("_away", "")
-
-        if verbose >= 0:
-            logger.info(f"Columna a rellenar: {variable}")   
-            calculate_nan_values(df, variable)
-
-        # Por partido nuevo
-        for id_match, row in df.iterrows():
-
-            # Si el valor es nan en el partido
-            if pd.isna(row[variable]):
-
-                team = row['id_team_home'] if "_home" in variable else row['id_team_away']
-
-                # Filtro df por fecha para obtener solo los "ultimos partidos" 
-                match_date = row['date']
-                limit_date = match_date - datetime.timedelta(days=n_days) 
-                df_to_fill = df[(df['date'] >= limit_date) & (df['date'] < match_date) ]
-
-                # Busco promedio en ultimos partidos
-                df_matches_home_team = df_to_fill[df_to_fill['id_team_home'] == team]
-                df_matches_away_team = df_to_fill[df_to_fill['id_team_away'] == team]
-                if verbose >=1:
-                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
-                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
-
-                # Obtener los valores de la variable para los partidos en casa y fuera de casa
-                values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
-                values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
-
-                # Remover los valores NaN
-                values_home_clean = values_home[~np.isnan(values_home)]
-                values_away_clean = values_away[~np.isnan(values_away)]
-
-                # Calcular el número total de partidos
-                total_partidos = (len(values_home_clean) + len(values_away_clean))
-                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
-
-                # Si hay al menos un valor que promediar, guardo promedio
-                if total_partidos > 0:
-                    df.loc[id_match, variable] = suma / total_partidos
-                    df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
-                    df_copiado_form.loc[id_match, variable] = suma / total_partidos
-                    if verbose >=1:
-                        print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
-
-        # Imprimo nan values luego de rellenar.
-        print("Luego de rellenar...")
-        calculate_nan_values(df, variable)
-
-    if verbose >= 0:
-        df_copiado_form.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_copiado_formaciones.xlsx", index=True)
-        df.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_filled.xlsx", index=True)
-
-    return df
-
 def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int = 0): 
     """
     Relleno NaN values en las columnas especificas del Dataframe.
@@ -466,6 +393,144 @@ def replace_infinite(df):
     df[df_numeric.columns] = df_numeric.replace([np.inf, -np.inf], np.nan) # Reemplazar los valores infinitos por NaN en las columnas numéricas
     return df
 
+## Relleno con valores de ultimos partidos
+def fillna_with_mean_in_last_matches(df: pd.DataFrame, cols_to_fill, country:str, n_days: int = 60, verbose: int = 0): # no tengo idea si funciona ok. Es la de mnm pero modificada.
+    """
+    Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
+
+    # Parameters
+        df_new: Dataframe con los proximos partidos. (DataFrame)
+        df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
+        cols_to_fill: Columnas a reemplazar valores NaN. (list)
+
+    # Returns
+        Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
+    """
+    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df.index)
+
+    # Por variable mean_player 
+    for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
+        col_sin_suffix = variable.replace("_home", "").replace("_away", "")
+
+        if verbose >= 0:
+            logger.info(f"Columna a rellenar: {variable}")   
+            calculate_nan_values(df, variable)
+
+        # Por partido nuevo
+        for id_match, row in df.iterrows():
+
+            # Si el valor es nan en el partido
+            if pd.isna(row[variable]):
+
+                team = row['id_team_home'] if "_home" in variable else row['id_team_away']
+
+                # Filtro df por fecha para obtener solo los "ultimos partidos" 
+                match_date = row['date']
+                limit_date = match_date - datetime.timedelta(days=n_days) 
+                df_to_fill = df[(df['date'] >= limit_date) & (df['date'] < match_date) ]
+
+                # Busco promedio en ultimos partidos
+                df_matches_home_team = df_to_fill[df_to_fill['id_team_home'] == team]
+                df_matches_away_team = df_to_fill[df_to_fill['id_team_away'] == team]
+                if verbose >=1:
+                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
+                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
+
+                # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
+                values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
+
+                # Remover los valores NaN
+                values_home_clean = values_home[~np.isnan(values_home)]
+                values_away_clean = values_away[~np.isnan(values_away)]
+
+                # Calcular el número total de partidos
+                total_partidos = (len(values_home_clean) + len(values_away_clean))
+                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
+
+                # Si hay al menos un valor que promediar, guardo promedio
+                if total_partidos > 0:
+                    df.loc[id_match, variable] = suma / total_partidos
+                    df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
+                    df_copiado_form.loc[id_match, variable] = suma / total_partidos
+                    if verbose >=1:
+                        print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
+
+        # Imprimo nan values luego de rellenar.
+        print("Luego de rellenar...")
+        calculate_nan_values(df, variable)
+
+    if verbose >= 0:
+        df_copiado_form.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_copiado_formaciones.xlsx", index=True)
+        df.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_filled.xlsx", index=True)
+
+    return df
+
+def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.DataFrame, cols_to_fill, verbose: int = 0): 
+    """
+    Para cada variable de cols_to_fill, reemplaza valores NaN por el valor promedio de dicha variable en los ultimos partidos.
+
+    # Parameters
+        df_to_fill: Dataframe con los proximos partidos. (DataFrame)
+        df: DataFrame con partidos ya jugados para rellenar df_new (DataFrame)
+        cols_to_fill: Columnas a reemplazar valores NaN. (list)
+
+    # Returns
+        Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
+    """
+    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_to_fill.index)
+    
+    # Por variable mean_player 
+    for variable in cols_to_fill: # (e.g. mean_val_player_sub_home, mean_rat_player_start_away)  
+
+        # En caso que ningun proximo partido tenga formaciones, creo la columna jugador correspondiente
+        if variable not in df_to_fill.columns:
+            df_to_fill[variable] = np.nan
+        
+        if verbose >=1: 
+            print(f"\nVariable a promediar: {variable}")
+        
+        col_sin_suffix = variable.replace("_home", "").replace("_away", "")
+
+        # Por partido nuevo
+        for id_match, row in df_to_fill.iterrows():
+
+            # Si el valor es nan en el partido
+            if pd.isna(row[variable]):
+
+                team = row['id_team_home'] if "_home" in variable else row['id_team_away']
+
+                # Busco promedio en ultimos partidos
+                df_matches_home_team = df[df['id_team_home'] == team]
+                df_matches_away_team = df[df['id_team_away'] == team]
+                if verbose >=1:
+                    print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
+                    print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
+
+                # Obtener los valores de la variable para los partidos en casa y fuera de casa
+                values_home = df_matches_home_team[f'{col_sin_suffix}_home'].values
+                values_away = df_matches_away_team[f'{col_sin_suffix}_away'].values
+
+                # Remover los valores NaN
+                values_home_clean = values_home[~np.isnan(values_home)]
+                values_away_clean = values_away[~np.isnan(values_away)]
+
+                # Calcular el número total de partidos
+                total_partidos = (len(values_home_clean) + len(values_away_clean))
+                suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
+
+                # Si hay al menos un valor que promediar, guardo promedio
+                if total_partidos > 0:
+                    df_to_fill.loc[id_match, variable] = suma / total_partidos
+                    df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
+                    df_copiado_form.loc[id_match, variable] = suma / total_partidos
+                    if verbose >=1:
+                        print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
+
+    return df_to_fill, df_copiado_form
+    
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     import os
