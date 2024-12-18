@@ -79,13 +79,15 @@ class BettingStrategy:
             l_odd_weight = [0, 1, 2, 4]
             l_lim_sup = [0, 1]
 
-        elif self.strategy=="reality":
+        elif self.strategy=="general_0":
             l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
             d_rectas = {
                 "equal": [[(0, 0), (1, 0)]],
                 'linear': [[1, 0], [5, 0], [10, 0], [15, 0],[20, 0], [25, 0],[30, 0], [40, 0]],
                 # 'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
             }
+            l_odd_weight = [0, 1, 2, 4]
+            l_lim_sup = [0]
 
         if self.verbose >= 1:
             logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas} \n- Pesos cuotas: {l_odd_weight} \n- Limite para afectar stake con cuotas: {l_lim_sup}")

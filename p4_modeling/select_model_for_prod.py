@@ -26,11 +26,14 @@ class SelectBestModel():
         country = d_countries[id_country]
 
         self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
-        self.PATH_sbm = f'data/{country}/p4_modeling/{self.iteration_date}/best_models' 
-        self.path_old_sbm = f'{self.PATH_sbm}/{datetime.datetime.now().date()}' 
-        self.path_predic = f'{self.PATH_sbm}/predicciones/'
-        directories.copy_directory(origen=self.PATH_sbm, destino=self.path_old_sbm)
-        directories.make_directories(l_directorios=[self.PATH_sbm, self.path_predic])
+        
+        self.PATH_sbm = f'{self.BASE_PATH}/best_models' 
+        self.path_old_sbm = f'{self.BASE_PATH}/best_models_old/{datetime.datetime.now().date()}' 
+        self.path_predic = f'{self.BASE_PATH}/best_models/predicciones/'
+
+        directories.make_directories(l_directorios=[self.path_old_sbm])
+        directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
+        directories.make_directories(l_directorios=[self.path_predic])
 
     # Paso 1
     def filter_models_by_roi(self, df, perc_cutoff):
@@ -84,9 +87,9 @@ class SelectBestModel():
         for idx, row in df.iterrows():
             l_difs = [abs(row['dif_loc']), abs(row['dif_vis'])]  # No considero la diff de empate.
 
-            # Si alguna diferencia es menor o igual a diff_min, no eliminar el modelo
-            if any(diff <= diff_min for diff in l_difs):
-                continue  # Salta este modelo y no lo elimina
+            # # Si alguna diferencia es menor o igual a diff_min, no eliminar el modelo
+            # if any(diff <= diff_min for diff in l_difs):
+            #     continue  # Salta este modelo y no lo elimina
 
             # Si alguna diferencia es mayor o igual a diff_max, eliminar el modelo
             if any(diff >= diff_max for diff in l_difs):
@@ -104,13 +107,13 @@ class SelectBestModel():
         return df_filtered
 
     # Paso 3
-    def define_betting_strategy_per_model(self, df, with_assess: bool = False):
+    def define_betting_strategy_per_model(self, df, strategy: str = 'general', with_assess: bool = False):
         """
         Determina la estrategia de apuesta optima para cada modelo.
         """
         # Lista para almacenar los resultados
         logger.info("Paso 3: Definiendo la estrategia de apuesta optima por modelo...")
-        bs = BettingStrategy(strategy='general', verbose=-1)
+        bs = BettingStrategy(strategy=strategy, verbose=-1)
         progress_bar = tqdm(total=len(df), ncols=80)  # Inicializo barra de progreso
         results = []
 
@@ -189,7 +192,7 @@ class SelectBestModel():
         return df
 
     # Main
-    def main(self, df, perc_cutoff:float = 0.2, with_assess: bool = False):
+    def main(self, df, perc_cutoff:float = 0.2, strategy: str = 'general', with_assess: bool = False):
         """
         Determino el modelo a usar en produccion
         """
@@ -200,7 +203,7 @@ class SelectBestModel():
         df_filt = self.filter_models_by_distribution(df_filt)
 
         # PASO 3: Definir mejor combinación de hiperparametros de apuesta por modelo
-        df_filt_strategy = self.define_betting_strategy_per_model(df_filt, with_assess=with_assess)
+        df_filt_strategy = self.define_betting_strategy_per_model(df_filt, strategy=strategy, with_assess=with_assess)
         
         # PASO 4: Seleccionar el modelo que maximiza ROI y expected ROI con la estrategia de apuesta
         df = self.select_best_model_with_strategy(df_filt_strategy)
@@ -216,15 +219,17 @@ class SelectBestModel():
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 48
-    iteration_date = '2024-12-16'
+    id_country = 59
+    iteration_date = '2024-12-17'
 
     # Defino variables
     d_countries = {6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
 
-    # Determino roi_weight
+    # Parametros de ejecucion
     roi_weight = 1  # Pues expected presumo que mete ruido x no tener bien definido el threshold. # if id_country == 55 else 0.8 # Uso roi_weight de 1 en GER porque no hay correl entre roi y expected roi.
+    strategy = 'general_0' if id_country == 77 else 'general'
+    with_assess=False
 
     # Creo objeto de clase select_best_model
     sbm = SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight)
@@ -233,7 +238,7 @@ if __name__ == "__main__":
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
     # Selecciono el mejor modelo
-    sbm.main(df_ite, perc_cutoff=0.01, with_assess=False)
+    sbm.main(df_ite, perc_cutoff=0.1, strategy=strategy, with_assess=with_assess)
 
 
 
