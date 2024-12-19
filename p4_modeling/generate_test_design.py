@@ -6,7 +6,9 @@ import numpy as np
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
+from p3_data_preparation.select_data import select_league_matches
 from random import randint
+import datetime
 
 def balance_dataset(X, y, bal_type: str, verbose: int = 0):
     """
@@ -93,22 +95,20 @@ def select_test_set(df, n_reg_test: int = 100, retrain: bool = True, country : s
         y_test: Dataframe de testeo solo la variable respuesta.
     """
     # Levanto df_match del pais
-    if retrain:
-        df_match = pd.read_excel(f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
-        df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-        logger.warning(f"Se levanto el df_match con los missing pues retrain=True. Shape: {df_match.shape}")
-    else:
+    df_match = pd.read_excel(f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
+    if not retrain:
+        logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
         df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
     
     # Ordeno por fecha descendiente
+    df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
     df_match = df_match.sort_values(by='date', ascending=False)
-    
+
     if verbose >= 2:
         logger.info(df_match.columns) # No quiero "unnamed"
         logger.info(df_match['date'].head(10))
 
     # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
-    from p3_data_preparation.select_data import select_league_matches
     df1 = select_league_matches(df_match)
     index_comp = df1.index
 
@@ -117,9 +117,29 @@ def select_test_set(df, n_reg_test: int = 100, retrain: bool = True, country : s
         logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
     
     # Requisito 2: Last matches 
-    df_match_comp = df_match[df_match.index.isin(df1.index)]  # Dejo solo las comp publicas
+    df_match_comp = df_match[df_match.index.isin(df1.index)]  # Dejo solo las ligas / comp publicas
     df2 = df_match_comp.head(n_reg_test)
     index_last_matches = df2.index
+
+    # Imprimo rango de fechas de df_test
+    if verbose >= 0:
+        date_hoy = datetime.datetime.now().date()
+        col_index = df_match_comp.columns.get_loc('date')  # Índice de la columna "date"
+        date_final = df_match_comp.iloc[0, col_index]
+        date_inic = df_match_comp.iloc[100, col_index]
+
+        # Los convierto a datetime
+        date_final = pd.to_datetime(date_final, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
+        date_inic =  pd.to_datetime(date_inic, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
+
+        logger.info(f"Date hoy: {date_hoy}. Dates en df_test: {date_inic} --> {date_final}")
+
+        dif_dias = date_hoy - date_final
+        dif_dias_max = 20
+
+        # Si no hay partidos de los ultimos x dias en df_test
+        if dif_dias.days >= dif_dias_max:
+            logger.warning(f"No hay registros de los ultimos {dif_dias.days} dias en df_test. uede haber fallado algo en la extraccion de missing o en la seleccion del df_test.")
 
     if verbose >= 2:
         df_filt_2 = df[df.index.isin(index_last_matches)]
