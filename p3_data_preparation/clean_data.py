@@ -294,6 +294,9 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
             mode_value = X[col].mode()[0]
             X_filled[col] = X_filled[col].fillna(mode_value)
 
+        elif fill_type == "0":
+            X_filled[col] = X_filled[col].fillna(0)
+
         # OPCION 2: Llenar los valores faltantes con ML
         elif fill_type == "ml": # Poner un limite a las columnas a rellenar? Por ej, si tiene un 80% de nan, no rellenar sino eliminar columna...
 
