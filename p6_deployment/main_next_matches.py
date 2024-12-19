@@ -302,7 +302,7 @@ class DataPreparationNew(DataPreparation):
             df_emergency_fill = pd.DataFrame()
             df_emergency_fill['emergency_fill'] = 0
         '''
-        
+
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
         # self.miss_player_columns = [col for col in df_last_old_matches.columns if ('player_miss' in col)] --> ojo porque no se si las rellena ok... es complejo el rellenado.
         l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away'] # + self.miss_player_columns
@@ -566,6 +566,8 @@ class DataPreparationNew(DataPreparation):
             # Crear DataFrame con las columnas rellenadas y `emergency_fill`
             df_filled_columns = df_copy.loc[filled_rows, columns_to_fill]
             df_filled_columns['emergency_fill'] = 1
+
+            # Columna con valor 0 o 1 segun si rellena columna que contiene "player_start" o "player_sub"
     
             if self.export: 
                 df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
@@ -587,7 +589,6 @@ class DataPreparationNew(DataPreparation):
 
         if self.export: 
             df_sin_dup.to_excel(f'{self.BASE_DIR}/df_selected_nan.xlsx', index=True)
-            df_filled_columns.to_excel(f'{self.BASE_DIR}/df_emergency_fill.xlsx', index=True) # --> Decir que filas rellene y que columnas de estas.
 
         return df_sin_dup, df_filled_columns
         
@@ -1249,7 +1250,10 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
 
         # Concateno conjunto de datos
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones'], df_fill['emergency_fill']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
+        try:
+            df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones'], df_fill['emergency_fill']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
+        except:
+            df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
 
         # Determino estrategia de apuesta
         df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
