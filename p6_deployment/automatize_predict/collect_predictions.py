@@ -23,7 +23,8 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
         df_predicciones_country = main_next_matches.main(d_run, id_country, n_days_max_next_matches=n_days, d_model=None, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
-        if len(df_predicciones_country) > 0:
+        if df_predicciones_country is not None and not df_predicciones_country.empty:
+        # if len(df_predicciones_country) > 0:
             df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
             df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
 
@@ -33,6 +34,10 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
             # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
             df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
             df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+
+        else:
+            # Manejo del caso cuando no se extraen datos
+            logger.warning(f"No se generaron predicciones para el país {id_country}. Verificar extracción.")
 
     # Guardo predicciones en historial_predicciones
     largo_inic = len(df_historial_predicciones)
@@ -59,9 +64,9 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 15
-        l_countries = [48, 55, 59, 77, 148] # 55
-        # l_countries = [148]
+        n_days = 7
+        l_countries = [48, 55, 59, 77, 148]
+        # l_countries = [77]
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
         d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
