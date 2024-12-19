@@ -242,7 +242,7 @@ class BettingStrategy:
         return df
 
     def determine_stake_to_bet(self, df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
-                            porc_emergency: float = 0.75,
+                            porc_emergency: float = 1,
                             odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
         """
         Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
@@ -338,7 +338,10 @@ class BettingStrategy:
         
         # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
         if 'emergency_fill' in df.columns:
-                # Contar los registros donde 'emergency_fill' es igual a 1
+
+            # Deberia reducir stake solo si se rellenan variables players START o SUB  (y no cualquier relleno...)
+
+            # Contar los registros donde 'emergency_fill' es igual a 1
             emergency_count = df['emergency_fill'].sum()  # Asumiendo que los valores son 0 o 1
             
             if self.verbose >= 0:

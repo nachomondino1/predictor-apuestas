@@ -331,13 +331,17 @@ class DataPreparation:
                 print(f"Competiciones: {d_comps['comp_sin_cups']}")
 
                 # Por Liga:
-                for id_comp in d_comps['comp_sin_cups']:
+                for id_comp in d_comps['comp_sin_cups']:                        
+
                     print(f"Competicion: {id_comp}")
 
                     # filtrar df_match y df_match_player y df_player_sofifa
                     ## Flashscore
                     print(f"AA: {len(df_match)} {len(df_match_player)}")
                     df_match_league = df_match[df_match['id_competition'] == id_comp]
+                    if id_country == 6:
+                        df_match_league = df_match[df_match['id_competition'].isin([61, 62])]  # Argentina
+
                     df_match_player_league = df_match_player[df_match_player.index.isin(df_match_league.index)]
                     df_player_league = create_df_player(df_match_player_league)
                     print(f"BB: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
@@ -355,13 +359,17 @@ class DataPreparation:
                     # Concateno mapeos de ligas
                     df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_league], axis=0)
                     df_player = pd.concat([df_player, df_player_league], axis=0)
-                    print(f"ZZ: {len(df_map_players_fs_so)}")
+                    print(f"ZZ: {len(df_map_players_fs_so)}")                        
 
                     # df_map_players_fs_so.drop_duplicates()
                     if export:
                         df_player_league.to_excel(f"{self.base_path}/integrate_data/df_player_{id_comp}.xlsx", index=True)
                         df_map_players_fs_so_league.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so_{id_comp}.xlsx")
-                
+
+                    if id_country == 6:
+                        print("La copa de la liga prof es una mezcla entre liga y no... A dichos partidos los integro con los jugadores de la liga 61 (y no aparte).")
+                        break
+
                 print(f"Final: {len(df_map_players_fs_so)}")
                  # Eliminar jugadores duplicados (x jugar en ambas competicioens)
                 df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
@@ -1181,7 +1189,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 59 # 55, 59, 77, 148, 167 -1
+    id_country = 6
     d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': True}
 
     # Hiperparametros
