@@ -23,7 +23,7 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
         df_predicciones_country = main_next_matches.main(d_run, id_country, n_days_max_next_matches=n_days, d_model=None, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
-        if df_predicciones_country is not None and not df_predicciones_country.empty:
+        if isinstance(df_predicciones_country, pd.DataFrame):
         # if len(df_predicciones_country) > 0:
             df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
             df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
