@@ -288,33 +288,19 @@ class DataPreparationNew(DataPreparation):
         logger.info("Rellenando datos aun no disponibles...")
 
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos
-        self.l_player_cols  = [col for col in df_last_old_matches.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
-        # self.l_player_cols = [col for col in df_last_old_matches.columns if re.search(r'_player_', col)]  # Selecciono las variables que corresponden a jugadores
-        df_next_matches, df_copiado_formaciones = clean_data.fillna_with_mean_in_last_matches_with_df(df_to_fill=df_next_matches, df=df_last_old_matches, cols_to_fill=self.l_player_cols)            
-        
-        '''
-        # Si todavia tengo NaN values en formaciones, uso un n_days mayor --> Relleno fill_na=0 en treat_nan_values() tal como sucede en entrenamiento.
-        # Verificar si quedan valores NaN en las columnas seleccionadas
-        if df_next_matches[self.l_player_cols].isna().any().any():
-            # Si quedan NaN, realizar el rellenado de emergencia
-            df_next_matches, df_emergency_fill = self.emergency_fill_player_columns(df_next_matches, cols_to_fill=self.l_player_cols, verbose=verbose)
-        else:
-            df_emergency_fill = pd.DataFrame()
-            df_emergency_fill['emergency_fill'] = 0
-        '''
+        l_player_cols  = [col for col in df_last_old_matches.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
+        df_next_matches, df_copiado_formaciones = clean_data.fillna_with_mean_in_last_matches_with_df(df_to_fill=df_next_matches, df=df_last_old_matches, cols_to_fill=l_player_cols)            
 
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
-        # self.miss_player_columns = [col for col in df_last_old_matches.columns if ('player_miss' in col)] --> ojo porque no se si las rellena ok... es complejo el rellenado.
-        l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away'] # + self.miss_player_columns
+        miss_player_columns = [col for col in df_last_old_matches.columns if ('player_miss' in col)]  # --> ojo porque no se si las rellena ok... es complejo el rellenado.
+        l_var_to_copy = ['referee', 'id_coach_home', 'id_coach_away'] + miss_player_columns
         df_next_matches, df_copiado = self.fillna_with_last_match_value(df_next_matches, df_last_old_matches, cols_to_fill=l_var_to_copy) 
 
         if self.export:
             df_copiado_formaciones.to_excel(f"{self.BASE_DIR}/fill_data/df_copiado_formaciones.xlsx", index=True)
             df_copiado.to_excel(f"{self.BASE_DIR}/fill_data/df_copiado_ref_and_coaches.xlsx", index=True)
-            # df_emergency_fill.to_excel(f'{self.BASE_DIR}/fill_data/df_emergency_fill.xlsx', index=True)
             df_next_matches.to_excel(f"{self.BASE_DIR}/df_filled.xlsx", index=True)
 
-        # return df_next_matches, df_copiado_formaciones, df_emergency_fill, df_copiado
         return df_next_matches, df_copiado_formaciones, df_copiado
     
     def fillna_with_last_match_value(self, df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list):
@@ -547,9 +533,7 @@ class DataPreparationNew(DataPreparation):
             df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
         """
         logger.info("Treating NaN values...")
-
-        # Relleno variables de jugadores en relleno de emergencia --> Demasiado arbitrario, prefiero que sea 0. Para rellenar col de jugadores tiene que ser post integrate...
-        # df, df_fill = self.emergency_fill_player_columns(df)
+        df_filled_columns = pd.DataFrame(0, index=df.index, columns=['emergency_fill', 'player_emergency_fill']) # Inicializo el df
 
         # Rellenar NaN en algunas columnas espeecificas
         columns_to_fill = [col for col in df.columns if df[col].isna().any()]  # En teoria, solo rellena las variables historicas que son nan.
@@ -559,16 +543,20 @@ class DataPreparationNew(DataPreparation):
             df_copy = df.copy()
             df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
 
-            # Crear un DataFrame con las columnas que fueron rellenadas
             # Identificar filas donde se rellenaron NaN
             filled_rows = (df[columns_to_fill].isna() & (df_copy[columns_to_fill] == 0)).any(axis=1)
     
             # Crear DataFrame con las columnas rellenadas y `emergency_fill`
             df_filled_columns = df_copy.loc[filled_rows, columns_to_fill]
             df_filled_columns['emergency_fill'] = 1
-
+            
             # Columna con valor 0 o 1 segun si rellena columna que contiene "player_start" o "player_sub"
-    
+            player_columns = [col for col in columns_to_fill if "player_start" in col or "player_sub" in col]
+            df_filled_columns['player_emergency_fill'] = (
+                (df[player_columns].isna() & (df_copy[player_columns] == 0)).any(axis=1)
+                .astype(int)
+            )
+
             if self.export: 
                 df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
         
@@ -1230,7 +1218,7 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
             d_hiper_mod = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False}
         else:
             d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = porc_m / 2 if id_country in [55] else porc_m
+        porc_m = porc_m / 2 if id_country in [55] else porc_m  # Automatizar
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1251,7 +1239,7 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         # Concateno conjunto de datos
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
         try:
-            df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones'], df_fill['emergency_fill']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
+            df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
         except:
             df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
 
@@ -1284,12 +1272,12 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
 if __name__ == "__main__":    
 
     n_days = 15
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [48]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
@@ -1298,14 +1286,14 @@ if __name__ == "__main__":
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
 
         # Probar un modelo
-        # d_model = {'n_model': 1054, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-16"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
+        d_model = {'n_model': 13, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-16"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
 
         # Predict missing
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=True, no_strategy=True, export=d_run['export']) 
         
         # Prod 
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
 
 
         df.to_excel(f"{directorio}/predicciones.xlsx")

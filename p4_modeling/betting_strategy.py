@@ -58,7 +58,7 @@ class BettingStrategy:
             l_lim_sup = [0]
 
         elif self.strategy == "general":
-            l_thr_dif_prob = [-0.5, -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+            l_thr_dif_prob = [-1] # , -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
             d_rectas = {
                 # "equal": [[(0, 0), (1, 0)]],
                 # 'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
@@ -80,10 +80,10 @@ class BettingStrategy:
             l_lim_sup = [0, 1]
 
         elif self.strategy=="general_0":
-            l_thr_dif_prob = [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+            l_thr_dif_prob = [-0.5]  # tengo varios valores porque cambia mucho si el modelo es under o no.
             d_rectas = {
-                "equal": [[(0, 0), (1, 0)]],
-                'linear': [[1, 0], [5, 0], [10, 0], [15, 0],[20, 0], [25, 0],[30, 0], [40, 0]],
+                # "equal": [[(0, 0), (1, 0)]],
+                'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
                 # 'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
             }
             l_odd_weight = [0, 1, 2, 4]
@@ -242,7 +242,7 @@ class BettingStrategy:
         return df
 
     def determine_stake_to_bet(self, df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
-                            porc_emergency: float = 1,
+                            porc_emergency: float = 0.75,
                             odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
         """
         Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
@@ -337,12 +337,10 @@ class BettingStrategy:
             # df = df.drop(['stake_to_bet_raw', 'stake_to_bet_normalized'], axis=1)
         
         # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
-        if 'emergency_fill' in df.columns:
-
-            # Deberia reducir stake solo si se rellenan variables players START o SUB  (y no cualquier relleno...)
+        if 'player_emergency_fill' in df.columns:
 
             # Contar los registros donde 'emergency_fill' es igual a 1
-            emergency_count = df['emergency_fill'].sum()  # Asumiendo que los valores son 0 o 1
+            emergency_count = df['player_emergency_fill'].sum()  # Asumiendo que los valores son 0 o 1
             
             if self.verbose >= 0:
                 # Agregar el conteo al warning
@@ -351,7 +349,7 @@ class BettingStrategy:
                 )
             
             # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
-            df.loc[df['emergency_fill'] == 1, 'stake_to_bet'] *= porc_emergency
+            df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= porc_emergency
 
         # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
         val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
