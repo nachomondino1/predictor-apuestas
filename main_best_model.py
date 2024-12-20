@@ -301,8 +301,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    # l_modelos = [LogisticRegression(), 'neural_network', SVC(), XGBClassifier()] # GradientBoostingClassifier(), MLPClassifier()]
-    l_modelos = [LogisticRegression()]
+    l_modelos = [LogisticRegression(), DecisionTreeClassifier(), RandomForestClassifier()]
 
     # 1728 iteraciones
     d_params = {
@@ -313,9 +312,9 @@ def define_params_space(id_country, fast: bool = False):
             'dif_con_against': [False, True] 
         },
         'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']], # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
-            'n_years_to_select': [2, 3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
-            'fill_na': [None, 'ml'],  # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']],
+            'n_years_to_select': [2, 3, 5, 10], 
+            'fill_na': [None, "0", 'ml'],  
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -324,26 +323,25 @@ def define_params_space(id_country, fast: bool = False):
         'modeling': {
             'val_size': [0.10],
             'n_reg_test': [100], 
-            'bal_type': [None, 'under'], # None (ni con f1_score..)
+            'bal_type': [None, 'under'],
             'k': [5] 
-            # scoring : ['accuracy', 'f1_macro'] 
         }
     }
 
     if fast:
-        l_modelos = [LogisticRegression()]  # Neural network se corta x memoria. SVC() nunca ganó.
+        # l_modelos = [LogisticRegression()] 
 
         d_params = {  
             'construct': {
-                'n_dias_ult_part': [[30, 180]], # [180], [90], [30], [60, 240] --> Perdió claramente en los nuevos entrenam.
+                'n_dias_ult_part': [[30, 180]],
                 'n_years_h2h': [3],
                 'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']],  # d_comps['comp_sin_cups'], d_comps['comp_sin_b'],
-                'n_years_to_select': [2, 3, 5, 10], #, None --> no tiene sentido porque el fifa arranca en 2007 (hace 17 años). Tampoco tiene sentido usar 15 años si elimino los datos de antes de 2012
-                'fill_na': [None, 'ml'], #   # None se eliminan todos los ultimos partidos y el X_test queda vacio, por ende, no entrena.
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], 
+                'n_years_to_select': [2, 3, 5, 10],
+                'fill_na': [None, "0", 'ml'], 
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
@@ -351,10 +349,9 @@ def define_params_space(id_country, fast: bool = False):
             },
             'modeling': {
                 'val_size': [0.1],
-                'n_reg_test': [100], # 100 partidos son aprox los ultimos 3 meses.
-                'bal_type': [None, 'under'], # (ni con f1_score..) # ,
+                'n_reg_test': [100],
+                'bal_type': [None, 'under'],
                 'k': [5] 
-                # scoring : ['accuracy', 'f1_macro'] 
             }
         }
  
@@ -369,7 +366,7 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 59
+    id_country = 148
     only_select_best_model = False
     continue_old_train, date_old_train = False, '2024-11-27'
 
