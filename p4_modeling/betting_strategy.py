@@ -242,7 +242,7 @@ class BettingStrategy:
         return df
 
     def determine_stake_to_bet(self, df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
-                            porc_emergency: float = 0.75,
+                            porc_emergency: float = 0.5,
                             odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
         """
         Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
@@ -345,7 +345,7 @@ class BettingStrategy:
             if self.verbose >= 0:
                 # Agregar el conteo al warning
                 logger.warning(
-                    f"Disminución de stakes por copiado de emergencia en partido. Se afectaron los stakes de {emergency_count} de {len(df)} registros."
+                    f"Disminución de stakes por copiado de emergencia de variables START y/o SUB en partido. Se afectaron los stakes de {emergency_count} de {len(df)} registros."
                 )
             
             # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
