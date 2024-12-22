@@ -647,97 +647,163 @@ class DataPreparation:
             Dataframe sin NaN values
         """ 
         start = time.time()
-        df_test = generate_test_design.select_test_set(X, country=self.country)
+        print("\nTreating NaN values to avoid input=NaN in Modeling...")
+
+        # Determino que registros usaré en df_test
+        df_test_inic = generate_test_design.select_test_set(X, country=self.country)
+
+        # Separo test y train/val
+        df_test = X[X.index.isin(df_test_inic.index)]
+        df_train_val = X[~X.index.isin(df_test_inic.index)]
+        logger.info(f"{X.shape} --> {df_train_val.shape} {df_test.shape}")
+
+        # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones)
+        n_reg_inic = len(df_train_val)
+        df_train_val = clean_data.delete_rows_nan(df_train_val, porc_min_no_nan)
 
         if self.verbose >= 1:
-            print("\nTreating NaN values to avoid input=NaN in Modeling...")
-            logger.info(f" (1) Datos de entrada a treat_nan: {generate_test_design.n_rows_to_test(X, df_test)}")
-
-        # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones) --> Elimina "ultimos partidos" en SPA probablemente por falta de estadistica "total_passes". No sirve si fill_na=None pero si cuando fill_na=ml.
-        n_reg_inic_3 = len(X)
-        X = clean_data.delete_rows_nan(X, porc_min_no_nan)
-
-        if self.verbose >= 1:
-            print(f"Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
-            logger.warning(f"Cantidad de filas: {n_reg_inic_3} --> {len(X)}")
-            logger.info(f" (2) Luego de eliminar FILAS con mucho NaN: {generate_test_design.n_rows_to_test(X, df_test)}")
+            print(f"(1) Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
+            logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
 
         # (2) Eliminacion de columnas con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(porc_min_no_nan*len(X)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
-        X_sin_col_mucho_nan = X.copy()
-        X = clean_data.drop_columns_until_drop_na_min_rows(X, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
+        n_reg_min = int(porc_min_no_nan*len(df_train_val)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
+        X_sin_col_mucho_nan = df_train_val.copy()
+        df_train_val = clean_data.drop_columns_until_drop_na_min_rows(df_train_val, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
 
-        if self.verbose >= 0 and len(X.columns) != len(X_sin_col_mucho_nan.columns):
-            l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(X.columns))
-            logger.warning(f"Se han tenido que eliminar {len(X_sin_col_mucho_nan.columns) - len(X.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
-        
-        if self.verbose >= 1:
-            print(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {X.shape} ")
-            logger.info(f" (3) Luego de eliminar COLUMNAS con mucho NaN: {generate_test_design.n_rows_to_test(X, df_test, verbose=self.verbose)}")
+        if self.verbose >= 0 and len(df_train_val.columns) != len(X_sin_col_mucho_nan.columns):
+            l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(df_train_val.columns))
+            logger.warning(f"(2) Eliminacion de columnas con mucho Nan. Se han tenido que eliminar {len(X_sin_col_mucho_nan.columns) - len(df_train_val.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
+            logger.info(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {df_train_val.shape} ")
 
         # (3) Eliminacion de todo NaN ya sea drop o fill_na
-        X = self.emergency_fill_for_test(X, df_test)
-
+        ## Reemplazo NaN en TRAIN y VALIDATION 
         if fill_na is not None:
             
             # Determino las columns con mucho NaN (mas de nan_threshold%)
-            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(X, percentil_nan=percentil_nan)
+            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(df_train_val, percentil_nan=percentil_nan)
 
             # Elimino registros con al menos un NaN 
-            largo_inic = len(X)
-            X = X.dropna(subset=l_columns_poco_nan)
+            largo_inic = len(df_train_val)
+            df_train_val = df_train_val.dropna(subset=l_columns_poco_nan)
             if self.verbose >= 1:
-                print(f"De las {largo_inic} filas, se han eliminado {largo_inic-len(X)} por tener al menos un Nan value. Quedan {len(X)} filas. Shape final: {X.shape}") 
-                logger.info(f" (4.a.1) Luego de dropna de columnas con 'poco' nan: {generate_test_design.n_rows_to_test(X, df_test)}")
+                print(f"De las {largo_inic} filas, se han eliminado {largo_inic-len(df_train_val)} por tener al menos un Nan value. Quedan {len(df_train_val)} filas. Shape final: {df_train_val.shape}") 
 
             # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
-            df_rellenado = pd.DataFrame(index=X.index)
-            df_rellenado['rellenado'] = X[l_columns_mucho_nan].isnull().any(axis=1)
-            df_rellenado.to_excel(f'{self.base_path}/df_rellenado.xlsx', index=True)
+            df_rellenado = pd.DataFrame(index=df_train_val.index)
+            df_rellenado['rellenado'] = df_train_val[l_columns_mucho_nan].isnull().any(axis=1)
+            df_rellenado.to_excel(f'{self.base_path}/treat_nan/df_rellenado.xlsx', index=True)
 
             # Relleno nan de las columnas con mucho NaN
-            X = clean_data.fill_nan_values(X, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
+            df_train_val_filled = clean_data.fill_nan_values(df_train_val, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
             if self.verbose >= 1:
                 print(f"Columnas consideradas con mucho nan (a las cuales rellenar): {l_columns_mucho_nan}")
-                print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {X.shape}")
-                logger.info(f" (4.a.2) Luego de fill_na: {generate_test_design.n_rows_to_test(X, df_test)}")
+                print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {df_train_val_filled.shape}")
 
         else:
             # Elimino registros con al menos un NaN 
-            X = X.dropna(subset=X.columns)  # Elimina filas de df_test.
+            df_train_val_filled = df_train_val.dropna(subset=df_train_val.columns)
 
-            if self.verbose >= 1:
-                logger.info(f" (4.b) Luego de dropna: {generate_test_design.n_rows_to_test(X, df_test)}")
+        # Tratamiento de nan values para test
+        ## Eliminar columnas que se eliminaron x nan
+        columns_to_drop = [col for col in l_col_eliminated if col in df_test.columns]
+        df_test_filt = df_test.drop(columns=columns_to_drop)
+        logger.info(f"{df_test.shape} --> {df_test_filt.shape}")
+        ## Reemplazo NaN en TEST por 0
+        df_test_filled, df_filled = self.emergency_fill_for_test(df_test_filt)
 
-        if self.verbose >= 0:
-            logger.info(f" (5) Luego de tratamiento de NaN values: {generate_test_design.n_rows_to_test(X, df_test)}")
+        # Concateno df_test y df_train_val ya rellenados
+        X = pd.concat([df_train_val_filled, df_test_filled], axis=0)
+
+        # Imprimo cantidad de registros que quedan en test
+        if self.verbose >= 0:        
+            n_rows = generate_test_design.n_rows_to_test(X, df_test_filled)
+
+            if n_rows != len(df_test_inic):
+                logger.warning(f" Se han eliminado registros de df_test por tener NaN values cuando no deberia borrarse ninguno.")
+
+        logger.info(f"(3) Tras eliminar todo NaN con drop o fill_na: {df_train_val_filled.shape} {df_test_filled.shape} --> {X.shape}")
 
         end = time.time()
         print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
 
         if export:
             X.to_excel(f'{self.base_path}/df_selected_nan.xlsx', index=True)
-        
+            df_filled.to_excel(f'{self.base_path}/treat_nan/df_filled_columns.xlsx', index=True)
+
         return X
     
-    def emergency_fill_for_test(self, X, df_test):
+    def emergency_fill_for_test(self, df, export: bool = True):
         """
-        Relleno de emergencia de df_test para evitar su eliminado y, por ende, 
-            (1) predecir todo partido tal como hago en prod 
-            (2) tener un df_test del mismo tamaño siempre para poder comparar ROIs
+        Remoción de valores NaN en df_test
+
+        # Parameters:
+            df: Dataframe al cual remover NaN values. (DataFrame)
+            columns_selected: Listado de columnas seleccioandas para usar en produccion. (list)
+        
+        # Returns:
+            df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
         """
-        # Calcula las columnas afectadas y el porcentaje inicial de NaN
-        affected_columns = X.columns[X.loc[df_test.index].isna().any()].tolist()
-        nan_percentages = X.loc[df_test.index, affected_columns].isna().mean() * 100
+        logger.info("Treating NaN values in df_test...")
+        df_filled_columns = pd.DataFrame(0, index=df.index, columns=['emergency_fill', 'player_emergency_fill']) # Inicializo el df
 
-        # Realizar el relleno
-        X.loc[df_test.index] = X.loc[df_test.index].fillna(0)  # En producción, relleno con 0 también.
+        # Rellenar NaN en algunas columnas espeecificas
+        columns_to_fill = [col for col in df.columns if df[col].isna().any()]  # En teoria, solo rellena las variables historicas que son nan.
+        if self.verbose >= 1:
+            logger.info(f'Nº columnas a rellenar: {len(columns_to_fill)}')
 
-        # Loggear el warning
-        logger.warning(
-            f"Porcentaje inicial de NaN por columna: {nan_percentages.to_dict()}"
-        )
-        return X
+        if columns_to_fill:
+            # Crear una copia del DataFrame y rellenar los NaN
+            df_copy = df.copy()
+            df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
+
+            # Identificar filas donde se rellenaron NaN
+            filled_rows = (df[columns_to_fill].isna() & (df_copy[columns_to_fill] == 0)).any(axis=1)
+
+            # Crear DataFrame con las columnas rellenadas y `emergency_fill`
+            df_filled_columns = df_copy.loc[filled_rows, columns_to_fill]
+            df_filled_columns['emergency_fill'] = 1
+
+            # Columna con valor 0 o 1 según si se rellenaron columnas con "player_start" o "player_sub"
+            player_columns = [col for col in columns_to_fill if "player_start" in col or "player_sub" in col]
+            df_filled_columns['player_emergency_fill'] = (
+                (df[player_columns].isna() & (df_copy[player_columns] == 0)).any(axis=1).astype(int)
+            )
+
+            # Calcular cuántas columnas se rellenaron de emergencia para cada fila
+            df_filled_columns['num_columns_filled'] = (
+                (df[columns_to_fill].isna() & (df_copy[columns_to_fill] == 0)).sum(axis=1)
+            )
+
+            # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
+            df_filled_columns['percent_columns_filled'] = (
+                df_filled_columns['num_columns_filled'] / len(columns_to_fill) * 100
+            )
+
+            # Crear una columna con el listado de columnas rellenadas por cada registro
+            df_filled_columns['l_col_filled'] = df[columns_to_fill].apply(
+                lambda row: [col for col in columns_to_fill if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
+            )
+            
+            if self.verbose >= 0:
+                # Calcular y mostrar el porcentaje de NaN por cada columna
+                for col in columns_to_fill:
+                    nan_percentage = df[col].isna().mean() * 100
+
+                    if self.verbose >= 1:
+                        logger.warning(f"Columna '{col}' tiene {nan_percentage:.1f}% de valores NaN.")
+
+            # Actualizar el DataFrame original
+            df = df_copy
+
+        # Elimino partidos con al menos un NaN value --> Tal vez lo deberia poner al ppio para imprimir warning de cuantos partidos eliminaria...
+        df_sin_dup = df.dropna()
+        if self.verbose >= 1 and (len(df) != len(df_sin_dup)):
+            logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
+
+        if export: 
+            df_sin_dup.to_excel(f'{self.base_path}/treat_nan/df_selected_nan.xlsx', index=True)
+
+        return df_sin_dup, df_filled_columns
         
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, export: bool = True):
         """
@@ -1030,8 +1096,13 @@ class Modeling:
         d_metrics.update(d_distrib)
 
 
+        # Levanto relleno de nan df df_test
+        df_filled = pd.read_excel(f'./data/{self.country}/p3_data_preparation/treat_nan/df_filled_columns.xlsx', index_col=0)
+        df_filled_filt = df_filled.loc[:, ['player_emergency_fill', 'emergency_fill', 'num_columns_filled', 'percent_columns_filled', 'l_col_filled']]  # las num_columns_filled no tiene en cuenta si la columna fue seleccionada o no.
+        # logger.info(df_filled)
+
         # Concateno dfs --> Concateno antes de calcular ROI porque alli uso cuotas y expected result de df_match_odds y de df_match respectivamente
-        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba], axis=1)
+        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_filled_filt], axis=1) # Concatenar "player_emergency_fill"... 
 
 
         # Calculo ROI
