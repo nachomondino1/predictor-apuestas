@@ -164,6 +164,11 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         df.loc[idx, f'{name_extension}G/P'] = ganancia
         df.loc[idx, f'{name_extension}bank_final'] = bank_final
 
+        # Determino ganancias / perdidas (sin bank)
+        ingresos_sin_bank = row['stake_to_bet'] * row['odd_to_bet'] if row[f'{name_extension}acerte'] == 1 else 0
+        ganancia_sin_bank = ingresos_sin_bank - row['stake_to_bet']
+        df.loc[idx, f'{name_extension}G/P_sin_bank'] = ganancia_sin_bank
+
         # Guardo ROI en partidos especificados
         if save_roi:
             if cont in l_rois_partido:
