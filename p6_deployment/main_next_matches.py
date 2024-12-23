@@ -530,15 +530,20 @@ class DataPreparationNew(DataPreparation):
             )
 
             # Calcular cuántas columnas se rellenaron de emergencia para cada fila
-            df_filled_columns['num_columns_filled'] = (
+            df_filled_columns['n_cols_filled'] = (
                 (df[columns_to_fill].isna() & (df_copy[columns_to_fill_sel] == 0)).sum(axis=1)
             )
 
             # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
-            df_filled_columns['percent_columns_filled'] = (
-                df_filled_columns['num_columns_filled'] / len(columns_selected) * 100
+            df_filled_columns['perc_cols_filled'] = (
+                df_filled_columns['n_cols_filled'] / len(columns_selected) * 100
             )
 
+            # Crear una columna con el listado de columnas rellenadas por cada registro
+            df_filled_columns['l_col_filled'] = df[columns_to_fill_sel].apply(
+                lambda row: [col for col in columns_to_fill_sel if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
+            )
+            
             if self.export:
                 df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
 
@@ -1200,7 +1205,6 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
             d_hiper_mod = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False}
         else:
             d_hiper_mod = lo.load_modeling_hyperparameters()
-        porc_m = porc_m / 2 if id_country in [55] else porc_m  # Automatizar
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1253,13 +1257,13 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    n_days = 15
+    n_days = 7
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
+    l_countries = [77]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
@@ -1268,7 +1272,7 @@ if __name__ == "__main__":
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 838, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-17"} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 3, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-23"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
 
         # Predict missing
@@ -1276,6 +1280,5 @@ if __name__ == "__main__":
         
         # Prod 
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
-
 
         df.to_excel(f"{directorio}/predicciones.xlsx")

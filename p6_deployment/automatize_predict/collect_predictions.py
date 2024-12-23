@@ -9,7 +9,7 @@ from p6_deployment import main_next_matches
 from utils.set_up_logging import logger
 
 
-def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historial_predicciones:pd.DataFrame):
+def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historial_predicciones:pd.DataFrame, porc_m: float):
     """
     Recoleccion de predicciones de todos los paises
     """
@@ -19,12 +19,13 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
     # Por country
     for id_country in l_countries:
 
+        porc_m_country = porc_m/2 if id_country == 55 else porc_m 
+
         # Extraigo, preparo y predigo proximos partidos
-        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days_max_next_matches=n_days, d_model=None, export=d_run['export'])
+        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days_max_next_matches=n_days, porc_m=porc_m_country, d_model=None, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
         if isinstance(df_predicciones_country, pd.DataFrame):
-        # if len(df_predicciones_country) > 0:
             df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
             df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
 
@@ -64,11 +65,12 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 7
+        n_days = 5
         l_countries = [48, 55, 59, 77, 148]
-        # l_countries = [77]
+        # l_countries = [59]
+        porc_m = 0.4
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
@@ -78,4 +80,4 @@ if __name__ == "__main__":
     # Levanto historial_predicciones.xlsx
     df_historial_predicciones = pd.read_excel(f'data/historial_predicciones.xlsx', index_col=0)
 
-    collect_predictions(d_run, l_countries, n_days, df_historial_predicciones)
+    collect_predictions(d_run, l_countries, n_days, df_historial_predicciones, porc_m=porc_m)
