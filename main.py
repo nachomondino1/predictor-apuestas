@@ -423,7 +423,7 @@ class DataPreparation:
             # Expected Result and Expected Points (xPts) (from Expected Goals)
             # goals_to_xg_ratio_ajustado = construct_data.adjust_ratio_to_match_distributions(df, initial_ratio=0.27, tolerance=0.08)
             # df = construct_data.determine_expected_result(df, goals_to_xg_ratio=goals_to_xg_ratio_ajustado)
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.3, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
+            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
             df = construct_data.determine_expected_points(df)
             df = df.drop(['expected_result'], axis=1) # si no lo borras, la tenes que construir como variable historica (para FRA y no se GER no la borré...)
 
@@ -763,26 +763,38 @@ class DataPreparation:
             df_filled_columns = df_copy.loc[filled_rows, columns_to_fill]
             df_filled_columns['emergency_fill'] = 1
 
+            # Crear una columna con el listado de columnas rellenadas por cada registro
+            df_filled_columns['l_col_filled'] = df[columns_to_fill].apply(
+                lambda row: [col for col in columns_to_fill if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
+            )
+
             # Columna con valor 0 o 1 según si se rellenaron columnas con "player_start" o "player_sub"
-            player_columns = [col for col in columns_to_fill if "player_start" in col or "player_sub" in col]
+            player_columns = [col for col in columns_to_fill if "player_start" in col or "player_sub" in col]  # Esta bien missing tmb?
+            columns_to_fill_sin_player = [col for col in columns_to_fill if col not in player_columns]
             df_filled_columns['player_emergency_fill'] = (
                 (df[player_columns].isna() & (df_copy[player_columns] == 0)).any(axis=1).astype(int)
             )
 
             # Calcular cuántas columnas se rellenaron de emergencia para cada fila
-            df_filled_columns['num_columns_filled'] = (
+            df_filled_columns['n_col_filled'] = (
                 (df[columns_to_fill].isna() & (df_copy[columns_to_fill] == 0)).sum(axis=1)
             )
 
+            # Calcular cuántas columnas se rellenaron de emergencia para cada fila
+            df_filled_columns['n_col_filled_sin_player'] = (
+                (df[columns_to_fill_sin_player].isna() & (df_copy[columns_to_fill_sin_player] == 0)).sum(axis=1)
+            )
+            
             # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
-            df_filled_columns['percent_columns_filled'] = (
-                df_filled_columns['num_columns_filled'] / len(columns_to_fill) * 100
+            df_filled_columns['perc_col_filled'] = (
+                df_filled_columns['n_col_filled'] / len(columns_to_fill) * 100
             )
 
-            # Crear una columna con el listado de columnas rellenadas por cada registro
-            df_filled_columns['l_col_filled'] = df[columns_to_fill].apply(
-                lambda row: [col for col in columns_to_fill if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
+            # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
+            df_filled_columns['perc_col_filled_sin_player'] = (
+                df_filled_columns['n_col_filled_sin_player'] / len(columns_to_fill) * 100
             )
+            
             
             if self.verbose >= 0:
                 # Calcular y mostrar el porcentaje de NaN por cada columna
@@ -801,7 +813,7 @@ class DataPreparation:
             logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
 
         if export: 
-            df_sin_dup.to_excel(f'{self.base_path}/treat_nan/df_selected_nan.xlsx', index=True)
+            df_sin_dup.to_excel(f'{self.base_path}/treat_nan/df_treat_nan.xlsx', index=True)
 
         return df_sin_dup, df_filled_columns
         
@@ -999,7 +1011,7 @@ class Modeling:
             Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluating trained model with test sets...")
-        
+
         # Predigo sobre X_test
         y_pred_prob, y_pred = self.predict(model, X_test)
 
@@ -1098,7 +1110,7 @@ class Modeling:
 
         # Levanto relleno de nan df df_test
         df_filled = pd.read_excel(f'./data/{self.country}/p3_data_preparation/treat_nan/df_filled_columns.xlsx', index_col=0)
-        df_filled_filt = df_filled.loc[:, ['player_emergency_fill', 'emergency_fill', 'num_columns_filled', 'percent_columns_filled', 'l_col_filled']]  # las num_columns_filled no tiene en cuenta si la columna fue seleccionada o no.
+        df_filled_filt = df_filled.loc[:, ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled']]  # las num_columns_filled no tiene en cuenta si la columna fue seleccionada o no.
         # logger.info(df_filled)
 
         # Concateno dfs --> Concateno antes de calcular ROI porque alli uso cuotas y expected result de df_match_odds y de df_match respectivamente
@@ -1106,7 +1118,7 @@ class Modeling:
 
 
         # Calculo ROI
-        df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.3) # Intento hacerlo antes con df_match pero rompia.
+        df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
         d_hiper, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)
 
