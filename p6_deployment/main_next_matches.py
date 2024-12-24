@@ -540,10 +540,13 @@ class DataPreparationNew(DataPreparation):
             )
 
             # Crear una columna con el listado de columnas rellenadas por cada registro
-            df_filled_columns['l_col_filled'] = df[columns_to_fill_sel].apply(
-                lambda row: [col for col in columns_to_fill_sel if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
-            )
-            
+            try:
+                df_filled_columns['l_col_filled'] = df[columns_to_fill_sel].apply(
+                    lambda row: [col for col in columns_to_fill_sel if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
+                )
+            except ValueError: # ValueError: Length of values (0) does not match length of index (12)
+                pass
+                
             if self.export:
                 df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
 
@@ -729,10 +732,9 @@ class TrainingDataLoader():
         # Si se levanta de main_find_best_hyper.py
         if self.n_model is not None:
             try:
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_models/df_p3.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
+                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_models/df_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
                 
                 if self.verbose >= 2:
-                    print("AAAA")
                     print(df_iteration)
 
                 df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
@@ -1259,11 +1261,11 @@ if __name__ == "__main__":
 
     n_days = 7
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [48]
 
     # Definir condiciones del análisis
     for id_country in l_countries:
@@ -1272,11 +1274,11 @@ if __name__ == "__main__":
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 3, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-23"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 642, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-23"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        ## Prox partidos
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
-
-        # Predict missing
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, predict_missing=True, no_strategy=True, export=d_run['export']) 
+        ## En partidos missing
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, no_strategy=True, export=d_run['export']) 
         
         # Prod 
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
