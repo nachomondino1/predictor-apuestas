@@ -129,7 +129,7 @@ def adjust_ratio_to_match_distributions(
     print(f"Ratio final tras {max_iterations} iteraciones: {ratio:.2f}, Diferencia: {diff:.2f}%")
     return ratio
 
-def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.3, col_name="expected_result", verbose: int = 0):
+def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.42, col_name="expected_result", verbose: int = 0):
     """
     Determina el 'expected_result' a partir de los expected goals de cada equipo.
     :param df: DataFrame con columnas 'expected_goals_(xg)_home' y 'expected_goals_(xg)_away'.

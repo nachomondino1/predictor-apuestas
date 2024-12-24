@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from p3_data_preparation.construct_data import determine_result, determine_expected_result
 # from p4_modeling.asses_model import determine_winning_bets, calculate_roi
 from p6_deployment import main_next_matches
-
+from p4_modeling import betting_strategy
+import datetime
 
 # El objetivo es evaluar las predicciones de los mejores modelos de un pais en los ultimos partidos jugados sin tener que hacerlo manualmente.
 def assess_model_in_prod(id_country, n_model, model_name, iteration_date):
@@ -48,6 +49,7 @@ def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de
     """
     ## Levanto df_match_miss para obtener goals? ??
     df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
+    logger.info(df_match_miss)
     
     # Loggear información básica del DataFrame
     logger.info(f"Shape of df_match_miss: {df_match_miss.shape}")
@@ -77,9 +79,49 @@ def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de
     # df_match_odds = asses_model.determine_result_by_bookmaker(df_match_odds, self.var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
     return df
 
+
+def nose():
+    # Calcular metricas de df_predicciones ya sea de missing (?) o de prox partidos para cierto modelo...
+
+    id_country = 77
+    model = 314
+    iteration_date = '2024-12-23'
+    pred_missing = True
+
+    # Defino variables
+    d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
+    country = d_countries[id_country]
+
+    # Obtener predicciones missing
+    if pred_missing:
+        df_pred = collect_prediction_in_missing_matches(id_country=id_country, n_model=model, model_name='LogisticRegression', iteration_date=iteration_date)
+    else:
+        # Levanto predicciones
+        df_pred = pd.read_excel(f'data/{country}/p6_deployment/ASSESS/semana 19/predicciones_{model}.xlsx', index_col=0)
+        print(df_pred)
+
+    # Eliminar partidos aun no jugados
+    print(len(df_pred))
+    fecha_hoy = datetime.datetime.now()
+    df_pred = df_pred[df_pred['date'] <= fecha_hoy]
+    print(len(df_pred))
+
+    # Obtengo result y expected result
+    df_pred = prepare_for_betting_strategy(df_pred, country=country)
+    print(df_pred)
+
+    # Calculo metricas
+    bs = betting_strategy.BettingStrategy(strategy='train')
+    d_hiper, best_df_pred, best_d_rois  = bs.calculate_roi_by_betting_strategy(df_pred, roi_weight=1)
+
+    print(best_df_pred)
+    print(f'Ganancias sin bank: {best_df_pred['G/P_sin_bank'].sum()}')
+    print(f'Expected Ganancias sin bank: {best_df_pred['expected_G/P_sin_bank'].sum()}')
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
+    '''
     # Defino parametros
     id_country = 148
     country = 'spain'
@@ -94,3 +136,5 @@ if __name__ == "__main__":
     load_dotenv() 
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
     df_predicciones.to_excel(f'{BASE_DIR_LOCAL}/df_pred_missing_{n_model}.xlsx')
+    '''
+    nose()

@@ -117,7 +117,7 @@ def select_test_set(df, n_reg_test: int = 100, retrain: bool = True, country : s
         logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
     
     # Requisito 2: Last matches 
-    df_match_comp = df_match[df_match.index.isin(df1.index)]  # Dejo solo las ligas / comp publicas
+    df_match_comp = df_match[df_match.index.isin(index_comp)]  # Dejo solo las ligas / comp publicas
     df2 = df_match_comp.head(n_reg_test)
     index_last_matches = df2.index
 
@@ -156,9 +156,7 @@ def select_test_set(df, n_reg_test: int = 100, retrain: bool = True, country : s
         logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
         logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
     '''
-
-    # Construyo el dataset de testeo a partir de registros que no han sido rellenados
-    # df_test = df_filt.sample(random_state=42) --> no hace falta y ademas es peor.
+    # No hay forma de poder ordenar df_test descendetemente por fecha. Al menos el ROI no cambia con el orden de los registros y todos los modelos tienen el mismo orden. 
     return df_test
 
 def n_rows_to_test(df, df_test, verbose: int = 1):

@@ -464,30 +464,41 @@ def space_params(model_name, bayes, verbose: int = 0):
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
     # Logistic
-    min_it, max_it = 100, 2000
+    min_it, max_it = 100, 10000
 
     d_params = {
+
+        # ARBOLES DE DECISION
         'DecisionTreeClassifier': {
-            'criterion': ['entropy'],
-            'splitter': ['random', 'best'],
-            'max_depth': [None, 5, 7, 8, 10, 12, 14],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 4],
-            'max_features': ['auto'],
+            'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
+            'splitter': Categorical(['random', 'best']) if bayes else ['random', 'best'], 
+            'max_depth': Integer(3, 30) if bayes else [3, 5, 7, 10],
+            'min_samples_split': Integer(10, 50) if bayes else [2, 10], # Mayor o igual a 2
+            'min_samples_leaf': Integer(10, 50) if bayes else [1, 4], # Si usas 1 las probas van a ser 1-0-0, 0-1-0, 0-0-1, si usas 4 0.5-0.5-0 y asi.
+            'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(100, 500) if bayes else [100, 500],
+            'n_estimators': Integer(10, 100) if bayes else [10, 50, 100],
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'max_depth': Integer(3, 20) if bayes else [3, 5, 7, 10],
             # 'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
-            # 'min_samples_leaf': Integer(5, 50) if bayes else [1, 4],
+            'min_samples_leaf': Integer(10, 50) if bayes else [1, 10],
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
             'bootstrap': Categorical([True]) if bayes else [True] # False
+        },
+        'RandomForestRegressor': {
+            'n_estimators': Integer(10, 50) if bayes else [10, 50, 100],        
+            'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
+            'max_depth': Integer(3, 20) if bayes else [5, 10],  # 30 # 3
+            # 'min_samples_split': Integer(10, 50) if bayes else [10, 50], # Mayor o igual a 2 
+            'min_samples_leaf': Integer(10, 50) if bayes else [1, 5],
+            'bootstrap': Categorical([True]) if bayes else [True] # False
+            # 'verbose': Categorical([0]) if bayes else [0]
         },
         'XGBClassifier': {
             'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
             'n_estimators': Integer(5, 120) if bayes else [100],  # Suele ganar con 100
-            'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],                 # 'learning_rate': Real(0.0001, 0.1) if bayes else [0.001, 0.01, 0.1],
+            'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],
             'max_depth': Integer(3, 20) if bayes else [5, 10], # 3, 
             # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
             'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
@@ -513,11 +524,13 @@ def space_params(model_name, bayes, verbose: int = 0):
             # 'max_features': ['auto'],
             # 'loss': ['deviance']
         },
+        
+        # Modelos lineales
         'LogisticRegression': [
-            {'penalty': Categorical([None]) if bayes else [None], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}, # 'sag' --> ConvergenceWarning (talvez por la escala)
-            {'penalty': Categorical(['l2']) if bayes else ['l2'], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}, # , 'sag' --> ConvergenceWarning (talvez por la escala)
-            {'penalty': Categorical(['l1']) if bayes else ['l1'], 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [1000]},
-            {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [1000]}
+            {'penalty': Categorical([None]) if bayes else [None], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}, # 'sag' --> ConvergenceWarning (talvez por la escala)
+            {'penalty': Categorical(['l2']) if bayes else ['l2'], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}, # , 'sag' --> ConvergenceWarning (talvez por la escala)
+            {'penalty': Categorical(['l1']) if bayes else ['l1'], 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]},
+            {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}
         ],
         'SVC': {
             'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1],
@@ -529,6 +542,8 @@ def space_params(model_name, bayes, verbose: int = 0):
             # 'class_weight': Categorical(['balanced', None]) if bayes else ['balanced', None],
             'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
         },
+
+        # REDES NEURONALES
         'MLPClassifier': {
             # 'hidden_layer_sizes': Categorical([(50,), (100,)]) if bayes else [(50,), (100,)], # Tiene problema.
             'hidden_layer_sizes': Categorical([50, 100]) if bayes else [50, 100], # 50 va bien
@@ -539,6 +554,8 @@ def space_params(model_name, bayes, verbose: int = 0):
             'max_iter': Integer(500, 1000) if bayes else [500, 1000],
             'early_stopping': Categorical([True, False]) if bayes else [True, False]
         },
+
+        # OTROS 2
         'PCA': {
             'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
             'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
@@ -555,14 +572,6 @@ def space_params(model_name, bayes, verbose: int = 0):
             'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
             'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
         },
-        'RandomForestRegressor': {
-            'bootstrap': Categorical([True]) if bayes else [True], # False
-            'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
-            'max_depth': Integer(3, 30) if bayes else [5, 10],  # 30 # 3
-            'n_estimators': Integer(100, 300) if bayes else [100, 300],
-            # 'min_samples_split': Integer(5, 50) if bayes else [10, 50] # Mayor o igual a 2 
-            # 'verbose': Categorical([0]) if bayes else [0]
-        }
     }
 
     # Busco hiperpamateros default a probar
@@ -573,7 +582,7 @@ def space_params(model_name, bayes, verbose: int = 0):
 
     return params
 
-def determine_n_iter(num_samples, num_hyperparameters, min_iter: int = 20, max_iter: int = 50, verbose: int = 0):
+def determine_n_iter(num_samples, num_hyperparameters, mult_iter: float = 0.01, mult_hip: float = 200, min_iter: int = 20, max_iter: int = 60, verbose: int = 0):
     """
     Determina el número de iteraciones para BayesSearchCV basado en el tamaño del conjunto de datos
     y el número de hiperparámetros a optimizar.
@@ -585,8 +594,6 @@ def determine_n_iter(num_samples, num_hyperparameters, min_iter: int = 20, max_i
     # Return
         n_iter: Número sugerido de iteraciones (n_iter).
     """
-    mult_iter, mult_hip = 0.01, 200
-
     # Determinar n_iter basado en el tamaño del conjunto de datos
     n_iter_reg = int(mult_iter * num_samples)
 

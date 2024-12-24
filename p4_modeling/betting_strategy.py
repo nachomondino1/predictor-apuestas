@@ -242,7 +242,7 @@ class BettingStrategy:
         return df
 
     def determine_stake_to_bet(self, df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
-                            porc_emergency: float = 0.75,
+                            porc_emergency: float = 0.5,
                             odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
         """
         Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
@@ -272,6 +272,12 @@ class BettingStrategy:
 
             if self.verbose >= 1:
                 logger.info(f"dif_prob_result_to_bet capped: [{dif_prob_inf_cap}, {dif_prob_sup_cap}]")
+        
+        filled = False
+        if 'player_emergency_fill' in df.columns:
+            filled = True
+            rows_player_filled = df[df['player_emergency_fill'] == 1].index
+            rows_not_filled = df[df['player_emergency_fill'] != 1].index
 
         # Separo puntos en x e y
         if p1 is not None and p2 is not None:
@@ -296,7 +302,16 @@ class BettingStrategy:
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
             if dif_prob_inf_cap != dif_prob_sup_cap:
-                df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+
+                if filled:
+                    # Stake para filas NO rellenadas
+                    df.loc[rows_not_filled, 'stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+
+                    # Stake para filas rellenadas
+                    df.loc[rows_player_filled, 'stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, 0)) * m + b  # uso lim_sup=0 (no puedo agrandar stake con cuotas) y sin odd_weight para no influenciar en el valor que pueda tomar.
+                    
+                else:
+                    df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
 
             else:
                 df['stake_to_bet'] = df['prob_result_to_bet'] * m + b
@@ -339,18 +354,14 @@ class BettingStrategy:
         # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
         if 'player_emergency_fill' in df.columns:
 
-            # Contar los registros donde 'emergency_fill' es igual a 1
-            emergency_count = df['player_emergency_fill'].sum()  # Asumiendo que los valores son 0 o 1
+            # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
+            df.loc[rows_player_filled, 'stake_to_bet'] *= porc_emergency
             
+            # Contar los registros donde 'player_emergency_fill' es igual a 1
             if self.verbose >= 0:
                 # Agregar el conteo al warning
-                logger.warning(
-                    f"Disminución de stakes por copiado de emergencia en partido. Se afectaron los stakes de {emergency_count} de {len(df)} registros."
-                )
+                logger.warning(f"Disminución de stakes por copiado de emergencia de variables START y/o SUB en partido. Se afectaron los stakes de {len(rows_player_filled)} de {len(df)} registros.")
             
-            # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
-            df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= porc_emergency
-
         # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
         val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
         func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
