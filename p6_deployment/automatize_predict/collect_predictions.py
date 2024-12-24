@@ -26,15 +26,20 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
         if isinstance(df_predicciones_country, pd.DataFrame):
-            df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
-            df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
 
-            # Concatenar df_countries....
-            df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+            if len(df_predicciones_country) > 0:
+                df_predicciones_country = df_predicciones_country.dropna(subset=['id_country'])
+                df_predicciones_country = df_predicciones_country.dropna(axis=1, how='all')
 
-            # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
-            df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-            df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+                # Concatenar df_countries....
+                df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
+
+                # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
+                df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
+                df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+
+            else:
+                logger.warning(f"No se generaron predicciones para el país {id_country}.")
 
         else:
             # Manejo del caso cuando no se extraen datos
@@ -65,10 +70,10 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 5
+        n_days = 15
         l_countries = [48, 55, 59, 77, 148]
-        # l_countries = [59]
-        porc_m = 0.4
+        # l_countries = [77]
+        porc_m = 0.3
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
         d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
