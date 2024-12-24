@@ -301,7 +301,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), DecisionTreeClassifier(), RandomForestClassifier()]
+    l_modelos = [LogisticRegression(), DecisionTreeClassifier()] #  RandomForestClassifier()
 
     # 1728 iteraciones
     d_params = {
@@ -314,7 +314,7 @@ def define_params_space(id_country, fast: bool = False):
         'clean_data_2': {
             'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']],
             'n_years_to_select': [2, 3, 5, 10], 
-            'fill_na': [None, "0", 'ml'],  
+            'fill_na': [None, "0", 'ml'],
         },
         'select': {
             'thr_corr': [0.7, 0.85, None],
@@ -329,7 +329,7 @@ def define_params_space(id_country, fast: bool = False):
     }
 
     if fast:
-        # l_modelos = [LogisticRegression()] 
+        l_modelos = [LogisticRegression()] 
 
         d_params = {  
             'construct': {
@@ -339,7 +339,7 @@ def define_params_space(id_country, fast: bool = False):
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['all_comp']], 
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
                 'n_years_to_select': [2, 3, 5, 10],
                 'fill_na': [None, "0", 'ml'], 
             },
@@ -350,7 +350,7 @@ def define_params_space(id_country, fast: bool = False):
             'modeling': {
                 'val_size': [0.1],
                 'n_reg_test': [100],
-                'bal_type': [None, 'under'],
+                'bal_type': ['under'], # None, 
                 'k': [5] 
             }
         }
@@ -366,7 +366,7 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 148
+    id_country = 48
     only_select_best_model = False
     continue_old_train, date_old_train = False, '2024-11-27'
 

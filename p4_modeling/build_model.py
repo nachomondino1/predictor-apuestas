@@ -478,11 +478,11 @@ def space_params(model_name, bayes, verbose: int = 0):
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(10, 100) if bayes else [100, 500],
+            'n_estimators': Integer(10, 100) if bayes else [10, 50, 100],
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'max_depth': Integer(3, 20) if bayes else [3, 5, 7, 10],
             # 'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
-            'min_samples_leaf': Integer(10, 50) if bayes else [1, 4],
+            'min_samples_leaf': Integer(10, 50) if bayes else [1, 10],
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
             'bootstrap': Categorical([True]) if bayes else [True] # False
         },
