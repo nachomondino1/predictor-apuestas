@@ -3,7 +3,10 @@ sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
-from p4_modeling import asses_model
+from p4_modeling import asses_model, select_model_for_prod
+from p6_deployment.assess_models_in_prod import assess_model_in_prod
+from utils import directories
+
 
 def calculate_metric(df, roi_weight: float = 0.75, normalize: bool = True):
     """
@@ -41,9 +44,19 @@ def normalize_column(df, col, verbose : int = 0):
 
 class BettingStrategy:
 
-    def __init__(self, strategy: str = "general", verbose: int = 0):
+    def __init__(self, country: str, iteration_date: str, strategy: str = "general", verbose: int = 0):
+        self.country = country
+        self.iteration_date = iteration_date
         self.strategy = strategy
         self.verbose = verbose
+        self.initialize_directories()
+
+    def initialize_directories(self):
+        
+        self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
+        self.BASE_PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_models'
+
+        directories.make_directories(l_directorios=[self.BASE_PATH_sbm])
         
     def define_hiperparameters(self):
         """
@@ -508,21 +521,81 @@ class BettingStrategy:
         id_max = max_row[id_column]
         return id_max
 
+
+    def define_betting_strategy(self, row, roi_weight=0.25, with_assess: bool = False): # LA podria sacar de la clase.
+        """
+        Determina la estrategia de apuesta optima para cada modelo.
+        """
+        # Lista para almacenar los resultados
+        logger.info("Paso 5: Definiendo la estrategia de apuesta optima para el modelo seleccionado...")
+        results = []
+
+        print(row)
+        logger.warning(row)
+        n_model, model_name = row.index[0], row['model_name'].values[0]
+        if self.verbose >= 1:
+            logger.info(f'n_model: {n_model} model_name: {model_name}')
+
+        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
+        df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+        logger.info(df_pred.shape)
+        
+        # (opcional) Hacer assess --> Lo haria solo para los pocos modelos que pasan el filtro inicial.
+        if with_assess: # Hay que ver si funciona...
+
+            # Recolecto predicciones en ultimos partidos
+            df_pred_assess = assess_model_in_prod(self.id_country, n_model, model_name, iteration_date)
+            logger.info(df_pred_assess.shape)
+
+            # Concateno df
+            len_inic = len(df_pred)
+            df_pred = pd.concat([df_pred, df_pred_assess], axis=0)
+            logger.info(f"Se concatenó las predicciones de los partidos missing: {len_inic} --> {len(df_pred)}")
+
+            if self.verbose >= 2:
+                # Exporto predicciones concatenado
+                df_pred.to_excel(f"{self.path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
+        
+        # Determino la mejor estrategia de apuesta
+        if self.verbose >= 1:
+            logger.info("Calculando la mejor estrategia de apuesta...")
+        d_hiper, best_df_pred, best_d_rois = self.calculate_roi_by_betting_strategy(df_pred, roi_weight=roi_weight)
+
+        # Concateno datos y guardo
+        d_ct = {**d_hiper, **best_d_rois}  # Combinar los dos diccionarios
+        d_ct['model_name'] = model_name
+        d_ct['n_model'] = n_model
+
+        # Añadir el resultado al DataFrame final
+        results.append(d_ct)
+
+        # Convertir la lista de resultados en un DataFrame
+        df_final = pd.DataFrame(results)
+        df_final.set_index('n_model', inplace=True)
+        
+        # Exportar el DataFrame final a un archivo Excel
+        best_df_pred.to_excel(f'{self.BASE_PATH_sbm}/predicciones_{n_model}_{model_name}.xlsx')
+        df_final.to_excel(f'{self.BASE_PATH_sbm}/df_strategy.xlsx', index=True)
+        return df_final
+
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
     # Defino parametros
     id_country = 148
-    iteration_date = '2024-12-10'
-    n_model = 2507
-    model_name = 'LogisticRegression'
+    iteration_date = '2024-12-25'
+
+    # n_model = 2507
+    # model_name = 'LogisticRegression'
 
     # Defino variables
-    bs = BettingStrategy()
     d_countries = {6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
-    BASE_PATH = f'data/{country}/p4_modeling/{iteration_date}'
+    bs = BettingStrategy(country, iteration_date)
 
+
+    '''
     # Obtengo listado de todos los modelos entrenados
     # df_iteration = pd.read_excel(f'/df_iteration.xlsx')
 
@@ -532,3 +605,27 @@ if __name__ == "__main__":
     # Construyo variable expected result
     d_hiper, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones, strategy='general')
     print(d_roi)
+    '''
+
+    select_best_model = True
+
+    if select_best_model:
+        perc_cutoff = 0.05
+        roi_weight = 0.75
+        with_assess = False
+
+        # Creo objeto de clase select_best_model
+        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight)
+
+        # Obtengo listado de todos los modelos entrenados
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
+
+        # Selecciono el mejor modelo
+        row = sbm.main(df_ite, perc_cutoff=perc_cutoff, with_assess=with_assess)
+
+    else:
+        row = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx')
+        logger.info(row)
+
+    # PASO 5: Determinar estrategia de apuesta optima para el modelo seleccionado
+    bs.define_betting_strategy(row=row, roi_weight=0.5, with_assess=False)

@@ -1,13 +1,14 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from utils.set_up_logging import logger
 from utils import directories
-from p4_modeling.betting_strategy import BettingStrategy, calculate_metric
-from p6_deployment.assess_models_in_prod import assess_model_in_prod
+from p4_modeling.betting_strategy import calculate_metric
 from tqdm import tqdm
 import datetime
+
 
 class SelectBestModel():
 
@@ -23,14 +24,14 @@ class SelectBestModel():
         Inicializo paths donde guardar los datos generados durante la seleccion del mejor modelo
         """
         d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-        country = d_countries[id_country]
+        country = d_countries[self.id_country]
 
         self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
         self.PATH_sbm = f'{self.BASE_PATH}/best_models' 
         self.path_old_sbm = f'{self.BASE_PATH}/best_models_old/{datetime.datetime.now().date()}' 
 
-        directories.make_directories(l_directorios=[self.PATH_sbm, self.path_old_sbm])
         directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
+        directories.make_directories(l_directorios=[self.PATH_sbm])
 
     # Paso 1
     def filter_models_by_roi(self, df, perc_cutoff):
@@ -65,6 +66,7 @@ class SelectBestModel():
         if self.verbose >= 1:
             logger.info(df_filt.head())
             logger.warning(f"Descarte por ROI: {len(df)} --> {len(df_filt)}")
+            self.count_models(df_filt)
 
         df_filt.to_excel(f'{self.PATH_sbm}/df_p1.xlsx', index=False)
         return df_filt
@@ -94,12 +96,13 @@ class SelectBestModel():
 
         # Filtrar DataFrame eliminando los índices a remover
         df_filtered = df.drop(index=l_idx_to_remove)
+
+        if self.verbose >= 0:
+            logger.warning(f'Descarte por distribucion: {len(df)} --> {len(df_filtered)}' )
+            logger.info(f"Se eliminaron {len(l_idx_to_remove)} modelos por distribucion muy distinta a la de results.")
+            self.count_models(df_filtered)
+
         df_filtered.to_excel(f'{self.PATH_sbm}/df_p2.xlsx', index=False)
-
-        logger.warning(f"Se eliminaron {len(l_idx_to_remove)} modelos por distribucion muy distinta a la de results.")
-
-        if self.verbose >= 1:
-            print(f'{df.shape} --> {df_filtered.shape}' )
 
         return df_filtered
 
@@ -143,19 +146,20 @@ class SelectBestModel():
         
         progress_bar.close()
 
-        
         # Eliminar modelos con G/P provenientes de relleno nan...
-        import numpy as np
         median_gp_filled = np.percentile(df['%_gp_filled'], 75)
         mean_n_cols_filled =  np.percentile(df['average_col_filled'], 75) 
 
         df_filt = df[(df['%_gp_filled'] <= median_gp_filled) & (df['average_col_filled'] <= mean_n_cols_filled)]
-        logger.warning(f"Eliminar modelos con G/P filled >= {median_gp_filled} o n_cols_filled >= {mean_n_cols_filled}. {len(df)} --> {len(df_filt)}")
-        
-        # df_filt = df.copy()
+
+        if self.verbose >= 0:
+            logger.warning(f'Descarte por relleno de nan en test: {len(df)} --> {len(df_filt)}')
+            logger.info(f"Eliminar modelos con G/P filled >= {median_gp_filled} o n_cols_filled >= {mean_n_cols_filled}. {len(df)} --> {len(df_filt)}")
+            self.count_models(df_filt)
 
         # Exportar el DataFrame final a un archivo Excel
         df_filt.to_excel(f'{self.PATH_sbm}/df_p3.xlsx', index=True)
+
         return df_filt
 
     # Paso 4
@@ -178,67 +182,14 @@ class SelectBestModel():
 
         df.to_excel(f'{self.PATH_sbm}/df_p4.xlsx', index=True)
         return row
-
-    # Paso 5
-    def define_betting_strategy(self, row, strategy: str = 'general', with_assess: bool = False):
-        """
-        Determina la estrategia de apuesta optima para cada modelo.
-        """
-        # Lista para almacenar los resultados
-        logger.info("Paso 5: Definiendo la estrategia de apuesta optima para el modelo seleccionado...")
-        bs = BettingStrategy(strategy=strategy, verbose=-1)
-        results = []
-
-        print(row)
-        logger.warning(row)
-        n_model, model_name = row.index[0], row['model_name'].values[0]
-        if self.verbose >= 1:
-            logger.info(f'n_model: {n_model} model_name: {model_name}')
-
-        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
-        df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-        logger.info(df_pred.shape)
-        
-        # (opcional) Hacer assess --> Lo haria solo para los pocos modelos que pasan el filtro inicial.
-        if with_assess: # Hay que ver si funciona...
-
-            # Recolecto predicciones en ultimos partidos
-            df_pred_assess = assess_model_in_prod(self.id_country, n_model, model_name, iteration_date)
-            logger.info(df_pred_assess.shape)
-
-            # Concateno df
-            len_inic = len(df_pred)
-            df_pred = pd.concat([df_pred, df_pred_assess], axis=0)
-            logger.info(f"Se concatenó las predicciones de los partidos missing: {len_inic} --> {len(df_pred)}")
-
-            if self.verbose >= 2:
-                # Exporto predicciones concatenado
-                df_pred.to_excel(f"{self.path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
-        
-        # Determino la mejor estrategia de apuesta
-        if self.verbose >= 1:
-            logger.info("Calculando la mejor estrategia de apuesta...")
-        d_hiper, best_df_pred, best_d_rois = bs.calculate_roi_by_betting_strategy(df_pred, roi_weight=self.roi_weight)  # no esta calculando el ROI con los nuevos partidos assess... no calcula ok las winning bets ni nada.
-
-        # Concateno datos y guardo
-        d_ct = {**d_hiper, **best_d_rois}  # Combinar los dos diccionarios
-        d_ct['model_name'] = model_name
-        d_ct['n_model'] = n_model
-
-        # Añadir el resultado al DataFrame final
-        results.append(d_ct)
-
-        # Convertir la lista de resultados en un DataFrame
-        df_final = pd.DataFrame(results)
-        df_final.set_index('n_model', inplace=True)
-        
-        # Exportar el DataFrame final a un archivo Excel
-        best_df_pred.to_excel(f'{self.PATH_sbm}/predicciones_{n_model}_{model_name}.xlsx')
-        df_final.to_excel(f'{self.PATH_sbm}/df_strategy.xlsx', index=True)
-        return df_final
+    
+    def count_models(self, df):
+        if len(df) == 0:
+            logger.error("Tras el descarte, se han eliminado todos los modelos. Revisar descartes.")
+            raise ValueError
 
     # Main
-    def main(self, df, perc_cutoff:float = 0.2, strategy: str = 'general', with_assess: bool = False):
+    def main(self, df, perc_cutoff:float = 0.2, with_assess: bool = False):
         """
         Determino el modelo a usar en produccion
         """
@@ -252,25 +203,26 @@ class SelectBestModel():
         df_filt_3 = self.filter_models_by_fill_nan(df_filt_2)
         
         # PASO 4: Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
-        row_model = self.select_model(df_filt_3)
-
-        # PASO 5: Determinar estrategia de apuesta optima para el modelo seleccionado
-        self.define_betting_strategy(row=row_model, strategy=strategy, with_assess=with_assess)
+        row = self.select_model(df_filt_3)
+        return row
         
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 77
-    iteration_date = '2024-12-23'
+    id_country = 59
 
     # Defino variables
-    d_countries = {6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-    country = d_countries[id_country]
+    d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
+    country = d_countries[id_country][0]
+    iteration_date = d_countries[id_country][1]
+    import os
+    if not os.path.exists(f'data/{country}/p4_modeling/{iteration_date}'):
+        logger.error(f"No existe un entrenamiento para la fecha {iteration_date} para el pais {country}...")
+        raise ValueError
 
     # Parametros de ejecucion
     roi_weight = 0.75  # Pues expected presumo que mete ruido x no tener bien definido el threshold. # if id_country == 55 else 0.8 # Uso roi_weight de 1 en GER porque no hay correl entre roi y expected roi.
-    strategy = 'general' # 'general_0' if id_country == 77 else 'general'
     with_assess = False
 
     # Creo objeto de clase select_best_model
@@ -280,7 +232,7 @@ if __name__ == "__main__":
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
     # Selecciono el mejor modelo
-    sbm.main(df_ite, perc_cutoff=0.05, strategy=strategy, with_assess=with_assess)
+    row = sbm.main(df_ite, perc_cutoff=0.05, with_assess=with_assess)
 
 
 
