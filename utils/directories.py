@@ -21,6 +21,9 @@ def mover_archivo(origen, destino):
     """
     Mueve archivo o directorio de origen a destino.
     """
+    # Creo los directorios en caso que no existan
+    make_directories(l_directorios=[origen, destino])
+    
     try:
         # Mover el archivo desde el origen al destino
         shutil.move(origen, destino)
