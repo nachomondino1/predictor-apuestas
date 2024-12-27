@@ -34,9 +34,9 @@ on:
     - cron: "45 21 * * 1" # 18:45 hs ARG
 
   # Para forzar a que se ejecute la action
-  push: 
-    branches:
-      - staging
+  # push: 
+  #   branches:
+  #     - staging
 
 jobs:
   collect_results:
@@ -59,7 +59,6 @@ jobs:
         with:
           sparse-checkout: |
             utils
-            # set_up_logging.py
             data/df_countries.xlsx
             data/df_competencies.xlsx
             data/historial_predicciones.xlsx
@@ -69,8 +68,6 @@ jobs:
             p3_data_preparation/clean_data.py
             p4_modeling
             p6_deployment
-            # p6_deployment/automatize_predict
-            # p6_deployment/requirements_mnm.txt
           sparse-checkout-cone-mode: false
           ref: prod # Branch # Prueba con staging
 
