@@ -4,17 +4,16 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
-from p4_modeling.asses_model import calculate_metric
+from p4_modeling.asses_model import calculate_metric, asignar_roi_weight
 from tqdm import tqdm
 import datetime
 
 
 class SelectBestModel():
 
-    def __init__(self, id_country, iteration_date: str, roi_weight: float = 0.75, verbose: int = 1):
+    def __init__(self, id_country, iteration_date: str, verbose: int = 1):
         self.id_country = id_country
         self.iteration_date = iteration_date
-        self.roi_weight = roi_weight
         self.inicialize_directories()
         self.verbose = verbose
 
@@ -52,7 +51,8 @@ class SelectBestModel():
         self.metric_col = f'metric{name_extension}'
 
         # Calculo metrica combinada
-        df = calculate_metric(df, self.roi_weight, name_extension=name_extension)
+        self.roi_weight = asignar_roi_weight(df)  # Segun correlacion entre ROI y Expected ROI
+        df = calculate_metric(df, roi_weight=self.roi_weight, name_extension=name_extension)
 
         # Eliminar registros con 'metric' < 0
         df = df[df[self.metric_col] >= 0]
@@ -73,7 +73,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 2
-    def filter_models_by_distribution(self, df, diff_max=0.3, diff_min=0.05):
+    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.45):
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
@@ -85,12 +85,15 @@ class SelectBestModel():
 
         # Por modelo
         for idx, row in df.iterrows():
-            # l_difs = [abs(row['dif_loc']), abs(row['dif_emp']), abs(row['dif_vis'])]  # No considero la diff de empate.
             l_difs = [abs(row['dif_loc']), abs(row['dif_vis'])]  # No considero la diff de empate.
+            l_difs_2 =  [abs(row['dif_emp'])]
 
             # # Si alguna diferencia es menor o igual a diff_min, no eliminar el modelo
             # if any(diff <= diff_min for diff in l_difs):
             #     continue  # Salta este modelo y no lo elimina
+
+            if any(diff >= diff_max_draw for diff in l_difs_2):
+                l_idx_to_remove.append(idx)
 
             # Si alguna diferencia es mayor o igual a diff_max, eliminar el modelo
             if any(diff >= diff_max for diff in l_difs):
@@ -205,27 +208,23 @@ class SelectBestModel():
         row = self.select_model(df_filt_3)
         return row
         
+        
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 59
+    id_country = 48
 
     # Defino variables
     d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    import os
-    if not os.path.exists(f'data/{country}/p4_modeling/{iteration_date}'):
-        logger.error(f"No existe un entrenamiento para la fecha {iteration_date} para el pais {country}...")
-        raise ValueError
 
     # Parametros de ejecucion
-    roi_weight = 0.75  # Pues expected presumo que mete ruido x no tener bien definido el threshold. # if id_country == 55 else 0.8 # Uso roi_weight de 1 en GER porque no hay correl entre roi y expected roi.
     with_assess = False
 
     # Creo objeto de clase select_best_model
-    sbm = SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight)
+    sbm = SelectBestModel(id_country=id_country, iteration_date=iteration_date)
 
     # Obtengo listado de todos los modelos entrenados
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')

@@ -350,7 +350,7 @@ class BettingStrategy:
 
         return df
 
-    def calculate_roi_by_betting_strategy(self, df: pd.DataFrame, roi_weight: float = 0.75):
+    def calculate_roi_by_betting_strategy(self, df: pd.DataFrame, roi_weight: float = 0.5):
         """
         Determine the ROI for different betting strategies.
 
@@ -451,7 +451,7 @@ class BettingStrategy:
 
         return d_hiper, best_df_pred, best_d_rois
 
-    def select_best_combination(self, df, d_predicciones, roi_weight):
+    def select_best_combination(self, df, d_predicciones, roi_weight: float):
         """
         Selecciona la fila con la máxima métrica y retorna su ID.
         También crea un diccionario `d_hiper` basado en dicha fila, excluyendo columnas específicas.
@@ -488,7 +488,7 @@ class BettingStrategy:
         
         return d_hiper, best_d_rois, best_df_pred
 
-    def define_betting_strategy(self, row, roi_weight=0.25, with_assess: bool = False):
+    def define_betting_strategy(self, row, roi_weight: float, with_assess: bool = False):
         """
         Determina la estrategia de apuesta optima para cada modelo.
         """
@@ -552,11 +552,10 @@ class BettingStrategy:
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 48
+    id_country = 148
 
     # Defino hiperparametros
-    select_best_model = False
-    roi_weight_strategy = 0.5
+    select_best_model = True
     with_assess = False
     strategy = 'general'
 
@@ -568,18 +567,19 @@ if __name__ == "__main__":
 
     if select_best_model:
         perc_cutoff = 0.05
-        roi_weight_sbm = 0.5
 
         # Creo objeto de clase select_best_model
-        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight_sbm)
+        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date)
 
         # Obtengo listado de todos los modelos entrenados
         df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
         # Selecciono el mejor modelo
         row = sbm.main(df_ite, perc_cutoff=perc_cutoff, with_assess=with_assess)
+        roi_weight_strategy = sbm.roi_weight
 
     else:
+        roi_weight_strategy = 0.5
         df = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx', index_col=0)
         row = df.head(1) # Selecciono la primera fila
         logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")

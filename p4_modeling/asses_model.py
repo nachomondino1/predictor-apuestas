@@ -282,7 +282,7 @@ def calculate_metric(df, roi_weight: float = 0.75, name_extension: str = '', nor
     Normaliza las columnas antes del cálculo, asigna el resultado a una nueva columna llamada 'metric' y retorna el DataFrame.
     """
     col1, col2 = f'roi_por_partido', f'expected_roi_por_partido'
-  
+      
     if normalize:
         norm_extension = '_norm' 
         
@@ -311,6 +311,39 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
     # Normalizo columna
     df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
     return df
+
+def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected_roi_por_partido'):
+    """
+    Asigna valores de roi_weight basados en la correlación entre ROI y Expected ROI por modelo.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con los datos.
+        roi_col (str): Nombre de la columna de ROI. Default 'roi_por_partido'.
+        expected_roi_col (str): Nombre de la columna de Expected ROI. Default 'expected_roi_por_partido'.
+        
+    Returns:
+        'roi_weight' asignado segun correlacion entre ROI y Expected ROI.
+    """       
+    correlacion = df[roi_col].corr(df[expected_roi_col])
+    logger.info(f"La correlacion entre {roi_col} y {expected_roi_col} es de {correlacion}")
+
+    min_high_corr = 0.4
+    max_low_corr = 0.2
+
+    # Si la correlacion es alta
+    if abs(correlacion) >= min_high_corr:
+        value = 0.25
+
+    # Si la correlacion es baja
+    elif abs(correlacion) <= max_low_corr:
+        value = 0.75
+
+    else:
+        value = 0.5
+    
+    logger.critical(f"El roi_weight a usar es {value}. Es decir, un peso de {value*100:.0f}% para el ROI y de {(1-value)*100:.0f}% para el Expected ROI")
+    return value
+
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
