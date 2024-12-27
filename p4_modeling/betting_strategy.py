@@ -10,12 +10,14 @@ from utils import directories
 
 class BettingStrategy:
 
-    def __init__(self, country: str, iteration_date: str, strategy: str = "general", verbose: int = 0):
+    def __init__(self, country: str = None, iteration_date: str = None, strategy: str = "general", verbose: int = 0):
         self.country = country
         self.iteration_date = iteration_date
         self.strategy = strategy
         self.verbose = verbose
-        self.initialize_directories()
+
+        if self.iteration_date is not None:
+            self.initialize_directories()
 
     def initialize_directories(self):
         
