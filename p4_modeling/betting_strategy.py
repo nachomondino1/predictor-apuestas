@@ -437,32 +437,13 @@ class BettingStrategy:
             print(df_bs)
             print(d_predicciones.keys())
 
-        # Determino hiperparametros de estrategia, df_prediccones y las metricas a retornar 
-        if self.strategy != "train":
-
-            # Calcular metrica combinada para determinar mejor estrategia
-            df_bs = asses_model.calculate_metric(df_bs, roi_weight=roi_weight)
-
-            # Seleccionar mejor estrategia
-            id_max = self.select_best_combination(df_bs)
-            row = df_bs[df_bs['id'] == id_max].iloc[0]  # Convertir a serie
-
-            if self.verbose >= 2:
-                print("Id max", id_max)
-                print("Row", row)
-
-            # excluded_columns = {'id', 'roi', 'roi_por_partido', 'expected_roi', 'expected_roi_por_partido', 'metric'}
-            excluded_columns = {'id', 'roi', 'roi_por_partido', 'expected_roi', 'expected_roi_por_partido', 'roi_por_partido_norm', 'expected_roi_por_partido_norm', 'metric'}
-
-            # Construyo variables a retornar
-            d_hiper = row.drop(labels=excluded_columns.intersection(df_bs.columns)).to_dict() # Crear d_hiper excluyendo las columnas específicas
-            best_d_rois = row[list(excluded_columns.intersection(df_bs.columns))].to_dict()
-            best_df_pred = d_predicciones[id_max]  # Con el id obtengo su df_pred y su df_metrics....
-        
-        else:
+        # Determino mejor estrategia
+        if self.strategy == "train":
             d_hiper = data
             best_d_rois = d_metrics
             best_df_pred = df_pred
+        else:
+            d_hiper, best_d_rois, best_df_pred = self.select_best_combination(df_bs, d_predicciones, roi_weight=roi_weight)
 
         if self.verbose >= 1:
             logger.info(f"Estrategia de apuesta ganadora: {d_hiper}")
@@ -470,7 +451,7 @@ class BettingStrategy:
 
         return d_hiper, best_df_pred, best_d_rois
 
-    def select_best_combination(self, df_bs, id_column='id'):
+    def select_best_combination(self, df, d_predicciones, roi_weight):
         """
         Selecciona la fila con la máxima métrica y retorna su ID.
         También crea un diccionario `d_hiper` basado en dicha fila, excluyendo columnas específicas.
@@ -479,15 +460,33 @@ class BettingStrategy:
         :param id_column: Nombre de la columna que actúa como identificador único.
         :return: (id_max, d_hiper) - ID de la fila seleccionada y el diccionario `d_hiper`.
         """
-        if 'metric' not in df_bs.columns:
-            raise ValueError("La columna 'metric' no existe en el DataFrame.")
+        name_extension = "_con_ea"
+        metric_col = f'metric{name_extension}'
+
+        # Calcular metrica combinada para determinar mejor estrategia
+        df = asses_model.calculate_metric(df, roi_weight=roi_weight, name_extension=name_extension)
+        # df.to_excel("/Users/nachomondino/Desktop/prueba.xlsx", index=True)
+        
+        # Seleccionar mejor estrategia
+        if metric_col not in df.columns:
+            raise ValueError(f"La columna '{metric_col}' no existe en el DataFrame.")
 
         # Encontrar la fila con el valor máximo de 'metric'
-        max_row = df_bs.loc[df_bs['metric'].idxmax()]
+        row = df.loc[df[metric_col].idxmax()]  # # Convertir a serie
+        id_max = row['id']
+        if self.verbose >= 2:
+            print("Id max", id_max)
+            print("Row", row)
 
-        # Extraer el ID de la fila seleccionada
-        id_max = max_row[id_column]
-        return id_max
+        # excluded_columns = {'id', 'roi', 'roi_por_partido', 'expected_roi', 'expected_roi_por_partido', 'metric'}
+        excluded_columns = {'id', 'roi', 'roi_por_partido', 'expected_roi', 'expected_roi_por_partido', 'roi_por_partido_norm', 'expected_roi_por_partido_norm', metric_col}
+
+        # Construyo variables a retornar
+        d_hiper = row.drop(labels=excluded_columns.intersection(df.columns)).to_dict() # Crear d_hiper excluyendo las columnas específicas
+        best_d_rois = row[list(excluded_columns.intersection(df.columns))].to_dict()
+        best_df_pred = d_predicciones[id_max]  # Con el id obtengo su df_pred y su df_metrics....
+        
+        return d_hiper, best_d_rois, best_df_pred
 
     def define_betting_strategy(self, row, roi_weight=0.25, with_assess: bool = False):
         """
@@ -553,13 +552,13 @@ class BettingStrategy:
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 59
+    id_country = 48
 
     # Defino hiperparametros
     select_best_model = False
-    roi_weight_strategy = 0.25
+    roi_weight_strategy = 0.5
     with_assess = False
-    strategy = 'all' #'general'
+    strategy = 'general'
 
     # Defino variables
     d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
@@ -569,7 +568,7 @@ if __name__ == "__main__":
 
     if select_best_model:
         perc_cutoff = 0.05
-        roi_weight_sbm = 0.75
+        roi_weight_sbm = 0.5
 
         # Creo objeto de clase select_best_model
         sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight_sbm)

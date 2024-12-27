@@ -48,15 +48,17 @@ class SelectBestModel():
         La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
         """
         logger.info("Paso 1: Descartando modelos con bajo ROI en df_test")
+        name_extension='_sin_ea'
+        self.metric_col = f'metric{name_extension}'
 
         # Calculo metrica combinada
-        df = calculate_metric(df, self.roi_weight)
+        df = calculate_metric(df, self.roi_weight, name_extension=name_extension)
 
         # Eliminar registros con 'metric' < 0
-        df = df[df['metric'] >= 0]
+        df = df[df[self.metric_col] >= 0]
 
         # Ordenar los registros por 'metric' en orden descendente
-        df = df.sort_values(by='metric', ascending=False)
+        df = df.sort_values(by=self.metric_col, ascending=False)
 
         # Seleccionar el 20% de los registros con los valores más altos de 'metric'
         cutoff = int(len(df) * perc_cutoff)  # Calcular el 20% superior
@@ -158,6 +160,7 @@ class SelectBestModel():
             self.count_models(df_filt)
 
         # Exportar el DataFrame final a un archivo Excel
+        df_filt.set_index('n_iteration', inplace=True)
         df_filt.to_excel(f'{self.PATH_sbm}/df_p3.xlsx', index=True)
 
         return df_filt
@@ -169,12 +172,8 @@ class SelectBestModel():
         """
         logger.info("Paso 4: Seleccionando mejor modelo...")
 
-        # Calculo metrica combinada (con ROIpp y ExpectedRoipp ya habiendo aplicado la estrategia de apuesta)
-        df = calculate_metric(df, roi_weight=self.roi_weight)
-
         # Ordenar los registros por 'metric' en orden descendente
-        df = df.sort_values(by='metric', ascending=False)
-        df.set_index('n_iteration', inplace=True)
+        df = df.sort_values(by=self.metric_col, ascending=False)
 
         # Imprimo por pantalla el mejor modelo
         row = df.head(1) # Selecciono la primera fila
