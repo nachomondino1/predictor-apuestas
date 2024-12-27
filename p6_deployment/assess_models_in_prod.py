@@ -4,13 +4,12 @@ from utils.set_up_logging import logger
 import pandas as pd
 import os
 from dotenv import load_dotenv
-# from utils.directories import make_directories
+'''ImportError: cannot import name 'DataPreparation' from partially initialized module 'main' (most likely due to a circular import) (/Users/nachomondino/Documents/GitHub/predictor-apuestas/main.py)
 from p3_data_preparation.construct_data import determine_result, determine_expected_result
-# from p4_modeling.asses_model import determine_winning_bets, calculate_roi
 from p6_deployment import main_next_matches
 from p4_modeling import betting_strategy
 import datetime
-
+'''
 # El objetivo es evaluar las predicciones de los mejores modelos de un pais en los ultimos partidos jugados sin tener que hacerlo manualmente.
 def assess_model_in_prod(id_country, n_model, model_name, iteration_date):
 

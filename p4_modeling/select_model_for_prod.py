@@ -2,10 +2,9 @@ import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 from utils.set_up_logging import logger
 from utils import directories
-from p4_modeling.betting_strategy import calculate_metric
+from p4_modeling.asses_model import calculate_metric
 from tqdm import tqdm
 import datetime
 
@@ -84,7 +83,8 @@ class SelectBestModel():
 
         # Por modelo
         for idx, row in df.iterrows():
-            l_difs = [abs(row['dif_loc']), abs(row['dif_emp']), abs(row['dif_vis'])]  # No considero la diff de empate.
+            # l_difs = [abs(row['dif_loc']), abs(row['dif_emp']), abs(row['dif_vis'])]  # No considero la diff de empate.
+            l_difs = [abs(row['dif_loc']), abs(row['dif_vis'])]  # No considero la diff de empate.
 
             # # Si alguna diferencia es menor o igual a diff_min, no eliminar el modelo
             # if any(diff <= diff_min for diff in l_difs):
