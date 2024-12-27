@@ -623,8 +623,10 @@ class TrainingDataLoader():
         if self.n_model is not None:
             
             df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_train.xlsx")
-            row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
-            # logger.warning(row_hiper)
+            
+            # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
+            row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
+            # logger.info(row_hiper)
             
             ## Levanto columnas utilizadas para entrenar el modelo
             # selected_columns = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
@@ -997,7 +999,7 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
 def main(d_run: dict, id_country: int, d_model: dict = None,                # Params
          n_seasons_missing : int = 1, extract_missing: bool = True,         # missing
          n_days_max_next_matches: int = 7, predict_missing: bool = False,   # Data unders
-         n_days_fill_data: int = 60, porc_m: float = 0.35, no_strategy: bool = False,                 # Data prep y Modeling
+         n_days_fill_data: int = 60, porc_m: float = 0.35,                  # Data prep y Modeling
          verbose: int = 1, export: bool = True):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1200,13 +1202,14 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
     if d_run['modeling']:
 
         # Levanto hiperparametros de modeling
-        bs = betting_strategy.BettingStrategy()
+        bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
         loaded_model = lo.load_model()
         classes = [0, 1, 2] # loaded_model.classes_
-        if no_strategy:
-            d_hiper_mod = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False}
-        else:
+        try:
             d_hiper_mod = lo.load_modeling_hyperparameters()
+        except ValueError:
+            d_hiper_mod = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False}
+
         m_to_use = d_hiper_mod['curva_m'] * porc_m
         logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
@@ -1259,14 +1262,15 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    n_days = 7
+    n_days = 20
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
     l_countries = [48]
-
+    d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
+    
     # Definir condiciones del análisis
     for id_country in l_countries:
 
@@ -1274,11 +1278,11 @@ if __name__ == "__main__":
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 642, 'model_name': "LogisticRegression", 'iteration_date': "2024-12-23"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 642, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         ## Prox partidos
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
         ## En partidos missing
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, no_strategy=True, export=d_run['export']) 
+        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=d_run['export']) 
         
         # Prod 
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
