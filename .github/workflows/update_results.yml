@@ -68,8 +68,9 @@ jobs:
             p3_data_preparation/construct_data.py
             p3_data_preparation/clean_data.py
             p4_modeling
-            p6_deployment/automatize_predict
-            p6_deployment/requirements_mnm.txt
+            p6_deployment
+            # p6_deployment/automatize_predict
+            # p6_deployment/requirements_mnm.txt
           sparse-checkout-cone-mode: false
           ref: prod # Branch # Prueba con staging
 
