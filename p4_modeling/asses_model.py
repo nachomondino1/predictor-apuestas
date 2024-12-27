@@ -276,29 +276,31 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def calculate_metric(df, roi_weight: float = 0.75, normalize: bool = True):
+def calculate_metric(df, roi_weight: float = 0.75, name_extension: str = '', normalize: bool = True):
     """
     Calcula la métrica combinada según 'roi_por_partido' y 'expected_roi_por_partido'.
     Normaliza las columnas antes del cálculo, asigna el resultado a una nueva columna llamada 'metric' y retorna el DataFrame.
     """
-    col_1 = 'roi_por_partido_norm' if normalize else 'roi_por_partido'
-    col_2 = 'expected_roi_por_partido_norm' if normalize else 'expected_roi_por_partido'
-
+    col1, col2 = f'roi_por_partido', f'expected_roi_por_partido'
+  
     if normalize:
+        norm_extension = '_norm' 
+        
         # Normalizo columnas por separado (cada una segun su escala)
-        normalize_column(df, col='roi_por_partido')
-        normalize_column(df, col='expected_roi_por_partido')
+        df = normalize_column(df, col=col1, norm_extension=norm_extension)
+        df = normalize_column(df, col=col2, norm_extension=norm_extension)
+        col1, col2 = f'{col1}{norm_extension}', f'{col2}{norm_extension}'
 
     def calculate_row_metric(row):
-        roi_pp = row[col_1]
-        expected_roi_pp = row[col_2]
+        roi_pp = row[col1]
+        expected_roi_pp = row[col2]
         return ((roi_weight * roi_pp) + ((1 - roi_weight) * expected_roi_pp))
 
     # Aplicar la función fila por fila
-    df['metric'] = df.apply(calculate_row_metric, axis=1)
+    df[f'metric{name_extension}'] = df.apply(calculate_row_metric, axis=1)
     return df
 
-def normalize_column(df, col, verbose : int = 0):
+def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
     
     # Determino puntos minimo y maximo de la columna
     p_min = df[col].min()
@@ -307,7 +309,7 @@ def normalize_column(df, col, verbose : int = 0):
         logger.info(f"Punto minimo: {p_min}. Punto maximo: {p_max}")
 
     # Normalizo columna
-    df[f'{col}_norm'] = (df[col] - p_min) / (p_max - p_min)
+    df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
