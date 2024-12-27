@@ -8,40 +8,6 @@ from p6_deployment.assess_models_in_prod import assess_model_in_prod
 from utils import directories
 
 
-def calculate_metric(df, roi_weight: float = 0.75, normalize: bool = True):
-    """
-    Calcula la métrica combinada según 'roi_por_partido' y 'expected_roi_por_partido'.
-    Normaliza las columnas antes del cálculo, asigna el resultado a una nueva columna llamada 'metric' y retorna el DataFrame.
-    """
-    col_1 = 'roi_por_partido_norm' if normalize else 'roi_por_partido'
-    col_2 = 'expected_roi_por_partido_norm' if normalize else 'expected_roi_por_partido'
-
-    if normalize:
-        # Normalizo columnas por separado (cada una segun su escala)
-        normalize_column(df, col='roi_por_partido')
-        normalize_column(df, col='expected_roi_por_partido')
-
-    def calculate_row_metric(row):
-        roi_pp = row[col_1]
-        expected_roi_pp = row[col_2]
-        return ((roi_weight * roi_pp) + ((1 - roi_weight) * expected_roi_pp))
-
-    # Aplicar la función fila por fila
-    df['metric'] = df.apply(calculate_row_metric, axis=1)
-    return df
-
-def normalize_column(df, col, verbose : int = 0):
-    
-    # Determino puntos minimo y maximo de la columna
-    p_min = df[col].min()
-    p_max = df[col].max()
-    if verbose >= 2:
-        logger.info(f"Punto minimo: {p_min}. Punto maximo: {p_max}")
-
-    # Normalizo columna
-    df[f'{col}_norm'] = (df[col] - p_min) / (p_max - p_min)
-    return df
-
 class BettingStrategy:
 
     def __init__(self, country: str, iteration_date: str, strategy: str = "general", verbose: int = 0):
@@ -87,9 +53,9 @@ class BettingStrategy:
                 "equal": [[(0, 0), (1, 0)]],
                 'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
                 'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
-                'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
+                # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
             }
-            l_odd_weight = [0, 1, 2, 4]
+            l_odd_weight = [0, 1, 2, 3, 4]
             l_lim_sup = [0, 1]
 
         elif self.strategy=="general_0":
@@ -278,6 +244,7 @@ class BettingStrategy:
         # Returns
             Dataframe pasado como parametro con nueva columna 'stake_to_bet'
         """
+        ''' Creo qu funciona mejor sin esto...
         # Limito caps segun odd_weight (para evitar stake=99 x inflado de stake con cuotas sobretodo cuando odd_weight=4). Esto pasaba en el 437 de GER. Basicamente evito overfitting de hiper de apuesta.
         if odd_weight > 0:
             dif_prob_inf_cap = dif_prob_inf_cap / odd_weight
@@ -285,8 +252,9 @@ class BettingStrategy:
 
             if self.verbose >= 1:
                 logger.info(f"dif_prob_result_to_bet capped: [{dif_prob_inf_cap}, {dif_prob_sup_cap}]")
-        
-        filled = False
+        '''
+
+        filled, rows_not_filled = False, []
         if 'player_emergency_fill' in df.columns:
             filled = True
             rows_player_filled = df[df['player_emergency_fill'] == 1].index
@@ -316,7 +284,7 @@ class BettingStrategy:
 
             if dif_prob_inf_cap != dif_prob_sup_cap:
 
-                if filled:
+                if filled and len(rows_not_filled) > 0:
                     # Stake para filas NO rellenadas
                     df.loc[rows_not_filled, 'stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
 
@@ -365,7 +333,7 @@ class BettingStrategy:
             # df = df.drop(['stake_to_bet_raw', 'stake_to_bet_normalized'], axis=1)
         
         # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
-        if 'player_emergency_fill' in df.columns:
+        if ('player_emergency_fill' in df.columns) and (len(rows_player_filled) > 0):
 
             # Reducir el stake al 50% solo para las filas donde 'emergency_fill' es igual a 1
             df.loc[rows_player_filled, 'stake_to_bet'] *= porc_emergency
@@ -473,7 +441,7 @@ class BettingStrategy:
         if self.strategy != "train":
 
             # Calcular metrica combinada para determinar mejor estrategia
-            df_bs = calculate_metric(df_bs, roi_weight=roi_weight)
+            df_bs = asses_model.calculate_metric(df_bs, roi_weight=roi_weight)
 
             # Seleccionar mejor estrategia
             id_max = self.select_best_combination(df_bs)
@@ -521,8 +489,7 @@ class BettingStrategy:
         id_max = max_row[id_column]
         return id_max
 
-
-    def define_betting_strategy(self, row, roi_weight=0.25, with_assess: bool = False): # LA podria sacar de la clase.
+    def define_betting_strategy(self, row, roi_weight=0.25, with_assess: bool = False):
         """
         Determina la estrategia de apuesta optima para cada modelo.
         """
@@ -573,6 +540,9 @@ class BettingStrategy:
         df_final = pd.DataFrame(results)
         df_final.set_index('n_model', inplace=True)
         
+        if self.verbose >= 0:
+            logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
+
         # Exportar el DataFrame final a un archivo Excel
         best_df_pred.to_excel(f'{self.BASE_PATH_sbm}/predicciones_{n_model}_{model_name}.xlsx')
         df_final.to_excel(f'{self.BASE_PATH_sbm}/df_strategy.xlsx', index=True)
@@ -583,16 +553,40 @@ class BettingStrategy:
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 148
-    iteration_date = '2024-12-25'
+    id_country = 59
 
-    # n_model = 2507
-    # model_name = 'LogisticRegression'
+    # Defino hiperparametros
+    select_best_model = False
+    roi_weight_strategy = 0.25
+    with_assess = False
+    strategy = 'all' #'general'
 
     # Defino variables
-    d_countries = {6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-    country = d_countries[id_country]
-    bs = BettingStrategy(country, iteration_date)
+    d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
+    country = d_countries[id_country][0]
+    iteration_date = d_countries[id_country][1]
+    bs = BettingStrategy(country, iteration_date, strategy=strategy)
+
+    if select_best_model:
+        perc_cutoff = 0.05
+        roi_weight_sbm = 0.75
+
+        # Creo objeto de clase select_best_model
+        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight_sbm)
+
+        # Obtengo listado de todos los modelos entrenados
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
+
+        # Selecciono el mejor modelo
+        row = sbm.main(df_ite, perc_cutoff=perc_cutoff, with_assess=with_assess)
+
+    else:
+        df = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx', index_col=0)
+        row = df.head(1) # Selecciono la primera fila
+        logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
+
+    # PASO 5: Determinar estrategia de apuesta optima para el modelo seleccionado
+    bs.define_betting_strategy(row=row, roi_weight=roi_weight_strategy, with_assess=with_assess)
 
 
     '''
@@ -606,26 +600,3 @@ if __name__ == "__main__":
     d_hiper, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones, strategy='general')
     print(d_roi)
     '''
-
-    select_best_model = True
-
-    if select_best_model:
-        perc_cutoff = 0.05
-        roi_weight = 0.75
-        with_assess = False
-
-        # Creo objeto de clase select_best_model
-        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, roi_weight=roi_weight)
-
-        # Obtengo listado de todos los modelos entrenados
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
-
-        # Selecciono el mejor modelo
-        row = sbm.main(df_ite, perc_cutoff=perc_cutoff, with_assess=with_assess)
-
-    else:
-        row = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx')
-        logger.info(row)
-
-    # PASO 5: Determinar estrategia de apuesta optima para el modelo seleccionado
-    bs.define_betting_strategy(row=row, roi_weight=0.5, with_assess=False)
