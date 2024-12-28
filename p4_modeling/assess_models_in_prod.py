@@ -1,5 +1,6 @@
 import sys
 sys.path.append('.')  # Fallaba el import de main
+from utils import directories
 from utils.set_up_logging import logger
 import pandas as pd
 import os
@@ -11,7 +12,7 @@ from p4_modeling import asses_model, betting_strategy # ImportError: cannot impo
 from p6_deployment import main_next_matches
 
 
-def update_test_with_missing(df_ite, country, iteration_date):
+def update_test_with_missing(df_ite, id_country, country, iteration_date, extract_missing: bool = True):
     """
     Creo un df_iteration actualizado con las predicciones de test y las de missing. Actualiza el input para la seleccion de modelos o estrategia de apuesta.
 
@@ -29,7 +30,14 @@ def update_test_with_missing(df_ite, country, iteration_date):
     bs = betting_strategy.BettingStrategy(strategy='train')
     BASE_PATH = f"data/{country}/p4_modeling/{iteration_date}"
     BASE_PATH_2 = f"data/{country}/p4_modeling/{iteration_date}/assess"
-    # df_train = pd.read_excel(f'{BASE_PATH}/df_iteration_train.xlsx', index_col=0)
+    directories.make_directories(l_directorios=[BASE_PATH_2])
+
+    # Extraer missing
+    if extract_missing:
+        logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
+        # Usar mnm.py con predict_missing=True y data_unders=False.
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        main_next_matches.main(d_run, id_country, export=d_run['export'], verbose=-1) 
 
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
 
@@ -45,14 +53,23 @@ def update_test_with_missing(df_ite, country, iteration_date):
         logger.info(df_pred.shape)
 
         # Recolecta predicciones de modelo en partidos "missing"
-        df_pred_missing = collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date)
-        df_pred_missing = prepare_for_betting_strategy(df_pred_missing, country)  #  Agrego columnas result y expected result
-        # print("A", df_pred_missing)
+        df_pred_missing = collect_model_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date)
 
-        # Concateno df_pred y df_pred missing.
-        df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
-        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']] # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-        # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_2.xlsx')
+        if isinstance(df_pred_missing, pd.DataFrame):
+            # if len(df_pred_missing) > 0:
+            #  Agrego columnas result y expected result
+            df_pred_missing = prepare_for_betting_strategy(df_pred_missing, country)  
+
+            # Concateno df_pred y df_pred missing.
+            df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
+
+        else:
+            logger.warning("No hay predicciones de partidos missing...")
+            df_predicciones = df_pred.copy()
+
+        # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
+        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]
+         # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_2.xlsx')
 
         # Volver a calcular metricas con test + missing
         df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
@@ -86,7 +103,7 @@ def update_test_with_missing(df_ite, country, iteration_date):
 
     return df_ite_updated
 
-def collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date):
+def collect_model_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
     """
     Recolecta predicciones de modelos en partidos "missing"
 
@@ -97,11 +114,7 @@ def collect_prediction_in_missing_matches(id_country, n_model, model_name, itera
     d_model = {'n_model': n_model, 'model_name': model_name, 'iteration_date': iteration_date} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     # Usar mnm.py con predict_missing=True y data_unders=False.
-    df = main_next_matches.main(d_run, id_country, d_model=d_model, predict_missing=True, export=False, verbose=0) # Probar un modelo
-
-    df = df.sort_values(by='date', ascending=False)
-    # df.to_excel(f'/Users/nachomondino/Desktop/df_pred_missing_{n_model}.xlsx')
-    # print(df)
+    df = main_next_matches.main(d_run, id_country, d_model=d_model, predict_missing=True, export=False, verbose=0) 
     return df
 
 def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de BettingStrategy????
@@ -110,14 +123,16 @@ def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de
     """
     ## Levanto df_match_miss para obtener goals? ??
     df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
-    logger.info(df_match_miss)
-    
+
     # Loggear información básica del DataFrame
-    logger.info(f"Shape of df_match_miss: {df_match_miss.shape}")
-    logger.info(f"Columns in df_match_miss: {df_match_miss.columns.tolist()}")
+    # logger.info(df_match_miss)
+    # logger.info(f"Shape of df_match_miss: {df_match_miss.shape}")
+    # logger.info(f"Columns in df_match_miss: {df_match_miss.columns.tolist()}")
 
     # Columnas a copiar
     l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']
+
+    df = df.sort_values(by='date', ascending=False)
 
     # Asignar valores de df_match_miss a df solo en las columnas y filas correspondientes
     for idx, row in df.iterrows():
@@ -142,7 +157,7 @@ def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
-    id_country = 48
+    id_country = 77
     iteration_date = '2024-12-23'
 
     # Defino variables
@@ -156,10 +171,10 @@ if __name__ == "__main__":
     ## Ordenar los registros por 'metric' en orden descendente
     df_ite = df_ite.sort_values(by='roi_por_partido', ascending=False)
     ## Seleccionar el 20% de los registros con los valores más altos de 'metric'
-    cutoff = int(len(df_ite) * 0.02)  # Calcular el 20% superior
+    cutoff = int(len(df_ite) * 0.01)  # Calcular el 20% superior
     df_ite_filt = df_ite.iloc[:cutoff]
 
     print(df_ite_filt)
 
     # Evaluo modelos en test y missing
-    df_ite_updated = update_test_with_missing(df_ite_filt, country, iteration_date)
+    df_ite_updated = update_test_with_missing(df_ite_filt, id_country, country, iteration_date)

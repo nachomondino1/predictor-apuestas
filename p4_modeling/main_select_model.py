@@ -1,0 +1,97 @@
+import sys
+sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+import pandas as pd
+import numpy as np
+from utils.set_up_logging import logger
+from utils import directories
+from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
+
+
+def main(
+        id_country, 
+        country, 
+        iteration_date,
+        first_cutoff: float = 0.01,
+        assess: bool = True, 
+        select_best_model: bool = True, 
+        strategy: str = 'general'
+        ):
+    """
+    Assess model in prod + Seleccion del modelo + Estrategia de apuesta
+
+    # Parameters
+        first_cutoff: Porcentaje de modelos para los cuales hacer el assess y la seleccion. Cuanto menor es, menor tiempo tarda. (float)
+        assess: True para recolectar las predicciones de los modelos en los partidos missing y concatenarlas a las de test. (bool)
+        select_best_model: True para hacer la seleccion del modelo a usar en produccion. (bool)
+        strategy: Estrategia de apuesta para determinar hiperparametros a probar. (str)
+
+    # Return
+        Modelo a usar en produccion con su estrategia de apuesta optima (teniendo en cuenta test + missing). 
+    """
+    # Defino parametros --> Futuros argumentos
+    second_cutoff = 1 if assess else 0.05
+
+   # Levanto df_iteration
+    df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+
+    # Defino roi_weight
+    roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
+    # roi_weight = 0.75 if with_assess else None
+
+    # (0) Filtro df_ite seleccionado top x% de registros.
+    df_ite = df_ite.sort_values(by='roi_por_partido', ascending=False) ## Ordenar los registros por 'metric' en orden descendente
+    cutoff = int(len(df_ite) * first_cutoff)  # Calcular el 20% superior
+    df_ite_filt = df_ite.iloc[:cutoff] ## Seleccionar el 20% de los registros con los valores más altos de 'metric'
+    print(df_ite_filt)
+
+    # (1) Actualizar df_prediccion test con missing?
+    if assess:
+        logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
+
+        # Evaluo modelos en test y missing
+        df_ite_filt = assess_models_in_prod.update_test_with_missing(df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date)
+        # df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/assess/df_iteration.xlsx')
+
+    logger.info(df_ite_filt)
+
+    # (2) Seleccion del modelo
+    if select_best_model:
+        # Creo objeto de clase select_best_model
+        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date)
+
+        # Selecciono el mejor modelo
+        row = sbm.main(df_ite_filt, roi_weight=roi_weight, perc_cutoff=second_cutoff)
+
+    else:
+        # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
+        df = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx', index_col=0)
+        row = df.head(1) # Selecciono la primera fila
+        logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
+
+    # (3) Determinar estrategia de apuesta optima para el modelo seleccionado
+    bs = betting_strategy.BettingStrategy(country, iteration_date, strategy=strategy)
+    bs.define_betting_strategy(row=row, roi_weight=roi_weight, with_assess=assess)
+    
+
+if __name__ == "__main__":
+    # Defino parametros
+    id_country = 55
+
+    # Defino hiperparametros
+    asssess_models_in_prod = True
+    select_best_model = True
+
+    # Defino variables
+    d_countries = {
+        6: ["argentina", '2024-12-05'], 
+        48: ["england", '2024-12-23'], 
+        55: ["france", '2024-12-26'], 
+        59: ["germany", '2024-12-26'], 
+        77: ["italy", '2024-12-23'], 
+        148: ["spain", '2024-12-28'], 
+        167: ["usa", '2024-12-05']
+        }
+    country = d_countries[id_country][0]
+    iteration_date = d_countries[id_country][1]
+
+    main(id_country=id_country, country=country, iteration_date=iteration_date, assess=asssess_models_in_prod, select_best_model=select_best_model)

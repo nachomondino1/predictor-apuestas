@@ -51,12 +51,7 @@ class SelectBestModel():
         self.metric_col = f'metric{name_extension}'
 
         # Calculo metrica combinada
-        if roi_weight is None:
-            self.roi_weight = asignar_roi_weight(df)  # Segun correlacion entre ROI y Expected ROI
-        else:
-            self.roi_weight = roi_weight
-
-        df = calculate_combined_metric(df, roi_weight=self.roi_weight, name_extension=name_extension)
+        df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
 
         # Eliminar registros con 'metric' < 0
         df = df[df[self.metric_col] >= 0]
@@ -162,7 +157,7 @@ class SelectBestModel():
             raise ValueError
 
     # Main
-    def main(self, df, perc_cutoff:float = 0.2, roi_weight: float = None):
+    def main(self, df, roi_weight, perc_cutoff:float = 0.2):
         """
         Determino el modelo a usar en produccion
         """
