@@ -463,6 +463,12 @@ def space_params(model_name, bayes, verbose: int = 0):
     # Return
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
+    # Arboles de decision
+    l_n_estimators = [5, 10, 25]
+    l_learning_rate = [0.001, 0.01, 0.1]
+    l_max_depth = [3, 5, 7, 10, 15]
+    l_min_samples_leaf = [21, 51]
+    l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
     # Logistic
     min_it, max_it = 100, 10000
 
@@ -472,24 +478,24 @@ def space_params(model_name, bayes, verbose: int = 0):
         'DecisionTreeClassifier': {
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'splitter': Categorical(['random', 'best']) if bayes else ['random', 'best'], 
-            'max_depth': Integer(3, 30) if bayes else [3, 5, 7, 10],
-            'min_samples_split': Integer(10, 50) if bayes else [2, 10], # Mayor o igual a 2
-            'min_samples_leaf': Integer(10, 50) if bayes else [1, 4], # Si usas 1 las probas van a ser 1-0-0, 0-1-0, 0-0-1, si usas 4 0.5-0.5-0 y asi.
+            'max_depth': Integer(3, 30) if bayes else l_max_depth,
+            'min_samples_split': Integer(10, 50) if bayes else l_min_samples_split, # Mayor o igual a 2
+            'min_samples_leaf': Integer(10, 50) if bayes else l_min_samples_leaf, # Si usas 1 las probas van a ser 1-0-0, 0-1-0, 0-0-1, si usas 4 0.5-0.5-0 y asi.
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(10, 100) if bayes else [10, 50, 100],
+            'n_estimators': Integer(5, 100) if bayes else l_n_estimators,
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
-            'max_depth': Integer(3, 20) if bayes else [3, 5, 7, 10],
-            # 'min_samples_split': Integer(2, 10) if bayes else [2, 10], # Mayor o igual a 2
-            'min_samples_leaf': Integer(10, 50) if bayes else [1, 10],
+            'max_depth': Integer(3, 20) if bayes else l_max_depth,
+            'min_samples_split': Integer(21, 101) if bayes else l_min_samples_split, # Mayor o igual a 2
+            'min_samples_leaf': Integer(11, 51) if bayes else l_min_samples_leaf,
             'max_features': Categorical(['sqrt', 'log2']) if bayes else ['sqrt', 'log2'], # Real(0.1, 1.0)
             'bootstrap': Categorical([True]) if bayes else [True] # False
         },
         'RandomForestRegressor': {
-            'n_estimators': Integer(10, 50) if bayes else [10, 50, 100],        
+            'n_estimators': Integer(10, 50) if bayes else l_n_estimators,        
             'criterion': Categorical(["friedman_mse"]) if bayes else ["friedman_mse"], # "squared_error", "absolute_error"
-            'max_depth': Integer(3, 20) if bayes else [5, 10],  # 30 # 3
+            'max_depth': Integer(3, 20) if bayes else l_max_depth,  # 30 # 3
             # 'min_samples_split': Integer(10, 50) if bayes else [10, 50], # Mayor o igual a 2 
             'min_samples_leaf': Integer(10, 50) if bayes else [1, 5],
             'bootstrap': Categorical([True]) if bayes else [True] # False
@@ -497,9 +503,9 @@ def space_params(model_name, bayes, verbose: int = 0):
         },
         'XGBClassifier': {
             'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
-            'n_estimators': Integer(5, 120) if bayes else [100],  # Suele ganar con 100
-            'learning_rate': Real(0.001, 1) if bayes else [0.001, 0.1],
-            'max_depth': Integer(3, 20) if bayes else [5, 10], # 3, 
+            'n_estimators': Integer(5, 120) if bayes else l_n_estimators,  # Suele ganar con 100
+            'max_depth': Integer(3, 20) if bayes else l_max_depth, # 3, 
+            'learning_rate': Real(0.001, 1) if bayes else l_learning_rate,
             # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
             'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
@@ -514,13 +520,13 @@ def space_params(model_name, bayes, verbose: int = 0):
             'alpha': Real(0.001, 1) if bayes else [0.001],
             'lambda': Real(0.001, 1) if bayes else [0.001],
         },
-        'GradientBoostingClassifier': { # Tarda muchisimo en entrenar a pesar de usar Bayes optimazation
-            'n_estimators': Integer(100, 300) if bayes else [100], 
-            'learning_rate': Real(0.001, 0.1) if bayes else [0.001, 0.01, 0.1],
-            'max_depth': Integer(3, 12) if bayes else [3, 5],
-            'min_samples_split': Integer(2, 8) if bayes else [2, 5, 10],  # Minimo 2.
-            'min_samples_leaf': Integer(2, 5) if bayes else [2, 4], 
-            'subsample': Real(0.7, 1.0) if bayes else [0.8, 1.0],
+        'GradientBoostingClassifier': { # Tarda muchisimo en entrenar
+            'n_estimators': Integer(100, 300) if bayes else l_n_estimators, 
+            'learning_rate': Real(0.001, 0.1) if bayes else l_learning_rate,
+            'max_depth': Integer(3, 12) if bayes else l_max_depth,
+            'min_samples_split': Integer(2, 8) if bayes else l_min_samples_split,  # Minimo 2.
+            'min_samples_leaf': Integer(2, 5) if bayes else l_min_samples_leaf, 
+            # 'subsample': Real(0.7, 1.0) if bayes else [0.8, 1.0],
             # 'max_features': ['auto'],
             # 'loss': ['deviance']
         },
@@ -533,7 +539,7 @@ def space_params(model_name, bayes, verbose: int = 0):
             {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}
         ],
         'SVC': {
-            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1],
+            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3],
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'],
             'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
             'coef0': Real(0, 1) if bayes else [0.0, 0.5],

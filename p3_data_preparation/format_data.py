@@ -204,6 +204,18 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
     
     return df, df_etiquetas
 
+def map_teams(df, country):
+    """
+    Convierto id_team_home e id_team_away de ids a nombre de equipos.
+    """
+    # Levanto df_teams
+    df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
+
+    # Revierto etiquetas para tener nombres de equipos en vez de ids
+    d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
+    df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
+    df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
+    return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

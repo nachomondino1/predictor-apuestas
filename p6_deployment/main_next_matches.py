@@ -1242,7 +1242,7 @@ def main(d_run: dict, id_country: int, d_model: dict = None,                # Pa
         df = bs.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
 
         # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
-        df = mo.map_teams(df)
+        df = format_data.map_teams(df, country=country)
 
         # Filtro partidos para quedarme solo con los de competencias publicas.
         df = df[df['id_competition'].isin(comp_public)]
@@ -1268,7 +1268,7 @@ if __name__ == "__main__":
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [77]
     d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
     
     # Definir condiciones del análisis
@@ -1278,13 +1278,14 @@ if __name__ == "__main__":
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 642, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 315, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         ## Prox partidos
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
+        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
         ## En partidos missing
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=d_run['export']) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=d_run['export']) 
         
         # Prod 
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
 
-        df.to_excel(f"{directorio}/predicciones.xlsx")
+        if isinstance(df, pd.DataFrame):
+            df.to_excel(f"{directorio}/predicciones.xlsx")
