@@ -246,7 +246,6 @@ class BettingStrategy:
         # Returns
             Dataframe pasado como parametro con nueva columna 'stake_to_bet'
         """
-        ''' Creo qu funciona mejor sin esto...
         # Limito caps segun odd_weight (para evitar stake=99 x inflado de stake con cuotas sobretodo cuando odd_weight=4). Esto pasaba en el 437 de GER. Basicamente evito overfitting de hiper de apuesta.
         if odd_weight > 0:
             dif_prob_inf_cap = dif_prob_inf_cap / odd_weight
@@ -254,8 +253,7 @@ class BettingStrategy:
 
             if self.verbose >= 1:
                 logger.info(f"dif_prob_result_to_bet capped: [{dif_prob_inf_cap}, {dif_prob_sup_cap}]")
-        '''
-
+        
         filled, rows_not_filled = False, []
         if 'player_emergency_fill' in df.columns:
             filled = True
@@ -505,30 +503,17 @@ class BettingStrategy:
             logger.info(f'n_model: {n_model} model_name: {model_name}')
 
         # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
-        df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+        if with_assess:
+            path_pred = f"{self.BASE_PATH}/assess/{n_model}__{model_name}_predicciones.xlsx"
+            logger.warning("Levanto predicciones test con missing...")
+        else:
+            path_pred = f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx"
+
+        df_pred = pd.read_excel(path_pred, index_col=0)
         logger.info(df_pred.shape)
-        
-        '''
-        # (opcional) Hacer assess --> Lo haria solo para los pocos modelos que pasan el filtro inicial.
-        if with_assess: # Hay que ver si funciona...
-
-            # Recolecto predicciones en ultimos partidos
-            df_pred_assess = assess_model_in_prod(self.id_country, n_model, model_name, iteration_date)
-            logger.info(df_pred_assess.shape)
-
-            # Concateno df
-            len_inic = len(df_pred)
-            df_pred = pd.concat([df_pred, df_pred_assess], axis=0)
-            logger.info(f"Se concatenó las predicciones de los partidos missing: {len_inic} --> {len(df_pred)}")
-
-            if self.verbose >= 2:
-                # Exporto predicciones concatenado
-                df_pred.to_excel(f"{self.path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
-        '''
 
         # Determino la mejor estrategia de apuesta
-        if self.verbose >= 1:
-            logger.info("Calculando la mejor estrategia de apuesta...")
+        logger.info("Calculando la mejor estrategia de apuesta...")
         d_hiper, best_df_pred, best_d_rois = self.calculate_roi_by_betting_strategy(df_pred, roi_weight=roi_weight)
 
         # Concateno datos y guardo
@@ -556,11 +541,11 @@ class BettingStrategy:
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 77
+    id_country = 48
 
     # Defino hiperparametros
-    select_best_model = True
-    with_assess = False
+    select_best_model = False
+    with_assess = True
     strategy = 'general'
 
     # Defino variables
@@ -570,41 +555,33 @@ if __name__ == "__main__":
     bs = BettingStrategy(country, iteration_date, strategy=strategy)
 
 
-    # Actualizar df_prediccion test con missing?
-    # ... 
+    # (1) Actualizar df_prediccion test con missing?
+    if with_assess:
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/assess/df_iteration.xlsx')
+        logger.warning("Estas levantando el df_iteration actualizado con missing.")
+    else:
+        # Obtengo listado de todos los modelos entrenados
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
+    logger.info(df_ite)
 
-    # Seleccion del modelo
+    # (2) Seleccion del modelo
     if select_best_model:
-        perc_cutoff = 0.05
+        perc_cutoff = 1 if with_assess else 0.05
+        roi_weight = 0.75 if with_assess else None
 
         # Creo objeto de clase select_best_model
         sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date)
 
-        # Obtengo listado de todos los modelos entrenados
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
-
         # Selecciono el mejor modelo
-        row = sbm.main(df_ite, perc_cutoff=perc_cutoff)
+        row = sbm.main(df_ite, roi_weight=roi_weight, perc_cutoff=perc_cutoff)
         roi_weight_strategy = sbm.roi_weight
 
     else:
-        roi_weight_strategy = 0.5
+        roi_weight_strategy = 0.75
         df = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx', index_col=0)
         row = df.head(1) # Selecciono la primera fila
         logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
-    # Determinar estrategia de apuesta optima para el modelo seleccionado
+    # (3) Determinar estrategia de apuesta optima para el modelo seleccionado
     bs.define_betting_strategy(row=row, roi_weight=roi_weight_strategy, with_assess=with_assess)
-
-
-    '''
-    # Obtengo listado de todos los modelos entrenados
-    # df_iteration = pd.read_excel(f'/df_iteration.xlsx')
-
-    # Obtengo predicciones del modelo
-    df_predicciones = pd.read_excel(f"{BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx")
-
-    # Construyo variable expected result
-    d_hiper, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones, strategy='general')
-    print(d_roi)
-    '''
+    
