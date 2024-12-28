@@ -32,7 +32,7 @@ class SelectBestModel():
         directories.make_directories(l_directorios=[self.PATH_sbm])
 
     # Paso 1
-    def filter_models_by_roi(self, df, perc_cutoff):
+    def filter_models_by_roi(self, df, perc_cutoff, roi_weight):
         """
         Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
 
@@ -51,7 +51,11 @@ class SelectBestModel():
         self.metric_col = f'metric{name_extension}'
 
         # Calculo metrica combinada
-        self.roi_weight = asignar_roi_weight(df)  # Segun correlacion entre ROI y Expected ROI
+        if roi_weight is None:
+            self.roi_weight = asignar_roi_weight(df)  # Segun correlacion entre ROI y Expected ROI
+        else:
+            self.roi_weight = roi_weight
+
         df = calculate_combined_metric(df, roi_weight=self.roi_weight, name_extension=name_extension)
 
         # Eliminar registros con 'metric' < 0
@@ -158,12 +162,12 @@ class SelectBestModel():
             raise ValueError
 
     # Main
-    def main(self, df, perc_cutoff:float = 0.2):
+    def main(self, df, perc_cutoff:float = 0.2, roi_weight: float = None):
         """
         Determino el modelo a usar en produccion
         """
         # PASO 1: DESCARTE POR ROI (sin estrategia de apuesta)
-        df_filt_1 = self.filter_models_by_roi(df, perc_cutoff=perc_cutoff)
+        df_filt_1 = self.filter_models_by_roi(df, perc_cutoff=perc_cutoff, roi_weight=roi_weight)
 
         # PASO 2: DESCARTE POR DISTRIBUCION
         df_filt_2 = self.filter_models_by_distribution(df_filt_1)
