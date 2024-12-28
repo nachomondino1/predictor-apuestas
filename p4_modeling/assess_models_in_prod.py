@@ -4,25 +4,101 @@ from utils.set_up_logging import logger
 import pandas as pd
 import os
 from dotenv import load_dotenv
-'''ImportError: cannot import name 'DataPreparation' from partially initialized module 'main' (most likely due to a circular import) (/Users/nachomondino/Documents/GitHub/predictor-apuestas/main.py)
+from tqdm import tqdm
+from p3_data_preparation import format_data
 from p3_data_preparation.construct_data import determine_result, determine_expected_result
+from p4_modeling import asses_model, betting_strategy # ImportError: cannot import name 'DataPreparation' from partially initialized module 'main' (most likely due to a circular import) (/Users/nachomondino/Documents/GitHub/predictor-apuestas/main.py)
 from p6_deployment import main_next_matches
-from p4_modeling import betting_strategy
-import datetime
-'''
+
+
 # El objetivo es evaluar las predicciones de los mejores modelos de un pais en los ultimos partidos jugados sin tener que hacerlo manualmente.
-def assess_model_in_prod(id_country, n_model, model_name, iteration_date):
 
-    d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-    country = d_countries[id_country]
+def update_test_with_missing(df_ite, country, iteration_date):  # Probar
+    """
+    Creo un df_iteration actualizado con las predicciones de test y las de missing. Actualiza el input para la seleccion de modelos o estrategia de apuesta.
 
-    # Recolecta predicciones de modelo en partidos "missing"
-    df = collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date)
+    # Parameters
+        df_ite
+        country
+        iteration_date
 
-    # Preparo el df 
-    df = prepare_for_betting_strategy(df, country)
-    return df
+    # Return
+        df_ite_updated: Train mas el test actualizado con nuevas metricas segun test y missing. (DataFrame)
+    """
+    # Defino variables
+    df_test = pd.DataFrame()    
 
+    bs = betting_strategy.BettingStrategy(strategy='train')
+    BASE_PATH = f"data/{country}/p4_modeling/{iteration_date}"
+    BASE_PATH_2 = f"data/{country}/p4_modeling/{iteration_date}/assess"
+    # df_train = pd.read_excel(f'{BASE_PATH}/df_iteration_train.xlsx', index_col=0)
+
+    progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
+
+    # Por modelo
+    for idx, row in df_ite.iterrows():
+
+        n_model, model_name = row['n_iteration'], row['model_name']
+        # if self.verbose >= 1:
+        #     logger.info(f'n_model: {n_model} model_name: {model_name}')
+
+        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
+        df_pred = pd.read_excel(f"{BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+        logger.info(df_pred.shape)
+
+
+        # Recolecta predicciones de modelo en partidos "missing"
+        df_pred_missing = collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date)
+        # Agrego columnas result y expected result
+        df_pred_missing = prepare_for_betting_strategy(df_pred_missing, country)
+        # print("A", df_pred_missing)
+
+
+        # Concateno df_pred y df_pred missing.
+        df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
+        # print("B", df_predicciones)
+        # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test.xlsx')
+
+
+        # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
+        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]
+        # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_2.xlsx')
+
+
+        # Volver a calcular metricas   # o llamo a assess_model de main.py????
+        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
+        # print("C", df_predicciones)
+        # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_3.xlsx')
+
+        df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+        _, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
+        d_metrics.update(d_roi)
+        d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
+
+        # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
+        df_predicciones = format_data.map_teams(df_predicciones, country=country)
+
+
+        # Hiperparametros del modelo y Metricas en testeo y train
+        row_test = {'n_iteration': n_model, 'model_name': model_name}
+        row_test.update(d_metrics)
+        df_row_test = pd.DataFrame([row_test])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
+        df_test = pd.concat([df_test, df_row_test], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
+
+        # Exporto datos del modelo
+        df_test.to_excel(f'{BASE_PATH_2}/df_iteration_test.xlsx', index=False)
+        df_predicciones.to_excel(f'{BASE_PATH_2}/{n_model}__{model_name}_predicciones.xlsx', index=True)
+        progress_bar.update(1)
+
+    progress_bar.close()
+
+    # Exporto df_iteration actualizado
+    ## Concateno df_test actualizado con df_train
+    df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')
+    ## Exporto concat
+    df_ite_updated.to_excel(f'{BASE_PATH_2}/df_iteration.xlsx', index=False)
+
+    return df_ite_updated
 
 def collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date):
     """
@@ -31,11 +107,11 @@ def collect_prediction_in_missing_matches(id_country, n_model, model_name, itera
     :return: df_predicciones del modelo en partidos missing
     """
     # Defino variables (no tocar)
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     d_model = {'n_model': n_model, 'model_name': model_name, 'iteration_date': iteration_date} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     # Usar mnm.py con predict_missing=True y data_unders=False.
-    df = main_next_matches.main(d_run, id_country, d_model=d_model, predict_missing=True, no_strategy=True, export=d_run['export'], verbose=0) # Probar un modelo
+    df = main_next_matches.main(d_run, id_country, d_model=d_model, predict_missing=True, export=False, verbose=0) # Probar un modelo
 
     df = df.sort_values(by='date', ascending=False)
     # df.to_excel(f'/Users/nachomondino/Desktop/df_pred_missing_{n_model}.xlsx')
@@ -68,8 +144,7 @@ def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de
 
     ## Determino result y expected result segun goals
     df = determine_result(df) # Intento hacerlo antes con df_match pero rompia.
-    df = determine_expected_result(df, goals_to_xg_ratio=0.3) # Intento hacerlo antes con df_match pero rompia.
-
+    df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
 
     # Por que no calculo ROI y expected roi --> No deberia pues ahora calculo metricas del df_concatenado.. --> Creo que no ahce falta gracias a calculate_roi_by_betting_strategy()
    
@@ -78,62 +153,27 @@ def prepare_for_betting_strategy(df, country):  # Ponerlo como funcion dentro de
     # df_match_odds = asses_model.determine_result_by_bookmaker(df_match_odds, self.var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
     return df
 
-
-def nose():
-    # Calcular metricas de df_predicciones ya sea de missing (?) o de prox partidos para cierto modelo...
-
-    id_country = 77
-    model = 314
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+    
+    id_country = 48
     iteration_date = '2024-12-23'
-    pred_missing = True
 
     # Defino variables
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
 
-    # Obtener predicciones missing
-    if pred_missing:
-        df_pred = collect_prediction_in_missing_matches(id_country=id_country, n_model=model, model_name='LogisticRegression', iteration_date=iteration_date)
-    else:
-        # Levanto predicciones
-        df_pred = pd.read_excel(f'data/{country}/p6_deployment/ASSESS/semana 19/predicciones_{model}.xlsx', index_col=0)
-        print(df_pred)
+    # Levanto df_iteration
+    df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
-    # Eliminar partidos aun no jugados
-    print(len(df_pred))
-    fecha_hoy = datetime.datetime.now()
-    df_pred = df_pred[df_pred['date'] <= fecha_hoy]
-    print(len(df_pred))
+    # Filtro df_ite seleccionado top x% de registros.
+    ## Ordenar los registros por 'metric' en orden descendente
+    df_ite = df_ite.sort_values(by='roi_por_partido', ascending=False)
+    ## Seleccionar el 20% de los registros con los valores más altos de 'metric'
+    cutoff = int(len(df_ite) * 0.02)  # Calcular el 20% superior
+    df_ite_filt = df_ite.iloc[:cutoff]
 
-    # Obtengo result y expected result
-    df_pred = prepare_for_betting_strategy(df_pred, country=country)
-    print(df_pred)
+    print(df_ite_filt)
 
-    # Calculo metricas
-    bs = betting_strategy.BettingStrategy(strategy='train')
-    d_hiper, best_df_pred, best_d_rois  = bs.calculate_roi_by_betting_strategy(df_pred, roi_weight=1)
-
-    print(best_df_pred)
-    print(f'Ganancias sin bank: {best_df_pred['G/P_sin_bank'].sum()}')
-    print(f'Expected Ganancias sin bank: {best_df_pred['expected_G/P_sin_bank'].sum()}')
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    
-    '''
-    # Defino parametros
-    id_country = 148
-    country = 'spain'
-    n_model = 1
-    model_name = "LogisticRegression"
-    iteration_date = "2024-12-03"
-    
-    # Obtengo predicciones en partidos missing
-    df_predicciones = collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date)
-
-    # Exporto datos
-    load_dotenv() 
-    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
-    df_predicciones.to_excel(f'{BASE_DIR_LOCAL}/df_pred_missing_{n_model}.xlsx')
-    '''
-    nose()
+    # Evaluo modelos en test y missing
+    df_ite_updated = update_test_with_missing(df_ite_filt, country, iteration_date)
