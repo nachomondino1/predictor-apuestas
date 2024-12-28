@@ -3,8 +3,8 @@ sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
-from p4_modeling import asses_model, select_model_for_prod
-from p6_deployment.assess_models_in_prod import assess_model_in_prod
+from p4_modeling.asses_model import calculate_combined_metric, calculate_roi
+from p4_modeling import select_model_for_prod
 from utils import directories
 
 
@@ -408,10 +408,10 @@ class BettingStrategy:
                             df_aux = self.determine_stake_to_bet(df2, type_relation=key, m=m, b=b, p1=p1, p2=p2, odd_weight=odd_weight, dif_prob_sup_cap=lim_sup, normalized=normalized)
 
                             # Calculo ROI
-                            df_pred, d_metrics = asses_model.calculate_roi(df_aux)   # (calculate_reality_roi(df_aux)) if strategy == 'reality' else (calculate_roi(df_aux))
+                            df_pred, d_metrics = calculate_roi(df_aux)   # (calculate_reality_roi(df_aux)) if strategy == 'reality' else (calculate_roi(df_aux))
 
                             # Calculo expected ROI
-                            df_pred_2, d_expected_roi = asses_model.calculate_roi(df_aux, name_extension='expected_')     
+                            df_pred_2, d_expected_roi = calculate_roi(df_aux, name_extension='expected_')     
 
                             # Concateno datos de ROI y Expected ROI
                             missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
@@ -466,7 +466,7 @@ class BettingStrategy:
         metric_col = f'metric{name_extension}'
 
         # Calcular metrica combinada para determinar mejor estrategia
-        df = asses_model.calculate_metric(df, roi_weight=roi_weight, name_extension=name_extension)
+        df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
         # df.to_excel("/Users/nachomondino/Desktop/prueba.xlsx", index=True)
         
         # Seleccionar mejor estrategia
@@ -508,6 +508,7 @@ class BettingStrategy:
         df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
         logger.info(df_pred.shape)
         
+        '''
         # (opcional) Hacer assess --> Lo haria solo para los pocos modelos que pasan el filtro inicial.
         if with_assess: # Hay que ver si funciona...
 
@@ -523,7 +524,8 @@ class BettingStrategy:
             if self.verbose >= 2:
                 # Exporto predicciones concatenado
                 df_pred.to_excel(f"{self.path_predic}/predicciones_raw_{n_model}_{model_name}.xlsx") # df_predicciones???
-        
+        '''
+
         # Determino la mejor estrategia de apuesta
         if self.verbose >= 1:
             logger.info("Calculando la mejor estrategia de apuesta...")
@@ -554,7 +556,7 @@ class BettingStrategy:
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 148
+    id_country = 77
 
     # Defino hiperparametros
     select_best_model = True
@@ -567,6 +569,11 @@ if __name__ == "__main__":
     iteration_date = d_countries[id_country][1]
     bs = BettingStrategy(country, iteration_date, strategy=strategy)
 
+
+    # Actualizar df_prediccion test con missing?
+    # ... 
+
+    # Seleccion del modelo
     if select_best_model:
         perc_cutoff = 0.05
 
@@ -577,7 +584,7 @@ if __name__ == "__main__":
         df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
         # Selecciono el mejor modelo
-        row = sbm.main(df_ite, perc_cutoff=perc_cutoff, with_assess=with_assess)
+        row = sbm.main(df_ite, perc_cutoff=perc_cutoff)
         roi_weight_strategy = sbm.roi_weight
 
     else:
@@ -586,7 +593,7 @@ if __name__ == "__main__":
         row = df.head(1) # Selecciono la primera fila
         logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
-    # PASO 5: Determinar estrategia de apuesta optima para el modelo seleccionado
+    # Determinar estrategia de apuesta optima para el modelo seleccionado
     bs.define_betting_strategy(row=row, roi_weight=roi_weight_strategy, with_assess=with_assess)
 
 
