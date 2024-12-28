@@ -9,6 +9,22 @@ from tqdm import tqdm
 import datetime
 
 
+def concat_test_and_missing():
+    # Recalcular metricas.
+    # Por modelo
+    for idx, row in df.iterrows():
+
+        n_model, model_name = row['n_iteration'], row['model_name']
+        # if self.verbose >= 1:
+        #     logger.info(f'n_model: {n_model} model_name: {model_name}')
+
+        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
+        df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+        logger.info(df_pred.shape)
+    
+    # progress_bar.close()
+    pass
+
 class SelectBestModel():
 
     def __init__(self, id_country, iteration_date: str, verbose: int = 1):
@@ -73,7 +89,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 2
-    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.45):
+    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.4):
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
@@ -116,45 +132,12 @@ class SelectBestModel():
 
         # Lista para almacenar los resultados
         logger.info("Paso 3: Descartando modelos según relleno de nan values en df_test...")
-        progress_bar = tqdm(total=len(df), ncols=80)  # Inicializo barra de progreso
-        
-        # Por modelo
-        for idx, row in df.iterrows():
 
-            n_model, model_name = row['n_iteration'], row['model_name']
-            # if self.verbose >= 1:
-            #     logger.info(f'n_model: {n_model} model_name: {model_name}')
-
-            # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
-            df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-            logger.info(df_pred.shape)
-
-            # Calculo metricas sobre relleno de nan
-            rows_filled = df_pred[df_pred['player_emergency_fill'] == 1].index
-            rows_not_filled = df_pred[df_pred['player_emergency_fill'] != 1].index
-            # print(len(rows_filled), len(rows_not_filled))
-            
-            gp_filled = df_pred.loc[rows_filled, 'G/P_sin_bank'].sum()
-            gp_not_filled = df_pred.loc[rows_not_filled, 'G/P_sin_bank'].sum()
-            average_col_filled = df_pred['n_col_filled'].sum() / len(df_pred)
-
-            # Agrego columnas sobre relleno de nan en df_test en df
-            ## Cantidad de registros rellenados y average de columnas rellenadas
-            df.loc[idx, 'n_matches_filled'] = len(rows_filled)
-            df.loc[idx, 'average_col_filled'] = average_col_filled
-            ## G/P cuando relleno y G/P cuando no relleno
-            df.loc[idx, 'sum_gp_filled'] = gp_filled
-            df.loc[idx, 'sum_gp_not_filled'] = gp_not_filled
-            df.loc[idx, '%_gp_filled'] = int(gp_filled / (gp_filled + gp_not_filled) * 100)
-            df.loc[idx, '%_gp_not_filled'] = int(gp_not_filled / (gp_filled + gp_not_filled) * 100)
-            progress_bar.update(1)  
-        
-        progress_bar.close()
-
-        # Eliminar modelos con G/P provenientes de relleno nan...
+        # Determino thresholds 
         median_gp_filled = np.percentile(df['%_gp_filled'], 75)
         mean_n_cols_filled =  np.percentile(df['average_col_filled'], 75) 
 
+        # Eliminar modelos con G/P provenientes de relleno nan...
         df_filt = df[(df['%_gp_filled'] <= median_gp_filled) & (df['average_col_filled'] <= mean_n_cols_filled)]
 
         if self.verbose >= 0:

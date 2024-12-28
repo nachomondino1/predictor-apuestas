@@ -939,7 +939,7 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = True, compare_tuning: bool = False, export: bool = True):
+                    bayes: bool = False, compare_tuning: bool = False, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         
@@ -1056,7 +1056,7 @@ class Modeling:
         Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
         """
         # Defino variables
-        bs = betting_strategy.BettingStrategy(strategy='train')
+        bs = betting_strategy.BettingStrategy(country=self.country, strategy='train')  # Al no pasarle iteration_date no inicializa directories de betting strategy
         self.var_pred_bm = 'bookmaker_result'  
         y_test = df_pred_proba[self.var_resp].values  # Etiquetas reales
         y_pred = df_pred_proba[self.var_pred].values  # Predicciones del modelo
@@ -1122,6 +1122,52 @@ class Modeling:
         d_hiper, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)
 
+
+
+        # Agrego columnas a df_test ?????  --> Pasar a funcion y poner en assess_model.py?
+        # Calculo metricas sobre relleno de nan
+        rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
+        rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+        # print(len(rows_filled), len(rows_not_filled))
+        
+        # G/P segun relleno de NaN
+        gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
+        gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
+        gp_total = df_predicciones['G/P_sin_bank'].sum()
+        average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
+
+        # Por resultado
+        df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
+        df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
+        df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
+        ## G/P por resultado
+        gp_home = df_pred_home['G/P_sin_bank'].sum()
+        gp_draw = df_pred_draw['G/P_sin_bank'].sum()
+        gp_away = df_pred_away['G/P_sin_bank'].sum()
+        ## Precision por resultado
+        prec_home = int( df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
+        prec_draw = int( df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
+        prec_away = int( df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
+
+        # Agrego columnas sobre relleno de nan en df_test en df
+        d_metrics.update({
+            ## Cantidad de registros rellenados y average de columnas rellenadas
+            'n_matches_filled': len(rows_filled),
+            'average_col_filled': average_col_filled,
+            ## G/P cuando relleno y G/P cuando no relleno
+            'sum_gp_filled': gp_filled, 
+            'sum_gp_not_filled': gp_not_filled,
+            '%_gp_filled': int(gp_filled / (gp_total) * 100),
+            '%_gp_not_filled': int(gp_not_filled / (gp_total) * 100),
+            'sum_gp_home': gp_home,
+            'sum_gp_draw': gp_draw,
+            'sum_gp_away': gp_away,
+            'precision_home': prec_home,
+            'precision_draw': prec_draw,
+            'precision_away': prec_away
+            }
+        )
+    
        # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
         df_predicciones = self.map_teams(df_predicciones)
 
