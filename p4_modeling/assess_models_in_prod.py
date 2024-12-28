@@ -11,9 +11,7 @@ from p4_modeling import asses_model, betting_strategy # ImportError: cannot impo
 from p6_deployment import main_next_matches
 
 
-# El objetivo es evaluar las predicciones de los mejores modelos de un pais en los ultimos partidos jugados sin tener que hacerlo manualmente.
-
-def update_test_with_missing(df_ite, country, iteration_date):  # Probar
+def update_test_with_missing(df_ite, country, iteration_date):
     """
     Creo un df_iteration actualizado con las predicciones de test y las de missing. Actualiza el input para la seleccion de modelos o estrategia de apuesta.
 
@@ -42,30 +40,21 @@ def update_test_with_missing(df_ite, country, iteration_date):  # Probar
         # if self.verbose >= 1:
         #     logger.info(f'n_model: {n_model} model_name: {model_name}')
 
-        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
+        # Levanto df_predicciones de test
         df_pred = pd.read_excel(f"{BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
         logger.info(df_pred.shape)
 
-
         # Recolecta predicciones de modelo en partidos "missing"
         df_pred_missing = collect_prediction_in_missing_matches(id_country, n_model, model_name, iteration_date)
-        # Agrego columnas result y expected result
-        df_pred_missing = prepare_for_betting_strategy(df_pred_missing, country)
+        df_pred_missing = prepare_for_betting_strategy(df_pred_missing, country)  #  Agrego columnas result y expected result
         # print("A", df_pred_missing)
-
 
         # Concateno df_pred y df_pred missing.
         df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
-        # print("B", df_predicciones)
-        # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test.xlsx')
-
-
-        # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]
+        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']] # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
         # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_2.xlsx')
 
-
-        # Volver a calcular metricas   # o llamo a assess_model de main.py????
+        # Volver a calcular metricas con test + missing
         df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
         # print("C", df_predicciones)
         # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_3.xlsx')
@@ -77,7 +66,6 @@ def update_test_with_missing(df_ite, country, iteration_date):  # Probar
 
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
         df_predicciones = format_data.map_teams(df_predicciones, country=country)
-
 
         # Hiperparametros del modelo y Metricas en testeo y train
         row_test = {'n_iteration': n_model, 'model_name': model_name}
@@ -91,11 +79,9 @@ def update_test_with_missing(df_ite, country, iteration_date):  # Probar
         progress_bar.update(1)
 
     progress_bar.close()
-
     # Exporto df_iteration actualizado
-    ## Concateno df_test actualizado con df_train
-    df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')
-    ## Exporto concat
+    df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
+    df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  # Concateno df_test actualizado con df_ite
     df_ite_updated.to_excel(f'{BASE_PATH_2}/df_iteration.xlsx', index=False)
 
     return df_ite_updated
