@@ -1024,9 +1024,20 @@ class Modeling:
                 f'prob_class_{self.classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=X_test.index)
         
-
         # Calculo metricas
-        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export)
+        df_predicciones, d_metrics = asses_model.calculate_metrics(df_pred_proba, country=self.country, retrain=retrain, export=export)
+
+        # Construyo expected results
+        df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+
+        # Calculo ROI
+        bs = betting_strategy.BettingStrategy(strategy='train')  # Al no pasarle iteration_date no inicializa directories de betting strategy
+        _, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
+        d_metrics.update(d_roi)
+        d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
+
+        # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
+        df_predicciones = format_data.map_teams(df_predicciones, country=self.country)
 
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1051,144 +1062,6 @@ class Modeling:
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array      
         return y_pred_prob, y_pred
     
-    def calculate_metrics(self, df_pred_proba: pd.DataFrame, retrain: bool = False, export: bool = False):
-        """
-        Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
-        """
-        # Defino variables
-        bs = betting_strategy.BettingStrategy(country=self.country, strategy='train')  # Al no pasarle iteration_date no inicializa directories de betting strategy
-        self.var_pred_bm = 'bookmaker_result'  
-        y_test = df_pred_proba[self.var_resp].values  # Etiquetas reales
-        y_pred = df_pred_proba[self.var_pred].values  # Predicciones del modelo
-
-        # Calculo metricas
-        test_accuracy = accuracy_score(y_test, y_pred) * 100
-        recall = recall_score(y_test, y_pred, average='macro') * 100
-        f1 = f1_score(y_test, y_pred, average='macro') * 100
-        d_metrics = {'test_accuracy': test_accuracy, 'recall': recall, 'f1_score': f1}
-        if self.verbose >= 1:
-            # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-            df_conf_mat = asses_model.confusion_matrix(y_test, y_pred)
-            if export:
-                df_conf_mat.to_excel(f'{self.base_path}/modeling/df_conf_matrix.xlsx')
-
-
-        ## df_match --> # Podria levantar el df_match para agregar equipos y saber que partido es cada cual en el df_predicciones... tal como hago en produccion.
-        path_match = f'data/{self.country}/p6_deployment/missing/old_updated/df_match.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match.xlsx'
-        df_match = pd.read_excel(path_match, index_col=0) # --> missing no lo necesita y el otro si?
-        df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']] 
-        # Determino expected ROI --> Lo uso en calculate_roi...
-        df_match = df_match[df_match.index.isin(df_pred_proba.index)]
-        # df_match = df_match.reindex(df_pred_proba.index
-
-        # Df_match_odds
-        path_match_odds = f'data/{self.country}/p6_deployment/missing/old_updated/df_match_odds.xlsx' if retrain else f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx'
-        df_match_odds = pd.read_excel(path_match_odds, index_col=0) # --> missing no lo necesita y el otro si?
-        # Filtro df_match_odds dejando solo los partidos de X_test
-        df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]  # Selecciono los partidos que estan en df_test
-        df_match_odds = df_match_odds.reindex(df_pred_proba.index)  # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-        
-        if self.verbose >= 2:
-            logger.info(f"Path odds: {path_match_odds}")
-            logger.info(df_match_odds)
-
-        # Agrego predicciones de bookmaker
-        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-        df_match_odds = asses_model.determine_result_by_bookmaker(df_match_odds, self.var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
-        y_pred_bm = df_match_odds[self.var_pred_bm].values
-
-        # Calculo precision de casa de apuesta
-        test_precision_bookmaker = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
-        dif_prec = test_accuracy - test_precision_bookmaker
-        d_metrics.update({'test_accuracy_bm': test_precision_bookmaker, 'dif_prec_bm': dif_prec})
-        
-
-        # Calculo distribucion en df_predicciones? .... lo guardo en df_metrics pues luego va a df_test.
-        d_distrib = asses_model.determine_distribution(df_pred_proba)
-        d_metrics.update(d_distrib)
-
-
-        # Levanto relleno de nan df df_test
-        df_filled = pd.read_excel(f'./data/{self.country}/p3_data_preparation/treat_nan/df_filled_columns.xlsx', index_col=0)
-        df_filled_filt = df_filled.loc[:, ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled']]  # las num_columns_filled no tiene en cuenta si la columna fue seleccionada o no.
-        # logger.info(df_filled)
-
-        # Concateno dfs --> Concateno antes de calcular ROI porque alli uso cuotas y expected result de df_match_odds y de df_match respectivamente
-        df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_filled_filt], axis=1) # Concatenar "player_emergency_fill"... 
-
-
-        # Calculo ROI
-        df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
-        d_hiper, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
-        d_metrics.update(d_roi)
-
-
-
-        # Agrego columnas a df_test ?????  --> Pasar a funcion y poner en assess_model.py?
-        # Calculo metricas sobre relleno de nan
-        rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
-        rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
-        # print(len(rows_filled), len(rows_not_filled))
-        
-        # G/P segun relleno de NaN
-        gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
-        gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
-        gp_total = df_predicciones['G/P_sin_bank'].sum()
-        average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
-
-        # Por resultado
-        df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
-        df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
-        df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
-        ## G/P por resultado
-        gp_home = df_pred_home['G/P_sin_bank'].sum()
-        gp_draw = df_pred_draw['G/P_sin_bank'].sum()
-        gp_away = df_pred_away['G/P_sin_bank'].sum()
-        ## Precision por resultado
-        prec_home = int( df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
-        prec_draw = int( df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
-        prec_away = int( df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
-
-        # Agrego columnas sobre relleno de nan en df_test en df
-        d_metrics.update({
-            ## Cantidad de registros rellenados y average de columnas rellenadas
-            'n_matches_filled': len(rows_filled),
-            'average_col_filled': average_col_filled,
-            ## G/P cuando relleno y G/P cuando no relleno
-            'sum_gp_filled': gp_filled, 
-            'sum_gp_not_filled': gp_not_filled,
-            '%_gp_filled': int(gp_filled / (gp_total) * 100),
-            '%_gp_not_filled': int(gp_not_filled / (gp_total) * 100),
-            'sum_gp_home': gp_home,
-            'sum_gp_draw': gp_draw,
-            'sum_gp_away': gp_away,
-            'precision_home': prec_home,
-            'precision_draw': prec_draw,
-            'precision_away': prec_away
-            }
-        )
-    
-       # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
-        df_predicciones = self.map_teams(df_predicciones)
-
-        if self.verbose >=1:
-            print(d_metrics)
-
-        return df_predicciones, d_metrics
-
-    def map_teams(self, df):
-        """
-        Convierto id_team_home e id_team_away de ids a nombre de equipos.
-        """
-        # Levanto df_teams
-        df_teams = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
-
-        # Revierto etiquetas para tener nombres de equipos en vez de ids
-        d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
-        df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
-        df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
-        return df
-
     def train_and_assess_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
         """
         Pruebo varios modelos 

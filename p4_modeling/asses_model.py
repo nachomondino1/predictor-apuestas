@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn import metrics
 from utils.set_up_logging import logger
+from sklearn import metrics
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+from p3_data_preparation import construct_data
+
 
 def confusion_matrix(y_real, y_pred):
     """
@@ -276,7 +279,7 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def calculate_metric(df, roi_weight: float = 0.75, name_extension: str = '', normalize: bool = True):
+def calculate_combined_metric(df, roi_weight: float = 0.75, name_extension: str = '', normalize: bool = True):
     """
     Calcula la métrica combinada según 'roi_por_partido' y 'expected_roi_por_partido'.
     Normaliza las columnas antes del cálculo, asigna el resultado a una nueva columna llamada 'metric' y retorna el DataFrame.
@@ -328,7 +331,7 @@ def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected
     logger.info(f"La correlacion entre {roi_col} y {expected_roi_col} es de {correlacion}")
 
     min_high_corr = 0.4
-    max_low_corr = 0.2
+    max_low_corr = 0.25
 
     # Si la correlacion es alta
     if abs(correlacion) >= min_high_corr:
@@ -344,6 +347,126 @@ def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected
     logger.critical(f"El roi_weight a usar es {value}. Es decir, un peso de {value*100:.0f}% para el ROI y de {(1-value)*100:.0f}% para el Expected ROI")
     return value
 
+
+# Simplificar...
+def calculate_metrics( 
+        df_pred_proba: pd.DataFrame,
+        country: str,
+        var_resp: str = 'result',
+        var_pred: str = 'predicted_result',
+        var_pred_bm: str = 'bookmaker_result',
+        retrain: bool = False,
+        verbose: int = 0,
+        export: bool = False):
+    """
+    Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
+    """
+    # Defino variables
+    y_test = df_pred_proba[var_resp].values  # Etiquetas reales
+    y_pred = df_pred_proba[var_pred].values  # Predicciones del modelo
+    base_path = f'./data/{country}/p4_modeling'
+
+    # Calculo métricas básicas
+    d_metrics = {
+        'test_accuracy': accuracy_score(y_test, y_pred) * 100,
+        'recall': recall_score(y_test, y_pred, average='macro') * 100,
+        'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
+    }
+
+    if verbose >= 1:
+        # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
+        df_conf_mat = confusion_matrix(y_test, y_pred)
+        if export:
+            df_conf_mat.to_excel(f'{base_path}/modeling/df_conf_matrix.xlsx')
+
+    # Procesar df_match y df_match_odds
+    df_match = load_file_by_condition(country=country, retrain=retrain, file_name="df_match.xlsx")
+    df_match_odds = load_file_by_condition(country=country, retrain=retrain, file_name="df_match_odds.xlsx")
+    if verbose >= 2:
+        logger.info(df_match_odds)
+
+    indices_to_use = df_pred_proba.index  # Selecciono los partidos que estan en df_test
+    df_match = df_match[df_match.index.isin(indices_to_use)].reindex(indices_to_use)
+    df_match_odds = df_match_odds[df_match_odds.index.isin(indices_to_use)].reindex(indices_to_use) # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+
+    # Calculo metricas de bookie
+    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
+    df_match_odds = determine_result_by_bookmaker(df_match_odds, var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
+    y_pred_bm = df_match_odds[var_pred_bm].values
+
+    d_metrics.update({
+        'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
+        'dif_prec_bm': d_metrics['test_accuracy'] - accuracy_score(y_test, y_pred_bm) * 100,
+    })
+
+    # Concatenación selectiva
+    df_filled = pd.read_excel(f'./data/{country}/p3_data_preparation/treat_nan/df_filled_columns.xlsx', index_col=0)
+    columns_to_concat = [
+        df_match[['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']],
+        df_match_odds,
+        df_pred_proba,
+        df_filled[['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled']]
+    ]
+    df_predicciones = pd.concat(columns_to_concat, axis=1)
+
+    if verbose >=1:
+        print(d_metrics)
+
+    return df_predicciones, d_metrics
+
+def calculate_advanced_metrics(df_predicciones):
+
+    d_distrib = determine_distribution(df_predicciones)
+
+    # Calculo metricas sobre relleno de nan
+    rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
+    rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+    # print(len(rows_filled), len(rows_not_filled))
+    
+    # G/P segun relleno de NaN
+    gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
+    gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
+    gp_total = df_predicciones['G/P_sin_bank'].sum()
+    average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
+
+    # Por resultado
+    df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
+    df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
+    df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
+    ## G/P por resultado
+    gp_home = df_pred_home['G/P_sin_bank'].sum()
+    gp_draw = df_pred_draw['G/P_sin_bank'].sum()
+    gp_away = df_pred_away['G/P_sin_bank'].sum()
+    ## Precision por resultado
+    prec_home = int( df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
+    prec_draw = int( df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
+    prec_away = int( df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
+
+    d = {
+        # Cantidad de registros rellenados y average de columnas rellenadas
+        'n_matches_filled': len(rows_filled),
+        'average_col_filled': average_col_filled,
+        # G/P cuando relleno y G/P cuando no relleno
+        'sum_gp_filled': gp_filled, 
+        'sum_gp_not_filled': gp_not_filled,
+        '%_gp_filled': int(gp_filled / (gp_total) * 100),
+        '%_gp_not_filled': int(gp_not_filled / (gp_total) * 100),
+        # Distribucion de bets por resultado
+        **d_distrib,
+        # G/P por resultado
+        'sum_gp_home': gp_home,
+        'sum_gp_draw': gp_draw,
+        'sum_gp_away': gp_away,
+        # Precision por resultado
+        'precision_home': prec_home,
+        'precision_draw': prec_draw,
+        'precision_away': prec_away
+        }
+    return d
+
+def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
+    subpath = f"data/{country}/p6_deployment/missing/old_updated" if retrain else f'data/{country}/p2_data_understanding'
+    return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
