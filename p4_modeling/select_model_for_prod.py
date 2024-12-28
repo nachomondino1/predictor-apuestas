@@ -4,26 +4,10 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
-from p4_modeling.asses_model import calculate_metric, asignar_roi_weight
+from p4_modeling.asses_model import calculate_combined_metric, asignar_roi_weight
 from tqdm import tqdm
 import datetime
 
-
-def concat_test_and_missing():
-    # Recalcular metricas.
-    # Por modelo
-    for idx, row in df.iterrows():
-
-        n_model, model_name = row['n_iteration'], row['model_name']
-        # if self.verbose >= 1:
-        #     logger.info(f'n_model: {n_model} model_name: {model_name}')
-
-        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
-        df_pred = pd.read_excel(f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-        logger.info(df_pred.shape)
-    
-    # progress_bar.close()
-    pass
 
 class SelectBestModel():
 
@@ -68,7 +52,7 @@ class SelectBestModel():
 
         # Calculo metrica combinada
         self.roi_weight = asignar_roi_weight(df)  # Segun correlacion entre ROI y Expected ROI
-        df = calculate_metric(df, roi_weight=self.roi_weight, name_extension=name_extension)
+        df = calculate_combined_metric(df, roi_weight=self.roi_weight, name_extension=name_extension)
 
         # Eliminar registros con 'metric' < 0
         df = df[df[self.metric_col] >= 0]
@@ -174,7 +158,7 @@ class SelectBestModel():
             raise ValueError
 
     # Main
-    def main(self, df, perc_cutoff:float = 0.2, with_assess: bool = False):
+    def main(self, df, perc_cutoff:float = 0.2):
         """
         Determino el modelo a usar en produccion
         """
@@ -203,9 +187,6 @@ if __name__ == "__main__":
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
 
-    # Parametros de ejecucion
-    with_assess = False
-
     # Creo objeto de clase select_best_model
     sbm = SelectBestModel(id_country=id_country, iteration_date=iteration_date)
 
@@ -213,7 +194,7 @@ if __name__ == "__main__":
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
     # Selecciono el mejor modelo
-    row = sbm.main(df_ite, perc_cutoff=0.05, with_assess=with_assess)
+    row = sbm.main(df_ite, perc_cutoff=0.05)
 
 
 
