@@ -67,15 +67,13 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, extrac
             logger.warning("No hay predicciones de partidos missing...")
             df_predicciones = df_pred.copy()
 
-        # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]
-         # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_2.xlsx')
-
         # Volver a calcular metricas con test + missing
+        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
         df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
         # print("C", df_predicciones)
         # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_3.xlsx')
 
+        # Calculo ROI y metricas que faltan
         df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
         _, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)

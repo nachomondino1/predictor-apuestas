@@ -11,7 +11,7 @@ def main(
         id_country, 
         country, 
         iteration_date,
-        first_cutoff: float = 0.01,
+        first_cutoff: float = 0.015, # 0.02 creo que es muy grande. Salvo que la diferencia de ROI sea pequeña como en SPA...
         assess: bool = True, 
         select_best_model: bool = True, 
         strategy: str = 'general'
@@ -38,13 +38,13 @@ def main(
     roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
     # roi_weight = 0.75 if with_assess else None
 
-    # (0) Filtro df_ite seleccionado top x% de registros.
+    # (0) Filtro df_ite seleccionado top x% de registros. --> Hacerlo segun el roi_por_partido maximo menos un 20%... para evaluar los modelos realmente buenos...
     df_ite = df_ite.sort_values(by='roi_por_partido', ascending=False) ## Ordenar los registros por 'metric' en orden descendente
     cutoff = int(len(df_ite) * first_cutoff)  # Calcular el 20% superior
     df_ite_filt = df_ite.iloc[:cutoff] ## Seleccionar el 20% de los registros con los valores más altos de 'metric'
     print(df_ite_filt)
 
-    # (1) Actualizar df_prediccion test con missing?
+    # (1) Actualizar df_prediccion test con missing? --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
@@ -75,7 +75,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 55
+    id_country = 48
 
     # Defino hiperparametros
     asssess_models_in_prod = True
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
         77: ["italy", '2024-12-23'], 
-        148: ["spain", '2024-12-28'], 
+        148: ["spain", '2024-12-25'], 
         167: ["usa", '2024-12-05']
         }
     country = d_countries[id_country][0]
