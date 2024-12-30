@@ -10,22 +10,31 @@ from utils import directories
 
 class BettingStrategy:
 
-    def __init__(self, country: str = None, iteration_date: str = None, strategy: str = "general", verbose: int = 0):
+    def __init__(self, country: str = None, iteration_date: str = None, strategy: str = "general", d_paths: dict = None, verbose: int = 0):
         self.country = country
         self.iteration_date = iteration_date
         self.strategy = strategy
         self.verbose = verbose
-
-        if self.iteration_date is not None:
-            self.initialize_directories()
+        self.d_paths = d_paths
+        self.initialize_directories()
 
     def initialize_directories(self):
         
-        self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
-        self.BASE_PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_models'
+        # Si se quiere guardar los datos:
+        if self.iteration_date is not None:
 
-        directories.make_directories(l_directorios=[self.BASE_PATH_sbm])
+            # Si no pasaron d_paths
+            if self.d_paths is None:
+
+                self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
+                self.BASE_PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_model'
+                directories.make_directories(l_directorios=[self.BASE_PATH_sbm])
         
+            else:
+                # Si pasaron d_paths
+                self.BASE_PATH = self.d_paths['base_path']
+                self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
+
     def define_hiperparameters(self):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
@@ -504,7 +513,7 @@ class BettingStrategy:
 
         # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
         if with_assess:
-            path_pred = f"{self.BASE_PATH}/assess/{n_model}__{model_name}_predicciones.xlsx"
+            path_pred = f"{self.BASE_PATH_sbm}/1_assess/{n_model}__{model_name}_predicciones.xlsx"
             logger.warning("Levanto predicciones test con missing...")
         else:
             path_pred = f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx"

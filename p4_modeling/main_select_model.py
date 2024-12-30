@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
+import datetime
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 
 
@@ -28,6 +29,8 @@ def main(
     # Return
         Modelo a usar en produccion con su estrategia de apuesta optima (teniendo en cuenta test + missing). 
     """
+    d_paths = initialize_directories(country, iteration_date)
+    
     # Defino parametros --> Futuros argumentos
     second_cutoff = 1 if assess else 0.05
 
@@ -49,7 +52,7 @@ def main(
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
         # Evaluo modelos en test y missing
-        df_ite_filt = assess_models_in_prod.update_test_with_missing(df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date)
+        df_ite_filt = assess_models_in_prod.update_test_with_missing(df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
         # df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/assess/df_iteration.xlsx')
 
     logger.info(df_ite_filt)
@@ -57,7 +60,7 @@ def main(
     # (2) Seleccion del modelo
     if select_best_model:
         # Creo objeto de clase select_best_model
-        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date)
+        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, d_paths=d_paths)
 
         # Selecciono el mejor modelo
         row = sbm.main(df_ite_filt, roi_weight=roi_weight, perc_cutoff=second_cutoff)
@@ -69,13 +72,39 @@ def main(
         logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
     # (3) Determinar estrategia de apuesta optima para el modelo seleccionado
-    bs = betting_strategy.BettingStrategy(country, iteration_date, strategy=strategy)
+    bs = betting_strategy.BettingStrategy(country, iteration_date, strategy=strategy, d_paths=d_paths)
     bs.define_betting_strategy(row=row, roi_weight=roi_weight, with_assess=assess)
     
+def initialize_directories(country, iteration_date):
+    """
+    Guardar seleccion de modelo vieja en carpeta
+    """
+    fecha_hoy = datetime.datetime.now().date()
+    
+    base_path = f"data/{country}/p4_modeling/{iteration_date}"
+    base_path_sbm = f"{base_path}/best_model"
+    directories.make_directories(l_directorios=[base_path_sbm]) # Por si nunca corri el main_select para el pais.
+
+    d_paths = {
+        'base_path': base_path,
+        'base_path_sbm': base_path_sbm,
+        'path_old': f'{base_path_sbm}/old/{fecha_hoy}',
+        'path_assess': f'{base_path_sbm}/1_assess/',
+        'path_select': f'{base_path_sbm}/2_select_model/',
+    }
+
+    # Mover anterior seleccion y assess a old..
+    directories.mover_archivo(origen=d_paths['path_assess'], destino=d_paths['path_old'])
+    directories.mover_archivo(origen=d_paths['path_select'], destino=d_paths['path_old'])
+
+    # Creo directorios para nuevo assess y seleccion
+    directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select']])
+    return d_paths
+
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 48
+    id_country = 77
 
     # Defino hiperparametros
     asssess_models_in_prod = True

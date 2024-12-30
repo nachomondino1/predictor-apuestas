@@ -12,7 +12,7 @@ from p4_modeling import asses_model, betting_strategy # ImportError: cannot impo
 from p6_deployment import main_next_matches
 
 
-def update_test_with_missing(df_ite, id_country, country, iteration_date, extract_missing: bool = True):
+def update_test_with_missing(df_ite, id_country, country, iteration_date, path_save, extract_missing: bool = True):
     """
     Creo un df_iteration actualizado con las predicciones de test y las de missing. Actualiza el input para la seleccion de modelos o estrategia de apuesta.
 
@@ -26,11 +26,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, extrac
     """
     # Defino variables
     df_test = pd.DataFrame()    
-
-    bs = betting_strategy.BettingStrategy(strategy='train')
-    BASE_PATH = f"data/{country}/p4_modeling/{iteration_date}"
-    BASE_PATH_2 = f"data/{country}/p4_modeling/{iteration_date}/assess"
-    directories.make_directories(l_directorios=[BASE_PATH_2])
+    bs = betting_strategy.BettingStrategy(strategy='train') # no le paso iteration_date para que no guarde datos
 
     # Extraer missing
     if extract_missing:
@@ -49,7 +45,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, extrac
         #     logger.info(f'n_model: {n_model} model_name: {model_name}')
 
         # Levanto df_predicciones de test
-        df_pred = pd.read_excel(f"{BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+        df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
         logger.info(df_pred.shape)
 
         # Recolecta predicciones de modelo en partidos "missing"
@@ -89,15 +85,15 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, extrac
         df_test = pd.concat([df_test, df_row_test], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
         # Exporto datos del modelo
-        df_test.to_excel(f'{BASE_PATH_2}/df_iteration_test.xlsx', index=False)
-        df_predicciones.to_excel(f'{BASE_PATH_2}/{n_model}__{model_name}_predicciones.xlsx', index=True)
+        df_test.to_excel(f'{path_save}/df_iteration_test.xlsx', index=False)
+        df_predicciones.to_excel(f'{path_save}/{n_model}__{model_name}_predicciones.xlsx', index=True)
         progress_bar.update(1)
 
     progress_bar.close()
     # Exporto df_iteration actualizado
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
     df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  # Concateno df_test actualizado con df_ite
-    df_ite_updated.to_excel(f'{BASE_PATH_2}/df_iteration.xlsx', index=False)
+    df_ite_updated.to_excel(f'{path_save}/df_iteration.xlsx', index=False)
 
     return df_ite_updated
 
@@ -161,6 +157,11 @@ if __name__ == "__main__":
     # Defino variables
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
+
+    # Directorios
+    BASE_PATH = f"data/{country}/p4_modeling/{iteration_date}"
+    BASE_PATH_2 = f"data/{country}/p4_modeling/{iteration_date}/assess"
+    directories.make_directories(l_directorios=[BASE_PATH_2])
 
     # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")

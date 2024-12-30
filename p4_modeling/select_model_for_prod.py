@@ -11,11 +11,12 @@ import datetime
 
 class SelectBestModel():
 
-    def __init__(self, id_country, iteration_date: str, verbose: int = 1):
+    def __init__(self, id_country, iteration_date: str, d_paths: dict = None, verbose: int = 1):
         self.id_country = id_country
         self.iteration_date = iteration_date
-        self.inicialize_directories()
         self.verbose = verbose
+        self.d_paths = d_paths
+        self.inicialize_directories()
 
     def inicialize_directories(self):
         """
@@ -24,12 +25,19 @@ class SelectBestModel():
         d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
         country = d_countries[self.id_country]
 
-        self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
-        self.PATH_sbm = f'{self.BASE_PATH}/best_models' 
-        self.path_old_sbm = f'{self.BASE_PATH}/best_models_old/{datetime.datetime.now().date()}' 
+        # Si aun no inicialice directorios
+        if self.d_paths is None:
+            self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
+            self.PATH_sbm = f'{self.BASE_PATH}/best_model' 
+            self.path_old_sbm = f'{self.BASE_PATH}/best_model_old/{datetime.datetime.now().date()}' 
 
-        directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
-        directories.make_directories(l_directorios=[self.PATH_sbm])
+            directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
+            directories.make_directories(l_directorios=[self.PATH_sbm])
+
+        # Si ya inicialice directorios
+        else:
+            self.BASE_PATH = self.d_paths['base_path']
+            self.PATH_sbm = self.d_paths['base_path_sbm']
 
     # Paso 1
     def filter_models_by_roi(self, df, perc_cutoff, roi_weight):
