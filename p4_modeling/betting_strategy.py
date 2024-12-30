@@ -10,22 +10,31 @@ from utils import directories
 
 class BettingStrategy:
 
-    def __init__(self, country: str = None, iteration_date: str = None, strategy: str = "general", verbose: int = 0):
+    def __init__(self, country: str = None, iteration_date: str = None, strategy: str = "general", d_paths: dict = None, verbose: int = 0):
         self.country = country
         self.iteration_date = iteration_date
         self.strategy = strategy
         self.verbose = verbose
-
-        if self.iteration_date is not None:
-            self.initialize_directories()
+        self.d_paths = d_paths
+        self.initialize_directories()
 
     def initialize_directories(self):
         
-        self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
-        self.BASE_PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_models'
+        # Si se quiere guardar los datos:
+        if self.iteration_date is not None:
 
-        directories.make_directories(l_directorios=[self.BASE_PATH_sbm])
+            # Si no pasaron d_paths
+            if self.d_paths is None:
+
+                self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
+                self.BASE_PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_model'
+                directories.make_directories(l_directorios=[self.BASE_PATH_sbm])
         
+            else:
+                # Si pasaron d_paths
+                self.BASE_PATH = self.d_paths['base_path']
+                self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
+
     def define_hiperparameters(self):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
@@ -504,7 +513,7 @@ class BettingStrategy:
 
         # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
         if with_assess:
-            path_pred = f"{self.BASE_PATH}/assess/{n_model}__{model_name}_predicciones.xlsx"
+            path_pred = f"{self.BASE_PATH_sbm}/1_assess/{n_model}__{model_name}_predicciones.xlsx"
             logger.warning("Levanto predicciones test con missing...")
         else:
             path_pred = f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx"
@@ -539,49 +548,4 @@ class BettingStrategy:
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    
-    # Defino parametros
-    id_country = 48
-
-    # Defino hiperparametros
-    select_best_model = False
-    with_assess = True
-    strategy = 'general'
-
-    # Defino variables
-    d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}
-    country = d_countries[id_country][0]
-    iteration_date = d_countries[id_country][1]
-    bs = BettingStrategy(country, iteration_date, strategy=strategy)
-
-
-    # (1) Actualizar df_prediccion test con missing?
-    if with_assess:
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/assess/df_iteration.xlsx')
-        logger.warning("Estas levantando el df_iteration actualizado con missing.")
-    else:
-        # Obtengo listado de todos los modelos entrenados
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
-    logger.info(df_ite)
-
-    # (2) Seleccion del modelo
-    if select_best_model:
-        perc_cutoff = 1 if with_assess else 0.05
-        roi_weight = 0.75 if with_assess else None
-
-        # Creo objeto de clase select_best_model
-        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date)
-
-        # Selecciono el mejor modelo
-        row = sbm.main(df_ite, roi_weight=roi_weight, perc_cutoff=perc_cutoff)
-        roi_weight_strategy = sbm.roi_weight
-
-    else:
-        roi_weight_strategy = 0.75
-        df = pd.read_excel(f'{bs.BASE_PATH_sbm}/df_p4.xlsx', index_col=0)
-        row = df.head(1) # Selecciono la primera fila
-        logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
-
-    # (3) Determinar estrategia de apuesta optima para el modelo seleccionado
-    bs.define_betting_strategy(row=row, roi_weight=roi_weight_strategy, with_assess=with_assess)
-    
+    pass

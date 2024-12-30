@@ -524,13 +524,19 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
                 total_partidos = (len(values_home_clean) + len(values_away_clean))
                 suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
 
+                # Calcular la mediana considerando ambos arreglos
+                all_values_clean = np.concatenate([values_home_clean, values_away_clean])
+                media = suma / total_partidos
+                mediana = np.median(all_values_clean)
+                val_to_copy = mediana
+
                 # Si hay al menos un valor que promediar, guardo promedio
                 if total_partidos > 0:
-                    df_to_fill.loc[id_match, variable] = suma / total_partidos
+                    df_to_fill.loc[id_match, variable] = val_to_copy
                     df_copiado_form.loc[id_match, 'copiado_formaciones'] = 1
-                    df_copiado_form.loc[id_match, variable] = suma / total_partidos
+                    df_copiado_form.loc[id_match, variable] = val_to_copy # suma / total_partidos
                     if verbose >=1:
-                        print(f"Valor a rellenar: {suma / total_partidos} en {variable}")
+                        print(f"Valor a rellenar: {val_to_copy} en {variable}")
 
     return df_to_fill, df_copiado_form
     

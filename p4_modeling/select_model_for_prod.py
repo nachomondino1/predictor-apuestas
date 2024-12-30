@@ -11,11 +11,12 @@ import datetime
 
 class SelectBestModel():
 
-    def __init__(self, id_country, iteration_date: str, verbose: int = 1):
+    def __init__(self, id_country, iteration_date: str, d_paths: dict = None, verbose: int = 1):
         self.id_country = id_country
         self.iteration_date = iteration_date
-        self.inicialize_directories()
         self.verbose = verbose
+        self.d_paths = d_paths
+        self.inicialize_directories()
 
     def inicialize_directories(self):
         """
@@ -24,12 +25,19 @@ class SelectBestModel():
         d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
         country = d_countries[self.id_country]
 
-        self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
-        self.PATH_sbm = f'{self.BASE_PATH}/best_models' 
-        self.path_old_sbm = f'{self.BASE_PATH}/best_models_old/{datetime.datetime.now().date()}' 
+        # Si aun no inicialice directorios
+        if self.d_paths is None:
+            self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
+            self.PATH_sbm = f'{self.BASE_PATH}/best_model' 
+            self.path_old_sbm = f'{self.BASE_PATH}/best_model_old/{datetime.datetime.now().date()}' 
 
-        directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
-        directories.make_directories(l_directorios=[self.PATH_sbm])
+            directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
+            directories.make_directories(l_directorios=[self.PATH_sbm])
+
+        # Si ya inicialice directorios
+        else:
+            self.BASE_PATH = self.d_paths['base_path']
+            self.PATH_sbm = self.d_paths['path_select']
 
     # Paso 1
     def filter_models_by_roi(self, df, perc_cutoff, roi_weight):
@@ -51,12 +59,7 @@ class SelectBestModel():
         self.metric_col = f'metric{name_extension}'
 
         # Calculo metrica combinada
-        if roi_weight is None:
-            self.roi_weight = asignar_roi_weight(df)  # Segun correlacion entre ROI y Expected ROI
-        else:
-            self.roi_weight = roi_weight
-
-        df = calculate_combined_metric(df, roi_weight=self.roi_weight, name_extension=name_extension)
+        df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
 
         # Eliminar registros con 'metric' < 0
         df = df[df[self.metric_col] >= 0]
@@ -77,7 +80,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 2
-    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.4):
+    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.3):
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
@@ -162,7 +165,7 @@ class SelectBestModel():
             raise ValueError
 
     # Main
-    def main(self, df, perc_cutoff:float = 0.2, roi_weight: float = None):
+    def main(self, df, roi_weight, perc_cutoff:float = 0.2):
         """
         Determino el modelo a usar en produccion
         """

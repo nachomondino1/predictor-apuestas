@@ -170,7 +170,7 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
     # Determino columnas a codificar de string a integer
     l_columnas_a_codificar = df_etiquetas['variable'].unique()
 
-    if verbose >= 1:
+    if verbose >= 0:
         print("Columnas a codificar: ", l_columnas_a_codificar)
     
     # Por columna a codificar
@@ -188,19 +188,14 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
             
             # Si la etiqueta no existe
             if row[columna] not in d_mapeo.keys():
-                ultimo_registro = df_etiquetas_columna.iloc[-1]
-
-                d = {'variable': columna, 'str_value': row[columna], 'int_value': ultimo_registro['int_value'] + 1}
-                df_etiquetas_new_row = pd.DataFrame(d, index=[0])
-                df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_new_row], axis=0)
-                
-                # Reemplazo valor
-                df.loc[i, columna] = ultimo_registro['int_value'] + 1
-            
+                logger.error(f"No se encontró etiqueta para {row[columna]}. Se rellena con 0.")
+                valor = 0
             # Si la etiqueta existe
             else:
                 # Reemplazo valor
-                df.loc[i, columna] = d_mapeo[row[columna]]
+                valor = d_mapeo[row[columna]]
+            
+            df.loc[i, columna] = valor
     
     return df, df_etiquetas
 
