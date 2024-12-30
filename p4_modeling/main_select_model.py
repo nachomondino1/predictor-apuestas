@@ -14,6 +14,7 @@ def main(
         iteration_date,
         first_cutoff: float = 0.015, # 0.02 creo que es muy grande. Salvo que la diferencia de ROI sea pequeña como en SPA...
         assess: bool = True, 
+        avoid_assess: bool = False,
         select_best_model: bool = True, 
         strategy: str = 'general'
         ):
@@ -47,15 +48,18 @@ def main(
     df_ite_filt = df_ite.iloc[:cutoff] ## Seleccionar el 20% de los registros con los valores más altos de 'metric'
     print(df_ite_filt)
 
+    
     # (1) Actualizar df_prediccion test con missing? --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
-    if assess:
+    if assess and not avoid_assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
         # Evaluo modelos en test y missing
         df_ite_filt = assess_models_in_prod.update_test_with_missing(df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-        # df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/assess/df_iteration.xlsx')
+    else:
+        df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
 
     logger.info(df_ite_filt)
+    
 
     # (2) Seleccion del modelo
     if select_best_model:
@@ -104,10 +108,11 @@ def initialize_directories(country, iteration_date):
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 77
+    id_country = 48
 
     # Defino hiperparametros
     asssess_models_in_prod = True
+    avoid_assess = True
     select_best_model = True
 
     # Defino variables

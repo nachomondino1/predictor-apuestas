@@ -80,7 +80,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 2
-    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.4):
+    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.3):
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
