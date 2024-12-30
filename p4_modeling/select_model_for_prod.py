@@ -37,7 +37,7 @@ class SelectBestModel():
         # Si ya inicialice directorios
         else:
             self.BASE_PATH = self.d_paths['base_path']
-            self.PATH_sbm = self.d_paths['base_path_sbm']
+            self.PATH_sbm = self.d_paths['path_select']
 
     # Paso 1
     def filter_models_by_roi(self, df, perc_cutoff, roi_weight):
