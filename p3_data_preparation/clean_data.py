@@ -130,7 +130,7 @@ def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
     # Determino cuales son las estadisticas a eliminar
     stats_to_drop = list(set(stats_columns).difference(set(relevant_stats_columns)))
     n_cols_inic = len(df.columns)
-
+    
     # Eliminar las columnas especificadas
     for stat in stats_to_drop:
 
@@ -140,7 +140,9 @@ def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
 
     n_cols_fin = len(df.columns)
     n_removed_cols = n_cols_inic - n_cols_fin
+    
     if n_removed_cols > 0:
+        logger.warning(f"Las estadisticas eliminadas antes de construir (cuidado en no eliminar alguna columna que si deseo tener): {stats_to_drop}")
         logger.warning(f"Eliminacion de columnas irrelevantes: {n_cols_inic} --> {n_cols_fin}")
 
     return df
@@ -184,7 +186,7 @@ def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = Fal
         logger.warning(f"De las {len(df.columns)} columns, se eliminaron {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
     return df_sin_nan
 
-def determine_columns_to_fill(df, percentil_nan, porc_max: float = 0.3, _print: bool = False):
+def determine_columns_to_fill(df, percentil_nan, porc_max_fixed: float = 0.3, verbose: int = 0):
     """
     Determinar que columnas del dataframe son consideradas con mucho nan y cuales con poco nan
     # Parameters
@@ -198,11 +200,13 @@ def determine_columns_to_fill(df, percentil_nan, porc_max: float = 0.3, _print: 
     df_nan = df.isna().mean()
 
     # Determino porc_nan_max_col segun percentil 
-    perc_max = np.percentile(df_nan.sort_values(), percentil_nan) # Ordena el DataFrame df_porc_nan antes de tomar el percentil (no hace falta pero bueno, para mas seguridad)
+    porc_max_by_percentile = np.percentile(df_nan.sort_values(), percentil_nan) # Ordena el DataFrame df_porc_nan antes de tomar el percentil (no hace falta pero bueno, para mas seguridad)
 
     # Determino porcentaje min de nan (En caso que el percentil sea muy grande, uso el porcentaje fijo mas pequeño de manera de rellenar mas)
-    porc_nan_max_col = min(porc_max, perc_max)
-    if _print:
+    porc_nan_max_col = min(porc_max_fixed, porc_max_by_percentile)
+    logger.warning(f'Las columnas con mas de {porc_nan_max_col*100:.0f}% NaN values, seran consideradas con mucho NaN y seran rellenadas.')
+
+    if verbose >=2:
         df_nan.to_excel('/Users/nachomondino/Desktop/df_nan.xlsx')
         logger.info(f"Porcentaje min de nan para considerar con mucho nan: {perc_max}")
         logger.info(f"Porcentaje min de nan para considerar con mucho nan: {porc_max}")
@@ -211,7 +215,7 @@ def determine_columns_to_fill(df, percentil_nan, porc_max: float = 0.3, _print: 
     # Diferencio entre columnas con mucho nan y poco nan
     l_columns_con_mucho_nan = df.columns[df_nan > porc_nan_max_col].tolist() 
     l_columns_con_poco_nan = df.columns.difference(l_columns_con_mucho_nan)
-    if _print:
+    if verbose:
         print(f"{len(l_columns_con_mucho_nan)} de las {len(df.columns)} columnas son consideradas con mucho NaN (+{porc_nan_max_col*100:.0f}% de NaN): {l_columns_con_mucho_nan}")
 
     return l_columns_con_poco_nan, l_columns_con_mucho_nan

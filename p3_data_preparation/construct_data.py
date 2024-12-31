@@ -163,30 +163,65 @@ def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.42,
     return df
 
 def determine_number_matches_last_days(df: pd.DataFrame, n_days):
-
+    """
+    Determinar numero de partidos jugados en los ultimos dias. 
+    
+    Posibles mejoras:
+        - Agregar el calculo de numero de wins, draws y losses.
+        - Hacerlo por localia usando "segun_localia"
+    """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
+    l_teams = df['id_team_home'].unique()
+    # logger.warning(f"1: {df.shape}")
+
+    # Inicializar columnas para evitar errores con columnas inexistentes
+    for col in ['n_matches_last']: # , 'n_wins_last', 'n_draws_last', 'n_loss_last']:
+        for location in ['home', 'away']:
+            df[f'{col}_{n_days}_days_{location}'] = np.nan
+    # logger.warning(f"2: {df.shape}")
 
     # Por team
-    for team in df['id_team_home'].unique():
+    for team in l_teams:
     
-        # Obtengo los matchs que jugó el team
+        # Obtengo los matchs que jugó el team --> Deberia tomarlo distinto segun "segun_localia" True o False...            
         df_match_team = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
 
         # Por match del team
-        for id_match, row in df_match_team.iterrows(): # for id_match, row in df_match_team_2.iloc[:3].iterrows():
+        for idx, row in df_match_team.iterrows():
 
             home_or_away = 'home' if row['id_team_home'] == team else 'away'
             limit_date = row['date'] - timedelta(days=n_days)
 
             # Selecciono los ultimos matchs del team
             df_match_team_filt = df_match_team.loc[(df_match_team['date'] >= limit_date) & (df_match_team['date'] < row['date'])]
+            n_games = len(df_match_team_filt)
 
-            if len(df_match_team_filt) > 0:
-                df.loc[id_match, f'n_matches_last_{n_days}_days_{home_or_away}'] = len(df_match_team_filt)
-            else:
-                df.loc[id_match, f'n_matches_last_{n_days}_days_{home_or_away}'] = np.nan
+            df_match_team_filt_home = df_match_team_filt[df_match_team_filt['id_team_home'] == team]
+            df_match_team_filt_away = df_match_team_filt[df_match_team_filt['id_team_away'] == team]
+            
+            if n_games != (len(df_match_team_filt_home) + len(df_match_team_filt_away)):
+                logger.error(f"Error en filtrado de partidos en la construccion... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_match_team_filt)}")
 
+            # Construyo variables
+            n_wins = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 1]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 2])
+            n_draws = len(df_match_team_filt[df_match_team_filt['result'] == 0])
+            n_loss = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 1])
+
+            if n_games != (n_wins + n_draws + n_loss):
+                logger.error(f"Error en determinacion de resultados en ultimos dias {n_wins} + {n_draws} + {n_loss} != {n_games}")
+
+            # Asignar valores al DataFrame original
+            if n_games > 0:
+                df.at[idx, f'n_matches_last_{n_days}_days_{home_or_away}'] = n_games
+                # df.at[idx, f'n_wins_last_{n_days}_days_{home_or_away}'] = n_wins
+                # df.at[idx, f'n_draws_last_{n_days}_days_{home_or_away}'] = n_draws
+                # df.at[idx, f'n_loss_last_{n_days}_days_{home_or_away}'] = n_loss
+  
+    # Calculo diferencia entre local y visitate
+    df[f'dif_n_matches_last_{n_days}_days'] = df[f'n_matches_last_{n_days}_days_home'] - df[f'n_matches_last_{n_days}_days_away']  
+    df = df.drop(columns=[f'n_matches_last_{n_days}_days_home', f'n_matches_last_{n_days}_days_away'])
+    # logger.warning(f"3: {df.shape}")
     return df
 
 ## Rendimiento del equipo
@@ -377,7 +412,8 @@ def determine_stats_columns(df: pd.DataFrame):
         Lista de variables a ser promediadas.
     """
     # Definicion variables
-    keywords_prohibidas = ['_player_', 'team_', 'odds_', 'coach_']  # Definir palabras clave prohibidas 
+    keywords_prohibidas = ['_player_', 'team_', 'odds_', 'coach_']  # Definir palabras clave prohibidas. 'free_kicks', 'corner_kicks', 'clearances', 'tackles', 'blocked_shots', 'throw-ins', --> ya los use para construir. 'n_matches_last', 'n_wins_last', 'n_draws_last', 'n_loss_last', 'interceptions'
+    
     pattern = r'[a-zA-Z_\(\)%]+\_(home|away)' # Patrón regex para encontrar columnas relevantes
 
     # Obtener nombres de columnas relevantes

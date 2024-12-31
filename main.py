@@ -166,7 +166,7 @@ class DataPreparation:
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
 
-    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
+    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = False, export: bool = True):
         """
         Arreglo el data data_type de algunas variables.
 
@@ -192,6 +192,12 @@ class DataPreparation:
         df_match = format_data.convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
         # df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo estadisticas a float (no se por que son object)
 
+        if reformat: # Solo para missing
+            # Formateo nuevas columnas...
+            logger.warning("Reformateo columnas stats nuevas")
+            base_columns = ['passes', 'passes_in_the_final_third', 'crosses', 'tackles']
+            df_match = format_data.format_percentage_columns(df_match, base_columns)
+       
         # Dataframe player_fifa_sofifa
         ## Fecha
         df_player_fifa_sofifa['date'] = pd.to_datetime(df_player_fifa_sofifa['date'], format='%b %d, %Y')
@@ -409,8 +415,17 @@ class DataPreparation:
         start = time.time()
         logger.info("Constructing data...")
 
+        # CLEAN DATA ANTES DE CONSTRUIR
+        # Rellenar las red_cards con 0 para los años mayores a 2015 (pues desde ahi ya veo que se media la roja) --> Es nan siempre salvo que haya un expulsado en el partido...
+        df.loc[(df['date'].dt.year > 2015) & (df['red_cards_home'].isna()), 'red_cards_home'] = 0
+        df.loc[(df['date'].dt.year > 2015) & (df['red_cards_away'].isna()), 'red_cards_away'] = 0
+
         # Elimino columnas "Ruido"
-        df = df.drop(['attendance', 'capacity'], axis=1)  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        cols_basics_noise = ['attendance', 'capacity'] # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        col_players_noise = [col for col in df.columns if 'hei_player' in col or 'wage_player' in col or 'rep_player' in col] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+        cols_to_drop = cols_basics_noise + col_players_noise
+        df = df.drop(columns=cols_to_drop)         # Dropear las columnas seleccionadas
+        logger.warning(f"Columnas jugadores eliminadas: {cols_to_drop}")
 
         # Si quiero construir variables historicas
         if with_historic:
@@ -420,16 +435,15 @@ class DataPreparation:
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
-            # Expected Result and Expected Points (xPts) (from Expected Goals)
-            # goals_to_xg_ratio_ajustado = construct_data.adjust_ratio_to_match_distributions(df, initial_ratio=0.27, tolerance=0.08)
-            # df = construct_data.determine_expected_result(df, goals_to_xg_ratio=goals_to_xg_ratio_ajustado)
+            # Expected Result and Expected Points (xPts) (from Expected Goals) --> Aun no se si el threshold es correcto... no quiero meter ruido.
             df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
             df = construct_data.determine_expected_points(df)
             df = df.drop(['expected_result'], axis=1) # si no lo borras, la tenes que construir como variable historica (para FRA y no se GER no la borré...)
 
             ## OFENSIVE
             ## Goal ratio
-            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio")  # Similar a G2A
+            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="G2S")  # Similar a G2A
+            # df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="shots_on_goal", laplace=True,  column_name="G2SOG")  # Similar a G2A
 
             # Traduccion de posesion a tiros
             df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="total_passes", laplace=True,  column_name="PPS")  # home = home / home
@@ -443,7 +457,7 @@ class DataPreparation:
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
-            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
+            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'clearances_completed', 'clearances_total', 'tackles_completed', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
             df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
             df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
 
@@ -451,7 +465,7 @@ class DataPreparation:
             df['clean_sheet_home'] = (df['goals_away'] == 0).astype(int)
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
-            # Keeping Goals Prevented (KGP)
+            # Keeping Goals Prevented (KGP) --> usa dangeorous attacks...
             df['KGP_home'] = np.where(df['dangerous_attacks_away'].notna(),  (df['goals_away'] + 1) / df['dangerous_attacks_away'], None)
             df['KGP_away'] = np.where(df['dangerous_attacks_home'].notna(),  (df['goals_home'] + 1) / df['dangerous_attacks_home'],  None)
 
@@ -461,13 +475,13 @@ class DataPreparation:
 
             # Efficiency --> (lo evito por cantidad de NaN)
             # df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
-            # df['efficiency_away'] =df['attacking_efficiency_away'] + df['defensive_efficiency_away']
+            # df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
             # Numero de partidos jugados en ultimos n days
             for n_days in l_days:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
-  
+            
             # Historiales
             if with_h2h:
                 df = construct_data.h2h_by_date(df, n_years=-1)
@@ -478,14 +492,16 @@ class DataPreparation:
             # Determino cuales son las variables stats automaticamente
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
+                # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
                 # Ofensive
                 'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
-                'shots_on_goal', 'goal_attempts', 'goals', 'points', 'goal_ratio', 'PPS', # 'shots_off_goal'
-                'attacks', 'dangerous_attacks', 'dead_balls', # 'goal_ratio_dead_balls',
-                'ball_possession', 'total_passes', # 'attacking_efficiency',
+                'shots_on_goal', 'goal_attempts', 'goals', 'points', 'G2S', 'PPS', # 'shots_off_goal' # 'SG2G',
+                'attacks', 'dangerous_attacks', # ya no se recolecta mas. En los partidos missing ya no existe.
+                'dead_balls', # 'goal_ratio_dead_balls',
+                'ball_possession', 'total_passes', # 'pass_success_%', 'attacking_efficiency',
                 # Defensive
                 'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls',  'interceptions'
-                'PPDA', 'KGP', 'clean_sheet' # 'defensive_efficiency', "efficiency"
+                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency", 'KGP', 'interceptions', 'goalkeeper_saves'
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
@@ -592,9 +608,11 @@ class DataPreparation:
 
         # (2) Eliminacion de columnas   
         ## usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue'] # 'id_team_home', 'id_team_away' # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles) # ['date', 'venue', 'id_competition', 'id_team_home', 'id_team_away']  
+        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        cols_avoid_noise = [] # ['id_team_home', 'id_team_away']  #  'id_coach_home', 'id_coach_away', 'referee'       
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
-        X.drop(columns=cols_for_construct+cols_constants, inplace=True)
+        cols_to_drop = cols_for_construct + cols_avoid_noise + cols_constants
+        X.drop(columns=cols_to_drop, inplace=True)
         if self.verbose >= 1:
             print("Eliminación de columnas...")
             print(f"Columnas constantes eliminadas: {cols_constants}")
@@ -669,9 +687,9 @@ class DataPreparation:
         n_reg_min = int(porc_min_no_nan*len(df_train_val)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
         X_sin_col_mucho_nan = df_train_val.copy()
         df_train_val = clean_data.drop_columns_until_drop_na_min_rows(df_train_val, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
+        l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(df_train_val.columns))
 
         if self.verbose >= 0 and len(df_train_val.columns) != len(X_sin_col_mucho_nan.columns):
-            l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(df_train_val.columns))
             logger.warning(f"(2) Eliminacion de columnas con mucho Nan. Se han tenido que eliminar {len(X_sin_col_mucho_nan.columns) - len(df_train_val.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
             logger.info(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {df_train_val.shape} ")
 
@@ -680,7 +698,7 @@ class DataPreparation:
         if fill_na is not None:
             
             # Determino las columns con mucho NaN (mas de nan_threshold%)
-            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(df_train_val, percentil_nan=percentil_nan)
+            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(df_train_val, percentil_nan=percentil_nan) #  porc_max_fixed=(1-porc_min_no_nan) ?
 
             # Elimino registros con al menos un NaN 
             largo_inic = len(df_train_val)
@@ -709,7 +727,7 @@ class DataPreparation:
         df_test_filt = df_test.drop(columns=columns_to_drop)
         logger.info(f"{df_test.shape} --> {df_test_filt.shape}")
         ## Reemplazo NaN en TEST por 0
-        df_test_filled, df_filled = self.emergency_fill_for_test(df_test_filt)
+        df_test_filled = self.emergency_fill_for_test(df_test_filt)
 
         # Concateno df_test y df_train_val ya rellenados
         X = pd.concat([df_train_val_filled, df_test_filled], axis=0)
@@ -728,7 +746,6 @@ class DataPreparation:
 
         if export:
             X.to_excel(f'{self.base_path}/df_selected_nan.xlsx', index=True)
-            df_filled.to_excel(f'{self.base_path}/treat_nan/df_filled_columns.xlsx', index=True)
 
         return X
     
@@ -795,7 +812,6 @@ class DataPreparation:
                 df_filled_columns['n_col_filled_sin_player'] / len(columns_to_fill) * 100
             )
             
-            
             if self.verbose >= 0:
                 # Calcular y mostrar el porcentaje de NaN por cada columna
                 for col in columns_to_fill:
@@ -812,10 +828,11 @@ class DataPreparation:
         if self.verbose >= 1 and (len(df) != len(df_sin_dup)):
             logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
 
-        if export: 
+        if export:
             df_sin_dup.to_excel(f'{self.base_path}/treat_nan/df_treat_nan.xlsx', index=True)
+            df_filled_columns.to_excel(f'{self.base_path}/treat_nan/df_filled_columns.xlsx', index=True)
 
-        return df_sin_dup, df_filled_columns
+        return df_sin_dup
         
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, export: bool = True):
         """
@@ -1145,18 +1162,21 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
     #------------------------------------------- DATA PREPARATION -------------------------------------------#
     if d_run.data_prep:
         print(" Data preparation ".center(120, "#"))
-        # Hiperparametros # PODRIA PONERLOS EN UN DICT Y HACER EL DATAFRAME MAS AUTOMATICO
- 
-        # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-        # print(df.head(2))
 
         # Preparo el dataset para el analisis
-        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
-        df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
-        df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
-       
+        ## Hasta integrate
+        if not d_run.from_integrate:
+            df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
+            df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
+            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
+        else:
+            df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
+            print(df.head(2))
+
+        ## Desde construct hasta el final
         if not d_run.until_integrate:
             df = dp.construct_data(df, l_days=d_par.l_days, n_years_h2h=d_par.n_years_h2h, segun_localia=d_par.segun_localia, dif_con_against=d_par.dif_con_against, export=export)
+            # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_constructed.xlsx', index_col=0)
             df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
             df, scaler, columns_used = dp.clean_data_2(df, d_par.n_years_to_select, d_par.comp_to_select, export=export)
             df = dp.select_data(df, thr_corr=d_par.thr_corr, thr_fs=d_par.thr_fs, export=export)
@@ -1191,8 +1211,8 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 6
-    d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': True}
+    id_country = 48
+    d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': False, 'from_integrate': True}
 
     # Hiperparametros
     d_comps = select_data.determine_country_competitions(id_country)
@@ -1203,9 +1223,9 @@ if __name__ == "__main__":
         'segun_localia': False,
         'dif_con_against': False,
         'thr_corr': 0.85,
-        'thr_fs': 0.5,
+        'thr_fs': 0.25,
         'n_years_to_select': 3, 
-        'comp_to_select': d_comps['all_comp'],
+        'comp_to_select': d_comps['comp_solo_liga'],
         'fill_na': None,
         'val_size':  0.125,
         'test_size': 0.125,

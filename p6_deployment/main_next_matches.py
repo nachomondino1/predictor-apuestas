@@ -843,6 +843,7 @@ def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds,
     df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
     df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
     len_final = len(df_concat_match)
+    logger.warning(f"Old:{df_match.shape} + Missing: {df_match_miss.shape} = {df_concat_match.shape}")
 
     verif = (len_inicial + len_inicial_miss) == len_final
     if not verif:
@@ -1054,23 +1055,28 @@ def main(
             df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
             df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
             df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
+            logger.warning(f"Levanto missing ya extraido: {df_match_miss.shape} {df_match_player_miss.shape} {df_match_odds_miss.shape}")
 
         # Si hay partidos missing que no extraje aun
         if len(df_match_miss) > 0:
             logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
-            if export and extract_missing:
-                # Guardo datos con los que entrenó el modelo y los missing
+            if export:
                 concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country)
-                concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
+
+                if extract_missing:
+                    # Guardo datos con los que entrenó el modelo y los missing
+                    concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
 
             # Preparo datos
-            df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
+            df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_integrated_updated = pd.concat([df_integrated, df_integrated_missing], axis=0)
+            logger.warning(f"Concatenación old + missing: {df_integrated.shape} + {df_integrated_missing.shape} --> {df_integrated_updated.shape}")
+
             if export:
                 df_integrated_missing.to_excel(f'./data/{country}/p6_deployment/missing/data_preparation/df_integrated_missing.xlsx', index=True)
                 df_integrated_updated.to_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index=True)
@@ -1285,12 +1291,12 @@ def main(
 if __name__ == "__main__":    
 
     n_days = 2
-    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [48]
     d_countries = {
         6: ["argentina", '2024-12-05'], 
         48: ["england", '2024-12-23'], 
@@ -1305,14 +1311,15 @@ if __name__ == "__main__":
     for id_country in l_countries:
 
         # recolectar missing
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
+        # df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
+        df = main(d_run, id_country, extract_missing=False, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 314, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        # d_model = {'n_model': 314, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         ## Prox partidos
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
         ## En partidos missing
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
         
         # Prod 
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
