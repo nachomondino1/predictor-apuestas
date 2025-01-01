@@ -301,7 +301,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), DecisionTreeClassifier()] #  RandomForestClassifier()
+    l_modelos = [LogisticRegression(), DecisionTreeClassifier(), RandomForestClassifier(), GradientBoostingClassifier()]   # SVC()
 
     # 1728 iteraciones
     d_params = {
