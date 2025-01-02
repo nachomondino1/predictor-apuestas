@@ -377,6 +377,15 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
         # Numero fijo
         l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()  
 
+    # Imprimir importancias por pantalla
+    df_normalized_sorted = df_normalized.sort_values(by='suma_de_imp_norm', ascending=False)
+    pos = 0
+    for idx, row in df_normalized_sorted.iterrows():
+        pos += 1
+        logger.info(f"Nº{pos}: Variable {idx} con importancia: {row['suma_de_imp_norm']}")
+        if pos == 10:
+            break
+
     # Grafico importancias teniendo en cuenta todos los modelos
     if graf:
         fs.graficar_importancia_atrib(X=df_normalized['suma_de_imp_norm'], y=df_normalized.index)

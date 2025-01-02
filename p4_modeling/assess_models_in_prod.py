@@ -26,7 +26,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     """
     # Defino variables
     df_test = pd.DataFrame()    
-    bs = betting_strategy.BettingStrategy(strategy='train') # no le paso iteration_date para que no guarde datos
+    bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
 
     # Extraer missing
     if extract_missing:
@@ -71,7 +71,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
 
         # Calculo ROI y metricas que faltan
         df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
-        _, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, strategy='train') # Chequear que funciona...
         d_metrics.update(d_roi)
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
 

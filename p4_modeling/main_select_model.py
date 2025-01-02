@@ -12,7 +12,7 @@ def main(
         id_country, 
         country, 
         iteration_date,
-        first_cutoff: float = 0.015, # 0.02 creo que es muy grande. Salvo que la diferencia de ROI sea pequeña como en SPA...
+        first_cutoff: float = 0.2, # 0.02 creo que es muy grande. Salvo que la diferencia de ROI sea pequeña como en SPA...
         assess: bool = True, 
         avoid_assess: bool = False,
         select_best_model: bool = True, 
@@ -33,7 +33,7 @@ def main(
     d_paths = initialize_directories(country, iteration_date)
     
     # Defino parametros --> Futuros argumentos
-    second_cutoff = 1 if assess else 0.05
+    second_cutoff = 0.1
 
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
@@ -48,19 +48,18 @@ def main(
     df_ite_filt = df_ite.iloc[:cutoff] ## Seleccionar el 20% de los registros con los valores más altos de 'metric'
     print(df_ite_filt)
 
-    
     # (1) Actualizar df_prediccion test con missing? --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
-    if assess and not avoid_assess:
+    if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
-        # Evaluo modelos en test y missing
-        df_ite_filt = assess_models_in_prod.update_test_with_missing(df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-    else:
-        df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
+        if avoid_assess:
+            df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
+        else:
+            # Evaluo modelos en test y missing
+            df_ite_filt = assess_models_in_prod.update_test_with_missing(df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
 
     logger.info(df_ite_filt)
     
-
     # (2) Seleccion del modelo
     if select_best_model:
         # Creo objeto de clase select_best_model
@@ -76,8 +75,9 @@ def main(
         logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
     # (3) Determinar estrategia de apuesta optima para el modelo seleccionado
-    bs = betting_strategy.BettingStrategy(country, iteration_date, strategy=strategy, d_paths=d_paths)
-    bs.define_betting_strategy(row=row, roi_weight=roi_weight, with_assess=assess)
+    bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths)
+    bs.define_model_betting_strategy(row=row, strategy=strategy, roi_weight=roi_weight, with_assess=assess, by_result=True)
+
     
 def initialize_directories(country, iteration_date):
     """
@@ -108,20 +108,23 @@ def initialize_directories(country, iteration_date):
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 48
+    id_country = 77
 
     # Defino hiperparametros
-    asssess_models_in_prod = True
+    asssess_models_in_prod = False
     avoid_assess = True
     select_best_model = True
 
     # Defino variables
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2024-12-23'], 
+        48: ["england", '2024-12-23'],
+        # 48: ["england", '2025-01-02'],
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
-        77: ["italy", '2024-12-23'], 
+        77: ["italy", '2024-12-23'],
+        # 77: ["italy", '2025-01-01'],
+        # 77: ["italy", '2025-01-02'],
         148: ["spain", '2024-12-25'], 
         167: ["usa", '2024-12-05']
         }

@@ -114,7 +114,8 @@ class SelectBestModel():
             logger.info(f"Se eliminaron {len(l_idx_to_remove)} modelos por distribucion muy distinta a la de results.")
             self.count_models(df_filtered)
 
-        df_filtered.to_excel(f'{self.PATH_sbm}/df_p2.xlsx', index=False)
+        df_filtered.set_index('n_iteration', inplace=True)
+        df_filtered.to_excel(f'{self.PATH_sbm}/df_p2.xlsx', index=True)
 
         return df_filtered
 
@@ -137,7 +138,6 @@ class SelectBestModel():
             self.count_models(df_filt)
 
         # Exportar el DataFrame final a un archivo Excel
-        df_filt.set_index('n_iteration', inplace=True)
         df_filt.to_excel(f'{self.PATH_sbm}/df_p3.xlsx', index=True)
 
         return df_filt
@@ -176,10 +176,11 @@ class SelectBestModel():
         df_filt_2 = self.filter_models_by_distribution(df_filt_1)
 
         # PASO 3: DESCARTE POR RELLENO DE NAN EN TEST
-        df_filt_3 = self.filter_models_by_fill_nan(df_filt_2)
-        
+        # df_filt_3 = self.filter_models_by_fill_nan(df_filt_2)
+
         # PASO 4: Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
-        row = self.select_model(df_filt_3)
+        row = self.select_model(df_filt_2)
+        # row = self.select_model(df_filt_3)
         return row
         
         
@@ -187,7 +188,7 @@ class SelectBestModel():
 if __name__ == "__main__":
     
     # Defino parametros
-    id_country = 48
+    id_country = 55
 
     # Defino variables
     d_countries = {6: ["argentina", '2024-12-05'], 48: ["england", '2024-12-23'], 55: ["france", '2024-12-26'], 59: ["germany", '2024-12-26'], 77: ["italy", '2024-12-23'], 148: ["spain", '2024-12-25'], 167: ["usa", '2024-12-05']}

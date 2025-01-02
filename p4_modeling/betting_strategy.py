@@ -6,14 +6,14 @@ from utils.set_up_logging import logger
 from p4_modeling.asses_model import calculate_combined_metric, calculate_roi
 from p4_modeling import select_model_for_prod
 from utils import directories
+from itertools import product
 
 
 class BettingStrategy:
 
-    def __init__(self, country: str = None, iteration_date: str = None, strategy: str = "general", d_paths: dict = None, verbose: int = 0):
+    def __init__(self, country: str = None, iteration_date: str = None, d_paths: dict = None, verbose: int = 0):
         self.country = country
         self.iteration_date = iteration_date
-        self.strategy = strategy
         self.verbose = verbose
         self.d_paths = d_paths
         self.initialize_directories()
@@ -35,54 +35,47 @@ class BettingStrategy:
                 self.BASE_PATH = self.d_paths['base_path']
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
-    def define_hiperparameters(self):
+    def define_hiperparameters(self, strategy):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
-        if self.strategy == "train":
-            l_thr_dif_prob = [-1] 
-            d_rectas = {
-                'linear': [[10, 0]], 
+        if strategy == "train":
+            dic = {
+                'prob_dp': [-1],
+                'curva': ['linear'],
+                'm': [10],
+                'b': [0],
+                'odd_weight': [0],
+                'lim_sup': [0]
             }
-            l_odd_weight = [0]
-            l_lim_sup = [0]
-
-        elif self.strategy == "general":
-            l_thr_dif_prob = [-1] # , -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-            d_rectas = {
-                # "equal": [[(0, 0), (1, 0)]],
-                # 'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
-                'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
-                # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
+          
+        elif strategy == "general":
+            dic = {
+                'prob_dp': [-1], # , -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+                'curva': ['linear'],
+                'm': [10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90],
+                'b': [0],
+                'odd_weight': [0, 1, 2, 4],
+                'lim_sup': [0, 1]
             }
-            l_odd_weight = [0, 1, 2, 4]
-            l_lim_sup = [0, 1] # no mas 1.
 
-        elif self.strategy == "all":
-            l_thr_dif_prob = [-0.5, -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-            d_rectas = {
-                "equal": [[(0, 0), (1, 0)]],
-                'kelly': [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], # le sumo b pues la casa esta desbalanceada y yo no... y muchas veces conviene aunque paguen "poco"
-                'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
-                # 'exponential': [[(0.33, 4), (1, 10)], [(0.33, 6), (1, 10)], [(0.33, 4), (1, 30)], [(0.33, 2), (1, 30)]] # no entiendo la curva. Se resuelve con matrices.
+        elif strategy == "all":
+               
+            dic = {
+                'l_thr_dif_prob': [-0.5, -0.3], # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
+
+                'curva': ['linear'], # 'equal', 'kelly', 'exponential'
+                'm': [10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90],
+                'b': [0],
+                'odd_weight': [0, 1, 2, 3, 4],
+                'lim_sup': [0, 1]
             }
-            l_odd_weight = [0, 1, 2, 3, 4]
-            l_lim_sup = [0, 1]
 
-        elif self.strategy=="general_0":
-            l_thr_dif_prob = [-0.5]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-            d_rectas = {
-                # "equal": [[(0, 0), (1, 0)]],
-                'linear': [[10, 0], [15, 0], [20, 0], [25, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0]],  # [1, 0], --> para que hay mas dif entre ROIpp de modelos en test..
-                # 'exponential': [[(0.33, 3), (1, 15)], [(0.33, 5), (1, 20)], [(0.33, 5), (1, 30)]]
-            }
-            l_odd_weight = [0, 1, 2, 4]
-            l_lim_sup = [0]
-
-        if self.verbose >= 1:
-            logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas} \n- Pesos cuotas: {l_odd_weight} \n- Limite para afectar stake con cuotas: {l_lim_sup}")
-        
-        return l_thr_dif_prob, d_rectas, l_odd_weight, l_lim_sup
+        if self.verbose >= 0:
+            logger.info(f"Hiperparametros estrategia de apuesta: {dic}")
+            # logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas} \n- Pesos cuotas: {l_odd_weight} \n- Limite para afectar stake con cuotas: {l_lim_sup}")
+    
+        return dic
 
     def calculate_dif_proba_in_predicted_result(self, df: pd.DataFrame):
         """
@@ -110,6 +103,7 @@ class BettingStrategy:
 
         return df
 
+    # RESULT TO BET
     def determine_result_to_bet(self, df: pd.DataFrame, thr_prob_min):
         """
         Determina el/los resultado/s a apostar (no necesariamente coincide con el resultado predicho).
@@ -231,9 +225,13 @@ class BettingStrategy:
 
         return df
 
-    def determine_stake_to_bet(self, df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, 
-                            porc_emergency: float = 0.5,
-                            odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False):
+    # STAKE TO BET
+    def determine_stake_to_bet(self, 
+                               df, type_relation: str = 'equal',                                                                            # Estrategia
+                               p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None,                                   # Puntos de rectas
+                               odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1, normalized: bool = False,      # Cuotas en stake
+                               porc_emergency: float = 0.5                                                                                  # Disminucion por relleno de emergencia
+                               ):
         """
         Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
         Cuanto mayor es la probabilidad del modelo para el resultado a apostar, mas dinero apuesto.
@@ -254,6 +252,9 @@ class BettingStrategy:
 
         # Returns
             Dataframe pasado como parametro con nueva columna 'stake_to_bet'
+
+        Mejoras:
+            - Separar variacion de stake por cuotas en otra funcion. 
         """
         # Limito caps segun odd_weight (para evitar stake=99 x inflado de stake con cuotas sobretodo cuando odd_weight=4). Esto pasaba en el 437 de GER. Basicamente evito overfitting de hiper de apuesta.
         if odd_weight > 0:
@@ -279,16 +280,18 @@ class BettingStrategy:
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
 
+        # STRATEGY: EQUAL
         if type_relation == "equal":  
             df['stake_to_bet'] = 1
 
+        # STRATEGY: KELLY
         elif type_relation == 'kelly':
             df['stake_to_bet'] = ((df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1)  #  (= (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100)
 
             # Puntos para normalizar
             p_min, p_max = 0, 50 
             
-        # Linear
+        # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
             if dif_prob_inf_cap != dif_prob_sup_cap:
@@ -309,9 +312,11 @@ class BettingStrategy:
             # Puntos para normalizar --> no tiene mucho sentido. Para eso esta exponential (modificar mas el stake ante un menor cambio en proba). Incluso con el b de linear tambien puedo lograr algo parecido.
             # p_min, p_max = (0.55 * m + b), (0.7 * m + b) # El punto min usa un stake de m_to_bet / 2. Si queres que prob=0.33 use un stake mas bajo, no tiene sentido usarlo como p_min.
 
+        # STRATEGY: POLY
         elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
             pass
 
+        # STRATEGY: EXPONENTIAL
         elif type_relation == "exponential":  # y=a * b^x
 
             # Resolver el sistema de ecuaciones
@@ -348,129 +353,136 @@ class BettingStrategy:
             df.loc[rows_player_filled, 'stake_to_bet'] *= porc_emergency
             
             # Contar los registros donde 'player_emergency_fill' es igual a 1
-            if self.verbose >= 0:
+            if self.verbose >= 2:
                 # Agregar el conteo al warning
                 logger.warning(f"Disminución de stakes por copiado de emergencia de variables START y/o SUB en partido. Se afectaron los stakes de {len(rows_player_filled)} de {len(df)} registros.")
             
         # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
         val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
         func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
-        df['stake_to_bet'] = df['stake_to_bet'].apply(func)
+        df.loc[:, 'stake_to_bet'] = df['stake_to_bet'].apply(func)         # df['stake_to_bet'] = df['stake_to_bet'].apply(func)
 
         return df
-
-    def calculate_roi_by_betting_strategy(self, df: pd.DataFrame, roi_weight: float = 0.5):
+    
+    ## Determinar la mejor estrategia
+    def calculate_roi_in_combinations(self, df, strategy, by_result: bool = False):
         """
-        Determine the ROI for different betting strategies.
-
-        # Paramaters:
-            df: Dataframe con predicciones del modelo, cuotas de la casa de apuestas y el resultado real del partido. (DataFrame)
-            strategy: Combinacion de hiperparametos de estrategia de apuesta a probar. (str)
-
-        # Returns
-            d_hiper: Diccionario con los hiperparametros de la estrategia de apuesta ganadora. (dict)
-            best_df_pred: Predicciones con estrategia de apuesta ganadora. (DataFrame)
-            best_d_rois: Diccionario con las metricas (roi, expected_roi y metric) de la estrategia de apuesta ganadora. (dict)
+        Mejoras:
+            - Estrategia por resultado...
         """
         # Definicion de variables
-        records, d_predicciones = [], {}  # Inicializa una lista para acumular los datos
-        l_thr_dif_prob, d_rectas, l_odd_weight, l_lim_sup = self.define_hiperparameters()
+        d_predic, d_hiper, d_metricas = {}, {}, {}
+        d_params = self.define_hiperparameters(strategy=strategy)
 
         # Eliminate rows with NaN odds or missing predictions
         df = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])
         df = self.calculate_dif_proba_in_predicted_result(df)  # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
 
-        # Por combinacion de hiperparametros 
-        for prob in l_thr_dif_prob:
+        # Generar combinaciones de parámetros automáticamente
+        param_combinations = list(product(*d_params.values()))
+        print(f'Las {len(param_combinations)} combinaciones: {param_combinations}')
+        cont = 0
+            
+        # Iterar sobre cada combinación
+        for params in param_combinations:
+            cont += 1
 
-            # Determinamos el resultado a apostar (no necesariamente el resultado predicho)
-            df2 = df.copy()  # esto parece boludo pero es clave sino df2 se le agrega las columnas de variacion de stake y los rdos son falsos...
-            df2 = self.determine_result_to_bet(df2, thr_prob_min=prob)
-            df2 = self.determine_winning_bets(df2)
-            df2 = self.determine_winning_bets(df2, name_extension='expected_')
+            # Emparejar cada parámetro con su nombre desde `param_grid`
+            param_dict = dict(zip(d_params.keys(), params))
+            print(f"\nNº Combinacion: {cont}")
+            print(param_dict)
 
-            # Por recta con la cual variar el stake
-            for key, value in d_rectas.items():
-                normalized = True if key == 'kelly' else False  # Solo lo aplico a Kelly dado que puede tener stakes negativos y este debe ser mayor a 0.
+            if param_dict['odd_weight'] == 0 and param_dict['lim_sup'] != 0:
+                logger.warning("Se evitó calcular combinacion porque si odd_weight es 0, no tiene sentido lim_sup != 0.")
+                continue
 
-                for a1, a2 in value:
+            # Aplicar estrategia a df_pred
+            df_aux = self.apply_strategy(df, param_dict)
 
-                    # Definir parámetros según la clave
-                    if key in ['linear', 'kelly']:
-                        m, b = a1, a2
-                        p1, p2 = None, None
-                    else:
-                        m, b = None, None
-                        p1, p2 = a1, a2
-                    
-                    if self.verbose >= 2:
-                        logger.info(f"{a1} {a2} --> {m} {b} {p1} {p2}")
+            # Calculo de metricas (ROI y expected roi)
+            df_pred_with_metrics, d_metrics = self.calculate_roi_in_combination(df_aux)
+            print(d_metrics)
 
-                    # for normalized in [True, False]:
-                    for odd_weight in l_odd_weight: # 0 significa no afectar stake con cuotas.  # 0.5,
+            # Guardo resultados
+            d_predic[cont] = df_pred_with_metrics
+            d_hiper[cont] = param_dict
+            d_metricas[cont] = d_metrics
 
-                        for lim_sup in l_lim_sup:
+        self.select_best_parameters(d_metricas, roi_weight=1) # Para pruebas
+        return d_predic, d_hiper, d_metricas
 
-                            # Determino stake a apostar segun curva
-                            df_aux = self.determine_stake_to_bet(df2, type_relation=key, m=m, b=b, p1=p1, p2=p2, odd_weight=odd_weight, dif_prob_sup_cap=lim_sup, normalized=normalized)
+    def apply_strategy_by_result(self, df, df_hiper):
+        """
+        Es para usar en produccion.
 
-                            # Calculo ROI
-                            df_pred, d_metrics = calculate_roi(df_aux)   # (calculate_reality_roi(df_aux)) if strategy == 'reality' else (calculate_roi(df_aux))
+        df_hiper: Parametros a probar por result
+        """
+        df_comp = pd.DataFrame()
 
-                            # Calculo expected ROI
-                            df_pred_2, d_expected_roi = calculate_roi(df_aux, name_extension='expected_')     
+        # Por resultado
+        for pred in [1, 0, 2]:
+            df_pred = df[df['predicted_result'] == pred] 
 
-                            # Concateno datos de ROI y Expected ROI
-                            missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
-                            df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
-                            d_metrics.update(d_expected_roi)
-
-                            # Guardo resultados
-                            id_str = f'{prob}_{key}_{m}_{b}_{odd_weight}_{lim_sup}'
-                            data = {
-                                'id': id_str,
-                                'thr_prob_min': prob,
-                                'curva': key,
-                                'param1': m,
-                                'param2': b,
-                                'odd_weight': odd_weight,
-                                'dif_prob_sup_cap': lim_sup,
-                                'normalized': normalized
-                            }
-                            data.update(d_metrics)
-                            records.append(data)
-                            d_predicciones.update({id_str: df_pred})
+            row_pred = df_hiper.loc[pred]
+            prob = row_pred['prob_dp']
+            curva = row_pred['curva']
+            m = row_pred['m']
+            b = row_pred['b']
+            odd_weight = row_pred['odd_weight']
+            lim_sup = row_pred['lim_sup']
+	
+            # Determino result to bet
+            df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
         
-        df_bs = pd.DataFrame(records)
-        if self.verbose >= 2:
-            print(df_bs)
-            print(d_predicciones.keys())
+            # Determino stake to bet
+            d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
+            d_params_odds = {'odd_weight': odd_weight, 'dif_prob_sup_cap': lim_sup}
+            df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake, **d_params_odds)
 
-        # Determino mejor estrategia
-        if self.strategy == "train":
-            d_hiper = data
-            best_d_rois = d_metrics
-            best_df_pred = df_pred
-        else:
-            d_hiper, best_d_rois, best_df_pred = self.select_best_combination(df_bs, d_predicciones, roi_weight=roi_weight)
+            df_comp = pd.concat([df_comp, df_pred], axis=0)
 
-        if self.verbose >= 1:
-            logger.info(f"Estrategia de apuesta ganadora: {d_hiper}")
-            logger.info(f'Metricas: {best_d_rois}.')
+        return df_comp
 
-        return d_hiper, best_df_pred, best_d_rois
+    def apply_strategy(self, df, param_dict):
+        # Determino result to bet
+        df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
+    
+        # Determino acierto de prediccion
+        df = self.determine_winning_bets(df)
+        df = self.determine_winning_bets(df, name_extension='expected_')
 
-    def select_best_combination(self, df, d_predicciones, roi_weight: float):
-        """
-        Selecciona la fila con la máxima métrica y retorna su ID.
-        También crea un diccionario `d_hiper` basado en dicha fila, excluyendo columnas específicas.
+        # Determino stake to bet
+        d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b']}
+        d_params_odds = {'odd_weight': param_dict['odd_weight'], 'dif_prob_sup_cap': param_dict['lim_sup']}
+        df = self.determine_stake_to_bet(df, **d_params_stake, **d_params_odds)
 
-        :param df_bs: DataFrame con la columna 'metric' y una columna identificadora.
-        :param id_column: Nombre de la columna que actúa como identificador único.
-        :return: (id_max, d_hiper) - ID de la fila seleccionada y el diccionario `d_hiper`.
-        """
+        # df = self.determine_stake_to_bet(df, **d_params_stake)
+        # df = self.modify_stake_with_odds(df, **d_params_stake, **d_params_odds)
+        return df
+    
+    def calculate_roi_in_combination(self, df):
+   
+        # Calculo ROI
+        df_pred, d_metrics = calculate_roi(df)
+
+        # Calculo expected ROI
+        df_pred_2, d_expected_roi = calculate_roi(df, name_extension='expected_')     
+
+        # Concateno datos de ROI y Expected ROI
+        missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
+        df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+        d_metrics.update(d_expected_roi)
+
+        return df_pred, d_metrics
+
+    def select_best_parameters(self, data, roi_weight):
+        
         name_extension = "_con_ea"
         metric_col = f'metric{name_extension}'
+
+        # df = pd.DataFrame(data=data)
+        df = pd.DataFrame.from_dict(data, orient='index')
+        print(df)
 
         # Calcular metrica combinada para determinar mejor estrategia
         df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
@@ -481,31 +493,24 @@ class BettingStrategy:
             raise ValueError(f"La columna '{metric_col}' no existe en el DataFrame.")
 
         # Encontrar la fila con el valor máximo de 'metric'
-        row = df.loc[df[metric_col].idxmax()]  # # Convertir a serie
-        id_max = row['id']
-        if self.verbose >= 2:
-            print("Id max", id_max)
-            print("Row", row)
-
-        # excluded_columns = {'id', 'roi', 'roi_por_partido', 'expected_roi', 'expected_roi_por_partido', 'metric'}
-        excluded_columns = {'id', 'roi', 'roi_por_partido', 'expected_roi', 'expected_roi_por_partido', 'roi_por_partido_norm', 'expected_roi_por_partido_norm', metric_col}
-
-        # Construyo variables a retornar
-        d_hiper = row.drop(labels=excluded_columns.intersection(df.columns)).to_dict() # Crear d_hiper excluyendo las columnas específicas
-        best_d_rois = row[list(excluded_columns.intersection(df.columns))].to_dict()
-        best_df_pred = d_predicciones[id_max]  # Con el id obtengo su df_pred y su df_metrics....
-        
-        return d_hiper, best_d_rois, best_df_pred
-
-    def define_betting_strategy(self, row, roi_weight: float, with_assess: bool = False):
+        n_comb = df[metric_col].idxmax()
+        logger.critical(f"Nº combination: {n_comb}")
+        # row = df.loc[n_comb]  # # Convertir a serie
+        # print("Row", row)
+        return n_comb
+         
+    # Main
+    def define_model_betting_strategy(self, row, strategy: str, roi_weight: float, with_assess: bool = False, by_result: bool = True):
         """
-        Determina la estrategia de apuesta optima para cada modelo.
+        Determina la estrategia de apuesta optima para un modelo.
+
+        Mejoras:
+            - simplificar codigo cuando hago el if by_result
         """
         # Lista para almacenar los resultados
-        logger.info("Paso 5: Definiendo la estrategia de apuesta optima para el modelo seleccionado...")
+        logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
         results = []
 
-        print(row)
         logger.warning(row)
         n_model, model_name = row.index[0], row['model_name'].values[0]
         if self.verbose >= 1:
@@ -517,26 +522,61 @@ class BettingStrategy:
             logger.warning("Levanto predicciones test con missing...")
         else:
             path_pred = f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx"
-
         df_pred = pd.read_excel(path_pred, index_col=0)
         logger.info(df_pred.shape)
 
         # Determino la mejor estrategia de apuesta
         logger.info("Calculando la mejor estrategia de apuesta...")
-        d_hiper, best_df_pred, best_d_rois = self.calculate_roi_by_betting_strategy(df_pred, roi_weight=roi_weight)
+        # d_hiper, best_df_pred, best_d_rois = self.calculate_roi_by_betting_strategy(df_pred, roi_weight=roi_weight)
 
-        # Concateno datos y guardo
-        d_ct = {**d_hiper, **best_d_rois}  # Combinar los dos diccionarios
-        d_ct['model_name'] = model_name
-        d_ct['n_model'] = n_model
+        if by_result:
+            d_metrics_res, d_hiper_res = {}, {}
+            best_df_pred = pd.DataFrame()
 
-        # Añadir el resultado al DataFrame final
-        results.append(d_ct)
+            # Por resultado
+            for pred in [1, 0, 2]:
+                df_result = df_pred[df_pred['predicted_result'] == pred] 
 
-        # Convertir la lista de resultados en un DataFrame
-        df_final = pd.DataFrame(results)
-        df_final.set_index('n_model', inplace=True)
-        
+                d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, strategy=strategy)
+                n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)   # Determinar mejor estrategia para el resultado
+                
+                d_hiper_res[pred] = d_hiper[n_comb]
+                d_metrics_res[pred] = d_metricas[n_comb]
+
+                best_df_pred = pd.concat([best_df_pred, d_predic[n_comb]], axis=0)
+
+            # Concateno datos y guardo
+            df_metrics = pd.DataFrame.from_dict(d_metrics_res, orient='index')
+            df_hiper = pd.DataFrame.from_dict(d_hiper_res, orient='index')
+            df_final = pd.concat([df_hiper, df_metrics], axis=1)
+            df_final.to_excel(f'{self.BASE_PATH_sbm}/df_strategy_by_result_{n_model}_{model_name}.xlsx', index=True)
+            '''
+            df_hiper.to_excel('/Users/nachomondino/Desktop/prueba.xlsx')
+            df_final.to_excel('/Users/nachomondino/Desktop/prueba_final.xlsx')
+            df_pred_ct.to_excel('/Users/nachomondino/Desktop/best_df_pred_prueba.xlsx')
+            '''
+        # Todos los resultados con la misma estrategia
+        else:
+            d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, strategy=strategy)
+            n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
+
+            d_hiper = d_hiper[n_comb]
+            best_df_pred = d_predic[n_comb]
+            best_d_rois = d_metricas[n_comb]
+
+            # Concateno datos y guardo
+            ## Combinar los dos diccionarios
+            d_ct = {**d_hiper, **best_d_rois}  
+            d_ct['model_name'] = model_name
+            d_ct['n_model'] = n_model
+
+            ## Añadir el resultado al DataFrame final
+            results.append(d_ct)
+
+            ## Convertir la lista de resultados en un DataFrame
+            df_final = pd.DataFrame(results)
+            df_final.set_index('n_model', inplace=True)
+
         if self.verbose >= 0:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
 
@@ -545,7 +585,50 @@ class BettingStrategy:
         df_final.to_excel(f'{self.BASE_PATH_sbm}/df_strategy.xlsx', index=True)
         return df_final
 
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
-    pass
+
+    # Defino parametros
+    id_country = 77
+    strategy = 'general'
+
+    # Defino hiperparametros
+    asssess_models_in_prod = False
+    avoid_assess = True
+    select_best_model = True
+
+    # Defino variables
+    d_countries = {
+        6: ["argentina", '2024-12-05'], 
+        48: ["england", '2024-12-23'],  # '2024-12-23'  '2025-01-02'
+        55: ["france", '2024-12-26'], 
+        59: ["germany", '2024-12-26'], 
+        77: ["italy", '2024-12-23'], 
+        # 77: ["italy", '2025-01-01'],
+        148: ["spain", '2024-12-25'], 
+        167: ["usa", '2024-12-05']
+        }
+    country = d_countries[id_country][0]
+    iteration_date = d_countries[id_country][1]
+    
+
+    bs = BettingStrategy(country, iteration_date)
+
+    '''
+    df_predicciones = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/14__LogisticRegression_predicciones.xlsx", index_col=0)
+
+    l_cols = ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away', 
+              'odds_home', 'odds_draw', 'odds_away', 'prob_home_bm', 'prob_draw_bm', 'prob_away_bm', 'overround', 'bookmaker_result', 'result', 'predicted_result',
+            'prob_class_1', 'prob_class_0', 'prob_class_2', 'emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled', 'expected_result']
+    df_predicciones = df_predicciones.loc[:, l_cols]
+
+    df = bs.calculate_roi_in_combinations(df_predicciones, strategy="general")
+
+    '''
+
+    # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
+    df = pd.read_excel(f'{bs.BASE_PATH_sbm}/2_select_model/df_p4.xlsx', index_col=0)
+    row = df.head(1) # Selecciono la primera fila
+    logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
+
+    df = bs.define_model_betting_strategy(row, strategy="general", roi_weight=1, with_assess=False)

@@ -471,6 +471,7 @@ def space_params(model_name, bayes, verbose: int = 0):
     l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
     # Logistic
     min_it, max_it = 100, 10000
+    param_c = [0.01, 1, 10]
 
     d_params = {
 
@@ -534,9 +535,9 @@ def space_params(model_name, bayes, verbose: int = 0):
         # Modelos lineales
         'LogisticRegression': [
             {'penalty': Categorical([None]) if bayes else [None], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}, # 'sag' --> ConvergenceWarning (talvez por la escala)
-            {'penalty': Categorical(['l2']) if bayes else ['l2'], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}, # , 'sag' --> ConvergenceWarning (talvez por la escala)
-            {'penalty': Categorical(['l1']) if bayes else ['l1'], 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]},
-            {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else [0.1, 1, 10], 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}
+            {'penalty': Categorical(['l2']) if bayes else ['l2'], 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else param_c, 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}, # , 'sag' --> ConvergenceWarning (talvez por la escala)
+            {'penalty': Categorical(['l1']) if bayes else ['l1'], 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else param_c, 'max_iter': Integer(min_it, max_it) if bayes else [max_it]},
+            {'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 'solver': Categorical(['saga']) if bayes else ['saga'], 'C': Real(0.01, 10, prior='log-uniform') if bayes else param_c, 'l1_ratio': Real(0, 1) if bayes else [0.5], 'max_iter': Integer(min_it, max_it) if bayes else [max_it]}
         ],
         'SVC': {
             'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3],

@@ -105,6 +105,59 @@ def convert_capacity_to_int(df):
                 print(f"Fallo la conversion de la columna {col} a float")
     return df
 
+def format_percentage_columns(df, base_columns):
+    """
+    Formatea columnas que contienen porcentajes en sus versiones _home y _away.
+    Extrae precisión, acciones exitosas y totales.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con las columnas a procesar.
+        base_columns (list): Lista de nombres base de las columnas (sin _home o _away).
+    
+    Returns:
+        pd.DataFrame: DataFrame con las columnas formateadas.
+    """
+    for base_col in base_columns:
+
+        home_col = f"{base_col}_home"
+        away_col = f"{base_col}_away"
+
+        # Defino nombres de columnas tal que macheen los del df_match ya extraido
+        accuracy_col_home = f'accuracy_{home_col}'
+        accuracy_col_away = f'accuracy_{away_col}'
+        completed_col_home = f'{base_col}_completed_home'
+        completed_col_away = f'{base_col}_completed_away'
+        total_col_home = f'total_{home_col}'
+        total_col_away = f'total_{away_col}'
+
+
+        # Procesar la columna `_home`
+        df[[accuracy_col_home, completed_col_home, total_col_home]] = df[home_col].str.extract(
+            r'(\d+)% \((\d+)/(\d+)\)').astype(float)
+
+        # Procesar la columna `_away`
+        df[[accuracy_col_away, completed_col_away, total_col_away]] = df[away_col].str.extract(
+            r'(\d+)% \((\d+)/(\d+)\)').astype(float)
+    
+        # Eliminar las columnas originales
+        df.drop(columns=[home_col, away_col], inplace=True)
+    
+    return df
+
+def rename_columns(df, rename_dict):
+    """
+    Renombra columnas de un DataFrame según un diccionario de mapeo.
+    
+    Args:
+        df (pd.DataFrame): DataFrame cuyas columnas deseas renombrar.
+        rename_dict (dict): Diccionario donde las claves son los nombres de las columnas originales
+                            y los valores son los nuevos nombres.
+    
+    Returns:
+        pd.DataFrame: DataFrame con las columnas renombradas.
+    """
+    return df.rename(columns=rename_dict)
+
 def convert_columns_to_float(df: pd.DataFrame, verbose: int = 0):
     """
     Intenta convertir las columnas object a float

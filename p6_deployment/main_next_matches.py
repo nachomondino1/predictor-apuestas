@@ -686,14 +686,8 @@ class TrainingDataLoader():
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        # Si se levanta de main_find_best_hyper.py
-        if self.n_model is not None:
-            n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
-            path_scaler = f'{self.BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
-        # Si se levanta de main.py
-        else:
-            logger.error("Se levanta el modelo y el scaler desde de main.py")
-            path_scaler = f"./data/{self.country}/p3_data_preparation/scaler_model.pkl"
+        n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
+        path_scaler = f'{self.BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
@@ -722,12 +716,22 @@ class TrainingDataLoader():
     def load_modeling_hyperparameters(self):
         """
         Cargo hiperparametros de Modeling()
+
+        Mejora: 
+         - Levantar parametros por resultado...
         """
         d = {}
         l_curvas = ['linear', 'kelly']
 
-        # Si se levanta de main_find_best_hyper.py
-        if self.n_model is not None:
+        # Estrategia por resultado
+        try:
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/df_strategy_by_result_{self.n_model}_{self.model_name}.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
+            print(df_hiper)
+            return df_hiper
+        
+        # Misma Estrategia para los resultados
+        except FileNotFoundError:
+            logger.warning("Falló la obtencion de hiperparametros de estrategia de apuesta por resultado.")
             try:
                 df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/df_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
                 # df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_models/df_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
@@ -769,10 +773,7 @@ class TrainingDataLoader():
                 logger.error(f"Falló la carga de hiperparametros de la estrategia de apuesta. El modelo a cargar era el {self.n_model}, un {self.model_name}. La fila con los hiperparametros tiene un largo de {len(row_hiper_bet_strat)} (≠ de 1:).")
                 logger.info(df_iteration)
                 raise ValueError
-        else:
-            row_hiper_bet_strat = pd.read_excel(f'./data/{country}/p4_modeling/modeling/df_hiper_mod.xlsx')
-            logger.error("Se levantan los hiperparametros de Modeling desde de main.py")
-
+  
         try:
             d['thr_prob_min'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
         except:
@@ -843,6 +844,7 @@ def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds,
     df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
     df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
     len_final = len(df_concat_match)
+    logger.warning(f"Old:{df_match.shape} + Missing: {df_match_miss.shape} = {df_concat_match.shape}")
 
     verif = (len_inicial + len_inicial_miss) == len_final
     if not verif:
@@ -1054,23 +1056,28 @@ def main(
             df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
             df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
             df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
+            logger.warning(f"Levanto missing ya extraido: {df_match_miss.shape} {df_match_player_miss.shape} {df_match_odds_miss.shape}")
 
         # Si hay partidos missing que no extraje aun
         if len(df_match_miss) > 0:
             logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
-            if export and extract_missing:
-                # Guardo datos con los que entrenó el modelo y los missing
+            if export:
                 concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country)
-                concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
+
+                if extract_missing:
+                    # Guardo datos con los que entrenó el modelo y los missing
+                    concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
 
             # Preparo datos
-            df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, export=False)
+            df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_integrated_updated = pd.concat([df_integrated, df_integrated_missing], axis=0)
+            logger.warning(f"Concatenación old + missing: {df_integrated.shape} + {df_integrated_missing.shape} --> {df_integrated_updated.shape}")
+
             if export:
                 df_integrated_missing.to_excel(f'./data/{country}/p6_deployment/missing/data_preparation/df_integrated_missing.xlsx', index=True)
                 df_integrated_updated.to_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index=True)
@@ -1221,21 +1228,15 @@ def main(
     if d_run['modeling']:
 
         # Levanto hiperparametros de modeling
-        bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
         loaded_model = lo.load_model()
         classes = [0, 1, 2] # loaded_model.classes_
-
-        d_train_strategy = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False}
-        d_hiper_mod = d_train_strategy if predict_missing else lo.load_modeling_hyperparameters()
-
-        m_to_use = d_hiper_mod['curva_m'] * porc_m
-        logger.info(f"Porcentaje m: {porc_m} --> m_to_use: {m_to_use}")
 
         try:
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']] 
         except KeyError:
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'
- 
+        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
+
         # Realizo predicciones sobre los nuevos partidos
         y_pred_prob, y_pred = mo.predict(model=loaded_model, X_test=df)
         df_pred_proba = pd.DataFrame({
@@ -1245,25 +1246,32 @@ def main(
                 f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
             }, index=df.index)
 
-        # Concateno conjunto de datos
-        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-        try:
-            df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
-        except:
-            df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1['copiado_formaciones']], axis=1)  # df_predicciones = pd.concat([df_match, df_match_odds, df_pred_proba, df_c1, df_c2, df], axis=1)
-
-        # Determino estrategia de apuesta
+        # Concateno conjunto de datos # df_fill puede tirar error. Si tira, arreglar.
+        df_predicciones = pd.concat(
+            [df_match, 
+             df_match_odds, 
+             df_pred_proba, 
+             df_c1['copiado_formaciones'], 
+             df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]
+             ], 
+            axis=1) 
+    
+        # Aplico estrategia de apuesta
+        bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
+        d_strategy = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False} if predict_missing else lo.load_modeling_hyperparameters()
         df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
-        df = bs.determine_result_to_bet(df, thr_prob_min=d_hiper_mod['thr_prob_min'])
 
-        # Vario el stake segun curva especifica
-        df = bs.determine_stake_to_bet(df, type_relation=d_hiper_mod['curva'], m=m_to_use, b=d_hiper_mod['curva_b'], odd_weight=d_hiper_mod['odd_weight'], dif_prob_sup_cap=d_hiper_mod['dif_prob_sup_cap'], normalized=d_hiper_mod['normalized']) # Uso un m bajo para los clientes
+        # Pasarle "strategy" prod o bien ya pasarle el d_params...
+        df = bs.apply_strategy_by_result(df, df_hiper=d_strategy)
+        # df = bs.apply_strategy(df, param_dict=d_strategy)
 
-        # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
-        df = format_data.map_teams(df, country=country)
+        # Aplico reduccion a stake --> Ver si funciona.. Creo que si.
+        df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+        # logger.info(f"m_to_use: {d_strategy['curva_m']} tras aplicar {porc_m}")
 
-        # Filtro partidos para quedarme solo con los de competencias publicas.
-        df = df[df['id_competition'].isin(comp_public)]
+        # Ultimos preparativos
+        df = format_data.map_teams(df, country=country)     # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
+        df = df[df['id_competition'].isin(comp_public)]     # Filtro partidos para quedarme solo con los de competencias publicas.
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
@@ -1284,7 +1292,7 @@ def main(
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
 
-    n_days = 2
+    n_days = 15
     # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
@@ -1296,7 +1304,8 @@ if __name__ == "__main__":
         48: ["england", '2024-12-23'], 
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
-        77: ["italy", '2024-12-23'], 
+        # 77: ["italy", '2024-12-23'], 
+        77: ["italy", '2025-01-02'], 
         148: ["spain", '2024-12-25'], 
         167: ["usa", '2024-12-05']
         }
@@ -1305,14 +1314,15 @@ if __name__ == "__main__":
     for id_country in l_countries:
 
         # recolectar missing
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, n_seasons_missing=3, export=d_run['export']) 
+        # df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
+        # df = main(d_run, id_country, extract_missing=False, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 314, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 914, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         ## Prox partidos
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
         ## En partidos missing
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
+        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
         
         # Prod 
         # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
