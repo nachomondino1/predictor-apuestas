@@ -197,7 +197,21 @@ class DataPreparation:
             logger.warning("Reformateo columnas stats nuevas")
             base_columns = ['passes', 'passes_in_the_final_third', 'crosses', 'tackles']
             df_match = format_data.format_percentage_columns(df_match, base_columns)
-       
+
+            # Renombro columnas para usar el mismo nombre que en los datos viejos (por ende, se concatenen juntas)
+            rename_dict = {
+                # nombre en missing: --> nombre en datos viejos
+                "passes_completed_home" : "completed_passes_home",
+                "passes_completed_away": "completed_passes_away",
+                "accuracy_passes_home": 'pass_success_%_home',
+                "accuracy_passes_away": 'pass_success_%_away',
+                'clearances_total_home': 'clearances_completed_home',
+                'clearances_total_away': 'clearances_completed_away',
+                'tackles_completed_home': 'tackles_home',  # "total_tackles_home" : "tackles_home",
+                'tackles_completed_away': 'tackles_away',  # "total_tackles_away": "tackles_away",
+            }
+            df_match = format_data.rename_columns(df_match, rename_dict)
+                
         # Dataframe player_fifa_sofifa
         ## Fecha
         df_player_fifa_sofifa['date'] = pd.to_datetime(df_player_fifa_sofifa['date'], format='%b %d, %Y')
@@ -415,7 +429,8 @@ class DataPreparation:
         start = time.time()
         logger.info("Constructing data...")
 
-        # CLEAN DATA ANTES DE CONSTRUIR
+        '''
+        # CLEAN DATA ANTES DE CONSTRUIR (en prod rompe porque los trian anteriores fueron con estas variables...)
         # Rellenar las red_cards con 0 para los años mayores a 2015 (pues desde ahi ya veo que se media la roja) --> Es nan siempre salvo que haya un expulsado en el partido...
         df.loc[(df['date'].dt.year > 2015) & (df['red_cards_home'].isna()), 'red_cards_home'] = 0
         df.loc[(df['date'].dt.year > 2015) & (df['red_cards_away'].isna()), 'red_cards_away'] = 0
@@ -426,7 +441,7 @@ class DataPreparation:
         cols_to_drop = cols_basics_noise + col_players_noise
         df = df.drop(columns=cols_to_drop)         # Dropear las columnas seleccionadas
         logger.warning(f"Columnas jugadores eliminadas: {cols_to_drop}")
-
+        '''    
         # Si quiero construir variables historicas
         if with_historic:
 
@@ -442,7 +457,7 @@ class DataPreparation:
 
             ## OFENSIVE
             ## Goal ratio
-            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="G2S")  # Similar a G2A
+            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
             # df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="shots_on_goal", laplace=True,  column_name="G2SOG")  # Similar a G2A
 
             # Traduccion de posesion a tiros
@@ -457,7 +472,7 @@ class DataPreparation:
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
-            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'clearances_completed', 'clearances_total', 'tackles_completed', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
+            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
             df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
             df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
 
@@ -495,13 +510,13 @@ class DataPreparation:
                 # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
                 # Ofensive
                 'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
-                'shots_on_goal', 'goal_attempts', 'goals', 'points', 'G2S', 'PPS', # 'shots_off_goal' # 'SG2G',
+                'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', 'KGP',  #  'G2S',  # 'shots_off_goal' # 'SG2G',
                 'attacks', 'dangerous_attacks', # ya no se recolecta mas. En los partidos missing ya no existe.
                 'dead_balls', # 'goal_ratio_dead_balls',
                 'ball_possession', 'total_passes', # 'pass_success_%', 'attacking_efficiency',
                 # Defensive
                 'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls',  'interceptions'
-                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency", 'KGP', 'interceptions', 'goalkeeper_saves'
+                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency", 'KGP', 'goalkeeper_saves'
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
@@ -761,7 +776,7 @@ class DataPreparation:
             df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
         """
         logger.info("Treating NaN values in df_test...")
-        df_filled_columns = pd.DataFrame(0, index=df.index, columns=['emergency_fill', 'player_emergency_fill']) # Inicializo el df
+        df_filled_columns = pd.DataFrame(0, index=df.index, columns=['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled']) # Inicializo el df
 
         # Rellenar NaN en algunas columnas espeecificas
         columns_to_fill = [col for col in df.columns if df[col].isna().any()]  # En teoria, solo rellena las variables historicas que son nan.
@@ -1048,8 +1063,9 @@ class Modeling:
         df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
 
         # Calculo ROI
-        bs = betting_strategy.BettingStrategy(strategy='train')  # Al no pasarle iteration_date no inicializa directories de betting strategy
-        _, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
+        bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, strategy='train')
+        # _, df_predicciones, d_roi = bs.calculate_roi_by_betting_strategy(df_predicciones)
         d_metrics.update(d_roi)
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
 

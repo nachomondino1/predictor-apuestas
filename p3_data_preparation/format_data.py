@@ -123,12 +123,13 @@ def format_percentage_columns(df, base_columns):
         away_col = f"{base_col}_away"
 
         # Defino nombres de columnas tal que macheen los del df_match ya extraido
-        accuracy_col_home = f'pass_success_%_home' if base_col == 'passes' else f'accuracy_{home_col}'
-        accuracy_col_away = f'pass_success_%_away' if base_col == 'passes' else f'accuracy_{away_col}'
-        completed_col_home = f'completed_{base_col}_home' if base_col == 'passes' else f'{base_col}_completed_home'
-        completed_col_away = f'completed_{base_col}_away' if base_col == 'passes' else f'{base_col}_completed_away'
-        total_col_home = f'total_{home_col}' if base_col == 'passes' else home_col
-        total_col_away = f'total_{away_col}' if base_col == 'passes' else away_col
+        accuracy_col_home = f'accuracy_{home_col}'
+        accuracy_col_away = f'accuracy_{away_col}'
+        completed_col_home = f'{base_col}_completed_home'
+        completed_col_away = f'{base_col}_completed_away'
+        total_col_home = f'total_{home_col}'
+        total_col_away = f'total_{away_col}'
+
 
         # Procesar la columna `_home`
         df[[accuracy_col_home, completed_col_home, total_col_home]] = df[home_col].str.extract(
@@ -143,7 +144,19 @@ def format_percentage_columns(df, base_columns):
     
     return df
 
-
+def rename_columns(df, rename_dict):
+    """
+    Renombra columnas de un DataFrame según un diccionario de mapeo.
+    
+    Args:
+        df (pd.DataFrame): DataFrame cuyas columnas deseas renombrar.
+        rename_dict (dict): Diccionario donde las claves son los nombres de las columnas originales
+                            y los valores son los nuevos nombres.
+    
+    Returns:
+        pd.DataFrame: DataFrame con las columnas renombradas.
+    """
+    return df.rename(columns=rename_dict)
 
 def convert_columns_to_float(df: pd.DataFrame, verbose: int = 0):
     """

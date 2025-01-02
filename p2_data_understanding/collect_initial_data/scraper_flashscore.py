@@ -403,6 +403,9 @@ class FlashscoreCrawler(Crawler):
     def select_items_by_date(self, l_items, n_days):
         """
         Selecciona los partidos que se juegan entre hoy y los proximos n dias.
+
+        Mejoras:
+            - Tiene problemas al extraer partidos cuando cambia de año.
         """
         # Definicion de variables
         l_items_filt = []
@@ -427,7 +430,8 @@ class FlashscoreCrawler(Crawler):
                 
                 # Formateo fecha de str a datetime (agregandole el año pues sino toma 1900)
                 mes_str = fecha_str[3:5]
-                anio = anio_siguiente if mes_str == '01' else anio_actual
+                # anio = anio_siguiente if mes_str == '01' else anio_actual
+                anio = anio_actual
                 fecha_str = f"{anio}.{fecha_str}"
                 
                 if self.verbose >= 1:

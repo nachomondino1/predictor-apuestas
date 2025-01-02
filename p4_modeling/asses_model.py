@@ -407,11 +407,12 @@ def calculate_metrics(
 
     # Concatenación selectiva
     df_filled = pd.read_excel(f'./data/{country}/p3_data_preparation/treat_nan/df_filled_columns.xlsx', index_col=0)
+    l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
     columns_to_concat = [
         df_match[['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']],
         df_match_odds,
         df_pred_proba,
-        df_filled[['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled']]
+        df_filled[l_cols]
     ]
     df_predicciones = pd.concat(columns_to_concat, axis=1)
 
@@ -421,20 +422,33 @@ def calculate_metrics(
     return df_predicciones, d_metrics
 
 def calculate_advanced_metrics(df_predicciones):
+    """
+    Calculo metricas mas avanzadas que precision o recall.
 
+    Posibles mejoras:
+        - Mas metricas
+        - Calculo de metricas G/P cuando estas son negativas (e.g. perc_gp_filled) --> Tampoco jode tanto porque en la seleccion las uso pero solo de modelos buenos los cuales tienen G/P positivas...
+    """
+    # Calculo numero de predicciones por resultado
     d_distrib = determine_distribution(df_predicciones)
 
     # Calculo metricas sobre relleno de nan
     rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
     rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+    average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
     # print(len(rows_filled), len(rows_not_filled))
-    
+
     # G/P segun relleno de NaN
     gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
     gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
     gp_total = df_predicciones['G/P_sin_bank'].sum()
-    average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
 
+    if gp_total != 0:
+        perc_gp_filled = int(gp_filled / (gp_total) * 100)
+        perc_gp_not_filled = int(gp_not_filled / (gp_total) * 100),
+    else:
+        perc_gp_filled, perc_gp_not_filled = 0, 0
+    
     # Por resultado
     df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
     df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
@@ -455,8 +469,8 @@ def calculate_advanced_metrics(df_predicciones):
         # G/P cuando relleno y G/P cuando no relleno
         'sum_gp_filled': gp_filled, 
         'sum_gp_not_filled': gp_not_filled,
-        '%_gp_filled': int(gp_filled / (gp_total) * 100),
-        '%_gp_not_filled': int(gp_not_filled / (gp_total) * 100),
+        '%_gp_filled': perc_gp_filled,
+        '%_gp_not_filled': perc_gp_not_filled,
         # Distribucion de bets por resultado
         **d_distrib,
         # G/P por resultado
