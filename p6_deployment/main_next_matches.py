@@ -725,35 +725,27 @@ class TrainingDataLoader():
 
         # Estrategia por resultado
         try:
-            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/df_strategy_by_result_{self.n_model}_{self.model_name}.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
             print(df_hiper)
-            return df_hiper
-        
+
+            # Si es por resultado
+            if len(df_hiper) == 3:
+                logger.critical("Se levantó la estrategia de apuesta por resultado")
+                return df_hiper
+
+            df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
+            df_iteration.rename(columns={'n_model': 'n_iteration'}, inplace=True)  # Renombra la columna creada
+
         # Misma Estrategia para los resultados
         except FileNotFoundError:
-            logger.warning("Falló la obtencion de hiperparametros de estrategia de apuesta por resultado.")
+            logger.warning("Falló la obtencion de hiperparametros de estrategia de apuesta")
             try:
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/df_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
-                # df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/best_models/df_strategy.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
-
-                if self.verbose >= 2:
-                    print(df_iteration)
-
-                df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
-                df_iteration.rename(columns={'n_model': 'n_iteration'}, inplace=True)  # Renombra la columna creada
-
-                if self.verbose >= 2:
-                    print("BBB")
-                    print(df_iteration)
+                logger.warning("No está df_iteration_with_strategy")
+                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
 
             except FileNotFoundError:
-                try:
-                    logger.warning("No está df_iteration_with_strategy")
-                    df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
-
-                except FileNotFoundError:
-                    logger.warning("No está df_iteration_with_strategy ni df_iteration")
-                    df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
+                logger.warning("No está df_iteration_with_strategy ni df_iteration")
+                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
 
             row_ite = df_iteration[df_iteration['n_iteration'] == self.n_model]
 
@@ -775,19 +767,19 @@ class TrainingDataLoader():
                 raise ValueError
   
         try:
-            d['thr_prob_min'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
+            d['prob_dp'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
         except:
-            d['thr_prob_min'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min'))
+            d['prob_dp'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min'))
 
         d['curva'] = self.load_value_from_series(row_hiper_bet_strat, 'curva') # str
         param1 = self.load_value_from_series(row_hiper_bet_strat, 'param1')  # int?
         param2 = self.load_value_from_series(row_hiper_bet_strat, 'param2') 
-        d['curva_m'] = param1 if d['curva'] in l_curvas else None
-        d['curva_b'] = param2 if d['curva'] in l_curvas else None
+        d['m'] = param1 if d['curva'] in l_curvas else None
+        d['b'] = param2 if d['curva'] in l_curvas else None
         d['curva_p1'] = eval(str(param1)) if d['curva'] not in l_curvas else None
         d['curva_p2'] = eval(str(param2)) if d['curva'] not in l_curvas else None
         d['odd_weight'] = int(self.load_value_from_series(row_hiper_bet_strat, 'odd_weight'))
-        d['dif_prob_sup_cap'] = float(self.load_value_from_series(row_hiper_bet_strat, 'dif_prob_sup_cap'))
+        d['lim_sup'] = float(self.load_value_from_series(row_hiper_bet_strat, 'dif_prob_sup_cap'))
         d['normalized'] = self.load_value_from_series(row_hiper_bet_strat, 'normalized')
 
         if self.verbose >= 0:
@@ -1258,12 +1250,16 @@ def main(
     
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'thr_prob_min': -1, 'curva': 'linear', 'curva_m': 10, 'curva_b': 0, 'odd_weight':0, 'dif_prob_sup_cap': 0, 'normalized': False} if predict_missing else lo.load_modeling_hyperparameters()
+        d_strategy = {'prob_dp': -1, 'curva': 'linear', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': False} if predict_missing else lo.load_modeling_hyperparameters()
         df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
-        df = bs.apply_strategy_by_result(df, df_hiper=d_strategy)
-        # df = bs.apply_strategy(df, param_dict=d_strategy)
+        if  isinstance(d_strategy, dict):
+            logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
+            df = bs.apply_strategy(df, param_dict=d_strategy)
+        else:
+            logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
+            df = bs.apply_strategy_by_result(df, df_hiper=d_strategy)
 
         # Aplico reduccion a stake --> Ver si funciona.. Creo que si.
         df['stake_to_bet'] = df['stake_to_bet'] * porc_m
@@ -1304,8 +1300,8 @@ if __name__ == "__main__":
         48: ["england", '2024-12-23'], 
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
-        # 77: ["italy", '2024-12-23'], 
-        77: ["italy", '2025-01-02'], 
+        77: ["italy", '2024-12-23'], 
+        # 77: ["italy", '2025-01-02'], 
         148: ["spain", '2024-12-25'], 
         167: ["usa", '2024-12-05']
         }
@@ -1318,7 +1314,7 @@ if __name__ == "__main__":
         # df = main(d_run, id_country, extract_missing=False, export=d_run['export']) 
 
         # Probar un modelo
-        d_model = {'n_model': 914, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+        d_model = {'n_model': 902, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
         ## Prox partidos
         df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
         ## En partidos missing
