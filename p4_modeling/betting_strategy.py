@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from p4_modeling.asses_model import calculate_combined_metric, calculate_roi
-from p4_modeling import select_model_for_prod
 from utils import directories
 from itertools import product
 
@@ -365,7 +364,7 @@ class BettingStrategy:
         return df
     
     ## Determinar la mejor estrategia
-    def calculate_roi_in_combinations(self, df, strategy, by_result: bool = False):
+    def calculate_roi_in_combinations(self, df, strategy):
         """
         Mejoras:
             - Estrategia por resultado...
@@ -380,7 +379,8 @@ class BettingStrategy:
 
         # Generar combinaciones de parámetros automáticamente
         param_combinations = list(product(*d_params.values()))
-        print(f'Las {len(param_combinations)} combinaciones: {param_combinations}')
+        if self.verbose >= 1:
+            print(f'Las {len(param_combinations)} combinaciones: {param_combinations}')
         cont = 0
             
         # Iterar sobre cada combinación
@@ -389,26 +389,31 @@ class BettingStrategy:
 
             # Emparejar cada parámetro con su nombre desde `param_grid`
             param_dict = dict(zip(d_params.keys(), params))
-            print(f"\nNº Combinacion: {cont}")
-            print(param_dict)
+            if self.verbose >= 1:
+                print(f"\nNº Combinacion: {cont}")
+                print(param_dict)
 
             if param_dict['odd_weight'] == 0 and param_dict['lim_sup'] != 0:
-                logger.warning("Se evitó calcular combinacion porque si odd_weight es 0, no tiene sentido lim_sup != 0.")
+                if self.verbose >= 1:
+                    logger.warning("Se evitó calcular combinacion porque si odd_weight es 0, no tiene sentido lim_sup != 0.")
                 continue
 
             # Aplicar estrategia a df_pred
-            df_aux = self.apply_strategy(df, param_dict)
+            df_aux = self.apply_strategy(df, param_dict, prod=False)
 
             # Calculo de metricas (ROI y expected roi)
             df_pred_with_metrics, d_metrics = self.calculate_roi_in_combination(df_aux)
-            print(d_metrics)
+            if self.verbose >= 1:
+                print(d_metrics)
 
             # Guardo resultados
             d_predic[cont] = df_pred_with_metrics
             d_hiper[cont] = param_dict
             d_metricas[cont] = d_metrics
 
-        self.select_best_parameters(d_metricas, roi_weight=1) # Para pruebas
+        if strategy == 'train':
+            d_predic, d_hiper, d_metricas = df_pred_with_metrics, param_dict, d_metrics
+
         return d_predic, d_hiper, d_metricas
 
     def apply_strategy_by_result(self, df, df_hiper):
@@ -443,13 +448,14 @@ class BettingStrategy:
 
         return df_comp
 
-    def apply_strategy(self, df, param_dict):
+    def apply_strategy(self, df, param_dict, prod: bool = True):
         # Determino result to bet
         df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
     
         # Determino acierto de prediccion
-        df = self.determine_winning_bets(df)
-        df = self.determine_winning_bets(df, name_extension='expected_')
+        if not prod:
+            df = self.determine_winning_bets(df)
+            df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
         d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b']}
@@ -482,7 +488,8 @@ class BettingStrategy:
 
         # df = pd.DataFrame(data=data)
         df = pd.DataFrame.from_dict(data, orient='index')
-        print(df)
+        if self.verbose >= 1:
+            print(df)
 
         # Calcular metrica combinada para determinar mejor estrategia
         df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
@@ -494,13 +501,15 @@ class BettingStrategy:
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df[metric_col].idxmax()
-        logger.critical(f"Nº combination: {n_comb}")
-        # row = df.loc[n_comb]  # # Convertir a serie
-        # print("Row", row)
+        if self.verbose >= 1:
+            logger.critical(f"Nº combination: {n_comb}")
+            row = df.loc[n_comb]  # # Convertir a serie
+            print("Row", row)
+
         return n_comb
          
     # Main
-    def define_model_betting_strategy(self, row, strategy: str, roi_weight: float, with_assess: bool = False, by_result: bool = True):
+    def define_model_betting_strategy(self, df_pred, strategy: str, roi_weight: float, by_result: bool = True):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -510,20 +519,6 @@ class BettingStrategy:
         # Lista para almacenar los resultados
         logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
         results = []
-
-        logger.warning(row)
-        n_model, model_name = row.index[0], row['model_name'].values[0]
-        if self.verbose >= 1:
-            logger.info(f'n_model: {n_model} model_name: {model_name}')
-
-        # Levanto df_predicciones --> Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             # Falta levantar las predicciones de los missing y concatenerlas (si hubiera) --> no haria falta el assess_models_in_prod.py????
-        if with_assess:
-            path_pred = f"{self.BASE_PATH_sbm}/1_assess/{n_model}__{model_name}_predicciones.xlsx"
-            logger.warning("Levanto predicciones test con missing...")
-        else:
-            path_pred = f"{self.BASE_PATH}/models/{n_model}__{model_name}_predicciones.xlsx"
-        df_pred = pd.read_excel(path_pred, index_col=0)
-        logger.info(df_pred.shape)
 
         # Determino la mejor estrategia de apuesta
         logger.info("Calculando la mejor estrategia de apuesta...")
@@ -549,12 +544,7 @@ class BettingStrategy:
             df_metrics = pd.DataFrame.from_dict(d_metrics_res, orient='index')
             df_hiper = pd.DataFrame.from_dict(d_hiper_res, orient='index')
             df_final = pd.concat([df_hiper, df_metrics], axis=1)
-            df_final.to_excel(f'{self.BASE_PATH_sbm}/df_strategy_by_result_{n_model}_{model_name}.xlsx', index=True)
-            '''
-            df_hiper.to_excel('/Users/nachomondino/Desktop/prueba.xlsx')
-            df_final.to_excel('/Users/nachomondino/Desktop/prueba_final.xlsx')
-            df_pred_ct.to_excel('/Users/nachomondino/Desktop/best_df_pred_prueba.xlsx')
-            '''
+  
         # Todos los resultados con la misma estrategia
         else:
             d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, strategy=strategy)
@@ -567,9 +557,7 @@ class BettingStrategy:
             # Concateno datos y guardo
             ## Combinar los dos diccionarios
             d_ct = {**d_hiper, **best_d_rois}  
-            d_ct['model_name'] = model_name
-            d_ct['n_model'] = n_model
-
+ 
             ## Añadir el resultado al DataFrame final
             results.append(d_ct)
 
@@ -577,13 +565,11 @@ class BettingStrategy:
             df_final = pd.DataFrame(results)
             df_final.set_index('n_model', inplace=True)
 
-        if self.verbose >= 0:
+        if self.verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
 
         # Exportar el DataFrame final a un archivo Excel
-        best_df_pred.to_excel(f'{self.BASE_PATH_sbm}/predicciones_{n_model}_{model_name}.xlsx')
-        df_final.to_excel(f'{self.BASE_PATH_sbm}/df_strategy.xlsx', index=True)
-        return df_final
+        return df_final, best_df_pred
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
@@ -627,7 +613,7 @@ if __name__ == "__main__":
     '''
 
     # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
-    df = pd.read_excel(f'{bs.BASE_PATH_sbm}/2_select_model/df_p4.xlsx', index_col=0)
+    df = pd.read_excel(f'{bs.BASE_PATH_sbm}/2_select_model/df_selected_model.xlsx', index_col=0)
     row = df.head(1) # Selecciono la primera fila
     logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
