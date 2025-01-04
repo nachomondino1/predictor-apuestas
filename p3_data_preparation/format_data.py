@@ -125,11 +125,10 @@ def format_percentage_columns(df, base_columns):
         # Defino nombres de columnas tal que macheen los del df_match ya extraido
         accuracy_col_home = f'accuracy_{home_col}'
         accuracy_col_away = f'accuracy_{away_col}'
-        completed_col_home = f'{base_col}_completed_home'
-        completed_col_away = f'{base_col}_completed_away'
-        total_col_home = f'total_{home_col}'
-        total_col_away = f'total_{away_col}'
-
+        completed_col_home = f'n_correct_{base_col}_home' # No uso 'completed' por si ya existe "completed_passes" en missing.
+        completed_col_away = f'n_correct_{base_col}_away'
+        total_col_home = f'n_{home_col}'  # No uso total por si ya existe "total_passes" en missing.
+        total_col_away = f'n_{away_col}'
 
         # Procesar la columna `_home`
         df[[accuracy_col_home, completed_col_home, total_col_home]] = df[home_col].str.extract(
@@ -144,19 +143,24 @@ def format_percentage_columns(df, base_columns):
     
     return df
 
-def rename_columns(df, rename_dict):
+def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
     """
-    Renombra columnas de un DataFrame según un diccionario de mapeo.
-    
-    Args:
-        df (pd.DataFrame): DataFrame cuyas columnas deseas renombrar.
-        rename_dict (dict): Diccionario donde las claves son los nombres de las columnas originales
-                            y los valores son los nuevos nombres.
-    
-    Returns:
-        pd.DataFrame: DataFrame con las columnas renombradas.
+    Función para renombrar, combinar y eliminar columnas viejas
     """
-    return df.rename(columns=rename_dict)
+    for old_col, new_col in rename_dict.items():
+        if old_col in df.columns:
+            if new_col in df.columns:  # Si ya existe el nuevo nombre
+                # Combina ambas columnas y elimina la vieja
+                df[new_col] = df[new_col].combine_first(df[old_col]) 
+
+                # Eliminar la columna vieja después de transferir los datos
+                df.drop(columns=[old_col], inplace=True)
+
+            else:
+                # Renombrar directamente si no hay conflicto
+                df.rename(columns={old_col: new_col}, inplace=True)
+
+    return df
 
 def convert_columns_to_float(df: pd.DataFrame, verbose: int = 0):
     """

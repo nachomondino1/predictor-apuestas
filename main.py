@@ -196,21 +196,23 @@ class DataPreparation:
             # Formateo nuevas columnas...
             logger.warning("Reformateo columnas stats nuevas")
             base_columns = ['passes', 'passes_in_the_final_third', 'crosses', 'tackles']
-            df_match = format_data.format_percentage_columns(df_match, base_columns)
+            df_match = format_data.format_percentage_columns(df_match, base_columns)  # Uso nombres ≠ que los df_match x si tmb existen dichas columnas en missing. (eso lo tendre en cuenta en el renombre de columnas...)
 
-            # Renombro columnas para usar el mismo nombre que en los datos viejos (por ende, se concatenen juntas)
+            # Renombro columnas para usar el mismo nombre que en los datos viejos (por ende, se concatenen juntas) 
             rename_dict = {
                 # nombre en missing: --> nombre en datos viejos
-                "passes_completed_home" : "completed_passes_home",
-                "passes_completed_away": "completed_passes_away",
+                "n_passes_home" : "total_passes_home",
+                "n_passes_away": "total_passes_away",
+                "n_correct_passes_home" : "completed_passes_home",
+                "n_correct_passes_away": "completed_passes_away",
                 "accuracy_passes_home": 'pass_success_%_home',
                 "accuracy_passes_away": 'pass_success_%_away',
-                'clearances_total_home': 'clearances_completed_home',
-                'clearances_total_away': 'clearances_completed_away',
-                'tackles_completed_home': 'tackles_home',  # "total_tackles_home" : "tackles_home",
-                'tackles_completed_away': 'tackles_away',  # "total_tackles_away": "tackles_away",
+                'n_clearances_home': 'clearances_completed_home', # No hay n_correct clearances a veces?
+                'n_clearances_away': 'clearances_completed_away',
+                'n_correct_tackles_home': 'tackles_home',  # "total_tackles_home" : "tackles_home",
+                'n_correct_tackles_away': 'tackles_away',  # "total_tackles_away": "tackles_away",
             }
-            df_match = format_data.rename_columns(df_match, rename_dict)
+            df_match = format_data.rename_and_merge_columns(df_match, rename_dict)
                 
         # Dataframe player_fifa_sofifa
         ## Fecha
@@ -256,6 +258,7 @@ class DataPreparation:
 
         # Preparacion de texto
         ## FLASHSCORE
+        df_match.to_excel("/Users/nachomondino/Desktop/df_error.xlsx")
         columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
         df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
         columns_player_names = list(df_match_player.filter(like='player_name').columns)
@@ -437,11 +440,12 @@ class DataPreparation:
 
         # Elimino columnas "Ruido"
         cols_basics_noise = ['attendance', 'capacity'] # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        col_players_noise = [col for col in df.columns if 'hei_player' in col or 'wage_player' in col or 'rep_player' in col] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+        col_players_noise = [col for col in df.columns if 'rep_player' in col] # 'wage_player' in col or 'hei_player' in col # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_basics_noise + col_players_noise
         df = df.drop(columns=cols_to_drop)         # Dropear las columnas seleccionadas
-        logger.warning(f"Columnas jugadores eliminadas: {cols_to_drop}")
-        '''    
+        logger.warning(f"Columnas eliminadas x posible ruido: {cols_to_drop}")
+        '''
+        
         # Si quiero construir variables historicas
         if with_historic:
 
@@ -508,15 +512,16 @@ class DataPreparation:
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
                 # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
+                'KGP', 'attacks', 'dangerous_attacks', # ya no se recolecta mas. En los partidos missing ya no existe.
+                
                 # Ofensive
                 'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
-                'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', 'KGP',  #  'G2S',  # 'shots_off_goal' # 'SG2G',
-                'attacks', 'dangerous_attacks', # ya no se recolecta mas. En los partidos missing ya no existe.
+                'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', # 'shots_off_goal' # 'SG2G',
                 'dead_balls', # 'goal_ratio_dead_balls',
                 'ball_possession', 'total_passes', # 'pass_success_%', 'attacking_efficiency',
                 # Defensive
-                'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls',  'interceptions'
-                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency", 'KGP', 'goalkeeper_saves'
+                'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls', 'interceptions'
+                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency", 'goalkeeper_saves'
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
