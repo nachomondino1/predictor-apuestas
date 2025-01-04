@@ -32,7 +32,11 @@ def update_predicciones_test_with_missing(df_ite, id_country, country, iteration
     # Por modelo
     for idx, row in df_ite.iterrows():
 
-        n_model, model_name = row['n_iteration'], row['model_name']
+        if 'n_iteration' in df_ite.columns:
+            n_model =  row['n_iteration']
+        else:
+            n_model = idx
+        model_name = row['model_name']
         # if self.verbose >= 1:
         #     logger.info(f'n_model: {n_model} model_name: {model_name}')
 

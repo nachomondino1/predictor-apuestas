@@ -88,6 +88,7 @@ class SelectBestModel():
         Selecciona el mejor modelo (aun sin estrategia de apuesta)
         """
         logger.info("Paso 4: Seleccionando mejor modelo...")
+        df.set_index('n_iteration', inplace=True)
 
         # Ordenar los registros por 'metric' en orden descendente
         df = df.sort_values(by=metric_col, ascending=False)

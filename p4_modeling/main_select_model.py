@@ -34,6 +34,7 @@ def main(
     # Return
         Modelo a usar en produccion con su estrategia de apuesta optima (teniendo en cuenta test + missing). 
     """
+    # Creo objeto de clase select_best_model
     d_paths = initialize_directories(country, iteration_date)
 
    # Levanto df_iteration
@@ -42,7 +43,18 @@ def main(
     # Defino roi_weight
     roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
    
-   # (0) DESCARTE POR ROI (pues el assess consume muchisimo tiempo, hacer solo a unos pocos modelos)
+    # (1) DESCARTE DE MODELOS
+    sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, path_save=d_paths['path_select'])
+    # 1.1. DESCARTE POR DISTRIBUCION (para evitar assess de modelos que ya se que son una cagada.)
+    df_ite = sbm.filter_models_by_distribution(df_ite)
+
+    # 1.2. DESCARTE POR RELLENO DE NAN EN TEST
+    if '%_gp_filled' in df_ite.columns and 'average_col_filled' in df_ite.columns:
+        df_ite = sbm.filter_models_by_fill_nan(df_ite)
+    else:
+        logger.warning("Evito eliminacion de modelos por relleno de nan values en test puesto que no le medí lo cuando entrené")
+
+    # POR ROI (pues el assess consume muchisimo tiempo, hacer solo a unos pocos modelos)
     # Calculo metrica combinada entre ROI y Expected ROI
     name_extension = '_sin_ea_test'
     metric_col_test = f'metric{name_extension}'
@@ -54,7 +66,7 @@ def main(
     df_ite_filt.to_excel(f'{d_paths['base_path_sbm']}/0_df_filt.xlsx', index=False)
     print(df_ite_filt.shape)
 
-    # (1) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
+    # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
@@ -71,6 +83,7 @@ def main(
             # Concatenar df_predicciones missing a test para cada modelo
             df_ite_filt = assess_models_in_prod.update_predicciones_test_with_missing(
                 df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
+        
         # Usar test + missing ya actualizado
         else:
             df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
@@ -81,24 +94,11 @@ def main(
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, roi_weight=roi_weight, name_extension=name_extension)
         print(df_ite_filt.shape)
 
-    # (2) Seleccion del modelo
+    # (3) Seleccion del modelo
     if select_best_model:
-        # Creo objeto de clase select_best_model
-        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, path_save=d_paths['path_select'])
-
-        # 1.1. DESCARTE POR DISTRIBUCION
-        df_ite = sbm.filter_models_by_distribution(df_ite_filt)
-
-        # 1.2. DESCARTE POR RELLENO DE NAN EN TEST
-        if '%_gp_filled' in df_ite.columns and 'average_col_filled' in df_ite.columns:
-            df_ite = sbm.filter_models_by_fill_nan(df_ite)
-        else:
-            logger.warning("Evito eliminacion de modelos por relleno de nan values en test puesto que no le medí lo cuando entrené")
-
-        # 1.3: Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
+        # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
         metric_col = metric_col_assess if assess else metric_col_test
-        row = sbm.select_model(df_ite, metric_col=metric_col)
-
+        row = sbm.select_model(df_ite_filt, metric_col=metric_col)
     else:
         # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
         df = pd.read_excel(f'{d_paths['path_select']}/df_selected_model.xlsx', index_col=0)
@@ -196,22 +196,21 @@ def filter_models_by_roi(df, method: str = 'prop_to_max', prop_to_max: float = 0
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 148
+    id_country = 55
 
     # Defino hiperparametros
-    asssess_models_in_prod = False
+    asssess_models_in_prod = True
     select_best_model = True
 
     # Defino variables
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2024-12-23'],
-        # 48: ["england", '2025-01-02'],
+        # 48: ["england", '2024-12-23'],
+        48: ["england", '2025-01-03'],
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
-        77: ["italy", '2024-12-23'],
-        # 77: ["italy", '2025-01-01'],
-        # 77: ["italy", '2025-01-02'],
+        # 77: ["italy", '2024-12-23'],
+        77: ["italy", '2025-01-03'],
         148: ["spain", '2024-12-25'], 
         167: ["usa", '2024-12-05']
         }
@@ -219,5 +218,5 @@ if __name__ == "__main__":
     iteration_date = d_countries[id_country][1]
 
     main(id_country=id_country, country=country, iteration_date=iteration_date, 
-         assess=asssess_models_in_prod, extract_missing=False, assess_already_extracted=False,
+         assess=asssess_models_in_prod, extract_missing=True, assess_already_extracted=False,
          select_best_model=select_best_model)
