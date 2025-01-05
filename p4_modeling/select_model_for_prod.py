@@ -11,75 +11,13 @@ import datetime
 
 class SelectBestModel():
 
-    def __init__(self, id_country, iteration_date: str, d_paths: dict = None, verbose: int = 1):
+    def __init__(self, id_country, iteration_date: str, path_save: str = None, verbose: int = 1):
         self.id_country = id_country
         self.iteration_date = iteration_date
+        self.path_save = path_save
         self.verbose = verbose
-        self.d_paths = d_paths
-        self.inicialize_directories()
-
-    def inicialize_directories(self):
-        """
-        Inicializo paths donde guardar los datos generados durante la seleccion del mejor modelo
-        """
-        d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-        country = d_countries[self.id_country]
-
-        # Si aun no inicialice directorios
-        if self.d_paths is None:
-            self.BASE_PATH = f'data/{country}/p4_modeling/{self.iteration_date}'
-            self.PATH_sbm = f'{self.BASE_PATH}/best_model' 
-            self.path_old_sbm = f'{self.BASE_PATH}/best_model_old/{datetime.datetime.now().date()}' 
-
-            directories.mover_archivo(origen=self.PATH_sbm, destino=self.path_old_sbm)
-            directories.make_directories(l_directorios=[self.PATH_sbm])
-
-        # Si ya inicialice directorios
-        else:
-            self.BASE_PATH = self.d_paths['base_path']
-            self.PATH_sbm = self.d_paths['path_select']
-
+ 
     # Paso 1
-    def filter_models_by_roi(self, df, perc_cutoff, roi_weight):
-        """
-        Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
-
-        # Parameters
-        df: Un DataFrame que contiene información sobre los modelos, incluyendo las columnas roi_por_partido y expected_roi_por_partido.
-        cutoff: Proporción de los mejores registros a seleccionar (por defecto, 0.02 o el 2% superior).
-        verbose: Nivel de detalle en los mensajes de salida.
-            0 (por defecto): Salida básica.
-            Valores mayores producen más detalles.
-
-        # Return 
-        La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
-        """
-        logger.info("Paso 1: Descartando modelos con bajo ROI en df_test")
-        name_extension='_sin_ea'
-        self.metric_col = f'metric{name_extension}'
-
-        # Calculo metrica combinada
-        df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
-
-        # Eliminar registros con 'metric' < 0
-        df = df[df[self.metric_col] >= 0]
-
-        # Ordenar los registros por 'metric' en orden descendente
-        df = df.sort_values(by=self.metric_col, ascending=False)
-
-        # Seleccionar el 20% de los registros con los valores más altos de 'metric'
-        cutoff = int(len(df) * perc_cutoff)  # Calcular el 20% superior
-        df_filt = df.iloc[:cutoff]
-
-        if self.verbose >= 1:
-            logger.info(df_filt.head())
-            logger.warning(f"Descarte por ROI: {len(df)} --> {len(df_filt)}")
-            self.count_models(df_filt)
-
-        df_filt.to_excel(f'{self.PATH_sbm}/df_p1.xlsx', index=False)
-        return df_filt
-
-    # Paso 2
     def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.3):
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
@@ -115,11 +53,13 @@ class SelectBestModel():
             self.count_models(df_filtered)
 
         df_filtered.set_index('n_iteration', inplace=True)
-        df_filtered.to_excel(f'{self.PATH_sbm}/df_p2.xlsx', index=True)
+
+        if self.path_save is not None:
+            df_filtered.to_excel(f'{self.path_save}/df_distrib.xlsx', index=True)
 
         return df_filtered
 
-    # Paso 3
+    # Paso 2
     def filter_models_by_fill_nan(self, df):
 
         # Lista para almacenar los resultados
@@ -137,51 +77,35 @@ class SelectBestModel():
             logger.info(f"Eliminar modelos con G/P filled >= {median_gp_filled} o n_cols_filled >= {mean_n_cols_filled}. {len(df)} --> {len(df_filt)}")
             self.count_models(df_filt)
 
-        # Exportar el DataFrame final a un archivo Excel
-        df_filt.to_excel(f'{self.PATH_sbm}/df_p3.xlsx', index=True)
-
+        if self.path_save is not None:
+            df_filt.to_excel(f'{self.path_save}/df_nan.xlsx', index=True)
+            
         return df_filt
 
-    # Paso 4
-    def select_model(self, df):
+    # Paso 3
+    def select_model(self, df, metric_col):
         """
         Selecciona el mejor modelo (aun sin estrategia de apuesta)
         """
         logger.info("Paso 4: Seleccionando mejor modelo...")
+        df.set_index('n_iteration', inplace=True)
 
         # Ordenar los registros por 'metric' en orden descendente
-        df = df.sort_values(by=self.metric_col, ascending=False)
+        df = df.sort_values(by=metric_col, ascending=False)
 
         # Imprimo por pantalla el mejor modelo
         row = df.head(1) # Selecciono la primera fila
         logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
-        df.to_excel(f'{self.PATH_sbm}/df_p4.xlsx', index=True)
+        if self.path_save is not None:
+            df.to_excel(f'{self.path_save}/df_selected.xlsx', index=True)
+            
         return row
     
     def count_models(self, df):
         if len(df) == 0:
             logger.error("Tras el descarte, se han eliminado todos los modelos. Revisar descartes.")
             raise ValueError
-
-    # Main
-    def main(self, df, roi_weight, perc_cutoff:float = 0.2):
-        """
-        Determino el modelo a usar en produccion
-        """
-        # PASO 1: DESCARTE POR ROI (sin estrategia de apuesta)
-        df_filt_1 = self.filter_models_by_roi(df, perc_cutoff=perc_cutoff, roi_weight=roi_weight)
-
-        # PASO 2: DESCARTE POR DISTRIBUCION
-        df_filt_2 = self.filter_models_by_distribution(df_filt_1)
-
-        # PASO 3: DESCARTE POR RELLENO DE NAN EN TEST
-        # df_filt_3 = self.filter_models_by_fill_nan(df_filt_2)
-
-        # PASO 4: Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
-        row = self.select_model(df_filt_2)
-        # row = self.select_model(df_filt_3)
-        return row
         
         
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
@@ -201,8 +125,18 @@ if __name__ == "__main__":
     # Obtengo listado de todos los modelos entrenados
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
 
-    # Selecciono el mejor modelo
-    row = sbm.main(df_ite, perc_cutoff=0.05)
+    # PASO 1: DESCARTE POR DISTRIBUCION
+    df_filt_1 = sbm.filter_models_by_distribution(df_ite)
+
+    # PASO 2: DESCARTE POR RELLENO DE NAN EN TEST
+    if ['%_gp_filled', 'average_col_filled'] in df_filt_1.columns:
+        df_filt_2 = sbm.filter_models_by_fill_nan(df_filt_1)
+    else:
+        logger.warning("Evito eliminacion de modelos por relleno de nan values en test puesto que no le medí lo cuando entrené")
+        df_filt_2 = df_filt_1.copy()
+
+    # PASO 3: Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
+    row = sbm.select_model(df_filt_2)
 
 
 

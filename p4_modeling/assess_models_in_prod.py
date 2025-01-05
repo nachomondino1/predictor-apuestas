@@ -12,7 +12,7 @@ from p4_modeling import asses_model, betting_strategy # ImportError: cannot impo
 from p6_deployment import main_next_matches
 
 
-def update_test_with_missing(df_ite, id_country, country, iteration_date, path_save, extract_missing: bool = True):
+def update_predicciones_test_with_missing(df_ite, id_country, country, iteration_date, path_save):
     """
     Creo un df_iteration actualizado con las predicciones de test y las de missing. Actualiza el input para la seleccion de modelos o estrategia de apuesta.
 
@@ -27,20 +27,16 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     # Defino variables
     df_test = pd.DataFrame()    
     bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
-
-    # Extraer missing
-    if extract_missing:
-        logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
-        # Usar mnm.py con predict_missing=True y data_unders=False.
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        main_next_matches.main(d_run, id_country, export=d_run['export'], verbose=-1) 
-
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
 
     # Por modelo
     for idx, row in df_ite.iterrows():
 
-        n_model, model_name = row['n_iteration'], row['model_name']
+        if 'n_iteration' in df_ite.columns:
+            n_model =  row['n_iteration']
+        else:
+            n_model = idx
+        model_name = row['model_name']
         # if self.verbose >= 1:
         #     logger.info(f'n_model: {n_model} model_name: {model_name}')
 

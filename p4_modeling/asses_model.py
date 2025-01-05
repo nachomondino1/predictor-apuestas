@@ -109,7 +109,6 @@ def determine_distribution(df, var_resp: str = 'result', var_pred: str = 'predic
     # Promedio de variaciones absolutas
     var = (var_loc_abs + var_emp_abs + var_vis_abs) / 3
 
-    
     # Crear el diccionario con los resultados
     d = {
         'n_loc': n_loc, 'n_emp': n_emp, 'n_vis': n_vis,
@@ -429,9 +428,7 @@ def calculate_advanced_metrics(df_predicciones):
         - Mas metricas
         - Calculo de metricas G/P cuando estas son negativas (e.g. perc_gp_filled) --> Tampoco jode tanto porque en la seleccion las uso pero solo de modelos buenos los cuales tienen G/P positivas...
     """
-    # Calculo numero de predicciones por resultado
-    d_distrib = determine_distribution(df_predicciones)
-
+    # RELLENO DE NAN
     # Calculo metricas sobre relleno de nan
     rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
     rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
@@ -442,14 +439,12 @@ def calculate_advanced_metrics(df_predicciones):
     gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
     gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
     gp_total = df_predicciones['G/P_sin_bank'].sum()
+    perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
+    perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
 
-    if gp_total != 0:
-        perc_gp_filled = int(gp_filled / (gp_total) * 100)
-        perc_gp_not_filled = int(gp_not_filled / (gp_total) * 100),
-    else:
-        perc_gp_filled, perc_gp_not_filled = 0, 0
-    
-    # Por resultado
+    # POR RESULTADO
+    # Calculo numero de predicciones por resultado
+    d_distrib = determine_distribution(df_predicciones)
     df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
     df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
     df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
@@ -457,33 +452,52 @@ def calculate_advanced_metrics(df_predicciones):
     gp_home = df_pred_home['G/P_sin_bank'].sum()
     gp_draw = df_pred_draw['G/P_sin_bank'].sum()
     gp_away = df_pred_away['G/P_sin_bank'].sum()
+    gp_total = gp_home + gp_draw + gp_away
+    # G/P por resultado %
+    perc_gp_home = calculate_perc_gp(gp_home, gp_total)
+    perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
+    perc_gp_away = calculate_perc_gp(gp_away, gp_total)
     ## Precision por resultado
     prec_home = int( df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
     prec_draw = int( df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
     prec_away = int( df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
 
     d = {
+        # RELLENO DE NAN
         # Cantidad de registros rellenados y average de columnas rellenadas
         'n_matches_filled': len(rows_filled),
         'average_col_filled': average_col_filled,
         # G/P cuando relleno y G/P cuando no relleno
-        'sum_gp_filled': gp_filled, 
-        'sum_gp_not_filled': gp_not_filled,
+        'gp_filled': gp_filled, 
+        'gp_not_filled': gp_not_filled,
         '%_gp_filled': perc_gp_filled,
         '%_gp_not_filled': perc_gp_not_filled,
-        # Distribucion de bets por resultado
+
+        # POR RESULTADO
         **d_distrib,
-        # G/P por resultado
-        'sum_gp_home': gp_home,
-        'sum_gp_draw': gp_draw,
-        'sum_gp_away': gp_away,
         # Precision por resultado
-        'precision_home': prec_home,
-        'precision_draw': prec_draw,
-        'precision_away': prec_away
+        'acc_home': prec_home,
+        'acc_draw': prec_draw,
+        'acc_away': prec_away,
+        # G/P por resultado
+        'gp_home': gp_home,
+        'gp_draw': gp_draw,
+        'gp_away': gp_away,
+        'gp_total': gp_total,
+        '%_gp_home': perc_gp_home,
+        '%_gp_draw': perc_gp_draw,
+        '%_gp_away': perc_gp_away
         }
     return d
 
+def calculate_perc_gp(gp, gp_total):
+    if gp > gp_total and gp_total > 0:
+        return 1
+    elif gp > 0 and gp_total > 0:
+        return gp / gp_total
+    else:
+        return 0
+    
 def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
     subpath = f"data/{country}/p6_deployment/missing/old_updated" if retrain else f'data/{country}/p2_data_understanding'
     return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
