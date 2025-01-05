@@ -43,7 +43,7 @@ def main(
     # (0) Defino roi_weight
     roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
    
-    # (1) DESCARTE DE MODELOS (pues el assess consume muchisimo tiempo, hacer solo a unos pocos modelos)
+    # (1) DESCARTE DE MODELOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, path_save=d_paths['path_select'])
     # 1.1. POR DISTRIBUCION (para evitar assess de modelos que ya se que son una cagada.)
     df_ite = sbm.filter_models_by_distribution(df_ite)
@@ -65,7 +65,7 @@ def main(
     
     ## Filtro
     df_ite_filt = filter_models_by_roi(df_ite, method='prop_to_max', prop_to_max=prop_to_max, metric_col=metric_col_test)
-    df_ite_filt.to_excel(f'{d_paths['base_path_sbm']}/0_df_filt.xlsx', index=False)
+    df_ite_filt.to_excel(f'{d_paths['base_path_sbm']}/0_df_filt.xlsx', index=True)
     print(df_ite_filt.shape)
     warning_empty_dataframe(df_ite_filt)
 
@@ -206,10 +206,10 @@ def filter_models_by_roi(df, method: str = 'prop_to_max', prop_to_max: float = 0
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 55
+    id_country = 77
 
     # Defino hiperparametros
-    asssess_models_in_prod = False
+    asssess_models_in_prod = True
     select_best_model = True
 
     # Defino variables
