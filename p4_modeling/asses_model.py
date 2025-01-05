@@ -425,14 +425,15 @@ def calculate_advanced_metrics(df_predicciones):
     Calculo metricas mas avanzadas que precision o recall.
 
     Posibles mejoras:
-        - Mas metricas
-        - Calculo de metricas G/P cuando estas son negativas (e.g. perc_gp_filled) --> Tampoco jode tanto porque en la seleccion las uso pero solo de modelos buenos los cuales tienen G/P positivas...
+        - l_col_filled = # Listado de columnas que rellena....
+        - Mas o mejores metricas
     """
     # RELLENO DE NAN
     # Calculo metricas sobre relleno de nan
     rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
     rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
     average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
+    # l_col_filled = # Listado de columnas que rellena....
     # print(len(rows_filled), len(rows_not_filled))
 
     # G/P segun relleno de NaN

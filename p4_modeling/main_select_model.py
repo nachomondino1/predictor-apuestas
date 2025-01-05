@@ -40,31 +40,34 @@ def main(
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
-    # Defino roi_weight
+    # (0) Defino roi_weight
     roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
    
     # (1) DESCARTE DE MODELOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, iteration_date=iteration_date, path_save=d_paths['path_select'])
-    # 1.1. DESCARTE POR DISTRIBUCION (para evitar assess de modelos que ya se que son una cagada.)
+    # 1.1. POR DISTRIBUCION (para evitar assess de modelos que ya se que son una cagada.)
     df_ite = sbm.filter_models_by_distribution(df_ite)
+    warning_empty_dataframe(df_ite)
 
-    # 1.2. DESCARTE POR RELLENO DE NAN EN TEST
+    # 1.2. POR RELLENO DE NAN EN TEST
     if '%_gp_filled' in df_ite.columns and 'average_col_filled' in df_ite.columns:
         df_ite = sbm.filter_models_by_fill_nan(df_ite)
+        warning_empty_dataframe(df_ite)
     else:
         logger.warning("Evito eliminacion de modelos por relleno de nan values en test puesto que no le medí lo cuando entrené")
 
-    # POR ROI (pues el assess consume muchisimo tiempo, hacer solo a unos pocos modelos)
-    # Calculo metrica combinada entre ROI y Expected ROI
+    # 1.3. POR ROI
+    ## Calculo metrica combinada entre ROI y Expected ROI
     name_extension = '_sin_ea_test'
     metric_col_test = f'metric{name_extension}'
     df_ite = asses_model.calculate_combined_metric(df_ite, roi_weight=roi_weight, name_extension=name_extension)
     df_ite = df_ite.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
     
-    # Filtro
+    ## Filtro
     df_ite_filt = filter_models_by_roi(df_ite, method='prop_to_max', prop_to_max=prop_to_max, metric_col=metric_col_test)
-    df_ite_filt.to_excel(f'{d_paths['base_path_sbm']}/0_df_filt.xlsx', index=False)
+    df_ite_filt.to_excel(f'{d_paths['base_path_sbm']}/0_df_filt.xlsx', index=True)
     print(df_ite_filt.shape)
+    warning_empty_dataframe(df_ite_filt)
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
@@ -96,6 +99,9 @@ def main(
 
     # (3) Seleccion del modelo
     if select_best_model:
+        if "n_iteration" in df_ite_filt.columns:
+            df_ite_filt.set_index('n_iteration', inplace=True)
+
         # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
         metric_col = metric_col_assess if assess else metric_col_test
         row = sbm.select_model(df_ite_filt, metric_col=metric_col)
@@ -121,6 +127,10 @@ def main(
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
     df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
 
+
+def warning_empty_dataframe(df):
+    if len(df) == 0:
+        logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
 
 def initialize_directories(country, iteration_date):
     """
@@ -196,7 +206,7 @@ def filter_models_by_roi(df, method: str = 'prop_to_max', prop_to_max: float = 0
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 55
+    id_country = 77
 
     # Defino hiperparametros
     asssess_models_in_prod = True
@@ -207,11 +217,14 @@ if __name__ == "__main__":
         6: ["argentina", '2024-12-05'], 
         # 48: ["england", '2024-12-23'],
         48: ["england", '2025-01-03'],
-        55: ["france", '2024-12-26'], 
-        59: ["germany", '2024-12-26'], 
+        # 55: ["france", '2024-12-26'], 
+        55: ["france", '2025-01-04'], 
+        # 59: ["germany", '2024-12-26'], 
+        59: ["germany", '2025-01-04'], 
         # 77: ["italy", '2024-12-23'],
         77: ["italy", '2025-01-03'],
-        148: ["spain", '2024-12-25'], 
+        # 148: ["spain", '2024-12-25'], 
+        148: ["spain", '2025-01-04'], 
         167: ["usa", '2024-12-05']
         }
     country = d_countries[id_country][0]
