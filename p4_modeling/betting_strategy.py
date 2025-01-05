@@ -423,28 +423,34 @@ class BettingStrategy:
         df_hiper: Parametros a probar por result
         """
         df_comp = pd.DataFrame()
+        print(df.shape)
 
         # Por resultado
         for pred in [1, 0, 2]:
+            print(f"Resultado: {pred}")
+
             df_pred = df[df['predicted_result'] == pred] 
+            print(df_pred.shape)
 
-            row_pred = df_hiper.loc[pred]
-            prob = row_pred['prob_dp']
-            curva = row_pred['curva']
-            m = row_pred['m']
-            b = row_pred['b']
-            odd_weight = row_pred['odd_weight']
-            lim_sup = row_pred['lim_sup']
-	
-            # Determino result to bet
-            df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
+            # Si no hay registros falla...
+            if len(df_pred) > 0:
+                row_pred = df_hiper.loc[pred]
+                prob = row_pred['prob_dp']
+                curva = row_pred['curva']
+                m = row_pred['m']
+                b = row_pred['b']
+                odd_weight = row_pred['odd_weight']
+                lim_sup = row_pred['lim_sup']
         
-            # Determino stake to bet
-            d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
-            d_params_odds = {'odd_weight': odd_weight, 'dif_prob_sup_cap': lim_sup}
-            df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake, **d_params_odds)
+                # Determino result to bet
+                df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
 
-            df_comp = pd.concat([df_comp, df_pred], axis=0)
+                # Determino stake to bet
+                d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
+                d_params_odds = {'odd_weight': odd_weight, 'dif_prob_sup_cap': lim_sup}
+                df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake, **d_params_odds)
+
+                df_comp = pd.concat([df_comp, df_pred], axis=0)
 
         return df_comp
 
