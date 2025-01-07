@@ -11,9 +11,8 @@ import datetime
 
 class SelectBestModel():
 
-    def __init__(self, id_country, iteration_date: str, path_save: str = None, verbose: int = 1):
+    def __init__(self, id_country, path_save: str = None, verbose: int = 1):
         self.id_country = id_country
-        self.iteration_date = iteration_date
         self.path_save = path_save
         self.verbose = verbose
  
@@ -50,7 +49,7 @@ class SelectBestModel():
         if self.verbose >= 0:
             logger.warning(f'Descarte por distribucion: {len(df)} --> {len(df_filtered)}' )
             logger.info(f"Se eliminaron {len(l_idx_to_remove)} modelos por distribucion muy distinta a la de results.")
-            self.count_models(df_filtered)
+            self.error_empty_dataframe(df_filtered)
 
         df_filtered.set_index('n_iteration', inplace=True)
 
@@ -75,19 +74,71 @@ class SelectBestModel():
         if self.verbose >= 0:
             logger.warning(f'Descarte por relleno de nan en test: {len(df)} --> {len(df_filt)}')
             logger.info(f"Eliminar modelos con G/P filled >= {median_gp_filled} o n_cols_filled >= {mean_n_cols_filled}. {len(df)} --> {len(df_filt)}")
-            self.count_models(df_filt)
+            self.error_empty_dataframe(df_filt)
 
         if self.path_save is not None:
             df_filt.to_excel(f'{self.path_save}/df_nan.xlsx', index=True)
-            
+
         return df_filt
 
     # Paso 3
+    def filter_models_by_roi(self, df, method: str = 'prop_to_max', prop_to_max: float = 0.7, perc_cutoff: float = 20, metric_col: str = 'metric_sin_ea'):
+        """
+        Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
+
+        # Parameters
+        df: Un DataFrame que contiene información sobre los modelos, incluyendo las columnas roi_por_partido y expected_roi_por_partido.
+        cutoff: Proporción de los mejores registros a seleccionar (por defecto, 0.02 o el 2% superior).
+        method: Metodo para filtrar. 
+            'percentile' o 'prop_to_max'
+        verbose: Nivel de detalle en los mensajes de salida.
+            0 (por defecto): Salida básica.
+            Valores mayores producen más detalles.
+
+        # Return 
+        La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
+        """
+        logger.info("Paso 1: Descartando modelos con bajo ROI en df_test")
+
+        if method == 'prop_to_max':
+            max_roi = df[metric_col].max()
+            roi_cut = max_roi * prop_to_max
+
+        elif method == 'percentile':
+            # Seleccionar el 20% de los registros con los valores más altos de 'metric'
+            roi_cut = np.percentile(df[metric_col], (100-perc_cutoff))
+
+        else:
+            logger.error(f"No existe el metodo {method} para filtrar por ROI los modelos.")
+            raise ValueError
+
+        # Filtro modelos segun roi to cut
+        df_filt = df[df[metric_col] >= roi_cut]
+
+        if self.verbose >= 2:
+            val1 = df[metric_col].max()
+            val2 = np.percentile(df[metric_col], (100-perc_cutoff))
+            logger.info(f"\n(1) Metric Max: {val1} --> ROI cut: {val1 * prop_to_max} \n(2) Roi cut percentile {perc_cutoff}: {val2}")
+
+        if self.verbose >= 1:
+            logger.info(df_filt.head())
+            logger.warning(f"Descarte por ROI: {len(df)} --> {len(df_filt)}")
+            self.error_empty_dataframe(df_filt)
+
+        if self.path_save is not None:
+            df_filt.to_excel(f'{self.path_save}/0_df_filt.xlsx', index=True)
+
+        return df_filt
+
+    # Paso 4
     def select_model(self, df, metric_col):
         """
         Selecciona el mejor modelo (aun sin estrategia de apuesta)
         """
         logger.info("Paso 4: Seleccionando mejor modelo...")
+
+        if "n_iteration" in df.columns:
+            df.set_index('n_iteration', inplace=True)
 
         # Ordenar los registros por 'metric' en orden descendente
         df = df.sort_values(by=metric_col, ascending=False)
@@ -101,11 +152,10 @@ class SelectBestModel():
             
         return row
     
-    def count_models(self, df):
+    def error_empty_dataframe(self, df):
         if len(df) == 0:
-            logger.error("Tras el descarte, se han eliminado todos los modelos. Revisar descartes.")
+            logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
             raise ValueError
-        
         
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
@@ -119,7 +169,7 @@ if __name__ == "__main__":
     iteration_date = d_countries[id_country][1]
 
     # Creo objeto de clase select_best_model
-    sbm = SelectBestModel(id_country=id_country, iteration_date=iteration_date)
+    sbm = SelectBestModel(id_country=id_country)
 
     # Obtengo listado de todos los modelos entrenados
     df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx')
