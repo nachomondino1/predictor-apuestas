@@ -169,50 +169,6 @@ def concat_missing_data_by_country(d_countries, verbose: int = 1):
 
     return df_ct1, df_ct2
 
-def concat_integrate_data_by_country(l_countries):
-    """
-    Concatenacion de df_map_players de varios paises.
-    """
-
-    df, df_player_sofifa, df_player_fifa_sofifa = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    df_teams = pd.DataFrame()
-    # Por pais
-    for id_country, country in l_countries.items():
-
-        # Levanto su df_integrated
-        df_player_sofifa_cleaned_country = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
-        df_player_fifa_sofifa_cleaned_country = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
-        df_teams_country = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
-        df_int_country = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
-        # print(df_int_country)
-        print(f"\n\nNº de filas: {len(df_int_country)}")
-
-        # Concateno
-        df = pd.concat([df, df_int_country], axis=0)
-        df_player_sofifa = pd.concat([df_player_sofifa, df_player_sofifa_cleaned_country], axis=0)
-        df_player_fifa_sofifa = pd.concat([df_player_fifa_sofifa, df_player_fifa_sofifa_cleaned_country], axis=0)
-        df_teams = pd.concat([df_teams, df_teams_country], axis=0)
-        print(f"\n\nNº de filas concat: {len(df)}")
-
-    # Elimino duplicados
-    df_player_sofifa = df_player_sofifa.drop_duplicates()
-    df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates()
-
-    # Elimino duplicados (x traspasos de jugadores ppalmente) (28588 --> 29198)
-    # Paso 1: Calcular el porcentaje de NaN por fila
-    df['nan_percentage'] = df.isna().mean(axis=1)
-
-    # Paso 2: Ordenar el DataFrame basado en el porcentaje de NaN (de menor a mayor)
-    # df_sorted = df.sort_values(by='nan_percentage')
-    df_sorted = df.sort_values(by=['nan_percentage', "porcentaje_coincidencia", 'tipo'], ascending=[True, False, True])
-
-    # Paso 3: Eliminar duplicados y quedarte con los que tienen menos NaN
-    df_sin_dup = df_sorted.drop_duplicates(subset=['id_player_fs'])
-
-    # Opcional: Eliminar la columna auxiliar 'nan_percentage'
-    df_sin_dup = df_sin_dup.drop(columns=['nan_percentage'])
-    # print(f"\n\nNº de filas repetidas: {len(df_concat) - len(df_sin_duplicados)}")
-    return df_sin_dup, df_player_sofifa, df_player_fifa_sofifa, df_teams
 
 if __name__ == "__main__":
 
