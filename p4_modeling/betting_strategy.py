@@ -52,9 +52,9 @@ class BettingStrategy:
             dic = {
                 'prob_dp': [-1], # , -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
                 'curva': ['linear'],
-                'm': [10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90],
+                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [0],
-                'odd_weight': [0, 1, 2, 4],
+                'odd_weight': [0, 1, 2, 3, 4],
                 'lim_sup': [0, 1]
             }
 
@@ -64,7 +64,7 @@ class BettingStrategy:
                 'l_thr_dif_prob': [-0.5, -0.3], # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
 
                 'curva': ['linear'], # 'equal', 'kelly', 'exponential'
-                'm': [10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90],
+                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110],
                 'b': [0],
                 'odd_weight': [0, 1, 2, 3, 4],
                 'lim_sup': [0, 1]
