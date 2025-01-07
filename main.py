@@ -4,6 +4,7 @@ import numpy as np
 import os
 import datetime
 from utils.set_up_logging import logger
+from utils import directories
 ## Data understanding
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
@@ -51,11 +52,7 @@ class DataUnderstanding:
                         f'{ruta_base}/per_competition/df_player_sofifa/',
                         f'{ruta_base}/per_competition/df_player_fifa_sofifa/'
                         ]
-
-        for directorio in l_directorios:
-            if not os.path.exists(directorio):
-                # Si no existe, crear el directorio
-                os.makedirs(directorio)
+        directories.make_directories(l_directorios=l_directorios)
 
     def collect_initial_data(self, export: bool = True):
         """
@@ -143,28 +140,37 @@ class DataUnderstanding:
 
 class DataPreparation:
 
-    def __init__(self, country: str, var_resp: str = 'result', verbose: int = 0):
+    def __init__(self, id_country, country, date, var_resp: str = 'result', verbose: int = 0):
+        self.id_country = id_country
         self.country = country.lower()
+        self.date = date
         self.var_resp = var_resp
         self.verbose = verbose
+
+        # Tiene que estar aca por prod?
+        if self.date is not None:
+            path = f'./data/{self.country}/p3_data_preparation/{self.date}'
+        else:
+            path = f'./data/{self.country}/p3_data_preparation'
+        self.base_path = path
+        
         self.make_directories()
 
     def make_directories(self):
-        
-        self.base_path = f'./data/{self.country}/p3_data_preparation'
+
+        # Creo directorios para la preparacion actual
         l_directorios = [
             f'{self.base_path}/format_data',
             f'{self.base_path}/clean_data',
             f'{self.base_path}/integrate_data',
-            f'{self.base_path}/fill_data',
-            f'{self.base_path}/select_data',
+            # f'{self.base_path}/fill_data',
+            f'{self.base_path}/construct_data',
+            f'{self.base_path}/clean_data_2',
             f'{self.base_path}/treat_nan',
-        ]
-
-        for directorio in l_directorios:
-            if not os.path.exists(directorio):
-                # Si no existe, crear el directorio
-                os.makedirs(directorio)
+            f'{self.base_path}/tag',
+            f'{self.base_path}/select_data',
+        ]  
+        directories.make_directories(l_directorios=l_directorios)
 
     def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = False, export: bool = True):
         """
@@ -230,23 +236,20 @@ class DataPreparation:
 
         return df_match, df_match_player, df_player_fifa_sofifa
 
-    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, 
-                   df_teams_sofifa: pd.DataFrame, export: bool = True):
+    def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
         """
         Limpieza inicial de los dataframes
         """
         start = time.time()
         logger.info("\nCleanning data...")
-
-        # Elimino partidos viejos sin estadisticas y sin datos de jugadores --> PROBAR!
+        # Elimino partidos viejos sin estadisticas y sin datos de jugadores
         n_rows_inic = len(df_match)
         df_match['date'] = pd.to_datetime(df_match['date'])  # Asegurarte de que la columna 'date' sea de tipo datetime (si no lo es ya)
-        start_date = '2012-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
+        
+        start_date = '2015-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
         df_match = df_match[df_match['date'] >= start_date]
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)] # Es clave para eliminar jugadores y hacer una mejor integracion (tener menos falsos positivos)
-        
-        if self.verbose >= 1:
-            logger.info(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
+        logger.warning(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
 
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
@@ -258,7 +261,6 @@ class DataPreparation:
 
         # Preparacion de texto
         ## FLASHSCORE
-        df_match.to_excel("/Users/nachomondino/Desktop/df_error.xlsx")
         columns_to_keep = [col for col in df_match.columns if df_match[col].dtype == 'object' and 'id_' not in col]
         df_match = clean_data.prepare_text_columns(df_match, l_cols_to_process=columns_to_keep) # Ver si selecciona bien.. # ['team_home', 'team_away', 'coach_home', 'coach_away', 'venue', 'referee'])
         columns_player_names = list(df_match_player.filter(like='player_name').columns)
@@ -270,13 +272,12 @@ class DataPreparation:
         len_inic = len(df_player_sofifa)
         df_player_sofifa = df_player_sofifa[~df_player_sofifa.index.duplicated(keep='first')]
         df_player_fifa_sofifa = df_player_fifa_sofifa.drop_duplicates() # No por id_player porque no es unico (hay 2 por fifa)
+        
         n_players_eliminated = len_inic - len(df_player_sofifa)
         if self.verbose >= 0 and n_players_eliminated > 0:
             logger.warning(f"Se eliminaron {n_players_eliminated} jugadores de los {len_inic} de Sofifa que habia.")
         ### Dataframe player sofifa (df)
         df_player_sofifa = clean_data.prepare_text_columns(df_player_sofifa, l_cols_to_process=['player_name', 'player_name_short'])  # Preaparo texto para integrar
-        ### Dataframe teams sofifa (df_teams_sofifa)
-        df_teams_sofifa = clean_data.prepare_text_columns(df_teams_sofifa, l_cols_to_process=['team_name'])
 
         # Correcion de valores
         if self.verbose >= 1:
@@ -294,12 +295,10 @@ class DataPreparation:
             df_match_player.to_excel(f'{self.base_path}/clean_data/df_match_player_cleaned.xlsx', index=True)
             df_player_sofifa.to_excel(f'{self.base_path}/clean_data/df_player_sofifa_cleaned.xlsx', index=True)
             df_player_fifa_sofifa.to_excel(f'{self.base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
-            df_teams_sofifa.to_excel(f'{self.base_path}/clean_data/df_teams_sofifa_cleaned.xlsx', index=True)
     
-        return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa
+        return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa
 
-    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, 
-                       df_teams_sofifa: pd.DataFrame, export: bool = True):
+    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False, export: bool = True):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -308,7 +307,7 @@ class DataPreparation:
             df_match_player (pd.DataFrame): Dataframe de los datos de los jugadores en cada partido.
             df_player_sofifa (pd.DataFrame): Dataframe de los datos de los jugadores en Sofifa.
             df_player_fifa_sofifa (pd.DataFrame): Dataframe de los datos de los jugadores en Fifa-Sofifa.
-            df_teams_sofifa (pd.DataFrame): Dataframe de los datos de los equipos en Sofifa.
+            prod: Cuando entreno tengo que mapear, en cambio, cuando estoy en produccion tengo que usar el mapeo de cuando entrené (bool)
             export (bool): Booleano para indicar si se debe exportar el dataframe integrado. True para exportar y False para no exportar.
         
         Returns:
@@ -316,91 +315,84 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("\nIntegrating data...")
+        export = False if prod else export  # No exporto datos en produccion para no sobreescribir los de train y poder reutilizarlos.
 
         # (Temporalmente) Obtengo el listado de equipos unicos de Flashscore
+        # if export:
         df_teams = create_df_teams(df_match)
-        if export:
+        if not prod:
             df_teams.to_excel(f"{self.base_path}/integrate_data/df_teams.xlsx", index=True)
 
         # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
         print("\nIntegrating player's data to df_match...")
-        # Si ya hice el mapeo
-        try:
-            path_map = 'data/all/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx' # data/df_map_players_fs_so.xlsx
-            df_map_players_fs_so = pd.read_excel(path_map, index_col=0)
-            logger.info("No vuelvo a mapear sino que levanto df_map general ")
 
-            # Reemplazo los df_player de Sofifa del pais por los completos
-            df_player_sofifa = pd.read_excel('data/all/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0) #'data/df_player_sofifa.xlsx'
-            df_player_fifa_sofifa = pd.read_excel('data/all/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0) # 'data/df_player_fifa_sofifa.xlsx'
-            
-            logger.critical("Integración usando el df_map completo!")
+        # Segun si es train o produccion (en el 1ero hago el mapeo, en el 2do uso el mapeo ya hecho)
+        if prod:
+            logger.critical("Integración para produccion")
 
-        # Si aun no hice el mapeo
-        except FileNotFoundError:
+            df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx')
+            logger.info("No vuelvo a mapear sino que levanto df_map del pais (para producción)")
 
-            try:
-                df_map_players_fs_so = pd.read_excel(f'data/{self.country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
-                logger.info("No vuelvo a mapear sino que levanto df_map del pais ")
+        else: 
+            logger.critical("Integración para train")
 
-            except FileNotFoundError:
-                # Matcheo jugadores de Sofifa y Flashscore
-                logger.info("Mapeo jugadores de Sofifa y Flashscore")
+            # Matcheo jugadores de Sofifa y Flashscore
+            logger.info("Mapeo jugadores de Sofifa y Flashscore")
 
-                df_map_players_fs_so, df_player = pd.DataFrame(), pd.DataFrame()
+            df_map_players_fs_so, df_player = pd.DataFrame(), pd.DataFrame()
 
-                # Seleccionar ligas
-                d_comps = select_data.determine_country_competitions(id_country)            
-                print(f"Competiciones: {d_comps['comp_sin_cups']}")
+            # Seleccionar ligas
+            d_comps = select_data.determine_country_competitions(self.id_country)            
+            print(f"Competiciones: {d_comps['comp_sin_cups']}")
 
-                # Por Liga:
-                for id_comp in d_comps['comp_sin_cups']:                        
+            # Por Liga:
+            for id_comp in d_comps['comp_sin_cups']:                        
 
-                    print(f"Competicion: {id_comp}")
+                print(f"Competicion: {id_comp}")
 
-                    # filtrar df_match y df_match_player y df_player_sofifa
-                    ## Flashscore
-                    print(f"AA: {len(df_match)} {len(df_match_player)}")
-                    df_match_league = df_match[df_match['id_competition'] == id_comp]
-                    if id_country == 6:
-                        df_match_league = df_match[df_match['id_competition'].isin([61, 62])]  # Argentina
+                # filtrar df_match y df_match_player y df_player_sofifa
+                ## Flashscore
+                print(f"AA: {len(df_match)} {len(df_match_player)}")
+                df_match_league = df_match[df_match['id_competition'] == id_comp]
+                if self.id_country == 6:
+                    df_match_league = df_match[df_match['id_competition'].isin([61, 62])]  # Argentina
 
-                    df_match_player_league = df_match_player[df_match_player.index.isin(df_match_league.index)]
-                    df_player_league = create_df_player(df_match_player_league)
-                    print(f"BB: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
+                df_match_player_league = df_match_player[df_match_player.index.isin(df_match_league.index)]
+                df_player_league = create_df_player(df_match_player_league)
+                print(f"BB: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
 
-                    ## Sofifa
-                    print(f"FF: {len(df_player_sofifa)} {len(df_player_fifa_sofifa)}")
-                    df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
-                    ids_players = df_player_fifa_sofifa_league['id_player'].unique()
-                    df_player_sofifa_league = df_player_sofifa[df_player_sofifa.index.isin(ids_players)]
-                    print(f"GG: {len(df_player_sofifa_league)} {len(df_player_fifa_sofifa_league)}")
+                ## Sofifa
+                print(f"FF: {len(df_player_sofifa)} {len(df_player_fifa_sofifa)}")
+                df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
+                ids_players = df_player_fifa_sofifa_league['id_player'].unique()
+                df_player_sofifa_league = df_player_sofifa[df_player_sofifa.index.isin(ids_players)]
+                print(f"GG: {len(df_player_sofifa_league)} {len(df_player_fifa_sofifa_league)}")
 
-                    # Mapeo jugadores...
-                    df_map_players_fs_so_league = match_dataframes_by_str_column(df1=df_player_league, df2=df_player_sofifa_league, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+                # Mapeo jugadores...
+                df_map_players_fs_so_league = match_dataframes_by_str_column(df1=df_player_league, df2=df_player_sofifa_league, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
 
-                    # Concateno mapeos de ligas
-                    df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_league], axis=0)
-                    df_player = pd.concat([df_player, df_player_league], axis=0)
-                    print(f"ZZ: {len(df_map_players_fs_so)}")                        
+                # Concateno mapeos de ligas
+                df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_league], axis=0)
+                df_player = pd.concat([df_player, df_player_league], axis=0)
+                print(f"ZZ: {len(df_map_players_fs_so)}")                        
 
-                    # df_map_players_fs_so.drop_duplicates()
-                    if export:
-                        df_player_league.to_excel(f"{self.base_path}/integrate_data/df_player_{id_comp}.xlsx", index=True)
-                        df_map_players_fs_so_league.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so_{id_comp}.xlsx")
-
-                    if id_country == 6:
-                        print("La copa de la liga prof es una mezcla entre liga y no... A dichos partidos los integro con los jugadores de la liga 61 (y no aparte).")
-                        break
-
-                print(f"Final: {len(df_map_players_fs_so)}")
-                 # Eliminar jugadores duplicados (x jugar en ambas competicioens)
-                df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
-                print(f"Final sin dup: {len(df_map_players_fs_so)}")
-
+                # df_map_players_fs_so.drop_duplicates()
                 if export:
-                    df_player.to_excel(f"{self.base_path}/integrate_data/df_player.xlsx", index=True)
-                    df_map_players_fs_so.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so.xlsx")
+                    df_player_league.to_excel(f"{self.base_path}/integrate_data/df_player_{id_comp}.xlsx", index=True)
+                    df_map_players_fs_so_league.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so_{id_comp}.xlsx")
+
+                if self.id_country == 6:
+                    print("La copa de la liga prof es una mezcla entre liga y no... A dichos partidos los integro con los jugadores de la liga 61 (y no aparte).")
+                    break
+
+            print(f"Final: {len(df_map_players_fs_so)}")
+                # Eliminar jugadores duplicados (x jugar en ambas competicioens)
+            df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
+            print(f"Final sin dup: {len(df_map_players_fs_so)}")
+
+            if export:
+                df_player.to_excel(f"{self.base_path}/integrate_data/df_player.xlsx", index=True)
+                df_map_players_fs_so.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so.xlsx")
 
         # Integro datos de jugadores a df_match usando el mapeo
         df, df_aux = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
@@ -432,19 +424,13 @@ class DataPreparation:
         start = time.time()
         logger.info("Constructing data...")
 
-        '''
-        # CLEAN DATA ANTES DE CONSTRUIR (en prod rompe porque los trian anteriores fueron con estas variables...)
-        # Rellenar las red_cards con 0 para los años mayores a 2015 (pues desde ahi ya veo que se media la roja) --> Es nan siempre salvo que haya un expulsado en el partido...
-        df.loc[(df['date'].dt.year > 2015) & (df['red_cards_home'].isna()), 'red_cards_home'] = 0
-        df.loc[(df['date'].dt.year > 2015) & (df['red_cards_away'].isna()), 'red_cards_away'] = 0
-
+        # CLEAN DATA ANTES DE CONSTRUIR
         # Elimino columnas "Ruido"
-        cols_basics_noise = ['attendance', 'capacity'] # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        cols_basics_noise = ['attendance', 'capacity', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
         col_players_noise = [col for col in df.columns if 'rep_player' in col] # 'wage_player' in col or 'hei_player' in col # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_basics_noise + col_players_noise
         df = df.drop(columns=cols_to_drop)         # Dropear las columnas seleccionadas
         logger.warning(f"Columnas eliminadas x posible ruido: {cols_to_drop}")
-        '''
         
         # Si quiero construir variables historicas
         if with_historic:
@@ -484,10 +470,6 @@ class DataPreparation:
             df['clean_sheet_home'] = (df['goals_away'] == 0).astype(int)
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
-            # Keeping Goals Prevented (KGP) --> usa dangeorous attacks...
-            df['KGP_home'] = np.where(df['dangerous_attacks_away'].notna(),  (df['goals_away'] + 1) / df['dangerous_attacks_away'], None)
-            df['KGP_away'] = np.where(df['dangerous_attacks_home'].notna(),  (df['goals_home'] + 1) / df['dangerous_attacks_home'],  None)
-
             # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
             # df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
             # df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
@@ -512,8 +494,6 @@ class DataPreparation:
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
                 # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
-                'KGP', 'attacks', 'dangerous_attacks', # ya no se recolecta mas. En los partidos missing ya no existe.
-                
                 # Ofensive
                 'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
                 'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', # 'shots_off_goal' # 'SG2G',
@@ -688,7 +668,8 @@ class DataPreparation:
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
 
         # Determino que registros usaré en df_test
-        df_test_inic = generate_test_design.select_test_set(X, country=self.country)
+        df_match_old = generate_test_design.read_df_match(country=self.country)
+        df_test_inic = generate_test_design.select_test_set(X, df_match=df_match_old)
 
         # Separo test y train/val
         df_test = X[X.index.isin(df_test_inic.index)]
@@ -874,16 +855,22 @@ class DataPreparation:
                 print('\n Eliminando columnas correlacionadas...')
                 print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
 
+            if export:
+                df_corr_tri_X.to_excel(f'{self.base_path}/select_data/df_correlation.xlsx', index=True)
+
         # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
             n_cols = len(df.columns)-1  # -1 por variable respuesta
-            l_important_features, df_normalized = select_data.select_best_features(df, self.var_resp, thr_fs, graf=export)
+            l_important_features, df_normalized = select_data.select_best_features(df, self.var_resp, thr_fs, graf=False)
             l_col_eliminated = list(df.columns.difference(l_important_features))
             df = df.loc[:, l_important_features + [self.var_resp]]
 
             if self.verbose >= 1:
                 print('\n Feature Selection...')
                 print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas eliminadas: {l_col_eliminated}")
+
+            if export:
+                df_normalized.to_excel(f'{self.base_path}/select_data/df_fs.xlsx', index=True)
 
         if self.verbose >= 1:
             print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
@@ -892,8 +879,6 @@ class DataPreparation:
         logger.info(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
         if export:
-            df_corr_tri_X.to_excel(f'{self.base_path}/select_data/df_correlation.xlsx', index=True)
-            df_normalized.to_excel(f'{self.base_path}/select_data/df_fs.xlsx', index=True)
             df.to_excel(f'{self.base_path}/df_selected.xlsx', index=True)
 
         return df
@@ -901,30 +886,41 @@ class DataPreparation:
 
 class Modeling:
 
-    def __init__(self, country: str, var_resp: str = 'result', var_pred: str = 'predicted_result', verbose: int = 0):
+    def __init__(self, country: str, date: str = None, var_resp: str = 'result', var_pred: str = 'predicted_result', verbose: int = 0):
         if not isinstance(var_resp, str) or not isinstance(var_pred, str):
             raise TypeError("Los parámetros var_resp y var_pred deben ser cadenas de texto.")
         if not isinstance(country, str):
             raise TypeError("El parámetro country debe ser una cadena de texto.")
 
+        self.country = country.lower()
+        self.date = date
         self.var_resp = var_resp
         self.var_pred = var_pred
-        self.country = country.lower()
         self.verbose = verbose
-        # self.make_directories()
+        self.make_directories()
 
     def make_directories(self):
 
-        self.base_path = f'./data/{self.country}/p4_modeling'
+        if self.date is not None:
+            path = f'./data/{self.country}/p4_modeling/{self.date}'
+            path_dp = f'./data/{self.country}/p3_data_preparation/{self.date}'
+        else:
+            path = f'./data/{self.country}/p4_modeling'
+            path_dp = f'./data/{self.country}/p3_data_preparation'
+
+        self.base_path = path
+        self.base_path_dp = path_dp
         l_directorios = [
             f'{self.base_path}/generate_test_design',
             f'{self.base_path}/modeling',
         ]
 
+        '''
         for directorio in l_directorios:
             if not os.path.exists(directorio):
                 # Si no existe, crear el directorio
                 os.makedirs(directorio)
+        '''
         
     def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, n_reg_test: float = 100, retrain: bool = False, export: bool = True):
         """
@@ -944,7 +940,8 @@ class Modeling:
             print("\nSeparating data in train, val and test...")
 
         # Selecciono test set
-        df_test = generate_test_design.select_test_set(df, retrain=retrain, n_reg_test=n_reg_test, country=self.country)
+        df_match_old = generate_test_design.read_df_match(country=self.country, retrain=retrain)
+        df_test = generate_test_design.select_test_set(df, df_match=df_match_old, n_reg_test=n_reg_test)
         X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
 
         # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
@@ -1062,7 +1059,8 @@ class Modeling:
             }, index=X_test.index)
         
         # Calculo metricas
-        df_predicciones, d_metrics = asses_model.calculate_metrics(df_pred_proba, country=self.country, retrain=retrain, export=export)
+        df_filled = pd.read_excel(f'{self.base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0)
+        df_predicciones, d_metrics = asses_model.calculate_metrics(df_pred_proba, country=self.country, df_filled=df_filled, retrain=retrain, export=export)
 
         # Construyo expected results
         df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
@@ -1075,7 +1073,8 @@ class Modeling:
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
 
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
-        df_predicciones = format_data.map_teams(df_predicciones, country=self.country)
+        df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
+        df_predicciones = format_data.map_teams(df_predicciones,df_teams=df_teams)
 
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1100,7 +1099,7 @@ class Modeling:
         y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array      
         return y_pred_prob, y_pred
     
-    def train_and_assess_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, export=True):
+    def train_and_assess_models(self, l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_mod_seg, cont_iter, retrain: bool = False):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -1157,7 +1156,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
 
     # Creo instancias de clases
     du = DataUnderstanding(id_country, country) # Creo objeto de clase DataPreparation
-    dp = DataPreparation(country) # Creo objeto de clase DataPreparation
+    dp = DataPreparation(id_country, country) # Creo objeto de clase DataPreparation
     mo = Modeling(country=country)  # Creo objeto de clase Modeling
 
     #------------------------------------------- DATA UNDERSTANDING -------------------------------------------#
@@ -1176,7 +1175,6 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
         df_match_odds = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
         df_player_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx') #  index_col=0 --> si lo uso falla la integracion porque pone 'id_player' como index
-        df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
         
         du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
 
@@ -1189,7 +1187,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
         if not d_run.from_integrate:
             df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, export=False)
             df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export)
-            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=export) 
+            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=export) 
         else:
             df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
             print(df.head(2))

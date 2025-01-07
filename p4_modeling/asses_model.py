@@ -357,6 +357,7 @@ def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected
 def calculate_metrics( 
         df_pred_proba: pd.DataFrame,
         country: str,
+        df_filled: pd.DataFrame = None,
         var_resp: str = 'result',
         var_pred: str = 'predicted_result',
         var_pred_bm: str = 'bookmaker_result',
@@ -405,14 +406,15 @@ def calculate_metrics(
     })
 
     # Concatenación selectiva
-    df_filled = pd.read_excel(f'./data/{country}/p3_data_preparation/treat_nan/df_filled_columns.xlsx', index_col=0)
-    l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
     columns_to_concat = [
         df_match[['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']],
         df_match_odds,
         df_pred_proba,
-        df_filled[l_cols]
     ]
+    if df_filled is not None:
+        l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+        columns_to_concat.append(df_filled[l_cols])
+        
     df_predicciones = pd.concat(columns_to_concat, axis=1)
 
     if verbose >=1:

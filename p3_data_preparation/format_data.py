@@ -130,7 +130,7 @@ def format_percentage_columns(df, base_columns):
         total_col_home = f'n_{home_col}'  # No uso total por si ya existe "total_passes" en missing.
         total_col_away = f'n_{away_col}'
 
-        # Procesar la columna `_home`
+        # Procesar la columna `_home` (con warning) --> No usar .loc[] porque reformatea mal (no termina uniendo columnas nuevas a las viejas..)
         df[[accuracy_col_home, completed_col_home, total_col_home]] = df[home_col].str.extract(
             r'(\d+)% \((\d+)/(\d+)\)').astype(float)
 
@@ -151,8 +151,8 @@ def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
         if old_col in df.columns:
             if new_col in df.columns:  # Si ya existe el nuevo nombre
                 # Combina ambas columnas y elimina la vieja
-                df[new_col] = df[new_col].combine_first(df[old_col]) 
-
+                df[new_col] = df[new_col].combine_first(df[old_col])  # Warning pero esto lo hace mal: # df.loc[:, new_col] = df[new_col].combine_first(df[old_col]) 
+                
                 # Eliminar la columna vieja después de transferir los datos
                 df.drop(columns=[old_col], inplace=True)
 
@@ -256,13 +256,10 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
     
     return df, df_etiquetas
 
-def map_teams(df, country):
+def map_teams(df, df_teams):
     """
     Convierto id_team_home e id_team_away de ids a nombre de equipos.
     """
-    # Levanto df_teams
-    df_teams = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_teams.xlsx', index_col=0)
-
     # Revierto etiquetas para tener nombres de equipos en vez de ids
     d_mapeo = dict(zip(df_teams.index, df_teams['team_name']))        
     df['id_team_home'] = df['id_team_home'].replace(d_mapeo)

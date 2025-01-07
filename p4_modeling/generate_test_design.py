@@ -77,7 +77,24 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=
     X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=shuffle)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
-def select_test_set(df, n_reg_test: int = 100, retrain: bool = True, country : str = '', verbose : int = 0):
+def read_df_match(country, retrain: bool = True):
+    """
+    Levanto el df_match
+    """
+    # Levanto df_match del pais
+    if retrain:
+        BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated" # f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx'
+        df_match = pd.read_excel(f'{BASE_DIR_du}/df_match.xlsx', index_col=0)
+    else:
+        logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
+        df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
+
+    if 'Unnamed: 0' in df_match.columns:
+        df_match = df_match.drop(columns=['Unnamed: 0'])
+
+    return df_match
+
+def select_test_set(df, df_match, n_reg_test: int = 100, verbose : int = 0):
     """
     Determina qué registros pueden ser utilizados en el test
     Requisitos para el test
@@ -86,26 +103,18 @@ def select_test_set(df, n_reg_test: int = 100, retrain: bool = True, country : s
 
     # Parameters
         df: Dataframe.
-        n_years_to_select: Numero de años para seleccionar los ultimos partidos los cuales iran al df_test.
-        n_max_reg: Numero maximo de registros para X_test. (int)
-        verbose: 
+        df_match: Del cual determinar que partidos son los ultimos partidos y la competicion (tiene date e id_comp)
+        n_reg_test: Numero de registros los ultimos partidos a selecciona los cuales iran al df_test.
 
     # Return
         X_test: Dataframe de testeo sin variable respuesta.
         y_test: Dataframe de testeo solo la variable respuesta.
     """
-    # Levanto df_match del pais
-    df_match = pd.read_excel(f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx', index_col=0)
-    if not retrain:
-        logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
-        df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
-    
     # Ordeno por fecha descendiente
     df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
     df_match = df_match.sort_values(by='date', ascending=False)
 
     if verbose >= 2:
-        logger.info(df_match.columns) # No quiero "unnamed"
         logger.info(df_match['date'].head(10))
 
     # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
