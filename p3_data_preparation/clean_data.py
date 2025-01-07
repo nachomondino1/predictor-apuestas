@@ -27,7 +27,9 @@ class TextPreparation:
         d = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u'}
         for col in columns:
             try:
-                df[col] = df[col].replace(d, regex=True)
+                # df[col] = df[col].replace(d, regex=True) # Con warning
+                df.loc[:, col] = df[col].replace(d, regex=True)
+
             except ValueError:
                 pass
         return df
@@ -38,7 +40,8 @@ class TextPreparation:
             'ó': 'o', 'û': 'u', 'ü': 'u', 'ù': 'u', 'ñ': 'n', 'č': 'c', 'ć': 'c', 'ğ': 'g', 'ß': 'ss', 'ń': 'n', 'š': 's'}
         for col in columns:
             try:
-                df[col] = df[col].replace(d, regex=True)
+                # df[col] = df[col].replace(d, regex=True) # Con warning
+                df.loc[:, col] = df[col].replace(d, regex=True)
             except ValueError:
                 pass
         return df
@@ -46,13 +49,15 @@ class TextPreparation:
     def delete_punctuation(self, df, columns):
         """Elimina signos de puntuación de los textos"""
         for col in columns:
-            df[col] = df[col].str.replace(f'[{string.punctuation}]', ' ', regex=True)
+            # df[col] = df[col].str.replace(f'[{string.punctuation}]', ' ', regex=True) # con warning
+            df.loc[:, col] = df[col].str.replace(f'[{string.punctuation}]', ' ', regex=True) # con warning
         return df
 
     def tokenize(self, df, columns):
         """Tokeniza los textos"""
         for col in columns:
-            df[col] = df[col].str.split()
+            # df[col] = df[col].str.split() # Con warning
+            df.loc[:, col] = df[col].str.split()
         return df
 
     def stop_word_removal(self, df, columns):
