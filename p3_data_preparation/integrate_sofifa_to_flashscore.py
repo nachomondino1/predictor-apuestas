@@ -108,9 +108,10 @@ def match_dataframes_by_str_column(df1, df2, column_to_match1, column_to_match2,
     df_map = pd.DataFrame(columns=[f'{column_to_integrate}_fs', f'{column_to_match1}_fs', f'{column_to_integrate}_so', f'{column_to_match2}_so', 'porcentaje_coincidencia', 'tipo'])
     n_matchs, n_pos_matchs = 0, len(df1)
     print(f"Mapping Sofifa and Flashscore by {column_to_match1}...")
-    progress_bar = tqdm(total=n_pos_matchs, ncols=80)
 
+    # Ordeno df2 segun lenght (long first). Para que el df2 ordenado por coincidencia quede segun lenght tmb.
     df2 = sort_by_col_lenght(df2, col=column_to_match2, ascending=False)
+    progress_bar = tqdm(total=n_pos_matchs, ncols=80)
 
     # Por fila en df1
     for id_df1, row in df1.iterrows():

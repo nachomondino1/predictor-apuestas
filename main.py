@@ -352,21 +352,21 @@ class DataPreparation:
 
                 # filtrar df_match y df_match_player y df_player_sofifa
                 ## Flashscore
-                print(f"AA: {len(df_match)} {len(df_match_player)}")
+                print(f"Flashscore (todas las ligas): {len(df_match)} {len(df_match_player)}")
                 df_match_league = df_match[df_match['id_competition'] == id_comp]
                 if self.id_country == 6:
                     df_match_league = df_match[df_match['id_competition'].isin([61, 62])]  # Argentina
 
                 df_match_player_league = df_match_player[df_match_player.index.isin(df_match_league.index)]
                 df_player_league = create_df_player(df_match_player_league)
-                print(f"BB: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
+                print(f"Flashscore comp {id_comp}: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
 
                 ## Sofifa
-                print(f"FF: {len(df_player_sofifa)} {len(df_player_fifa_sofifa)}")
+                print(f"Sofifa (todas las ligas): {len(df_player_sofifa)} {len(df_player_fifa_sofifa)}")
                 df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
                 ids_players = df_player_fifa_sofifa_league['id_player'].unique()
                 df_player_sofifa_league = df_player_sofifa[df_player_sofifa.index.isin(ids_players)]
-                print(f"GG: {len(df_player_sofifa_league)} {len(df_player_fifa_sofifa_league)}")
+                print(f"Sofifa comp {id_comp}: {len(df_player_sofifa_league)} {len(df_player_fifa_sofifa_league)}")
 
                 # Mapeo jugadores...
                 df_map_players_fs_so_league = match_dataframes_by_str_column(df1=df_player_league, df2=df_player_sofifa_league, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
@@ -374,7 +374,7 @@ class DataPreparation:
                 # Concateno mapeos de ligas
                 df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_league], axis=0)
                 df_player = pd.concat([df_player, df_player_league], axis=0)
-                print(f"ZZ: {len(df_map_players_fs_so)}")                        
+                print(f"Players map: {len(df_map_players_fs_so)}")                        
 
                 # df_map_players_fs_so.drop_duplicates()
                 if export:
@@ -385,10 +385,10 @@ class DataPreparation:
                     print("La copa de la liga prof es una mezcla entre liga y no... A dichos partidos los integro con los jugadores de la liga 61 (y no aparte).")
                     break
 
-            print(f"Final: {len(df_map_players_fs_so)}")
+            print(f"Players map final: {len(df_map_players_fs_so)}")
                 # Eliminar jugadores duplicados (x jugar en ambas competicioens)
             df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
-            print(f"Final sin dup: {len(df_map_players_fs_so)}")
+            print(f"Players map final sin dup: {len(df_map_players_fs_so)}")
 
             if export:
                 df_player.to_excel(f"{self.base_path}/integrate_data/df_player.xlsx", index=True)
