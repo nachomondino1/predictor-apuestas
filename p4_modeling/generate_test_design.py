@@ -83,8 +83,8 @@ def read_df_match(country, retrain: bool = True):
     """
     # Levanto df_match del pais
     if retrain:
-        BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated" # f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx'
-        df_match = pd.read_excel(f'{BASE_DIR_du}/df_match.xlsx', index_col=0)
+        path = f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx' #   f"./data/{country}/p2_data_understanding/old_updated"
+        df_match = pd.read_excel(path, index_col=0)
     else:
         logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
         df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
