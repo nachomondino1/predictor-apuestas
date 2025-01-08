@@ -242,18 +242,20 @@ def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
 
         # Por partido
         for i, row in df.iterrows():
-            
-            # Si la etiqueta no existe
+                    
+            # Si la etiqueta no existe en el mapeo
             if row[columna] not in d_mapeo.keys():
-                logger.error(f"No se encontró etiqueta para {row[columna]}. Se rellena con 0.")
+                logger.error(f"No se encontró etiqueta para {row[columna]} en la fila {i}. Se rellena con 0.")
                 valor = 0
+
             # Si la etiqueta existe
             else:
-                # Reemplazo valor
+                # Reemplazo el valor
                 valor = d_mapeo[row[columna]]
             
+            # Actualizo el DataFrame
             df.loc[i, columna] = valor
-    
+
     return df, df_etiquetas
 
 def map_teams(df, df_teams):
