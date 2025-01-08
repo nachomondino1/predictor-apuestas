@@ -31,3 +31,24 @@ def mover_archivo(origen, destino):
         logger.error(f"No tienes permisos para acceder o mover el archivo {origen}.")
     except Exception as e:
         logger.error(f"Ocurrió un error al intentar mover el archivo: {e}")
+
+def remove_directories(directories):
+    """
+    Elimina directorios o archivos especificados en la lista.
+    
+    Parameters:
+        directories: list
+            Lista de rutas de directorios o archivos a eliminar.
+    """
+    for directory in directories:
+        try:
+            if os.path.isdir(directory):  # Verifica si es un directorio
+                shutil.rmtree(directory)
+                print(f"Directorio eliminado: {directory}")
+            elif os.path.isfile(directory):  # Verifica si es un archivo
+                os.remove(directory)
+                print(f"Archivo eliminado: {directory}")
+            else:
+                print(f"No se encontró la ruta: {directory}")
+        except Exception as e:
+            print(f"Error al eliminar {directory}: {e}")
