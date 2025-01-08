@@ -14,6 +14,7 @@ from sklearn.neural_network import MLPClassifier
 from p2_data_understanding.collect_initial_data import update_sofifa_data
 from p3_data_preparation import concat_mapeos
 from p3_data_preparation.select_data import determine_country_competitions
+from p6_deployment import main_next_matches
 import utils.directories as directories
 import pickle
 from itertools import product
@@ -92,25 +93,33 @@ def comprehensive_search(
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
-    save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
-    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_dp])
-
+    # save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
+    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
+ 
     ####################################################################### DATA UNDERSTANDING #######################################################################
     if not from_construct:
-        # Muevo anterior trian para no sobreescribir
-        dp.make_directories() # El old se los lleva sino...
+
+        # MISSING
+        # Podria recolectar missing para tener lo ultimos partidos actualzados
+        # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        # main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=True, prepare_missing=False, export=d_run['export'])  #prepare_missing = False puesto que no tiene el df_map actualziado... Solo necesito los datos raw..
+
+        ## Eliminar preparacion de missing actual
+        l_dirs_to_remove = [
+            f'data/{country}/p6_deployment/missing/data_preparation',
+            f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx' # --> Creo que no lo tenes que remover proque son solo datos extraidos.
+        ]    
+        directories.remove_directories(directories=l_dirs_to_remove)
 
         # Defino paths de donde levantar los datos
+        base_path_fs = f'data/{country}/p6_deployment/missing/old_updated'
         if retrain:
-            base_path_fs = f'data/{country}/p6_deployment/missing/old_updated'
             base_path_so = f'data/{country}/p2_data_understanding/sofifa_update'
-            logger.critical("Tengo en cuenta los datos missing junto con los viejos para reentrenar modelos")        
         else:
-            base_path_fs = f'data/{country}/p2_data_understanding'
             base_path_so = f'data/{country}/p2_data_understanding'
-            logger.warning("No tengo en cuenta los datos missing junto con los viejos para reentrenar modelos")
+            logger.warning("Using Sofifa old")
         
-        # Levanto datos --> Deberia usarlos en modeling cuando hago retrain...
+        # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
         df_match = pd.read_excel(f'{base_path_fs}/df_match.xlsx', index_col=0)
         df_match_player = pd.read_excel(f'{base_path_fs}/df_match_player.xlsx', index_col=0)
         df_match_odds = pd.read_excel(f'{base_path_fs}/df_match_odds.xlsx', index_col=0)
@@ -146,7 +155,7 @@ def comprehensive_search(
         df_player_sofifa.to_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index=True)
         df_player_fifa_sofifa.to_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index=True)
 
-        ####################################################################### DATA PREPARATION #######################################################################
+        ####################################################################### DATA PREPARATION (solo old) #######################################################################
         # Format data
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, reformat=True, export=True)  # Reformat True porque tomo el missing raw
         
@@ -160,7 +169,16 @@ def comprehensive_search(
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
+    
+    
+    #___________________________________________________________________ DATA PREPARATION (MISSING) ___________________________________________________________________ --> No pues el df_integrated ya tiene missing pues el input es con missing...
+    # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
+    ## Volver a preaparar missing
+    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+    main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=False, export=d_run['export'])  # La ite date es clave para que sepa que df_map levantar...
+    # No tenes que exportar datos que usas aqui porque solamente actualizar la preparacion pero no los extraidos...
 
+    #___________________________________________________________________ DATA PREPARATION ___________________________________________________________________
     # Construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
@@ -196,7 +214,7 @@ def comprehensive_search(
 
             df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, competencies_to_select=comp_to_select, 
                                                                     fill_na=fill_na, export=True)
-            joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/scaler_model_{path_1}_{path_2}.pkl')
+            joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_1}_{path_2}.pkl')
 
             if verbose >= 2:
                 df_cons_clean.to_excel(path_clean_data, index=True)
@@ -225,7 +243,7 @@ def comprehensive_search(
                 for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                     
                     # Muevo anterior trian para no sobreescribir
-                    mo.make_directories() 
+                    # mo.make_directories() 
 
                     # Asigno valor a cada hiperparametro
                     val_size, n_reg_test, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
@@ -396,7 +414,7 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
+    id_country = 59
     from_construct = False
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
