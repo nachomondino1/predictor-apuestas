@@ -1102,7 +1102,7 @@ def main(
         logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
         # Si extrajo missingnot
-        if prepare_missing: #len(df_match_miss) > 0:
+        if prepare_missing and len(df_match_miss) > 0:
             
             # Preparo datos missing
             df_player_sofifa, df_player_fifa_sofifa = mis.read_last_sofifa_data()  # Levanto datos para preparar missing
