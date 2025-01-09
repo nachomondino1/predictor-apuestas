@@ -1224,7 +1224,7 @@ def main(
         
         # Guardo df justo antes de predecir cuando hago pred_missing para poder comparar ASSESS Y PROD
         if predict_missing: 
-            df.to_excel(f'./data/{country}/p6_deployment/data_preparation/df_selected_MISS.xlsx', index=True)
+            df.to_excel(f'./data/{country}/p6_deployment/assess/df_selected_MISS_{n_model}.xlsx', index=True)
 
         logger.info(f"Shape Dataframe antes de Modeling(): {df.shape}")
         if len(df) == 0:
@@ -1306,7 +1306,7 @@ def main(
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
 
         if predict_missing: 
-            df.to_excel(f'./data/{country}/p6_deployment/df_predicciones_missing.xlsx', index=True)
+            df.to_excel(f'./data/{country}/p6_deployment/assess/df_predicciones_missing_{n_model}.xlsx', index=True)
 
         logger.critical("LA PREDICCION FUE UN EXITO!")
 
