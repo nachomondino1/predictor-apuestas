@@ -69,11 +69,24 @@ def create_df_player(df: pd.DataFrame):
 
     # Crear DataFrame con los valores únicos
     df_unique_values = pd.DataFrame(list(unique_values), columns=['id_player', 'player_name'])
+    df_unique_values = sort_by_col_lenght(df_unique_values, col='player_name', ascending=False)
 
     # Establecer 'id_player' como índice
     df_unique_values.set_index('id_player', inplace=True)
 
     return df_unique_values
+
+def sort_by_col_lenght(df, col, ascending):
+ 
+    # Calcular la longitud de los nombres
+    df['name_length'] = df[col].str.len()
+
+    # Ordenar por la longitud de los nombres de mayor a menor
+    df.sort_values(by='name_length', ascending=ascending, inplace=True)
+
+    # Eliminar la columna temporal 'name_length'
+    df.drop(columns=['name_length'], inplace=True)
+    return df
 
 def match_dataframes_by_str_column(df1, df2, column_to_match1, column_to_match2, column_to_integrate, thr_coincidence_min: int, column_to_match2_aux: str = None, _print: bool = False):
     """
@@ -95,6 +108,9 @@ def match_dataframes_by_str_column(df1, df2, column_to_match1, column_to_match2,
     df_map = pd.DataFrame(columns=[f'{column_to_integrate}_fs', f'{column_to_match1}_fs', f'{column_to_integrate}_so', f'{column_to_match2}_so', 'porcentaje_coincidencia', 'tipo'])
     n_matchs, n_pos_matchs = 0, len(df1)
     print(f"Mapping Sofifa and Flashscore by {column_to_match1}...")
+
+    # Ordeno df2 segun lenght (long first). Para que el df2 ordenado por coincidencia quede segun lenght tmb.
+    df2 = sort_by_col_lenght(df2, col=column_to_match2, ascending=False)
     progress_bar = tqdm(total=n_pos_matchs, ncols=80)
 
     # Por fila en df1
@@ -122,7 +138,6 @@ def match_dataframes_by_str_column(df1, df2, column_to_match1, column_to_match2,
             df2_filt_2 = df2_filt.sort_values(by='porcentaje_coincidencia_2', ascending=False) 
             row_best_coincidende_2 = df2_filt_2.iloc[0] # Selecciono la primera fila
 
-        
         if len(df2_filt) > 0:
             # Selecciono la opcion con mayor coincidencia
             row_best_coincidende = df2_filt.iloc[0]

@@ -29,6 +29,8 @@ def update_predicciones_test_with_missing(df_ite, id_country, country, iteration
     bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
 
+    base_path_dp = f'./data/{country}/p3_data_preparation/{iteration_date}'
+
     # Por modelo
     for idx, row in df_ite.iterrows():
 
@@ -61,7 +63,8 @@ def update_predicciones_test_with_missing(df_ite, id_country, country, iteration
 
         # Volver a calcular metricas con test + missing
         df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
+        df_filled = pd.read_excel(f'{base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0) #  para calcular relleno..
+        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, export=False)  # --> Sobreescribe metricas de df_pred...
         # print("C", df_predicciones)
         # df_predicciones.to_excel('/Users/nachomondino/Desktop/df_iteration_test_3.xlsx')
 
@@ -72,7 +75,8 @@ def update_predicciones_test_with_missing(df_ite, id_country, country, iteration
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
 
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
-        df_predicciones = format_data.map_teams(df_predicciones, country=country)
+        df_teams = pd.read_excel(f'{base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
+        df_predicciones = format_data.map_teams(df_predicciones, df_teams=df_teams)
 
         # Hiperparametros del modelo y Metricas en testeo y train
         row_test = {'n_iteration': n_model, 'model_name': model_name}

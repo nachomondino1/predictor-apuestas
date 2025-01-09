@@ -166,14 +166,18 @@ class DataUnderstandingNew():
 
 class DataPreparationNew(DataPreparation):
 
-    def __init__(self, country, export: bool = True):
+    def __init__(self, id_country, country, iteration_date, export: bool = True):
+        self.id_country = id_country
         self.country = country
-        self.BASE_DIR = f"./data/{country}/p6_deployment/data_preparation"
+        self.iteration_date = iteration_date
         self.export = export
         self.make_directories()
-        super().__init__(country)
+        super().__init__(self.id_country , self.country, self.iteration_date)
 
-    def make_directories(self):  # Pasarle direcotio o l_directorios como argumento...
+    def make_directories(self):
+
+        self.BASE_DIR = f"./data/{self.country}/p6_deployment/data_preparation"
+
         l_directorios = [
             f'{self.BASE_DIR}/format_data',
             f'{self.BASE_DIR}/clean_data',
@@ -252,7 +256,7 @@ class DataPreparationNew(DataPreparation):
 
         return df_match, df_match_player
 
-    def integrate_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, verbose: int = 0):
+    def integrate_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa, df_player_fifa_sofifa, verbose: int = 0):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -267,7 +271,7 @@ class DataPreparationNew(DataPreparation):
         Podria guardar el nuevo mapeo para jugadores nuevo o no hace falta? No hace falta creo.
         """
         # Uso integracion de main.py
-        df = self.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
+        df = self.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
         if self.export:
             df.to_excel(f'{self.BASE_DIR}/df_integrated.xlsx')
@@ -298,7 +302,7 @@ class DataPreparationNew(DataPreparation):
 
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
         miss_player_columns = [col for col in df_last_old_matches.columns if ('player_miss' in col)]  # --> ojo porque no se si las rellena ok... es complejo el rellenado.
-        l_var_to_copy = miss_player_columns # ['id_coach_home', 'id_coach_away'] + 
+        l_var_to_copy = miss_player_columns + ['id_coach_home', 'id_coach_away']  # Es clave copiar coaches porque no suele estar hasta que esten las formaciones..
         df_next_matches, df_copiado = self.fillna_with_last_match_value(df_next_matches, df_last_old_matches, cols_to_fill=l_var_to_copy) 
         if self.export:
             df_copiado_formaciones.to_excel(f"{self.BASE_DIR}/fill_data/df_copiado_formaciones.xlsx", index=True)
@@ -610,8 +614,8 @@ class TrainingDataLoader():
     def construct_directories(self):
         # self.BASE_DIR_ALL_MISSING = f'./data/{self.country}/p6_deployment/missing/data_understanding/all'
         # self.BASE_DIR_NEXT_MATCHES = f'./data/{self.country}/p6_deployment/data_understanding'
+        self.BASE_DIR_dp = f"./data/{self.country}/p3_data_preparation/{self.iteration_date}"
         self.BASE_DIR_mod = f"./data/{self.country}/p4_modeling/{self.iteration_date}"
-        self.BASE_DIR_dp = f"{self.BASE_DIR_mod}/p3_data_preparation/"
     
     # Data preparation
     def load_data_preparation_hyperparameters(self):
@@ -665,18 +669,9 @@ class TrainingDataLoader():
 
         logger.info("Levento etiquetas con el que entrené")
         n_ult_part, n_years_h2h, segun_localia, dif_con_against = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against']
-        path_tag = f'{self.BASE_DIR_dp}/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}.xlsx'       
+        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
-        '''
-        # Si se levanta de find_best_hyper.py
-        if self.n_model is not None:
-            n_ult_part, n_years_h2h, segun_localia, dif_con_against = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against']
-            path_tag = f'{self.BASE_DIR_dp}/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}.xlsx'       
-        # Si se levanta de main.py
-        else:
-            path_tag = f"./data/{country}/p3_data_preparation/df_etiquetas.xlsx"
-        '''
         if self.verbose >= 1:  
             print(df_etiquetas.head(3))
 
@@ -687,7 +682,7 @@ class TrainingDataLoader():
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
         n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
-        path_scaler = f'{self.BASE_DIR_dp}/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
+        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
@@ -700,16 +695,12 @@ class TrainingDataLoader():
         # Si se levanta de main_find_best_hyper.py
         if self.n_model is not None:
             path_model_1 = f"{self.BASE_DIR_mod}/models/{self.n_model}_{self.model_name}.pkl" 
-            path_model_2 =  f"{self.BASE_DIR_mod}/models/{self.n_model}_model.pkl"
+            loaded_model = pickle.load(open(path_model_1, "rb"))
         # Si se levanta de main.py
         else:
             logger.error("Se levanta el modelo y el scaler desde de main.py")
             path_model_1 = f"./data/{self.country}/p4_modeling/modelo.pkl"
-        
-        try:
             loaded_model = pickle.load(open(path_model_1, "rb"))
-        except FileNotFoundError:
-            loaded_model = pickle.load(open(path_model_2, "rb"))
 
         return loaded_model
 
@@ -799,90 +790,143 @@ class TrainingDataLoader():
         return val
 
 # Missing data
-def load_last_version_extracted_matches(country):
-    """
-    No lo pongo en la clase puesto que no son datos usados durante el entrenamiento.
-    """
-    # Esta bien levantar df_integrated aca tambien. para asegurarme que todos los missing estan en df_integrated tambien.
-    # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
-    try:
-        BASE_DIR_MISSING_AND_OLD = f'./data/{country}/p6_deployment/missing/old_updated'
-        df_match = pd.read_excel(f'{BASE_DIR_MISSING_AND_OLD}/df_match.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'{BASE_DIR_MISSING_AND_OLD}/df_match_player.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'{BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx', index_col=0)
-        df_integrated = pd.read_excel(f'{BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index_col=0)
-        logger.info('Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
+class MissingData:
+    def __init__(self, country, iteration_date, verbose: int = 1):
+        self.country = country
+        self.iteration_date = iteration_date
+        self.verbose = verbose
+        self.construct_directories()
 
-    except FileNotFoundError:
-        df_match = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_player.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'./data/{country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
-        df_integrated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-        logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+    def construct_directories(self):
+        self.BASE_DIR_du = f"./data/{self.country}/p2_data_understanding"
+        self.BASE_DIR_dp = f"./data/{self.country}/p3_data_preparation/{self.iteration_date}"
+        self.BASE_DIR_mod = f"./data/{self.country}/p4_modeling/{self.iteration_date}"
+        
+        self.BASE_DIR_MISSING_AND_OLD = f'./data/{self.country}/p6_deployment/missing/old_updated'
+        self.BASE_DIR_MISSING_ALL_du = f"./data/{self.country}/p6_deployment/missing/data_understanding/all"
+        self.BASE_DIR_MISSING_ALL_dp = f"./data/{self.country}/p6_deployment/missing/data_preparation/all"
+        
+    def read_last_flashscore_data(self):
+        """
+        Obtengo ultima version de df_match, df_match_player y df_match odds (con missing)
+        No lo pongo en la clase puesto que no son datos usados durante el entrenamiento.
+        """
+        try:
+            df_match = pd.read_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match.xlsx', index_col=0)
+            df_match_player = pd.read_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_player.xlsx', index_col=0)
+            df_match_odds = pd.read_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx', index_col=0)
+            logger.info('Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
+
+        except FileNotFoundError:
+            df_match = pd.read_excel(f'{self.BASE_DIR_du}/df_match.xlsx', index_col=0)
+            df_match_player = pd.read_excel(f'{self.BASE_DIR_du}/df_match_player.xlsx', index_col=0)
+            df_match_odds = pd.read_excel(f'{self.BASE_DIR_du}/df_match_odds.xlsx', index_col=0)
+            logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+        
+        logger.info(f"Shapes: \t df_match: {df_match.shape} \t df_match_player:{df_match_player.shape} \t df_match_odds: {df_match_odds.shape}")
+        return df_match, df_match_player, df_match_odds
+
+    def read_last_sofifa_data(self):
+
+        try:
+            df_player_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/sofifa_update/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
+            df_player_fifa_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/sofifa_update/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
+
+        except FileNotFoundError:            
+            df_player_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
+            df_player_fifa_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
+            logger.error("No levanto los ultimos datos de Sofifa...")
+            raise ValueError
+        
+        return df_player_sofifa, df_player_fifa_sofifa
+
+    def read_last_integrate_data(self):
+
+        # Esta bien levantar df_integrated aca tambien. para asegurarme que todos los missing estan en df_integrated tambien.
+        # Levanto df_missing o corro la extraccion con el concat de df_match y df_match_missing (en vez de df_match solo pues sino siempre levanta los mismos partidos y cada vez mas...)
+        try:
+            df_integrated = pd.read_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index_col=0)
+            logger.info('Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
+
+        # Si no existe un df_integrated concatenado entre old y missing
+        except FileNotFoundError:
+            df_integrated = pd.read_excel(f'{self.BASE_DIR_dp}/df_integrated.xlsx', index_col=0)  # Tiene missing hasta el dia en el que entrené (por no desde ese dia en adelante)
+            logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+        
+        logger.info(f"df_integrated: {df_integrated.shape}")
+        return df_integrated
+
+    def read_last_missing_data(self):
+        """
+        Leer todos los datos missing ya extraidos
+        """
+        try:
+            df_match_miss = pd.read_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_miss.xlsx', index_col=0)
+            df_match_player_miss = pd.read_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_player_miss.xlsx', index_col=0)
+            df_match_odds_miss = pd.read_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_odds_miss.xlsx', index_col=0)
+
+        # Si es la primera vez que extraigo partidos missing
+        except FileNotFoundError:
+            logger.error("Nunca se extrajo missing data")
+            df_match_miss, df_match_player_miss, df_match_odds_miss = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+        return df_match_miss, df_match_player_miss, df_match_odds_miss
     
-    logger.info(f"Shapes: \t df_match: {df_match.shape} \t df_match_player:{df_match_player.shape} \t df_match_odds: {df_match_odds.shape} \t df_integrated: {df_integrated.shape}")
-    return df_match, df_match_player, df_match_odds, df_integrated
+    def read_last_integrate_missing_data(self):
+        try:
+            df_integrated_missing_all = pd.read_excel(f'{self.BASE_DIR_MISSING_ALL_dp}/df_integrated_missing.xlsx', index_col=0)
+        
+        # Si es la primera vez que extraigo partidos missing
+        except FileNotFoundError:
+            logger.error("Nunca se ha integrado missing")
+            df_integrated_missing_all = pd.DataFrame()  # Es importante para que se guarde por primera vez df_integrated_missing en /all 
+        return df_integrated_missing_all
 
-def concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country):
-    """
-    Exporto datos de partidos con los que entreno el modelo y los partidos missing.
-    """
-    BASE_PATH=f"./data/{country}/p6_deployment/missing/old_updated"
+    def concat_old_with_missing(self, df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss):
+        """
+        Exporto datos de partidos con los que entreno el modelo y los partidos missing.
+        """
+        len_inicial = len(df_match)
+        len_inicial_miss = len(df_match_miss)
+        # Concateno old (que puede tener ya algunos missing) y nuevos missing
+        df_concat_match = pd.concat([df_match, df_match_miss], axis=0)
+        df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
+        df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
+        len_final = len(df_concat_match)
+        logger.warning(f"Old:{df_match.shape} + Missing: {df_match_miss.shape} = {df_concat_match.shape}")
 
-    len_inicial = len(df_match)
-    len_inicial_miss = len(df_match_miss)
-    # Concateno old (que puede tener ya algunos missing) y nuevos missing
-    df_concat_match = pd.concat([df_match, df_match_miss], axis=0)
-    df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
-    df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
-    len_final = len(df_concat_match)
-    logger.warning(f"Old:{df_match.shape} + Missing: {df_match_miss.shape} = {df_concat_match.shape}")
+        verif = (len_inicial + len_inicial_miss) == len_final
+        if not verif:
+            logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
 
-    verif = (len_inicial + len_inicial_miss) == len_final
-    if not verif:
-        logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
+        # Exporto datos
+        df_concat_match.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match.xlsx')
+        df_concat_match_player.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_player.xlsx')
+        df_concat_match_odds.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx')
+        logger.info(f"Shape de df_match concatenado con missing:: {len_inicial} --> {len_final}")
 
-    # Exporto datos
-    df_concat_match.to_excel(f'{BASE_PATH}/df_match.xlsx')
-    df_concat_match_player.to_excel(f'{BASE_PATH}/df_match_player.xlsx')
-    df_concat_match_odds.to_excel(f'{BASE_PATH}/df_match_odds.xlsx')
-    logger.info(f"Shape de df_match concatenado con missing:: {len_inicial} --> {len_final}")
-
-def concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country):
-    """
-    Guardo los nuevos partidos missing con los que ya tenia
-    """
-    BASE_PATH=f"./data/{country}/p6_deployment/missing/data_understanding/all"
-
-    # Si aun no extraje partidos missing
-    try: 
-        df_match_miss_comp = pd.read_excel(f'{BASE_PATH}/df_match_miss.xlsx', index_col=0)
-        df_match_player_miss_comp = pd.read_excel(f'{BASE_PATH}/df_match_player_miss.xlsx', index_col=0)
-        df_match_odds_miss_comp = pd.read_excel(f'{BASE_PATH}/df_match_odds_miss.xlsx', index_col=0)
-        len_inicial = len(df_match_miss_comp)
+    def concat_with_missing_already_extracted(self, df_match_miss, df_match_player_miss, df_match_odds_miss):
+        """
+        Guardo los nuevos partidos missing con los que ya tenia
+        """
+        df_match_miss_comp, df_match_player_miss_comp, df_match_odds_miss_comp = self.read_last_missing_data()
+        n_missing_ya_extraidos = len(df_match_miss_comp)
 
         df_match_miss_comp_ct = pd.concat([df_match_miss_comp, df_match_miss], axis=0)
         df_match_player_miss_comp_ct = pd.concat([df_match_player_miss_comp, df_match_player_miss], axis=0)
-        df_match_odds_miss_comp_ct = pd.concat([df_match_odds_miss_comp, df_match_odds_miss], axis=0)
+        df_match_odds_miss_comp_ct = pd.concat([df_match_odds_miss_comp, df_match_odds_miss], axis=0)      
 
-    # Si es la primera vez que extraigo partidos missing
-    except FileNotFoundError:
-        df_match_miss_comp_ct = df_match_miss
-        df_match_player_miss_comp_ct = df_match_player_miss
-        df_match_odds_miss_comp_ct = df_match_odds_miss
-        len_inicial = 0
+        n_missing_nuevos = len(df_match_miss)
+        len_final = len(df_match_miss_comp_ct)
+        verif = (n_missing_ya_extraidos + n_missing_nuevos) == len_final
+        if not verif:
+            logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
+        logger.info(f"Shape de todos los partidos missing hasta hoy : {n_missing_ya_extraidos} --> {len_final}")
 
-    len_inicial_miss = len(df_match_miss)
-    len_final = len(df_match_miss_comp_ct)
-    verif = (len_inicial + len_inicial_miss) == len_final
-    if not verif:
-        logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
-    logger.info(f"Shape de todos los partidos missing hasta hoy : {len_inicial} --> {len_final}")
-
-    # Exporto datos
-    df_match_miss_comp_ct.to_excel(f'{BASE_PATH}/df_match_miss.xlsx', index=True)
-    df_match_player_miss_comp_ct.to_excel(f'{BASE_PATH}/df_match_player_miss.xlsx', index=True)
-    df_match_odds_miss_comp_ct.to_excel(f'{BASE_PATH}/df_match_odds_miss.xlsx', index=True)
+        # Exporto datos
+        df_match_miss_comp_ct.to_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_miss.xlsx', index=True)
+        df_match_player_miss_comp_ct.to_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_player_miss.xlsx', index=True)
+        df_match_odds_miss_comp_ct.to_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_odds_miss.xlsx', index=True)
 
 # Data understanding
 def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int = 0):
@@ -987,12 +1031,14 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
 
 ########################################################################## MAIN #######################################################################
 def main(
-        d_run: dict, id_country: int, d_model: dict = None,                # Params
-        n_seasons_missing : int = 1, extract_missing: bool = True,         # Missing
-        n_days_max_next_matches: int = 7, predict_missing: bool = False,   # Data understanding
-        n_days_fill_data: int = 30,                                        # Data preparation
-        porc_m: float = 0.35,                                              # Modeling
-        verbose: int = 1, export: bool = True):
+        d_run: dict, id_country: int, d_model: dict = None,                                             # Params
+        n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
+        n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
+        n_days_fill_data: int = 30,                                                                     # Data preparation
+        porc_m: float = 0.35,                                                                           # Modeling
+        verbose: int = 1, export: bool = True,
+        iteration_date_dt: str = None
+        ):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
     """
@@ -1016,6 +1062,8 @@ def main(
     if d_model is not None:
         logger.warning("Se usa modelo especificado como parametro y no necesariamente es el que se esta usando en produccion.")
         n_model, model_name, iteration_date_dt = d_model['n_model'], d_model['model_name'], d_model['iteration_date']
+    elif iteration_date_dt is not None:
+        n_model, model_name, _ = read_data_of_best_model(id_country)
     else:
         n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
 
@@ -1026,87 +1074,75 @@ def main(
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export) # Creo objeto de clase DataUnderstanding
-    dp = DataPreparationNew(country=country, export=export) # Creo objeto de clase DataPreparation
+    dp = DataPreparationNew(id_country=id_country, country=country, iteration_date=iteration_date_dt, export=export) # Creo objeto de clase DataPreparation
     mo = Modeling(country=country) # Creo objeto de clase DataPreparation
     lo = TrainingDataLoader(country=country, n_model=n_model, model_name=model_name, iteration_date=iteration_date_dt)
-
+    mis = MissingData(country=country, iteration_date=iteration_date_dt)
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MISSING DATA".center(120) + "\n" + "+"*120 + "\n")
     if d_run['run_missing']: 
         
-        # Levanto datos 
-        df_match, df_match_player, df_match_odds, df_integrated = load_last_version_extracted_matches(country) # Obtengo ultima version de df_match, df_match_player y df_match odds (con missing)
-        df_player_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
-        df_player_fifa_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
-        df_teams_sofifa = pd.read_excel(f'./data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
-
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         if extract_missing:
+            
+            # Levanto datos viejos + los ultimos missing extraidos
+            df_match, df_match_player, df_match_odds = mis.read_last_flashscore_data()
+
+            # Extraigo missing (si hay)
             df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
+            
+            # Exporto datos (tarda banda en la concatenacion, simplificar...)
+            if export and len(df_match_miss) > 0:
+                mis.concat_with_missing_already_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all
+                mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
+
         else:
-            df_match_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
-            df_match_player_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
-            df_match_odds_miss = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
-            logger.warning(f"Levanto missing ya extraido: {df_match_miss.shape} {df_match_player_miss.shape} {df_match_odds_miss.shape}")
+            df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
+        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
-        # Si hay partidos missing que no extraje aun
-        if len(df_match_miss) > 0:
-            logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
-
-            if export:
-                concat_and_export_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss, country)
-
-                if extract_missing:
-                    # Guardo datos con los que entrenó el modelo y los missing
-                    concat_and_export_missing_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss, country)
-
-            # Preparo datos
+        # Si extrajo missingnot
+        if prepare_missing and len(df_match_miss) > 0:
+            
+            # Preparo datos missing
+            df_player_sofifa, df_player_fifa_sofifa = mis.read_last_sofifa_data()  # Levanto datos para preparar missing
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
-            df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False)
-            df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa, export=False) 
+            df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, export=False)
+            df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
+            df_integrated = mis.read_last_integrate_data()
             df_integrated_updated = pd.concat([df_integrated, df_integrated_missing], axis=0)
-            logger.warning(f"Concatenación old + missing: {df_integrated.shape} + {df_integrated_missing.shape} --> {df_integrated_updated.shape}")
-
-            if export:
-                df_integrated_missing.to_excel(f'./data/{country}/p6_deployment/missing/data_preparation/df_integrated_missing.xlsx', index=True)
-                df_integrated_updated.to_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index=True)
+            df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.duplicated(keep='first')]  # El df_integrated tiene missing hasta el dia en que entrené
+            logger.warning(f"Concatenación old + missing: {df_integrated.shape} + {df_integrated_missing.shape} --> {df_integrated_updated.shape} (si nunca preparaste, missing no se agrega pues ya está)")
 
             # Guardo registro de todos los partidos missing juntos (los recien recolectados y los que ya tenia)
-            try:
-                df_integrated_missing_all = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)
-            except FileNotFoundError:
-                df_integrated_missing_all = pd.DataFrame()  # Es importante para que se guarde por primera vez df_integrated_missing en /all 
-
+            df_integrated_missing_all = mis.read_last_integrate_missing_data()
             df_integrated_missing_all = pd.concat([df_integrated_missing_all, df_integrated_missing], axis=0)
+            
             if export:
+                df_integrated_missing.to_excel(f'./data/{country}/p6_deployment/missing/data_preparation/df_integrated_missing.xlsx', index=True)
+                df_integrated_updated.to_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index=True)
                 df_integrated_missing_all.to_excel(f'./data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
     
-            # Verificacion de concatatenacion de nuevos partidos missing con partidos ya jugados
-            if len(df_integrated_updated) != (len(df_match_miss) + len(df_integrated)):
-                logger.info(f"\nShape of df_integrated_with_missing (siempre es un poco menor a df_match_with_missing pero no se por qué): {df_integrated_updated.shape}")  # Calculo que debe ser por la eliminacion de partidos con goles="-" que hice de df_integrated en main.py
-                logger.info(df_integrated_updated.head(3))
-                logger.error("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
-                raise ValueError("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
-        
+            # Verificacion de concatatenacion de nuevos partidos missing con partidos ya jugados --> Falla cuando es la primera vez que guarda el concatenado..
+            # if len(df_integrated_updated) != (len(df_match_miss) + len(df_integrated)):
+            #     logger.info(f"\nShape of df_integrated_with_missing (siempre es un poco menor a df_match_with_missing pero no se por qué): {df_integrated_updated.shape}")  # Calculo que debe ser por la eliminacion de partidos con goles="-" que hice de df_integrated en main.py
+            #     logger.info(df_integrated_updated.head(3))
+            #     logger.error("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
+            #     raise ValueError("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
+    
         else:
-            logger.warning("Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos.")
-            df_integrated_updated = pd.read_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index_col=0)
+            df_integrated_updated = pd.read_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index_col=0)
+            logger.warning(f"Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos. {df_integrated_updated.shape}")
 
     else:
-        logger.warning("Se evitó por comando la extraccion y preparacion de partidos missing.")
+        df_integrated_updated = pd.read_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index_col=0)
+        logger.warning(f"Se evito por comando la extraccion de missing. Levanto integrated ya concatenado {df_integrated_updated.shape}...")
 
-        try:
-            df_integrated_updated = pd.read_excel(f'./data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx', index_col=0)
-        except FileNotFoundError:
-            df_integrated_updated = pd.read_excel(f'./data/{country}/p3_data_preparation/df_integrated.xlsx', index_col=0)
-            logger.warning("No hay un dataframe integrado con missing aun. Tuve que levantar el df_integrated de main.py...")
-    
-        if predict_missing:
-            df_integrated_updated = pd.read_excel(f"./data/{country}/p4_modeling/{iteration_date_dt}/p2_data_understanding/df_integrated.xlsx", index_col=0)
-
+    # Si solo queria missing, cortar.
+    if not d_run['data_unders'] and not d_run['data_prep'] and not d_run['modeling']:
+        return None
 
     # _____________________________________________________________ DATA UNDERSTANDING _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "DATA UNDERSTANDING".center(120) + "\n" + "+"*120 + "\n")
@@ -1129,17 +1165,15 @@ def main(
     if verbose >= 2:
         du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
     
-    if verbose >= 3:
+    # SOFIFA
+    df_player_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/{iteration_date_dt}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
+    df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/{iteration_date_dt}/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
+    
+    if verbose >= 1:
         print("\n DF MATCH \n", df_match.head(2))
         print("\n DF MATCH PLAYER \n", df_match_player.head(2))
         print("\n df_player_sofifa \n", df_player_sofifa.head(2))
         print("\n df_player_fifa_sofifa \n", df_player_fifa_sofifa.head(2))
-
-    # SOFIFA
-    df_player_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
-    df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
-    df_teams_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)
-
 
     # _____________________________________________________________ DATA PREPARATION _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "DATA PREPARATION".center(120) + "\n" + "+"*120 + "\n")
@@ -1153,8 +1187,7 @@ def main(
         # Preparacion de datos hasta integrate
         df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
         df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
-        df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
-
+        df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
 
         # Tirar error si estoy prediciendo proximos partidos que ya se jugaron y ya fueron recolectados en missing...
         rows_rep = df[df.index.isin(df_integrated_updated.index)]
@@ -1170,7 +1203,6 @@ def main(
                 logger.info(df_integrated_updated.shape)
             else:
                 raise KeyError
-        
 
         # Selecciono los ultimos partidos de los ya jugados
         initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
@@ -1266,7 +1298,8 @@ def main(
         # logger.info(f"m_to_use: {d_strategy['curva_m']} tras aplicar {porc_m}")
 
         # Ultimos preparativos
-        df = format_data.map_teams(df, country=country)     # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
+        df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date_dt}/integrate_data/df_teams.xlsx', index_col=0)
+        df = format_data.map_teams(df, df_teams=df_teams)     # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
         df = df[df['id_competition'].isin(comp_public)]     # Filtro partidos para quedarme solo con los de competencias publicas.
 
         if export:
@@ -1289,39 +1322,36 @@ def main(
 if __name__ == "__main__":    
 
     n_days = 15
-    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    id_country = 148
+
+    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} # Evitar cuando hay un entrenamiento al = tiempo.
+    # d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
     directorio = os.getenv('BASE_DIR_LOCAL')
 
-    l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
     d_countries = {
         6: ["argentina", '2024-12-05'], 
         48: ["england", '2024-12-23'], 
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
-        77: ["italy", '2024-12-23'], 
-        # 77: ["italy", '2025-01-02'], 
-        148: ["spain", '2024-12-25'], 
+        77: ["italy", '2025-01-06'],
+        148: ["spain", '2025-01-07'], 
         167: ["usa", '2024-12-05']
         }
+    iteration_date = d_countries[id_country][1]
+
+    # recolectar missing
+    # df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
+    # df = main(d_run, id_country, extract_missing=False, export=d_run['export']) 
+
+    # Probar un modelo
+    # d_model = {'n_model': 1494, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    ## Prox partidos
+    # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
+    ## En partidos missing
+    # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
     
-    # Definir condiciones del análisis
-    for id_country in l_countries:
+    # Prod 
+    df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
 
-        # recolectar missing
-        # df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
-        # df = main(d_run, id_country, extract_missing=False, export=d_run['export']) 
-
-        # Probar un modelo
-        d_model = {'n_model': 902, 'model_name': "LogisticRegression", 'iteration_date': d_countries[id_country][1]} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
-        ## Prox partidos
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
-        ## En partidos missing
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
-        
-        # Prod 
-        # df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
-
-        if isinstance(df, pd.DataFrame):
-            df.to_excel(f"{directorio}/predicciones.xlsx")
+    if isinstance(df, pd.DataFrame):
+        df.to_excel(f"{directorio}/predicciones.xlsx")

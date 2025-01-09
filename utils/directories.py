@@ -32,26 +32,23 @@ def mover_archivo(origen, destino):
     except Exception as e:
         logger.error(f"Ocurrió un error al intentar mover el archivo: {e}")
 
-def copy_directory(origen, destino):
+def remove_directories(directories):
     """
-    Copia directorio entero (con archivos dentro) en otra ubicacion.
+    Elimina directorios o archivos especificados en la lista.
     
-    # Parameters:
-        origen: Directorio de origen (el que quieres copiar) (str)
-            (e.g.'/ruta/de/origen')
-        destino: Directorio de destino (donde quieres copiarlo) (str)
-            (e.g.'/ruta/de/destino')
+    Parameters:
+        directories: list
+            Lista de rutas de directorios o archivos a eliminar.
     """
-
-    if not os.path.exists(origen):
-        print(f"El directorio de origen '{origen}' no existe.")
-
-    print(f"Copiando de {origen} a {destino}")
-    if os.path.exists(destino):
-        
-        # Eliminar el destino si existe
-        shutil.rmtree(destino)
-        # print(f"El directorio '{destino}' contiene: {os.listdir(destino)}")
-
-    # Copiar el directorio completo
-    shutil.copytree(origen, destino)
+    for directory in directories:
+        try:
+            if os.path.isdir(directory):  # Verifica si es un directorio
+                shutil.rmtree(directory)
+                print(f"Directorio eliminado: {directory}")
+            elif os.path.isfile(directory):  # Verifica si es un archivo
+                os.remove(directory)
+                print(f"Archivo eliminado: {directory}")
+            else:
+                print(f"No se encontró la ruta: {directory}")
+        except Exception as e:
+            print(f"Error al eliminar {directory}: {e}")

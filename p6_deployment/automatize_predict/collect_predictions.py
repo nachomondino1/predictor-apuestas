@@ -19,10 +19,10 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
     # Por country
     for id_country in l_countries:
 
-        # porc_m_country = porc_m/2 if id_country == 55 else porc_m 
+        porc_m_country = porc_m/3 if id_country == 55 else porc_m
 
         # Extraigo, preparo y predigo proximos partidos
-        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days_max_next_matches=n_days, porc_m=porc_m, d_model=None, export=d_run['export'])
+        df_predicciones_country = main_next_matches.main(d_run, id_country, n_days_max_next_matches=n_days, porc_m=porc_m_country, d_model=None, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
         if isinstance(df_predicciones_country, pd.DataFrame):
@@ -72,10 +72,10 @@ if __name__ == "__main__":
         # Definir condiciones del análisis
         n_days = 15
         l_countries = [48, 55, 59, 77, 148]
-        # l_countries = [48, 77]
+        # l_countries = [55]
         porc_m = 0.25
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
