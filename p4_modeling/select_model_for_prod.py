@@ -59,21 +59,26 @@ class SelectBestModel():
         return df_filtered
 
     # Paso 2
-    def filter_models_by_fill_nan(self, df):
+    def filter_models_by_fill_nan(self, df, type_: str = 'percentile', gp_fill_max: float = 0.1, n_col_fill_max: int = 5):
 
         # Lista para almacenar los resultados
         logger.info("Paso 3: Descartando modelos según relleno de nan values en df_test...")
 
         # Determino thresholds 
-        median_gp_filled = np.percentile(df['%_gp_filled'], 75)
-        mean_n_cols_filled =  np.percentile(df['average_col_filled'], 75) 
+        if type_ == 'percentile': 
+            gp_max = np.percentile(df['%_gp_filled'], 75) 
+            max_average_cols =  np.percentile(df['average_col_filled'], 75) 
+
+        elif type_ == 'fixed':
+            gp_max = gp_fill_max 
+            max_average_cols = n_col_fill_max
 
         # Eliminar modelos con G/P provenientes de relleno nan...
-        df_filt = df[(df['%_gp_filled'] <= median_gp_filled) & (df['average_col_filled'] <= mean_n_cols_filled)]
+        df_filt = df[(df['%_gp_filled'] <= gp_max) & (df['average_col_filled'] <= max_average_cols)]
 
         if self.verbose >= 0:
             logger.warning(f'Descarte por relleno de nan en test: {len(df)} --> {len(df_filt)}')
-            logger.info(f"Eliminar modelos con G/P filled >= {median_gp_filled} o n_cols_filled >= {mean_n_cols_filled}. {len(df)} --> {len(df_filt)}")
+            logger.info(f"Eliminar modelos con G/P filled >= {gp_max} o n_cols_filled >= {max_average_cols}. {len(df)} --> {len(df_filt)}")
             self.error_empty_dataframe(df_filt)
 
         if self.path_save is not None:
