@@ -42,31 +42,31 @@ def main(
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
-    # (0) Defino roi_weight
+    # (0) Calculo metrica combinada entre ROI y Expected ROI
+    # Defino roi_weight
     roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
+    name_extension = '_sin_ea_test'
+    metric_col_test = f'metric{name_extension}'
+    df_ite = asses_model.calculate_combined_metric(df_ite, roi_weight=roi_weight, name_extension=name_extension)
+    df_ite = df_ite.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
    
     # (1) SELECCION DE MODELOS CANDIDATOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por ROI
-    ## Calculo metrica combinada entre ROI y Expected ROI
-    name_extension = '_sin_ea_test'
-    metric_col_test = f'metric{name_extension}'
-    df_ite = asses_model.calculate_combined_metric(df_ite, roi_weight=roi_weight, name_extension=name_extension)
-    df_ite = df_ite.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
-    
-    ## Filtro
     df_ite_filt = sbm.filter_models_by_roi(df_ite, method='prop_to_max', prop_to_max=prop_to_max, metric_col=metric_col_test)
 
     # 1.2. Descarte por distribucion (para evitar assess de modelos que ya se que son una cagada.)
     df_ite_filt = sbm.filter_models_by_distribution(df_ite_filt)
 
+    ''' No tiene sentido cuando en test puedo estar rellenando variables que NO selecciona, por ende, NO usa en produccion.
     # 1.3. Descarte por relleno de nan en test --> Tiene sentido ahora?
     if '%_gp_filled' in df_ite.columns and 'average_col_filled' in df_ite.columns:
         df_ite_filt = sbm.filter_models_by_fill_nan(df_ite_filt, type_='fixed', gp_fill_max=0.1, n_col_fill_max=4)
     else:
         logger.warning("Evito eliminacion de modelos por relleno de nan values en test puesto que no le medí lo cuando entrené")
-   
+    '''
+
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
@@ -81,8 +81,8 @@ def main(
                 d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
                 main_next_matches.main(d_run, id_country, export=d_run['export'], verbose=-1) 
 
-            # Concatenar df_predicciones missing a test para cada modelo
-            df_ite_filt = assess_models_in_prod.update_predicciones_test_with_missing(
+            # Por modelo: Predict missing + Concatenar a df_predicciones test
+            df_ite_filt = assess_models_in_prod.update_test_with_missing(
                 df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
         
         # Usar test + missing ya actualizado
