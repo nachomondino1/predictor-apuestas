@@ -220,18 +220,19 @@ def convert_columns_to_int(df, verbose:int = 0):
     return df, df_etiquetas
 
 # main_next_matches.py
-def convert_columns_to_int_already_tagged(df, df_etiquetas, verbose: int = 0):
+def convert_columns_to_int_already_tagged(df, df_etiquetas, l_col_a_codificar: list = None, verbose: int = 0):
     """
     Etiquetado usando un df_etiquetas ya creado. Es para main_next_matches. Tengo en cuenta posibles nuevas etiquetas y las agrego a df_etiquetas
     """
     # Determino columnas a codificar de string a integer
-    l_columnas_a_codificar = df_etiquetas['variable'].unique()
+    if l_col_a_codificar is None:
+        l_col_a_codificar = df_etiquetas['variable'].unique()
 
     if verbose >= 0:
-        print("Columnas a codificar: ", l_columnas_a_codificar)
+        print("Columnas a codificar: ", l_col_a_codificar)
     
     # Por columna a codificar
-    for columna in l_columnas_a_codificar:
+    for columna in l_col_a_codificar:
         
         # Obtengo etiquetas de la columna
         df_etiquetas_columna = df_etiquetas[df_etiquetas['variable']==columna]        

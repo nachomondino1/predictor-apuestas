@@ -426,24 +426,33 @@ class DataPreparationNew(DataPreparation):
         df_next_matches = df[df.index.isin(df_next_matches.index)]
         return df_next_matches
         
-    def tag_string_data_to_integer_new(self, df: pd.DataFrame, df_etiquetas_loaded, verbose: int = 0):
+    def tag_string_data_to_integer_new(self, df: pd.DataFrame, df_etiquetas_loaded, columns_scaled, verbose: int = 0):
         """
         Utilizando las mismas etiquetas que cuando se entreno el modelo para el pais, convierto columnas string a integer
+
+        # Parameters
+            df: Dataframe con algunas columnas string las cuales necesitamos convertir a integer
+            df_etiquetas_loaded: Conversion de valores string a integer (usada en el entrenamiento).
+            columns_selected: Para determinar las columnas a codificar 
+
+        # Return
+            df: Dataframe pasado como parametro habiendo convertido sus columnas string a integer tal como en el entrenamiento.
         """
         logger.info("Tagging string data to integer..")
 
-        # Elimino season para no etiquetarla?
-        df = df.drop(['season'], axis=1)
+        # Determino columnas a codificar
+        l_col_codificadas = df_etiquetas_loaded['variable'].unique()
+        l_col_a_codificar = [col for col in l_col_codificadas if col in columns_scaled]  # Las col selected no puedo porque falla el scaler..
 
         # Codifico variables categoricas a numericas con el mismo sistema que se uso en el dataframe original (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df, df_etiquetas = format_data.convert_columns_to_int_already_tagged(df, df_etiquetas_loaded, verbose=2)  # Si o si tengo que devolver df_etiquetas?
+        df, df_etiquetas = format_data.convert_columns_to_int_already_tagged(df=df, df_etiquetas=df_etiquetas_loaded, l_col_a_codificar=l_col_a_codificar, verbose=2)  # Si o si tengo que devolver df_etiquetas?
     
         if self.export:
             df.to_excel(f'{self.BASE_DIR}/df_tagged.xlsx', index=True) 
             df_etiquetas.to_excel(f'{self.BASE_DIR}/df_etiquetas_actualizado.xlsx', index=False) 
         return df
 
-    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_used, comp_to_select, columns_selected, verbose: int = 0):
+    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_scaled, comp_to_select, columns_selected, verbose: int = 0):
         """
         Filtrado por competencias y escalado de datos.
         """
@@ -461,18 +470,15 @@ class DataPreparationNew(DataPreparation):
 
         # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
         try:
-            df = df.loc[:, columns_used]
-
+            df = df.loc[:, columns_scaled]
             if verbose >= 1:
                 logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
 
         except KeyError as e:
             logger.error("Las columnas del scaler no coinciden con las de los proximos partidos.")
-            
             if verbose >= 1:
                 logger.info(df)
                 logger.info(df.shape)
-
             raise e
         
         # Tratamiento de NaN values (antes de escalar para que el 0 realmente sea 0.)
@@ -481,7 +487,7 @@ class DataPreparationNew(DataPreparation):
         # Transforma los nuevos datos de predicción utilizando el StandardScaler cargado
         try: 
             X_scaled = scaler_loaded.transform(df)
-            X_scaled_df = pd.DataFrame(X_scaled, columns=columns_used, index=df.index)
+            X_scaled_df = pd.DataFrame(X_scaled, columns=columns_scaled, index=df.index)
 
             if verbose >= 1:
                 logger.critical("El escalado fue un exito!")
@@ -1218,8 +1224,8 @@ def main(
         # Sigo con la preparacion de datos desde fill_data
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill, comp_to_select=comp_public)
         df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], columns_used=columns_scaled)
-        df = dp.tag_string_data_to_integer_new(df, df_etiquetas)
-        df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_used=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
+        df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
+        df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
         df = dp.select_data_new(df, d_hiper['selected_columns'])
         
         # Guardo df justo antes de predecir cuando hago pred_missing para poder comparar ASSESS Y PROD
@@ -1320,13 +1326,13 @@ def main(
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
+    directorio = os.getenv('BASE_DIR_LOCAL')
 
     n_days = 15
     id_country = 148
 
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} # Evitar cuando hay un entrenamiento al = tiempo.
-    # d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
-    directorio = os.getenv('BASE_DIR_LOCAL')
+    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} # Evitar cuando hay un entrenamiento al = tiempo.
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
 
     d_countries = {
         6: ["argentina", '2024-12-05'], 
@@ -1334,24 +1340,53 @@ if __name__ == "__main__":
         55: ["france", '2024-12-26'], 
         59: ["germany", '2024-12-26'], 
         77: ["italy", '2025-01-06'],
-        148: ["spain", '2025-01-07'], 
+        # 148: ["spain", '2025-01-07'], 
+        148: ["spain", '2025-01-09'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
 
-    # recolectar missing
-    # df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
-    # df = main(d_run, id_country, extract_missing=False, export=d_run['export']) 
-
-    # Probar un modelo
-    # d_model = {'n_model': 1494, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
-    ## Prox partidos
-    # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=False, export=d_run['export']) 
-    ## En partidos missing
-    # df = main(d_run, id_country, n_days_max_next_matches=n_days, d_model=d_model, predict_missing=True, export=False) 
+    d_run_type = {
+        'missing': ['only_extract', 'only_preparation', 'all'],
+        'predict': ['try_a_specific_model', 'predict_missing'],
+        'prod': None
+    }
+    key = 'predict'
+    value = 'try_a_specific_model'
     
-    # Prod 
-    df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
+    d_model = {'n_model': 144, 'model_name': "DecisionTreeClassifier", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+
+    if key == 'missing':
+        
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
+
+        if value == 'only_extract':
+            logger.warning("Extract last missing matches")
+            df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
+        
+        elif value == 'only_preparation':
+            logger.warning("Prepare missing matches")
+            df = main(d_run, id_country, extract_missing=False, prepare_missing=True, export=d_run['export']) 
+        
+        elif value == 'all':
+            logger.warning("Extract and prepare missing matches")
+            df = main(d_run, id_country, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+
+    elif key == 'predict':
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False} 
+            
+        if value == "predict_missing":
+            logger.warning("Get predictions in missing matches of specific model")
+            df = main(d_run, id_country, d_model=d_model, predict_missing=True, export=False) 
+
+        elif value == "try_a_specific_model":
+            logger.warning("Get predictions of specific model")
+            df = main(d_run, id_country, d_model=d_model, export=False) 
+
+    elif key == 'prod':
+        logger.warning("Get predictions for model in prod")
+        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True} 
+        df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
