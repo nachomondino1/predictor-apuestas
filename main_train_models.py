@@ -16,11 +16,9 @@ from p3_data_preparation import concat_mapeos
 from p3_data_preparation.select_data import determine_country_competitions
 from p6_deployment import main_next_matches
 import utils.directories as directories
-import pickle
 from itertools import product
 from main import DataPreparation, Modeling
 import joblib
-import re
 import time
 
 
@@ -121,25 +119,25 @@ def comprehensive_search(
         # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
         df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
     
+
+        ####################################################################### DATA PREPARATION (MISSING) #######################################################################
+        # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
+        ## Eliminar preparacion de missing actual
+        l_dirs_to_remove = [
+            f'data/{country}/p6_deployment/missing/data_preparation',
+            f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx'
+        ]    
+        directories.remove_directories(directories=l_dirs_to_remove)
+
+        ## Volver a preaparar missing
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
+
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
     
-        
-    ####################################################################### DATA PREPARATION (MISSING) #######################################################################
-    # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
-    ## Eliminar preparacion de missing actual
-    l_dirs_to_remove = [
-        f'data/{country}/p6_deployment/missing/data_preparation',
-        f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx'
-    ]    
-    directories.remove_directories(directories=l_dirs_to_remove)
 
-    ## Volver a preaparar missing
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
-
-    
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
     # Construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
@@ -368,7 +366,8 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), DecisionTreeClassifier(), RandomForestClassifier(), GradientBoostingClassifier()]   # SVC()
+    l_modelos = [DecisionTreeClassifier(), XGBClassifier(), SVC(), MLPClassifier()]   # , RandomForestClassifier(), GradientBoostingClassifier()
+    # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
 
     # 1728 iteraciones
     d_params = {
@@ -396,7 +395,7 @@ def define_params_space(id_country, fast: bool = False):
     }
 
     if fast:
-        l_modelos = [LogisticRegression()]
+        # l_modelos = [LogisticRegression()]
 
         d_params = {  
             'construct': {
@@ -433,8 +432,8 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 59
-    from_construct = False
+    id_country = 148
+    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
