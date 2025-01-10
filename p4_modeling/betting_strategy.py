@@ -114,6 +114,8 @@ class BettingStrategy:
         # Returns:
             Dataframe pasado como parametro con resultado a apostar, la cuota a apostar, la estrategia utiilizada y la probabilidad del resultado al que se apuesta. (DataFrame)
         """
+        df = df.copy()  # Crea una copia explícita del DataFrame antes de modificarlo (evita warnings por no saber si trabajas en un vista o en una copia)
+
         # Por partido
         for id_match, row in df.iterrows():
 
@@ -142,7 +144,7 @@ class BettingStrategy:
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
-
+            
         return df
 
     def calculate_odd_double_chance(self, row, result_to_bet):
