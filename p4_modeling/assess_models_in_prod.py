@@ -46,11 +46,13 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         # Predict missing
         df_pred_missing = predict_missing(id_country, n_model, model_name, iteration_date)
 
+        '''
         # DIF ASSESS Y PROD (ACA ESTA OK? FUNCIONA?)
         # Si el modelo fue utilizado en produccion:
         if n_model == n_model_prod:
-            compare_assess_prod.compare_preparation(n_model, export=True)
-            compare_assess_prod.compare_modeling(n_model, export=True)
+            compare_assess_prod.compare_preparation(n_model, country, export=True)
+            compare_assess_prod.compare_modeling(n_model, country, export=True)
+        '''
 
         #  Agrego columnas result y expected result
         df_pred_missing = determine_results(df_pred_missing, country)  
@@ -62,7 +64,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         # Recalculo metricas con test + missing
         df_filled = pd.read_excel(f'{base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0) #  para calcular relleno..
         df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, export=False)  # --> Sobreescribe metricas de df_pred...
-        # df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+        df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
         df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, strategy='train') # Chequear que funciona...
         d_metrics.update(d_roi)
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
