@@ -952,7 +952,7 @@ def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int 
         BASE_DIR_ALL_MISSING = f'./data/{country}/p6_deployment/missing/data_understanding/all'
 
         # Obtengo la fecha del ultimo partido con el que entrené los modelos
-        df_integrated_updated = pd.read_excel(f"./data/{country}/p4_modeling/{iteration_date}/p2_data_understanding/df_integrated.xlsx", index_col=0)
+        df_integrated_updated = pd.read_excel(f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}/df_match.xlsx", index_col=0)
         df_integrated_updated['date'] = pd.to_datetime(df_integrated_updated['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         last_date = df_integrated_updated['date'].max()
         logger.info(f'Last date: {last_date}')
@@ -1041,7 +1041,7 @@ def main(
         n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = 0.35,                                                                           # Modeling
+        porc_m: float = 0.35, no_strategy: bool = False,                                                # Modeling
         verbose: int = 1, export: bool = True,
         iteration_date_dt: str = None
         ):
@@ -1288,7 +1288,7 @@ def main(
     
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'prob_dp': -1, 'curva': 'linear', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': False} if predict_missing else lo.load_modeling_hyperparameters()
+        d_strategy = {'prob_dp': -1, 'curva': 'linear', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': False} if predict_missing or no_strategy else lo.load_modeling_hyperparameters()
         df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
@@ -1327,34 +1327,30 @@ def main(
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
     directorio = os.getenv('BASE_DIR_LOCAL')
+    d_run_type = {
+        'missing': ['only_extract', 'only_preparation', 'all'],
+        'predict': ['try_a_specific_model', 'predict_missing'],
+        'prod': None
+    }
 
-    n_days = 15
     id_country = 148
+    key, value = 'predict', 'try_a_specific_model'
+    # data_unders = False
+    n_days = 15
 
-    # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} # Evitar cuando hay un entrenamiento al = tiempo.
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
-
+    # Defino country, iteration date y modelo
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2024-12-23'], 
-        55: ["france", '2024-12-26'], 
-        59: ["germany", '2024-12-26'], 
+        48: ["england", '2025-01-07'], 
+        55: ["france", '2025-01-08'], 
+        59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         # 148: ["spain", '2025-01-07'], 
         148: ["spain", '2025-01-09'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-
-    d_run_type = {
-        'missing': ['only_extract', 'only_preparation', 'all'],
-        'predict': ['try_a_specific_model', 'predict_missing'],
-        'prod': None
-    }
-    key = 'predict'
-    value = 'try_a_specific_model'
-    
-    d_model = {'n_model': 144, 'model_name': "DecisionTreeClassifier", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1584, 'model_name': "DecisionTreeClassifier", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1381,7 +1377,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, d_model=d_model, export=False) 
+            df = main(d_run, id_country, d_model=d_model, no_strategy=True, export=False) 
 
     elif key == 'prod':
         logger.warning("Get predictions for model in prod")

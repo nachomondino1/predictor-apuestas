@@ -71,6 +71,9 @@ def comprehensive_search(
     df_iteration_comp: DataFrame
         Una fila por modelos entrenado detallando los hiperparametros usados al entrenar y su 
         evaluacion en el testeo.
+
+    Posibles mejoras:
+        - Entrenar evitando integrate pero variando los l_models por ejemplo. Usa mismo: old_updated/ integrate_data/ clean_data/ y df_integrated que el entrenamiento actual... 
     """
     # Definicion de variables
     cont_iter = 0
@@ -432,7 +435,7 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 148
+    id_country = 55
     from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
