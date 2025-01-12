@@ -12,7 +12,6 @@ def main(
         id_country, 
         country, 
         iteration_date,
-        prop_to_max: float = 0.7,                   # Filtrado
         assess: bool = True,                        # Assess
         extract_missing: bool = True,               # Assess
         assess_already_extracted: bool = False,     # Assess
@@ -49,12 +48,13 @@ def main(
     metric_col_test = f'metric{name_extension}'
     df_ite = asses_model.calculate_combined_metric(df_ite, roi_weight=roi_weight, name_extension=name_extension)
     df_ite = df_ite.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
-   
+    df_ite.to_excel(f'{d_paths['base_path_sbm']}/df_sort_by_roi.xlsx', index=False)
+
     # (1) SELECCION DE MODELOS CANDIDATOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por ROI
-    df_ite_filt = sbm.filter_models_by_roi(df_ite, method='prop_to_max', prop_to_max=prop_to_max, metric_col=metric_col_test)
+    df_ite_filt = sbm.filter_models_by_roi(df_ite, metric_col=metric_col_test)
 
     # 1.2. Descarte por distribucion (para evitar assess de modelos que ya se que son una cagada.)
     df_ite_filt = sbm.filter_models_by_distribution(df_ite_filt)
@@ -128,6 +128,7 @@ def initialize_directories(country, iteration_date):
         'path_select': f'{base_path_sbm}/1_filter_models/',
         'path_assess': f'{base_path_sbm}/2_assess/',
         'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
+        'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
 
     # Mover anterior seleccion y assess a old..
@@ -137,7 +138,7 @@ def initialize_directories(country, iteration_date):
         directories.mover_archivo(origen=d_paths['base_path_sbm'], destino=d_paths['path_old'])
 
     # Creo directorios para nuevo assess y seleccion
-    directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select'], d_paths['path_bet_strategy']])
+    directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select'], d_paths['path_bet_strategy'], d_paths['path_assess_dep']])
     return d_paths
 
 def read_predicciones(n_model, model_name, assess, d_paths):
@@ -154,11 +155,10 @@ def read_predicciones(n_model, model_name, assess, d_paths):
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 77
+    id_country = 59
 
     # Defino hiperparametros
-    assess = False
-    prop_to_max = 0.5
+    assess = True
 
     # Defino variables
     d_countries = {
@@ -175,6 +175,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        prop_to_max=prop_to_max,
         assess=assess, extract_missing=True, assess_already_extracted=False
         )
