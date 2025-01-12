@@ -63,8 +63,9 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
 
         # Recalculo metricas con test + missing
         df_filled = pd.read_excel(f'{base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0) #  para calcular relleno..
-        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, export=False)  # --> Sobreescribe metricas de df_pred...
+        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
         df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+        
         df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, strategy='train') # Chequear que funciona...
         d_metrics.update(d_roi)
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
@@ -77,7 +78,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         row_test = {'n_iteration': n_model, 'model_name': model_name, **d_metrics}
         df_row_test = pd.DataFrame([row_test])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
         df_test = pd.concat([df_test, df_row_test], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
-        # Exporto datos del modelo
+        ## Exporto datos del modelo
         df_test.to_excel(f'{path_save}/df_iteration_test.xlsx', index=False)
         df_predicciones.to_excel(f'{path_save}/{n_model}__{model_name}_predicciones.xlsx', index=True)
         
@@ -88,6 +89,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     # Exporto df_iteration actualizado
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
     df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  # Concateno df_test actualizado con df_ite
+    df_ite_updated['dif_roi_pp'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
     df_ite_updated.to_excel(f'{path_save}/df_iteration.xlsx', index=False)
 
     return df_ite_updated

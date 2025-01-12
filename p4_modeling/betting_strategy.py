@@ -457,9 +457,14 @@ class BettingStrategy:
         return df_comp
 
     def apply_strategy(self, df, param_dict, prod: bool = True):
+        
+        if len(df) == 0:
+            logger.error("El dataframe a aplicar la estrategia esta vacio...")
+            raise ValueError
+        
         # Determino result to bet
         df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
-    
+  
         # Determino acierto de prediccion
         if not prod:
             df = self.determine_winning_bets(df)

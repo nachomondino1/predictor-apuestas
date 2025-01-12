@@ -3,26 +3,27 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from utils.set_up_logging import logger
 
+# El problema actual es que en deployment sobreescribo el df_selected y el df_pred a medida que recolecto missing y actualizo predicciones. Asi, pierdo los df_selected anteriores... y no funciona esto, tienen partidos ≠ asses y prod
 
-def read_model_preparation(n_model, country):
+def read_model_preparation(n_model, country, verbose : int = 0):
     ## Levanto df_selected de assess y prod --> no tiene en cuenta el modelo y podria pifiar.
     df_sel_assess = pd.read_excel(f'data/{country}/p6_deployment/assess/df_selected_MISS_{n_model}.xlsx', index_col=0)
     df_sel_prod = pd.read_excel(f'data/{country}/p6_deployment/data_preparation/df_selected.xlsx', index_col=0)
     
     # Shapes (deben ser iguales)
-    print(df_sel_assess)
-    print(df_sel_prod)
-    print(df_sel_assess.shape, df_sel_prod.shape)
+    if verbose >= 0:
+        print(f"Shapes df preparared del modelo {n_model} en assess y prod (deberian ser iguales)", df_sel_assess.shape, df_sel_prod.shape)
+
     return df_sel_assess, df_sel_prod
 
-def read_model_predictions(n_model, country):
+def read_model_predictions(n_model, country, verbose : int = 0):
 
     df_pred_assess = pd.read_excel(f'./data/{country}/p6_deployment/assess/df_predicciones_missing_{n_model}.xlsx', index_col=0)
     df_pred_prod = pd.read_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index_col=0)
 
-    print(df_pred_assess.shape, df_pred_prod.shape)
-    print(df_pred_assess)
-    print(df_pred_prod)
+    if verbose >= 0:
+        print(f"Shapes df pred del modelo {n_model} en assess y prod (deberian ser iguales)", df_pred_assess.shape, df_pred_prod.shape)
+
     return df_pred_assess, df_pred_prod
 
 def compare_preparation(n_model, country, export: bool = True):
