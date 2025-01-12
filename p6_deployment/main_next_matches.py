@@ -946,9 +946,7 @@ def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int 
 
     # Missing
     if predict_missing:
-
         logger.warning("Uso los partidos DF_MATCH_MISS quitando los que usé para entrenar.")
-        
         BASE_DIR_ALL_MISSING = f'./data/{country}/p6_deployment/missing/data_understanding/all'
 
         # Obtengo la fecha del ultimo partido con el que entrené los modelos
@@ -1201,14 +1199,19 @@ def main(
 
         if len(rows_rep) > 0:
             logger.error("En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)")
-                
-            user_input = str(input("Escribe 'y' para eliminar indices duplicados y seguir la prediccion: "))
-            if user_input == 'y':
+            
+            if predict_missing:
                 logger.info(df_integrated_updated.shape)
                 df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
                 logger.info(df_integrated_updated.shape)
             else:
-                raise KeyError
+                user_input = str(input("Escribe 'y' para eliminar indices duplicados y seguir la prediccion: "))
+                if user_input == 'y':
+                    logger.info(df_integrated_updated.shape)
+                    df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
+                    logger.info(df_integrated_updated.shape)
+                else:
+                    raise KeyError
 
         # Selecciono los ultimos partidos de los ya jugados
         initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
@@ -1333,7 +1336,7 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 148
+    id_country = 77
     key, value = 'predict', 'try_a_specific_model'
     # data_unders = False
     n_days = 15
@@ -1350,7 +1353,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1584, 'model_name': "DecisionTreeClassifier", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1339, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
