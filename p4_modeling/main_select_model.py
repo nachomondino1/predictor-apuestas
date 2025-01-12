@@ -57,7 +57,7 @@ def main(
     df_ite_filt = sbm.filter_models_by_roi(df_ite, metric_col=metric_col_test)
 
     # 1.2. Descarte por distribucion (para evitar assess de modelos que ya se que son una cagada.)
-    df_ite_filt = sbm.filter_models_by_distribution(df_ite_filt)
+    # df_ite_filt = sbm.filter_models_by_distribution(df_ite_filt)
 
     ''' No tiene sentido cuando en test puedo estar rellenando variables que NO selecciona, por ende, NO usa en produccion.
     # 1.3. Descarte por relleno de nan en test --> Tiene sentido ahora?
@@ -106,7 +106,7 @@ def main(
     df_pred = read_predicciones(n_model, model_name, assess, d_paths)
 
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-    df, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, strategy=strategy, roi_weight=roi_weight, by_result=by_result)
+    df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, strategy=strategy, roi_weight=roi_weight)
     
     # Exporto datos
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
@@ -155,16 +155,17 @@ def read_predicciones(n_model, model_name, assess, d_paths):
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 59
+    id_country = 55
 
     # Defino hiperparametros
-    assess = True
+    assess = False
 
     # Defino variables
     d_countries = {
         6: ["argentina", '2024-12-05'], 
         48: ["england", '2025-01-07'],
         55: ["france", '2025-01-08'], 
+        # 55: ["france", '2025-01-12'], 
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         148: ["spain", '2025-01-07'], 
