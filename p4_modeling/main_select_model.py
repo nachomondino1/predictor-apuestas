@@ -16,7 +16,6 @@ def main(
         extract_missing: bool = True,               # Assess
         assess_already_extracted: bool = False,     # Assess
         strategy: str = 'general',                  # Betting Strategy
-        by_result: bool = True                      # Betting Strategy
         ):
     """
     Assess model in prod + Seleccion del modelo + Estrategia de apuesta
@@ -33,15 +32,17 @@ def main(
         Modelo a usar en produccion con su estrategia de apuesta optima (teniendo en cuenta test + missing). 
 
     Mejoras:
-        - Separar claramente en: 1) Seleccion de modelos candidatos 2) [Opcional] Assess 3) Seleccion del mejor modelo 4) Betting strategy para el modelo
+        - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
     # Creo objeto de clase select_best_model
-    d_paths = initialize_directories(country, iteration_date)
+    d_paths = define_directories(country, iteration_date)
+    if not assess_already_extracted:
+        initialize_directories(d_paths=d_paths)
 
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
-    # (0) Calculo metrica combinada entre ROI y Expected ROI
+    # (0) Calculo metrica combinada entre ROI y Expected ROI --> Hacer dsp de filtrado? Documentar...
     # Defino roi_weight
     roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
     name_extension = '_sin_ea_test'
@@ -54,18 +55,7 @@ def main(
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por ROI
-    df_ite_filt = sbm.filter_models_by_roi(df_ite, metric_col=metric_col_test)
-
-    # 1.2. Descarte por distribucion (para evitar assess de modelos que ya se que son una cagada.)
-    # df_ite_filt = sbm.filter_models_by_distribution(df_ite_filt)
-
-    ''' No tiene sentido cuando en test puedo estar rellenando variables que NO selecciona, por ende, NO usa en produccion.
-    # 1.3. Descarte por relleno de nan en test --> Tiene sentido ahora?
-    if '%_gp_filled' in df_ite.columns and 'average_col_filled' in df_ite.columns:
-        df_ite_filt = sbm.filter_models_by_fill_nan(df_ite_filt, type_='fixed', gp_fill_max=0.1, n_col_fill_max=4)
-    else:
-        logger.warning("Evito eliminacion de modelos por relleno de nan values en test puesto que no le medí lo cuando entrené")
-    '''
+    df_ite_filt = sbm.filter_models_by_roi(df_ite, prop_to_max=0.6, perc_cutoff=1.5, metric_col=metric_col_test)
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
@@ -112,7 +102,7 @@ def main(
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
     df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
 
-def initialize_directories(country, iteration_date):
+def define_directories(country, iteration_date):
     """
     Guardar seleccion de modelo vieja en carpeta
     """
@@ -130,7 +120,15 @@ def initialize_directories(country, iteration_date):
         'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
         'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
+    return d_paths
 
+def initialize_directories(d_paths):
+    """
+    Guardar seleccion de modelo vieja en carpeta
+
+    Mejoras: 
+        - Evitar mover old si uso assess_already_extracted?
+    """
     # Mover anterior seleccion y assess a old..
     import os
     if os.path.exists(d_paths['base_path_sbm']):
@@ -139,7 +137,6 @@ def initialize_directories(country, iteration_date):
 
     # Creo directorios para nuevo assess y seleccion
     directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select'], d_paths['path_bet_strategy'], d_paths['path_assess_dep']])
-    return d_paths
 
 def read_predicciones(n_model, model_name, assess, d_paths):
     """
@@ -155,10 +152,10 @@ def read_predicciones(n_model, model_name, assess, d_paths):
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 55
+    id_country = 48
 
     # Defino hiperparametros
-    assess = False
+    assess = True
 
     # Defino variables
     d_countries = {
@@ -176,5 +173,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=True, assess_already_extracted=False
+        assess=assess, extract_missing=False, assess_already_extracted=True
         )
