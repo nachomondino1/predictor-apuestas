@@ -329,28 +329,15 @@ def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected
     correlacion = df[roi_col].corr(df[expected_roi_col])
     logger.info(f"La correlacion entre {roi_col} y {expected_roi_col} es de {correlacion}")
 
-    min_high_corr = 0.7
-    max_low_corr = 0.5
-    max_no_corr = 0.2
-
-    # Si la correlacion es alta
-    if correlacion >= min_high_corr:
-        value = 0.25
-
-    # Si la correlacion es media
-    elif correlacion >= max_low_corr:
-        value = 0.5
-
-    # Si la correlacion es baja
-    elif correlacion >= max_no_corr:
-        value = 0.75
-
-    # Si no hay correlacion
+    # Si la correlacion es positiva
+    if correlacion > 0:
+        roi_weight = 1 - correlacion  # A mayor correlacion entre ROI y Expected ROI, mayor peso para el Expected
+    # Si la correlacion es negativa
     else:
-        value = 1
-    
-    logger.critical(f"El roi_weight a usar es {value}. Es decir, un peso de {value*100:.0f}% para el ROI y de {(1-value)*100:.0f}% para el Expected ROI")
-    return value
+        roi_weight = 1
+
+    logger.critical(f"El roi_weight a usar es {roi_weight}. Es decir, un peso de {roi_weight*100:.0f}% para el ROI y de {(1-roi_weight)*100:.0f}% para el Expected ROI")
+    return roi_weight
 
 
 # Simplificar...
