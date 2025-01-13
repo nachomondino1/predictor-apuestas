@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
-from p4_modeling.asses_model import calculate_combined_metric, asignar_roi_weight
 from tqdm import tqdm
 import datetime
 
@@ -21,6 +20,9 @@ class SelectBestModel():
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
+
+        Mejoras:
+            - Tal vez eliminar por distribucion cuando dif_loc + dif_vis sea muy ≠ de 0.
         """
         logger.info("Paso 2: Descartando modelos según distribución en df_test")
 
@@ -87,7 +89,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 3
-    def filter_models_by_roi(self, df, prop_to_max: float = 0.5, perc_cutoff: float = 1.5, metric_col: str = 'metric_sin_ea'):
+    def filter_models_by_roi(self, df, prop_to_max: float = 0.6, perc_cutoff: float = 1, metric_col: str = 'metric_sin_ea'):
         """
         Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
 
@@ -113,7 +115,7 @@ class SelectBestModel():
         roi_cut_perc = np.percentile(df[metric_col], (100-perc_cutoff)) # Seleccionar el 20% de los registros con los valores más altos de 'metric'
         
         # Determino el minimo
-        roi_cut = min(roi_cut_prop, roi_cut_perc)
+        roi_cut = max(roi_cut_prop, roi_cut_perc)
         logger.info(f"\n(1) Metric Max: {max_roi} --> ROI cut: {max_roi * prop_to_max} \n(2) Roi cut percentile {perc_cutoff}: {roi_cut_perc}")
         logger.info(f"Roi cut: {roi_cut_prop} y {roi_cut_perc} --> {roi_cut}")
 
