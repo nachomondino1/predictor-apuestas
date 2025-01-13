@@ -86,10 +86,19 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
 
     progress_bar.close()
 
-    # Exporto df_iteration actualizado
+    # Concateno df_test actualizado con df_ite
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
-    df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  # Concateno df_test actualizado con df_ite
+    df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  
+    
+    # Creo columna 'dif_roi_pp'
     df_ite_updated['dif_roi_pp'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
+    ave_dif = df_ite_updated['dif_roi_pp'].mean() * 100
+    if ave_dif > 0:
+        logger.critical(f"La variacion del ROIpp de prod respecto de prod+asses es de {ave_dif:.0f}%.")
+    else:
+        logger.error(f"La variacion del ROIpp de prod respecto de prod+asses es de {ave_dif:.0f}%. Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
+
+    # Exporto df_iteration actualizado
     df_ite_updated.to_excel(f'{path_save}/df_iteration.xlsx', index=False)
 
     return df_ite_updated
