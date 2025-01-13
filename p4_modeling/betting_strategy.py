@@ -55,7 +55,7 @@ class BettingStrategy:
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [0],
                 'odd_weight': [0, 1, 2, 3, 4],
-                'lim_sup': [0, 1]
+                'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
         elif strategy == "all":
@@ -114,6 +114,8 @@ class BettingStrategy:
         # Returns:
             Dataframe pasado como parametro con resultado a apostar, la cuota a apostar, la estrategia utiilizada y la probabilidad del resultado al que se apuesta. (DataFrame)
         """
+        df = df.copy()  # Crea una copia explícita del DataFrame antes de modificarlo (evita warnings por no saber si trabajas en un vista o en una copia)
+
         # Por partido
         for id_match, row in df.iterrows():
 
@@ -142,7 +144,7 @@ class BettingStrategy:
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
-
+            
         return df
 
     def calculate_odd_double_chance(self, row, result_to_bet):
@@ -455,9 +457,14 @@ class BettingStrategy:
         return df_comp
 
     def apply_strategy(self, df, param_dict, prod: bool = True):
+        
+        if len(df) == 0:
+            logger.error("El dataframe a aplicar la estrategia esta vacio...")
+            raise ValueError
+        
         # Determino result to bet
         df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
-    
+  
         # Determino acierto de prediccion
         if not prod:
             df = self.determine_winning_bets(df)
@@ -515,7 +522,7 @@ class BettingStrategy:
         return n_comb
          
     # Main
-    def define_model_betting_strategy(self, df_pred, strategy: str, roi_weight: float, by_result: bool = True):
+    def define_model_betting_strategy_by_result(self, df_pred, strategy: str, roi_weight: float):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -524,52 +531,76 @@ class BettingStrategy:
         """
         # Lista para almacenar los resultados
         logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
-        results = []
+        d_metrics_res, d_hiper_res = {}, {}
+        best_df_pred = pd.DataFrame()
 
-        # Determino la mejor estrategia de apuesta
-        logger.info("Calculando la mejor estrategia de apuesta...")
-        # d_hiper, best_df_pred, best_d_rois = self.calculate_roi_by_betting_strategy(df_pred, roi_weight=roi_weight)
+        # Por resultado
+        for pred in [1, 0, 2]:
 
-        if by_result:
-            d_metrics_res, d_hiper_res = {}, {}
-            best_df_pred = pd.DataFrame()
+            # Filtro predicciones por result
+            df_result = df_pred[df_pred['predicted_result'] == pred] 
 
-            # Por resultado
-            for pred in [1, 0, 2]:
-                df_result = df_pred[df_pred['predicted_result'] == pred] 
-
+            # Si hay predicciones del modelo para ese result
+            if len(df_result) > 0:
+                # Calculo roi por cada set de hiper de apuesta
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, strategy=strategy)
-                n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)   # Determinar mejor estrategia para el resultado
-                
+
+                # Determinar mejor estrategia para el resultado
+                n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
+
+                # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
                 d_metrics_res[pred] = d_metricas[n_comb]
-
                 best_df_pred = pd.concat([best_df_pred, d_predic[n_comb]], axis=0)
 
-            # Concateno datos y guardo
-            df_metrics = pd.DataFrame.from_dict(d_metrics_res, orient='index')
-            df_hiper = pd.DataFrame.from_dict(d_hiper_res, orient='index')
-            df_final = pd.concat([df_hiper, df_metrics], axis=1)
-  
-        # Todos los resultados con la misma estrategia
-        else:
-            d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, strategy=strategy)
-            n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
+            else:
+                logger.warning(f"No hay predicciones con el resultado {pred} (o sea, el modelo no lo predice). Asigno strategy de train.")
+                d_hiper_res[pred] = {
+                    'prob_dp': -1,
+                    'curva': 'linear',
+                    'm': 10,
+                    'b': 0,
+                    'odd_weight': 0,
+                    'lim_sup': 0
+                    }
+                d_metrics_res[pred] = {}
 
-            d_hiper = d_hiper[n_comb]
-            best_df_pred = d_predic[n_comb]
-            best_d_rois = d_metricas[n_comb]
+        # Concateno datos y guardo
+        df_metrics = pd.DataFrame.from_dict(d_metrics_res, orient='index')
+        df_hiper = pd.DataFrame.from_dict(d_hiper_res, orient='index')
+        df_final = pd.concat([df_hiper, df_metrics], axis=1)
 
-            # Concateno datos y guardo
-            ## Combinar los dos diccionarios
-            d_ct = {**d_hiper, **best_d_rois}  
- 
-            ## Añadir el resultado al DataFrame final
-            results.append(d_ct)
+        if self.verbose >= 1:
+            logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
 
-            ## Convertir la lista de resultados en un DataFrame
-            df_final = pd.DataFrame(results)
-            df_final.set_index('n_model', inplace=True)
+        # Exportar el DataFrame final a un archivo Excel
+        return df_final, best_df_pred
+
+    def define_model_betting_strategy_general(self, df_pred, strategy: str, roi_weight: float):
+        """
+        Determina la estrategia de apuesta optima para un modelo. Todos los resultados con la misma estrategia
+        """
+        # Lista para almacenar los resultados
+        logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
+        results = []
+
+        d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, strategy=strategy)
+        n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
+
+        d_hiper = d_hiper[n_comb]
+        best_df_pred = d_predic[n_comb]
+        best_d_rois = d_metricas[n_comb]
+
+        # Concateno datos y guardo
+        ## Combinar los dos diccionarios
+        d_ct = {**d_hiper, **best_d_rois}  
+
+        ## Añadir el resultado al DataFrame final
+        results.append(d_ct)
+
+        ## Convertir la lista de resultados en un DataFrame
+        df_final = pd.DataFrame(results)
+        df_final.set_index('n_model', inplace=True)
 
         if self.verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
@@ -582,6 +613,8 @@ if __name__ == "__main__":
 
     # Defino parametros
     id_country = 77
+    n_model = 1339
+    model_name = 'LogisticRegression'
     strategy = 'general'
 
     # Defino hiperparametros
@@ -606,21 +639,12 @@ if __name__ == "__main__":
 
     bs = BettingStrategy(country, iteration_date)
 
-    '''
-    df_predicciones = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/14__LogisticRegression_predicciones.xlsx", index_col=0)
-
-    l_cols = ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away', 
-              'odds_home', 'odds_draw', 'odds_away', 'prob_home_bm', 'prob_draw_bm', 'prob_away_bm', 'overround', 'bookmaker_result', 'result', 'predicted_result',
-            'prob_class_1', 'prob_class_0', 'prob_class_2', 'emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled', 'expected_result']
-    df_predicciones = df_predicciones.loc[:, l_cols]
-
-    df = bs.calculate_roi_in_combinations(df_predicciones, strategy="general")
-
-    '''
-
     # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
     df = pd.read_excel(f'{bs.BASE_PATH_sbm}/2_select_model/df_selected_model.xlsx', index_col=0)
     row = df.head(1) # Selecciono la primera fila
     logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
-    df = bs.define_model_betting_strategy(row, strategy="general", roi_weight=1, with_assess=False)
+    from main_select_model import read_predicciones
+    df_pred = read_predicciones(n_model=n_model, model_name=model_name, assess=True, )
+
+    df = bs.define_model_betting_strategy_by_result(df_pred=df_pred, strategy="general", roi_weight=0.755)

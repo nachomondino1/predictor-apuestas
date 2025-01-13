@@ -3,21 +3,36 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from utils.set_up_logging import logger
 
+# El problema actual es que en deployment sobreescribo el df_selected y el df_pred a medida que recolecto missing y actualizo predicciones. Asi, pierdo los df_selected anteriores... y no funciona esto, tienen partidos ≠ asses y prod
 
-def check_preparation(country):
+def read_model_preparation(n_model, country, verbose : int = 0):
+    ## Levanto df_selected de assess y prod --> no tiene en cuenta el modelo y podria pifiar.
+    df_sel_assess = pd.read_excel(f'data/{country}/p6_deployment/assess/df_selected_MISS_{n_model}.xlsx', index_col=0)
+    df_sel_prod = pd.read_excel(f'data/{country}/p6_deployment/data_preparation/df_selected.xlsx', index_col=0)
+    
+    # Shapes (deben ser iguales)
+    if verbose >= 0:
+        print(f"Shapes df preparared del modelo {n_model} en assess y prod (deberian ser iguales)", df_sel_assess.shape, df_sel_prod.shape)
+
+    return df_sel_assess, df_sel_prod
+
+def read_model_predictions(n_model, country, verbose : int = 0):
+
+    df_pred_assess = pd.read_excel(f'./data/{country}/p6_deployment/assess/df_predicciones_missing_{n_model}.xlsx', index_col=0)
+    df_pred_prod = pd.read_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index_col=0)
+
+    if verbose >= 0:
+        print(f"Shapes df pred del modelo {n_model} en assess y prod (deberian ser iguales)", df_pred_assess.shape, df_pred_prod.shape)
+
+    return df_pred_assess, df_pred_prod
+
+def compare_preparation(n_model, country, export: bool = True):
     """
     Verificar diferencia en la preparacion de datos entre assess y produccion. Podria haber diferencia 
     solo en las variables jugadores porque una es con formaciones y la otra sin.
     """
-    df_selected_assess = pd.read_excel(f'data/{country}/p6_deployment/data_preparation/df_selected_MISS.xlsx', index_col=0)
-    df_selected_prod = pd.read_excel(f'data/{country}/p6_deployment/data_preparation/df_selected.xlsx', index_col=0)
-
-    # Shapes (deben ser iguales)
-    print(df_selected_assess)
-    print(df_selected_prod)
-    print(df_selected_assess.shape, df_selected_prod.shape)
-
-    # df_dif = pd.DataFrame(columns=df_selected_assess.columns, index=df_selected_prod.index)
+    # Levanto df_selected de assess y prod del modelo
+    df_selected_assess, df_selected_prod = read_model_preparation(n_model=n_model, country=country)
     df_dif = pd.DataFrame(index=df_selected_prod.index)
 
     # Por partido
@@ -49,13 +64,12 @@ def check_preparation(country):
         else:
             logger.error(f"El partido {idx}, no se encuentra en produccion.")
 
+    if export:
+        df_dif.to_excel(f"/Users/nachomondino/Desktop/dif_assess_prod/df_assess_prod_dp_{country}.xlsx")
 
-        # break
+    return df_dif
 
-    df_dif.to_excel("/Users/nachomondino/Desktop/df_dif_assess_prod.xlsx")
-
-
-def calculate_dif_proba(country):
+def compare_modeling(n_model, country, export: bool = True):
     """
     Calcular la diferencia de probabilidad por partido...
     
@@ -63,34 +77,17 @@ def calculate_dif_proba(country):
     - Ver si cambia result_to_bet
     - Diferencias probas de assess y prod con extension.
     """
-
-    df_pred_assess = pd.read_excel(f'./data/{country}/p6_deployment/df_predicciones_missing.xlsx', index_col=0)
-    try:
-        df_pred_prod = pd.read_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index_col=0)
-    except FileNotFoundError:
-        df_pred_prod = pd.read_excel(f'./data/{country}/p6_deployment/predicciones_prod.xlsx', index_col=0)
-
+    # Levanto predicciones de assess y prod del modelo
+    df_pred_assess, df_pred_prod = read_model_predictions(n_model, country)
     
-    print(df_pred_assess.shape, df_pred_prod.shape)
-    print(df_pred_assess)
-    print(df_pred_prod)
-
     l_cols_prob = ['prob_class_1', 'prob_class_0', 'prob_class_2', 'result_to_bet']
 
-    # Definir extensiones para cada DataFrame
-    # suffix_prod = '_prod'
-    suffix_assess = '_assess'
-
     # Renombrar las columnas en cada DataFrame
-    # df_pred_prod_renamed = df_pred_prod[l_cols_prob].add_suffix(suffix_prod)
+    suffix_assess = '_assess'
     df_pred_assess_renamed = df_pred_assess[l_cols_prob].add_suffix(suffix_assess)
 
     # Concatenar los DataFrames renombrados
     df_dif = pd.concat([df_pred_prod, df_pred_assess_renamed], axis=1)
-
-    # df_dif = df_pred_assess.loc[:, l_cols_prob]
-    # df_dif = pd.concat([df_dif, df_pred_prod[l_cols_prob]], axis=1)
-    # df_dif = pd.concat([df_pred_prod[l_cols_prob], df_pred_assess[l_cols_prob]], axis=1)
 
     # Por partido
     for idx, row in df_pred_prod.iterrows():
@@ -106,9 +103,10 @@ def calculate_dif_proba(country):
 
                 df_dif.loc[idx, f'dif_{col}'] = dif_prob
     
-    df_dif.to_excel("/Users/nachomondino/Desktop/df_dif_modeling_assess_prod_.xlsx")
+    if export:
+        df_dif.to_excel(f"/Users/nachomondino/Desktop/dif_assess_prod/df_assess_prod_mod_{n_model}.xlsx")
 
-
+    return df_dif
 
 if __name__ == "__main__":
 
@@ -128,6 +126,8 @@ if __name__ == "__main__":
     iteration_date = d_countries[id_country][1]
     n_model = 14
 
-    check_preparation(country)
+    # (1) Verifico diferencia en preparacion
+    check_preparation(n_model, export=True)
 
-    calculate_dif_proba(country)
+    # (2) Verifico diferencia en 
+    calculate_dif_proba(n_model, export=True)
