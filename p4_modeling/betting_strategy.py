@@ -55,7 +55,7 @@ class BettingStrategy:
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [0],
                 'odd_weight': [0, 1, 2, 3, 4],
-                'lim_sup': [0, 1]
+                'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
         elif strategy == "all":
@@ -613,6 +613,8 @@ if __name__ == "__main__":
 
     # Defino parametros
     id_country = 77
+    n_model = 1339
+    model_name = 'LogisticRegression'
     strategy = 'general'
 
     # Defino hiperparametros
@@ -637,21 +639,12 @@ if __name__ == "__main__":
 
     bs = BettingStrategy(country, iteration_date)
 
-    '''
-    df_predicciones = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/14__LogisticRegression_predicciones.xlsx", index_col=0)
-
-    l_cols = ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away', 
-              'odds_home', 'odds_draw', 'odds_away', 'prob_home_bm', 'prob_draw_bm', 'prob_away_bm', 'overround', 'bookmaker_result', 'result', 'predicted_result',
-            'prob_class_1', 'prob_class_0', 'prob_class_2', 'emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled', 'expected_result']
-    df_predicciones = df_predicciones.loc[:, l_cols]
-
-    df = bs.calculate_roi_in_combinations(df_predicciones, strategy="general")
-
-    '''
-
     # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
     df = pd.read_excel(f'{bs.BASE_PATH_sbm}/2_select_model/df_selected_model.xlsx', index_col=0)
     row = df.head(1) # Selecciono la primera fila
     logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
-    df = bs.define_model_betting_strategy(row, strategy="general", roi_weight=1, with_assess=False)
+    from main_select_model import read_predicciones
+    df_pred = read_predicciones(n_model=n_model, model_name=model_name, assess=True, )
+
+    df = bs.define_model_betting_strategy_by_result(df_pred=df_pred, strategy="general", roi_weight=0.755)
