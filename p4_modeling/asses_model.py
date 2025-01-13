@@ -329,28 +329,15 @@ def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected
     correlacion = df[roi_col].corr(df[expected_roi_col])
     logger.info(f"La correlacion entre {roi_col} y {expected_roi_col} es de {correlacion}")
 
-    min_high_corr = 0.7
-    max_low_corr = 0.5
-    max_no_corr = 0.2
-
-    # Si la correlacion es alta
-    if correlacion >= min_high_corr:
-        value = 0.25
-
-    # Si la correlacion es media
-    elif correlacion >= max_low_corr:
-        value = 0.5
-
-    # Si la correlacion es baja
-    elif correlacion >= max_no_corr:
-        value = 0.75
-
-    # Si no hay correlacion
+    # Si la correlacion es positiva
+    if correlacion > 0:
+        roi_weight = 1 - correlacion  # A mayor correlacion entre ROI y Expected ROI, mayor peso para el Expected
+    # Si la correlacion es negativa
     else:
-        value = 1
-    
-    logger.critical(f"El roi_weight a usar es {value}. Es decir, un peso de {value*100:.0f}% para el ROI y de {(1-value)*100:.0f}% para el Expected ROI")
-    return value
+        roi_weight = 1
+
+    logger.critical(f"El roi_weight a usar es {roi_weight}. Es decir, un peso de {roi_weight*100:.0f}% para el ROI y de {(1-roi_weight)*100:.0f}% para el Expected ROI")
+    return roi_weight
 
 
 # Simplificar...
@@ -389,11 +376,16 @@ def calculate_metrics(
     df_match = load_file_by_condition(country=country, retrain=retrain, file_name="df_match.xlsx")
     df_match_odds = load_file_by_condition(country=country, retrain=retrain, file_name="df_match_odds.xlsx")
     if verbose >= 2:
+        logger.info(df_match)
         logger.info(df_match_odds)
 
     indices_to_use = df_pred_proba.index  # Selecciono los partidos que estan en df_test
     df_match = df_match[df_match.index.isin(indices_to_use)].reindex(indices_to_use)
-    df_match_odds = df_match_odds[df_match_odds.index.isin(indices_to_use)].reindex(indices_to_use) # Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+    df_match_odds = df_match_odds[df_match_odds.index.isin(indices_to_use)].reindex(indices_to_use) # ".reindex()" tapa el error de que indices_to_use no está en df_match_odds. Sin embargo, el reindex es necesario pues: Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
+    if verbose >= 0:
+        print(indices_to_use)
+        print("Shapes: ", df_match.shape, df_match_odds.shape) # Deberia coindicir con el largo de indices_to_use
+        print(df_match.head())
 
     # Calculo metricas de bookie
     df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -414,8 +406,15 @@ def calculate_metrics(
     if df_filled is not None:
         l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
         columns_to_concat.append(df_filled[l_cols])
-        
-    df_predicciones = pd.concat(columns_to_concat, axis=1)
+    
+    df_predicciones = pd.concat(columns_to_concat, axis=1)  # Queda vacio salvo por df_pred_proba
+    
+    '''
+    df_match_filt = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']]
+    l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+    df_filled_filt = df_filled.loc[:, l_cols]
+    df_predicciones = pd.concat([df_match_filt, df_match_odds, df_pred_proba, df_filled_filt], axis=1)
+    '''
 
     if verbose >=1:
         print(d_metrics)
@@ -502,7 +501,12 @@ def calculate_perc_gp(gp, gp_total):
         return 0
     
 def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
-    subpath = f"data/{country}/p6_deployment/missing/old_updated" if retrain else f'data/{country}/p2_data_understanding'
+    if retrain:
+        subpath = f"data/{country}/p6_deployment/missing/old_updated" 
+    else:
+        logger.warning("Estas levantando df_match y df_match_odds viejo. Si no es lo deseado, no tendra los indices de df_pred_proba y quedara todo nan en el df_predicciones concatenado. Asegurate de usar retrain = True (en vez de False)")
+        subpath = f'data/{country}/p2_data_understanding'
+
     return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

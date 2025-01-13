@@ -77,14 +77,27 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=
     X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=shuffle)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
-def read_df_match(country, retrain: bool = True):
+def read_df_match(country, iteration_date, retrain: bool = True):
     """
     Levanto el df_match
     """
     # Levanto df_match del pais
     if retrain:
-        path = f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx' #   f"./data/{country}/p2_data_understanding/old_updated"
+        try:
+            # Levanto desde los datos usados para el nuevo train
+            path_new_train = f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}"
+            df_match = pd.read_excel(path_new_train, index_col=0)
+
+        except FileNotFoundError:
+            logger.warning(f"Fallo la carga del archivo df_match. No se encontró el archivo en '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
+
+        except IsADirectoryError:
+            logger.warning(f"Fallo la carga del archivo df_match. No existe el directorio '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
+
+        # Levanto desde deployment/missing
+        path = f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx' 
         df_match = pd.read_excel(path, index_col=0)
+
     else:
         logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
         df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  

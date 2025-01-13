@@ -668,7 +668,7 @@ class DataPreparation:
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
 
         # Determino que registros usaré en df_test
-        df_match_old = generate_test_design.read_df_match(country=self.country)
+        df_match_old = generate_test_design.read_df_match(country=self.country, iteration_date=self.date)
         df_test_inic = generate_test_design.select_test_set(X, df_match=df_match_old)
 
         # Separo test y train/val
@@ -904,23 +904,24 @@ class Modeling:
         if self.date is not None:
             path = f'./data/{self.country}/p4_modeling/{self.date}'
             path_dp = f'./data/{self.country}/p3_data_preparation/{self.date}'
+        
         else:
             path = f'./data/{self.country}/p4_modeling'
             path_dp = f'./data/{self.country}/p3_data_preparation'
 
+            l_directorios = [
+            f'{path_dp}/generate_test_design',
+            f'{path_dp}/modeling',
+            ]
+            
+            for directorio in l_directorios:
+                if not os.path.exists(directorio):
+                    # Si no existe, crear el directorio
+                    os.makedirs(directorio)
+
         self.base_path = path
         self.base_path_dp = path_dp
-        l_directorios = [
-            f'{self.base_path}/generate_test_design',
-            f'{self.base_path}/modeling',
-        ]
 
-        '''
-        for directorio in l_directorios:
-            if not os.path.exists(directorio):
-                # Si no existe, crear el directorio
-                os.makedirs(directorio)
-        '''
         
     def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, n_reg_test: float = 100, retrain: bool = False, export: bool = True):
         """
@@ -940,7 +941,7 @@ class Modeling:
             print("\nSeparating data in train, val and test...")
 
         # Selecciono test set
-        df_match_old = generate_test_design.read_df_match(country=self.country, retrain=retrain)
+        df_match_old = generate_test_design.read_df_match(country=self.country, iteration_date=self.date, retrain=retrain)
         df_test = generate_test_design.select_test_set(df, df_match=df_match_old, n_reg_test=n_reg_test)
         X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
 

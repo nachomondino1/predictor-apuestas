@@ -16,11 +16,9 @@ from p3_data_preparation import concat_mapeos
 from p3_data_preparation.select_data import determine_country_competitions
 from p6_deployment import main_next_matches
 import utils.directories as directories
-import pickle
 from itertools import product
 from main import DataPreparation, Modeling
 import joblib
-import re
 import time
 
 
@@ -73,6 +71,9 @@ def comprehensive_search(
     df_iteration_comp: DataFrame
         Una fila por modelos entrenado detallando los hiperparametros usados al entrenar y su 
         evaluacion en el testeo.
+
+    Posibles mejoras:
+        - Entrenar evitando integrate pero variando los l_models por ejemplo. Usa mismo: old_updated/ integrate_data/ clean_data/ y df_integrated que el entrenamiento actual... 
     """
     # Definicion de variables
     cont_iter = 0
@@ -96,57 +97,12 @@ def comprehensive_search(
     # save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
     directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
  
-    ####################################################################### DATA UNDERSTANDING #######################################################################
     if not from_construct:
-
-        # MISSING
-        # Podria recolectar missing para tener lo ultimos partidos actualzados
-        # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        # main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=True, prepare_missing=False, export=d_run['export'])  #prepare_missing = False puesto que no tiene el df_map actualziado... Solo necesito los datos raw..
-
-        ## Eliminar preparacion de missing actual
-        l_dirs_to_remove = [
-            f'data/{country}/p6_deployment/missing/data_preparation',
-            f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx' # --> Creo que no lo tenes que remover proque son solo datos extraidos.
-        ]    
-        directories.remove_directories(directories=l_dirs_to_remove)
-
+       
+        ####################################################################### DATA UNDERSTANDING #######################################################################
         # Defino paths de donde levantar los datos
-        base_path_fs = f'data/{country}/p6_deployment/missing/old_updated'
-        if retrain:
-            base_path_so = f'data/{country}/p2_data_understanding/sofifa_update'
-        else:
-            base_path_so = f'data/{country}/p2_data_understanding'
-            logger.warning("Using Sofifa old")
-        
-        # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
-        df_match = pd.read_excel(f'{base_path_fs}/df_match.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'{base_path_fs}/df_match_player.xlsx', index_col=0)
-        df_match_odds = pd.read_excel(f'{base_path_fs}/df_match_odds.xlsx', index_col=0)
-        
-        print("Flashscore data:")
-        print(df_match)
-        print(df_match_player)
-        print(df_match_odds)
-        print(df_match.shape)
-        print(df_match_player.shape)
-        print(df_match_odds.shape)
-
-        if update_sofifa:
-            # Actualizar sofifa con las ultimas seasons
-            df_comp = pd.read_excel('./data/df_competencies.xlsx')
-            df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
-
-            df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.update_player_data(id_country, df_comp_country, n_seasons_update=2, path_save=base_path_so, verbose=1)
-        else:
-            df_player_sofifa = pd.read_excel(f'{base_path_so}/df_player_sofifa.xlsx', index_col=0)
-            df_player_fifa_sofifa = pd.read_excel(f'{base_path_so}/df_player_fifa_sofifa.xlsx', index_col=0)
-
-        print("\n\nSofifa data:")
-        print(df_player_sofifa)
-        print(df_player_fifa_sofifa)   
-        print(df_player_sofifa.shape)
-        print(df_player_fifa_sofifa.shape)
+        df_match, df_match_player, df_match_odds = get_flashscore_data(country, update_missing=False)
+        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, retrain=retrain)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
         df_match.to_excel(f'{BASE_DIR_du}/df_match.xlsx', index=True)
@@ -155,9 +111,9 @@ def comprehensive_search(
         df_player_sofifa.to_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index=True)
         df_player_fifa_sofifa.to_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index=True)
 
-        ####################################################################### DATA PREPARATION (solo old) #######################################################################
+        ####################################################################### DATA PREPARATION (hasta integrate) #######################################################################
         # Format data
-        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, reformat=True, export=True)  # Reformat True porque tomo el missing raw
+        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, reformat=True, export=True)
         
         # Clean data
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=True)
@@ -166,19 +122,26 @@ def comprehensive_search(
         # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
         df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
     
+
+        ####################################################################### DATA PREPARATION (MISSING) #######################################################################
+        # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
+        ## Eliminar preparacion de missing actual
+        l_dirs_to_remove = [
+            f'data/{country}/p6_deployment/missing/data_preparation',
+            f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx'
+        ]    
+        directories.remove_directories(directories=l_dirs_to_remove)
+
+        ## Volver a preaparar missing
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
+
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
     
-    
-    #___________________________________________________________________ DATA PREPARATION (MISSING) ___________________________________________________________________ --> No pues el df_integrated ya tiene missing pues el input es con missing...
-    # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
-    ## Volver a preaparar missing
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-    main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=False, export=d_run['export'])  # La ite date es clave para que sepa que df_map levantar...
-    # No tenes que exportar datos que usas aqui porque solamente actualizar la preparacion pero no los extraidos...
 
-    #___________________________________________________________________ DATA PREPARATION ___________________________________________________________________
+    ####################################################################### DATA PREPARATION (desde construct) #######################################################################
     # Construct_data
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
@@ -242,9 +205,6 @@ def comprehensive_search(
                 ####################################################################### MODELING #######################################################################
                 for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                     
-                    # Muevo anterior trian para no sobreescribir
-                    # mo.make_directories() 
-
                     # Asigno valor a cada hiperparametro
                     val_size, n_reg_test, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
                     if verbose >= 0:
@@ -333,7 +293,7 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def save_old_train(l_directories, base_path_old):
+def save_old_train(l_directories, base_path_old): # Por ahora lo hago manual porque no funciona como quiero… Arreglar.
 
     directories.make_directories(l_directorios=[base_path_old])
 
@@ -344,12 +304,73 @@ def save_old_train(l_directories, base_path_old):
         #     os.makedirs(directorio)
         directories.mover_archivo(origen=directorio, destino=base_path_old)
 
+def get_flashscore_data(country, update_missing: bool = False, verbose: int = 0):
+    """
+    Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
+    """
+    base_path_fs = f'data/{country}/p6_deployment/missing/old_updated'
+    
+    # Podria recolectar missing para tener lo ultimos partidos actualzados
+    if update_missing:
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+        main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
+
+    # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
+    df_match = pd.read_excel(f'{base_path_fs}/df_match.xlsx', index_col=0)
+    df_match_player = pd.read_excel(f'{base_path_fs}/df_match_player.xlsx', index_col=0)
+    df_match_odds = pd.read_excel(f'{base_path_fs}/df_match_odds.xlsx', index_col=0)
+    
+    print("Flashscore data:")
+    if verbose >= 0:
+        print(df_match.shape)
+        print(df_match_player.shape)
+        print(df_match_odds.shape)
+
+    if verbose >= 1:
+        print(df_match)
+        print(df_match_player)
+        print(df_match_odds)
+
+    return df_match, df_match_player, df_match_odds
+
+def get_sofifa_data(country, update_sofifa, retrain: bool = True, verbose: int = 0):
+    """
+    Obtengo datos de Sofifa a usar en el nuevo entrenamiento.
+    """
+    if retrain:
+        base_path_so = f'data/{country}/p2_data_understanding/sofifa_update'        
+    else:
+        base_path_so = f'data/{country}/p2_data_understanding'
+        logger.warning("Using Sofifa old")
+
+    if update_sofifa:
+        # Actualizar sofifa con las ultimas seasons
+        df_comp = pd.read_excel('./data/df_competencies.xlsx')
+        df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
+
+        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.update_player_data(id_country, df_comp_country, n_seasons_update=2, path_save=base_path_so, verbose=1)
+    
+    else:
+        df_player_sofifa = pd.read_excel(f'{base_path_so}/df_player_sofifa.xlsx', index_col=0)
+        df_player_fifa_sofifa = pd.read_excel(f'{base_path_so}/df_player_fifa_sofifa.xlsx', index_col=0)
+
+    if verbose >= 0: 
+        print("\n\nSofifa data:")
+        print(df_player_sofifa.shape)
+        print(df_player_fifa_sofifa.shape)
+    
+    if verbose >= 1: 
+        print(df_player_sofifa)
+        print(df_player_fifa_sofifa)   
+
+    return df_player_sofifa, df_player_fifa_sofifa
 
 def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), DecisionTreeClassifier(), RandomForestClassifier(), GradientBoostingClassifier()]   # SVC()
+    l_modelos = [DecisionTreeClassifier(), XGBClassifier(), SVC(), MLPClassifier()]   # , RandomForestClassifier(), GradientBoostingClassifier()
+    # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
 
     # 1728 iteraciones
     d_params = {
@@ -377,7 +398,7 @@ def define_params_space(id_country, fast: bool = False):
     }
 
     if fast:
-        l_modelos = [LogisticRegression()]
+        # l_modelos = [LogisticRegression()]
 
         d_params = {  
             'construct': {
@@ -414,8 +435,8 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 59
-    from_construct = False
+    id_country = 55
+    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
 
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
