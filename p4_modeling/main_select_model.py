@@ -8,6 +8,54 @@ import datetime
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 from p6_deployment import main_next_matches
 
+def define_directories(country, iteration_date):
+    """
+    Guardar seleccion de modelo vieja en carpeta
+    """
+    fecha_hoy = datetime.datetime.now().date()
+    
+    base_path = f"data/{country}/p4_modeling/{iteration_date}"
+    base_path_sbm = f"{base_path}/best_model"
+
+    d_paths = {
+        'base_path': base_path,
+        'base_path_sbm': base_path_sbm,
+        'path_old': f'{base_path}/best_model_old/{fecha_hoy}',
+        'path_select': f'{base_path_sbm}/1_filter_models/',
+        'path_assess': f'{base_path_sbm}/2_assess/',
+        'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
+        'path_assess_dep': f"data/{country}/p6_deployment/assess"
+    }
+    return d_paths
+
+def initialize_directories(d_paths):
+    """
+    Guardar seleccion de modelo vieja en carpeta
+
+    Mejoras: 
+        - Evitar mover old si uso assess_already_extracted?
+    """
+    # Mover anterior seleccion y assess a old..
+    import os
+    if os.path.exists(d_paths['base_path_sbm']):
+        directories.make_directories(l_directorios=[d_paths['path_old']]) # Por si nunca corri el main_select para el pais.
+        directories.mover_archivo(origen=d_paths['base_path_sbm'], destino=d_paths['path_old'])
+
+    # Creo directorios para nuevo assess y seleccion
+    directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select'], d_paths['path_bet_strategy'], d_paths['path_assess_dep']])
+
+def read_predicciones(n_model, model_name, assess, d_paths):
+    """
+    Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             
+    """
+    filename = f'{n_model}__{model_name}_predicciones.xlsx'
+    path_pred = f"{d_paths['path_assess']}/{filename}" if assess else f"{d_paths['base_path']}/models/{filename}"
+    df_pred = pd.read_excel(path_pred, index_col=0)
+    
+    logger.info(f'n_model: {n_model} model_name: {model_name}')
+    logger.info(df_pred.shape)
+    return df_pred
+
 def main(
         id_country, 
         country, 
@@ -102,57 +150,9 @@ def main(
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
     df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
 
-def define_directories(country, iteration_date):
-    """
-    Guardar seleccion de modelo vieja en carpeta
-    """
-    fecha_hoy = datetime.datetime.now().date()
-    
-    base_path = f"data/{country}/p4_modeling/{iteration_date}"
-    base_path_sbm = f"{base_path}/best_model"
-
-    d_paths = {
-        'base_path': base_path,
-        'base_path_sbm': base_path_sbm,
-        'path_old': f'{base_path}/best_model_old/{fecha_hoy}',
-        'path_select': f'{base_path_sbm}/1_filter_models/',
-        'path_assess': f'{base_path_sbm}/2_assess/',
-        'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
-        'path_assess_dep': f"data/{country}/p6_deployment/assess"
-    }
-    return d_paths
-
-def initialize_directories(d_paths):
-    """
-    Guardar seleccion de modelo vieja en carpeta
-
-    Mejoras: 
-        - Evitar mover old si uso assess_already_extracted?
-    """
-    # Mover anterior seleccion y assess a old..
-    import os
-    if os.path.exists(d_paths['base_path_sbm']):
-        directories.make_directories(l_directorios=[d_paths['path_old']]) # Por si nunca corri el main_select para el pais.
-        directories.mover_archivo(origen=d_paths['base_path_sbm'], destino=d_paths['path_old'])
-
-    # Creo directorios para nuevo assess y seleccion
-    directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select'], d_paths['path_bet_strategy'], d_paths['path_assess_dep']])
-
-def read_predicciones(n_model, model_name, assess, d_paths):
-    """
-    Aqui deberia ser capaz de levantar las predicciones sobre los missing tambien y evaluar todo junto (test + missing).             
-    """
-    filename = f'{n_model}__{model_name}_predicciones.xlsx'
-    path_pred = f"{d_paths['path_assess']}/{filename}" if assess else f"{d_paths['base_path']}/models/{filename}"
-    df_pred = pd.read_excel(path_pred, index_col=0)
-    
-    logger.info(f'n_model: {n_model} model_name: {model_name}')
-    logger.info(df_pred.shape)
-    return df_pred
-
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 48
+    id_country = 55
 
     # Defino hiperparametros
     assess = True
@@ -161,8 +161,8 @@ if __name__ == "__main__":
     d_countries = {
         6: ["argentina", '2024-12-05'], 
         48: ["england", '2025-01-07'],
-        55: ["france", '2025-01-08'], 
-        # 55: ["france", '2025-01-12'], 
+        # 55: ["france", '2025-01-08'], 
+        55: ["france", '2025-01-12'], 
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         148: ["spain", '2025-01-07'], 
@@ -173,5 +173,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=False, assess_already_extracted=True
+        assess=assess, extract_missing=False, assess_already_extracted=False
         )
