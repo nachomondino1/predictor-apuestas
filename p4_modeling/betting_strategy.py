@@ -431,6 +431,9 @@ class BettingStrategy:
             d_hiper[cont] = param_dict
             d_metricas[cont] = d_metrics
 
+        if len(param_combinations) == 1: # strategy == 'train':
+            d_predic, d_hiper, d_metricas = df_pred_with_metrics, param_dict, d_metrics
+
         return d_predic, d_hiper, d_metricas
 
     def apply_strategy_by_result(self, df, df_hiper):
@@ -611,9 +614,6 @@ class BettingStrategy:
         # Defino hiperparametros a probar
         if d_params is None:
             d_params = self.define_hiperparameters(strategy='general')
-
-        # if strategy == 'train':
-        #     d_predic, d_hiper, d_metricas = df_pred_with_metrics, param_dict, d_metrics
 
         # Determino ROI por combinacion de hiper de apuesta
         d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, d_params=d_params)
