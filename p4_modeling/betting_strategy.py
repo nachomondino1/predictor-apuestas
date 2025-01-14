@@ -51,10 +51,10 @@ class BettingStrategy:
         elif strategy == "general":
             dic = {
                 'prob_dp': [-1], # , -0.3] # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-                'curva': ['linear'],
+                'curva': ['linear', 'kelly'], 
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [0],
-                'odd_weight': [0, 1, 2, 3, 4],
+                'odd_weight': [0, 1, 2, 4],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
@@ -287,10 +287,14 @@ class BettingStrategy:
 
         # STRATEGY: KELLY
         elif type_relation == 'kelly':
-            df['stake_to_bet'] = ((df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1)  #  (= (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100)
+            normalized = True  # si o si sino el stake es negativo.
+
+            # df['stake_to_bet'] = ((df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1)  #  (= (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100)
+
+            df['stake_to_bet'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1) 
 
             # Puntos para normalizar
-            p_min, p_max = 0, 50 
+            p_min, p_max = 0, m
             
         # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
@@ -345,7 +349,7 @@ class BettingStrategy:
             # Usar la función sigmoide para reducir la variabilidad y escalar entre 0 y 30
             num = m if m > 0 else 1
             df['stake_to_bet'] = num / (1 + np.exp(-df['stake_to_bet_norm']))
-            # df = df.drop(['stake_to_bet_raw', 'stake_to_bet_normalized'], axis=1)
+            df = df.drop(['stake_to_bet_raw'], axis=1)
         
         # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
         if ('player_emergency_fill' in df.columns) and (len(rows_player_filled) > 0):
