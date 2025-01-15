@@ -117,7 +117,9 @@ def format_percentage_columns(df, base_columns):
     Returns:
         pd.DataFrame: DataFrame con las columnas formateadas.
     """
-    for base_col in base_columns:
+    columns = [col for col in base_columns if col in df.columns]  # Evita KeyError dentro del for en caso que no exista la stat en los nuevos partidos missing
+
+    for base_col in columns:
 
         home_col = f"{base_col}_home"
         away_col = f"{base_col}_away"
