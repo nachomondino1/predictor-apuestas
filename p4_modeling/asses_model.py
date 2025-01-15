@@ -278,26 +278,26 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def calculate_combined_metric(df, roi_weight: float = 0.75, name_extension: str = '', normalize: bool = True):
+def calculate_combined_metric(df, l_metrics: list, l_weights: list, name_extension: str = ''):
     """
-    Calcula la métrica combinada según 'roi_por_partido' y 'expected_roi_por_partido'.
-    Normaliza las columnas antes del cálculo, asigna el resultado a una nueva columna llamada 'metric' y retorna el DataFrame.
+    Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
+    Normaliza las columnas en 'l_metrics' antes del cálculo y agrega el resultado como una nueva columna.
     """
-    col1, col2 = f'roi_por_partido', f'expected_roi_por_partido'
-      
-    if normalize:
-        norm_extension = '_norm' 
-        
-        # Normalizo columnas por separado (cada una segun su escala)
-        df = normalize_column(df, col=col1, norm_extension=norm_extension)
-        df = normalize_column(df, col=col2, norm_extension=norm_extension)
-        col1, col2 = f'{col1}{norm_extension}', f'{col2}{norm_extension}'
-
+    # Validar que el número de métricas y pesos coincida
+    if len(l_metrics) != len(l_weights):
+        raise ValueError("El número de métricas debe coincidir con el número de pesos.")
+    
+    norm_metrics = []
+    
+    # Normalizar cada columna en l_metrics
+    for metric in l_metrics:
+        df = normalize_column(df, col=metric)
+        norm_metrics.append(metric + '_norm')
+    
+    # Definir función para calcular la métrica por fila
     def calculate_row_metric(row):
-        roi_pp = row[col1]
-        expected_roi_pp = row[col2]
-        return ((roi_weight * roi_pp) + ((1 - roi_weight) * expected_roi_pp))
-
+        return sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
+    
     # Aplicar la función fila por fila
     df[f'metric{name_extension}'] = df.apply(calculate_row_metric, axis=1)
     return df
@@ -314,33 +314,29 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
     df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
     return df
 
-def asignar_roi_weight(df, roi_col='roi_por_partido', expected_roi_col='expected_roi_por_partido'):
+def define_weights(df, l_metrics):
     """
-    Asigna valores de roi_weight basados en la correlación entre ROI y Expected ROI por modelo.
+    Defino pesos de variables segun correlacion con ROI
+    """
+    weights = []
+    roi_col = 'roi_por_partido'
+
+    # Por metrica
+    for metric in l_metrics:
+
+        # Calculo correlacion con ROI
+        correlacion = df[roi_col].corr(df[metric])
+        logger.info(f"La correlacion entre {roi_col} y {metric} es de {correlacion*100:.0f}%.")
+
+        weights.append(correlacion)
     
-    Args:
-        df (pd.DataFrame): DataFrame con los datos.
-        roi_col (str): Nombre de la columna de ROI. Default 'roi_por_partido'.
-        expected_roi_col (str): Nombre de la columna de Expected ROI. Default 'expected_roi_por_partido'.
-        
-    Returns:
-        'roi_weight' asignado segun correlacion entre ROI y Expected ROI.
-    """       
-    correlacion = df[roi_col].corr(df[expected_roi_col])
-    logger.info(f"La correlacion entre {roi_col} y {expected_roi_col} es de {correlacion}")
+    total_weight = sum(weights)
+    weights_1 = [weight / total_weight for weight in weights]
 
-    # Si la correlacion es positiva
-    if correlacion > 0:
-        roi_weight = 1 - correlacion  # A mayor correlacion entre ROI y Expected ROI, mayor peso para el Expected
-    # Si la correlacion es negativa
-    else:
-        roi_weight = 1
+    logger.critical(weights_1)
+    return weights_1
 
-    logger.critical(f"El roi_weight a usar es {roi_weight}. Es decir, un peso de {roi_weight*100:.0f}% para el ROI y de {(1-roi_weight)*100:.0f}% para el Expected ROI")
-    return roi_weight
-
-
-# Simplificar...
+# Simplificar + Moduralizar
 def calculate_metrics( 
         df_pred_proba: pd.DataFrame,
         country: str,

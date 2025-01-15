@@ -89,7 +89,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 3
-    def filter_models_by_roi(self, df, prop_to_max: float = 0.6, perc_cutoff: float = 1, metric_col: str = 'metric_sin_ea'):
+    def filter_models_by_metric(self, df, prop_to_max: float = 0.6, perc_cutoff: float = 1, metric_col: str = 'metric_sin_ea'):
         """
         Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
 
@@ -108,27 +108,27 @@ class SelectBestModel():
         logger.info("Paso 1: Descartando modelos con bajo ROI en df_test")
 
         # Determino roi cut segun roi proporcional al max
-        max_roi = df[metric_col].max()
-        roi_cut_prop = max_roi * prop_to_max
+        max_metric = df[metric_col].max()
+        metric_cut_prop = max_metric * prop_to_max
 
         # Determino roi cut segun percentil 
-        roi_cut_perc = np.percentile(df[metric_col], (100-perc_cutoff)) # Seleccionar el 20% de los registros con los valores más altos de 'metric'
+        metric_cut_perc = np.percentile(df[metric_col], (100-perc_cutoff)) # Seleccionar el 20% de los registros con los valores más altos de 'metric'
         
         # Determino el minimo
-        roi_cut = max(roi_cut_prop, roi_cut_perc)
-        logger.info(f"\n(1) Metric Max: {max_roi} --> ROI cut: {max_roi * prop_to_max} \n(2) Roi cut percentile {perc_cutoff}: {roi_cut_perc}")
-        logger.info(f"Roi cut: {roi_cut_prop} y {roi_cut_perc} --> {roi_cut}")
+        roi_cut = max(metric_cut_prop, metric_cut_perc)
+        logger.info(f"\n(1) Metric Max: {max_metric} --> Metric cut: {max_metric * prop_to_max} \n(2) Metric cut percentile {perc_cutoff}: {metric_cut_perc}")
+        logger.info(f"Metric cut: {metric_cut_prop} y {metric_cut_perc} --> {roi_cut}")
 
         # Filtro modelos segun roi to cut
         df_filt = df[df[metric_col] >= roi_cut]
 
         if self.verbose >= 1:
             logger.info(df_filt.head())
-            logger.warning(f"Descarte por ROI: {len(df)} --> {len(df_filt)}")
+            logger.warning(f"Descarte por metrica: {len(df)} --> {len(df_filt)}")
             self.error_empty_dataframe(df_filt)
 
         if self.path_save is not None:
-            df_filt.to_excel(f'{self.path_save}/df_filt_by_roi.xlsx', index=False)
+            df_filt.to_excel(f'{self.path_save}/df_filt_by_metric.xlsx', index=False)
 
         return df_filt
 
@@ -147,7 +147,7 @@ class SelectBestModel():
 
         # Imprimo por pantalla el mejor modelo
         row = df.head(1) # Selecciono la primera fila
-        logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
+        logger.critical(f"El mejor modelo es el {row.index[0]} con metrica {row[metric_col].values[0]} y ROIpp {row['roi_por_partido'].values[0]:.1f}")
 
         if self.path_save is not None:
             df.to_excel(f'{self.path_save}/df_selected.xlsx', index=True)
