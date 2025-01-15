@@ -66,7 +66,8 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
         df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
         
-        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, strategy='train') # Chequear que funciona...
+        d_params = bs.define_hiperparameters(strategy='train')
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params) # Chequear que funciona...
         d_metrics.update(d_roi)
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
 
