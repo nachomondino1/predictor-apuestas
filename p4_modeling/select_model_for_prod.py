@@ -105,7 +105,7 @@ class SelectBestModel():
         # Return 
         La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
         """
-        logger.info("Paso 1: Descartando modelos con bajo ROI en df_test")
+        logger.info("Paso 1: Descartando modelos segun metrica en df_test")
 
         # Determino roi cut segun roi proporcional al max
         max_metric = df[metric_col].max()
