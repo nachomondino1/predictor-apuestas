@@ -94,8 +94,7 @@ def main(
     # (0) Calculo metrica con la cual seleccionar modelos y estrategia
     ## Defino variables para calcular metrica
     l_metrics = ['roi_por_partido', 'test_accuracy']  # si usas cv_acc ojo que en el recalculo de emtricas por assess deberia ser "cv_accuracy_train"
-    # l_metrics = ['test_accuracy', 'recall', 'f1_score', 'roi_por_partido', 'expected_roi_por_partido', 'gp_filled', 'gp_not_filled', 'dif_loc', 'dif_emp', 'dif_vis', '%_dif', 'acc_home', 'acc_draw', 'acc_away', '%_gp_home', '%_gp_draw', '%_gp_away']
-    l_weights = asses_model.define_weights(df_ite, l_metrics=l_metrics)
+    l_weights = [0.5, 0.5] # asses_model.define_weights(df_ite, l_metrics=l_metrics)
     ## Calculo metrica    
     metric_col_test = 'metric_sin_ea_test'
     df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea_test')
@@ -131,7 +130,6 @@ def main(
             df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
         
         # Recalculo metrica con assess
-        l_weights = asses_model.define_weights(df_ite_filt, l_metrics=l_metrics)
         metric_col_assess = 'metric_sin_ea'
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
         print(df_ite_filt.shape)
