@@ -512,7 +512,7 @@ class BettingStrategy:
 
         return df_pred, d_metrics
 
-    def select_best_parameters(self, data, roi_weight, verbose: int = 0):
+    def select_best_parameters(self, data, verbose: int = 0):
         
         name_extension = "_con_ea"
         metric_col = f'metric{name_extension}'
@@ -523,7 +523,7 @@ class BettingStrategy:
             print(df)
 
         # Calcular metrica combinada para determinar mejor estrategia
-        df = calculate_combined_metric(df, roi_weight=roi_weight, name_extension=name_extension)
+        df = calculate_combined_metric(df, l_metrics=['roi_por_partido'], l_weights=[1], name_extension=name_extension)
         if verbose >= 0:
             df.to_excel("/Users/nachomondino/Desktop/prueba.xlsx", index=True)
         
@@ -541,7 +541,7 @@ class BettingStrategy:
         return n_comb
          
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, roi_weight: float = 0.5, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -570,7 +570,7 @@ class BettingStrategy:
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
                 # Determinar mejor estrategia para el resultado            
-                n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
+                n_comb = self.select_best_parameters(d_metricas)
             
                 if pred == 0 and d_params['lim_sup'] == [0]:  # El empate no cambia con las cuotas y tira error el select porque todas las combinaciones tienen el mismo ROI
                     n_comb = 1
@@ -597,13 +597,19 @@ class BettingStrategy:
         df_hiper = pd.DataFrame.from_dict(d_hiper_res, orient='index')
         df_final = pd.concat([df_hiper, df_metrics], axis=1)
 
+        # Calculo G/P por resultado (para comparar con G/P sin estrategia)
+        gp_total = sum(df_final['roi'])
+        df_final.loc[1, '%_G/P'] = df_final.loc[1, 'roi'] / gp_total * 100
+        df_final.loc[0, '%_G/P'] = df_final.loc[0, 'roi'] / gp_total * 100
+        df_final.loc[2, '%_G/P'] = df_final.loc[2, 'roi'] / gp_total * 100
+
         if self.verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
 
         # Exportar el DataFrame final a un archivo Excel
         return df_final, best_df_pred
 
-    def define_model_betting_strategy_general(self, df_pred, d_params: dict = None, roi_weight: float = 0.5):
+    def define_model_betting_strategy_general(self, df_pred, d_params: dict = None):
         """
         Determina la estrategia de apuesta optima para un modelo. Todos los resultados con la misma estrategia
         """
@@ -617,7 +623,7 @@ class BettingStrategy:
 
         # Determino ROI por combinacion de hiper de apuesta
         d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, d_params=d_params)
-        n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
+        n_comb = self.select_best_parameters(d_metricas)
 
         d_hiper = d_hiper[n_comb]
         best_df_pred = d_predic[n_comb]

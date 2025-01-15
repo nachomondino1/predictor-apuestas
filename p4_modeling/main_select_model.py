@@ -8,7 +8,7 @@ import datetime
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 from p6_deployment import main_next_matches
 
-def define_directories(country, iteration_date):
+def initialize_directories(country, iteration_date, assess_already_extracted):
     """
     Guardar seleccion de modelo vieja en carpeta
     """
@@ -26,9 +26,12 @@ def define_directories(country, iteration_date):
         'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
         'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
+
+    if not assess_already_extracted:
+        create_and_move_directories(d_paths=d_paths)
     return d_paths
 
-def initialize_directories(d_paths):
+def create_and_move_directories(d_paths):
     """
     Guardar seleccion de modelo vieja en carpeta
 
@@ -83,27 +86,27 @@ def main(
         - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
     # Creo objeto de clase select_best_model
-    d_paths = define_directories(country, iteration_date)
-    if not assess_already_extracted:
-        initialize_directories(d_paths=d_paths)
+    d_paths = initialize_directories(country, iteration_date, assess_already_extracted)
 
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
-    # (0) Calculo metrica combinada entre ROI y Expected ROI --> Hacer dsp de filtrado? Documentar...
-    # Defino roi_weight
-    roi_weight = asses_model.asignar_roi_weight(df_ite)  # Segun correlacion entre ROI y Expected ROI
-    name_extension = '_sin_ea_test'
-    metric_col_test = f'metric{name_extension}'
-    df_ite = asses_model.calculate_combined_metric(df_ite, roi_weight=roi_weight, name_extension=name_extension)
+    # (0) Calculo metrica con la cual seleccionar modelos y estrategia
+    ## Defino variables para calcular metrica
+    l_metrics = ['roi_por_partido', 'test_accuracy']  # si usas cv_acc ojo que en el recalculo de emtricas por assess deberia ser "cv_accuracy_train"
+    # l_metrics = ['test_accuracy', 'recall', 'f1_score', 'roi_por_partido', 'expected_roi_por_partido', 'gp_filled', 'gp_not_filled', 'dif_loc', 'dif_emp', 'dif_vis', '%_dif', 'acc_home', 'acc_draw', 'acc_away', '%_gp_home', '%_gp_draw', '%_gp_away']
+    l_weights = asses_model.define_weights(df_ite, l_metrics=l_metrics)
+    ## Calculo metrica    
+    metric_col_test = 'metric_sin_ea_test'
+    df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea_test')
     df_ite = df_ite.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
-    df_ite.to_excel(f'{d_paths['base_path_sbm']}/df_sort_by_roi.xlsx', index=False)
+    df_ite.to_excel(f'{d_paths['base_path_sbm']}/df_sort_by_metric.xlsx', index=False)
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
-    # 1.1. Descarte por ROI
-    df_ite_filt = sbm.filter_models_by_roi(df_ite, prop_to_max=0.6, perc_cutoff=1.5, metric_col=metric_col_test)
+    # 1.1. Descarte por METRIC
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, prop_to_max=0.3, perc_cutoff=5, metric_col='metric_sin_ea_test') # 0.6 y 1.5
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
@@ -126,18 +129,13 @@ def main(
         # Usar test + missing ya actualizado
         else:
             df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
-
+        
         # Recalculo metrica con assess
-        name_extension = '_sin_ea'
-        metric_col_assess = f'metric{name_extension}'
-        df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, roi_weight=roi_weight, name_extension=name_extension)
+        l_weights = asses_model.define_weights(df_ite_filt, l_metrics=l_metrics)
+        metric_col_assess = 'metric_sin_ea'
+        df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
         print(df_ite_filt.shape)
-
-    # Descarto modelos no utiles en prod
-    shape_inic = df_ite_filt.shape
-    l_models_selected = ['LogisticRegression', 'DecisionTreeClassifier'] # por el momento
-    df_ite_filt = df_ite_filt[df_ite_filt['model_name'].isin(l_models_selected)]
-    print(f"Shape: {shape_inic} --> {df_ite_filt.shape}")
+        
 
     # (3) SELECCION DEL MODELO
     # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
@@ -152,18 +150,18 @@ def main(
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
 
     # Paso 1: Defino m para todos los resultados
-    d_params = bs.define_hiperparameters(strategy='no_odds')
-    df_final, best_df_pred = bs.define_model_betting_strategy_general(df_pred, d_params=d_params, roi_weight=roi_weight)
+    d_params = bs.define_hiperparameters(strategy='no_odds')  # no odds porque quiero determinar el m optimo no mas
+    df_final, best_df_pred = bs.define_model_betting_strategy_general(df_pred, d_params=d_params)
     print(df_final)
 
     # Paso 2: Defino d_params solo con el m que gano en el paso 1
-    d_params_new = bs.define_hiperparameters(strategy='general')
+    d_params_new = bs.define_hiperparameters(strategy=strategy)
     d_params_new['prob_dp'] = [df_final['prob_dp'].values[0]]  # Reemplazo los m por el dif_prob que ganó
     d_params_new['m'] = [df_final['m'].values[0]]  # Reemplazo los m por el m que ganó
     print(d_params_new)
     
     # Paso 3: Defino las odds por resultado (usando el mismo m) --> Le paso d_params a usar.
-    df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_new, roi_weight=roi_weight)
+    df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_new)
     
     # Exporto datos
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
@@ -171,7 +169,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 148
+    id_country = 48
 
     # Defino hiperparametros
     assess = True
