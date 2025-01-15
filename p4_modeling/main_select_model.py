@@ -105,7 +105,7 @@ def main(
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por METRIC
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, prop_to_max=0.3, perc_cutoff=5, metric_col='metric_sin_ea_test') # 0.6 y 1.5
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, prop_to_max=0.8, perc_cutoff=1, metric_col='metric_sin_ea_test') # 0.6 y 1.5
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
@@ -167,7 +167,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 48
+    id_country = 148
 
     # Defino hiperparametros
     assess = True
