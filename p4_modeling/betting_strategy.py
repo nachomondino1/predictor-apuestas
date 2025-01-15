@@ -63,7 +63,7 @@ class BettingStrategy:
                 'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
                 'curva': ['linear'], # ['linear',  'kelly'],  #
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [0, -0.2, -0.5, 0.1],
+                'b': [0, -0.1, -0.25, 0.1, -0.5, 0.5], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
                 'odd_weight': [0, 1, 2],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
@@ -574,10 +574,7 @@ class BettingStrategy:
 
                 # Determinar mejor estrategia para el resultado            
                 n_comb = self.select_best_parameters(d_metricas)
-            
-                if pred == 0 and d_params['lim_sup'] == [0]:  # El empate no cambia con las cuotas y tira error el select porque todas las combinaciones tienen el mismo ROI
-                    n_comb = 1
-                   
+
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
                 d_metrics_res[pred] = d_metricas[n_comb]
