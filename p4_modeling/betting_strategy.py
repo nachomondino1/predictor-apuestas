@@ -63,7 +63,7 @@ class BettingStrategy:
                 'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
                 'curva': ['linear'], # ['linear',  'kelly'],  #
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [0, -10, -20],
+                'b': [0, -0.2, -0.5, 0.2],
                 'odd_weight': [0, 1, 2],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
@@ -301,6 +301,9 @@ class BettingStrategy:
             
         # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
+
+            if b != 0:
+                b = m * b 
 
             if dif_prob_inf_cap != dif_prob_sup_cap:
                 df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
