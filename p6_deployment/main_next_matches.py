@@ -946,11 +946,13 @@ def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int 
 
     # Missing
     if predict_missing:
+
         logger.warning("Uso los partidos DF_MATCH_MISS quitando los que usé para entrenar.")
+        
         BASE_DIR_ALL_MISSING = f'./data/{country}/p6_deployment/missing/data_understanding/all'
 
         # Obtengo la fecha del ultimo partido con el que entrené los modelos
-        df_integrated_updated = pd.read_excel(f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}/df_match.xlsx", index_col=0)
+        df_integrated_updated = pd.read_excel(f"./data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx", index_col=0)
         df_integrated_updated['date'] = pd.to_datetime(df_integrated_updated['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         last_date = df_integrated_updated['date'].max()
         logger.info(f'Last date: {last_date}')
@@ -1199,7 +1201,7 @@ def main(
 
         if len(rows_rep) > 0:
             logger.error("En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)")
-            
+                
             if predict_missing:
                 logger.info(df_integrated_updated.shape)
                 df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
@@ -1262,7 +1264,6 @@ def main(
 
         # Levanto hiperparametros de modeling
         loaded_model = lo.load_model()
-        classes = [0, 1, 2] # loaded_model.classes_
 
         try:
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']] 
@@ -1271,13 +1272,12 @@ def main(
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
 
         # Realizo predicciones sobre los nuevos partidos
-        y_pred_prob, y_pred = mo.predict(model=loaded_model, X_test=df)
+        df_probabilities, y_pred = mo.predict(model=loaded_model, X_test=df)
         df_pred_proba = pd.DataFrame({
-                'predicted_result': y_pred,
-                f'prob_class_{classes[1]}': y_pred_prob[:, 1],  # Probabilidad de la clase 1
-                f'prob_class_{classes[0]}': y_pred_prob[:, 0],  # Probabilidad de la clase 0
-                f'prob_class_{classes[2]}': y_pred_prob[:, 2]   # Probabilidad de la clase 2 (si hay 3 clases)
+            'predicted_result': y_pred,
             }, index=df.index)
+        # Combinar ambos DataFrames
+        df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
 
         # Concateno conjunto de datos # df_fill puede tirar error. Si tira, arreglar.
         df_predicciones = pd.concat(
