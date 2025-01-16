@@ -143,6 +143,7 @@ def main(
     # (4) ESTRATRAGIA DE APUESTA PARA MODELO SELECCIONADO
     # Levanto df_predicciones
     n_model, model_name = row.index[0], row['model_name'].values[0]
+    # n_model, model_name = 930, "LogisticRegression"
     df_pred = read_predicciones(n_model, model_name, assess, d_paths)
 
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
@@ -167,7 +168,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 148
+    id_country = 48
 
     # Defino hiperparametros
     assess = True
