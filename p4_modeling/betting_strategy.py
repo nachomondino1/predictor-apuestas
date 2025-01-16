@@ -424,7 +424,13 @@ class BettingStrategy:
             df_aux = self.apply_strategy(df, param_dict, prod=False)
 
             # Calculo de metricas (ROI y expected roi)
-            df_pred_with_metrics, d_metrics = self.calculate_roi_in_combination(df_aux)
+            df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
+            # df_pred_2, d_expected_roi = calculate_roi(df, name_extension='expected_')     
+            # # Concateno datos de ROI y Expected ROI
+            # missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
+            # df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+            # d_metrics.update(d_expected_roi)
+
             if self.verbose >= 0:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
                 # df_pred_with_metrics.to_excel("/Users/nachomondino/Desktop/bs.xlsx")
@@ -492,28 +498,13 @@ class BettingStrategy:
         # Determino acierto de prediccion
         if not prod:
             df = self.determine_winning_bets(df)
-            df = self.determine_winning_bets(df, name_extension='expected_')
+            # df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
         d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b']}
         d_params_odds = {'odd_weight': param_dict['odd_weight'], 'dif_prob_sup_cap': param_dict['lim_sup']}
         df = self.determine_stake_to_bet(df, **d_params_stake, **d_params_odds)
         return df
-    
-    def calculate_roi_in_combination(self, df):
-   
-        # Calculo ROI
-        df_pred, d_metrics = calculate_roi(df)
-
-        # Calculo expected ROI
-        df_pred_2, d_expected_roi = calculate_roi(df, name_extension='expected_')     
-
-        # Concateno datos de ROI y Expected ROI
-        missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
-        df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
-        d_metrics.update(d_expected_roi)
-
-        return df_pred, d_metrics
 
     def select_best_parameters(self, data, verbose: int = 0):
         
