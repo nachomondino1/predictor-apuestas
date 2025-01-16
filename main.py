@@ -440,6 +440,11 @@ class DataPreparation:
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
+            # Expected Result and Expected Points (xPts) --> SACARLO UNA VEZ QUE YA NO TENGO MODELOS VIEJOS.
+            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
+            df = construct_data.determine_expected_points(df)
+            df = df.drop(['expected_result'], axis=1) # si no lo borras, la tenes que construir como variable historica (para FRA y no se GER no la borré...)
+
             ## OFENSIVE
             ## Goal ratio
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
@@ -489,6 +494,7 @@ class DataPreparation:
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
                 # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
+                'expected_points', # --> SACARLO UNA VEZ QUE YA NO TENGO MODELOS VIEJOS.
                 # Ofensive
                 'expected_goals_(xg)', 
                 'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', # 'shots_off_goal' # 'SG2G',
