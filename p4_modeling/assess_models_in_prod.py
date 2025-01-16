@@ -26,7 +26,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     # Defino variables
     df_test = pd.DataFrame()    
     mo = Modeling(country, iteration_date)
-    bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
+    # bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
     base_path_dp = f'./data/{country}/p3_data_preparation/{iteration_date}'
 
@@ -64,17 +64,6 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
 
         # Recalculo metricas con test + missing
         df_predicciones, d_metrics = mo.calculate_metrics(df_pred_proba, retrain=True)
-    
-        '''
-        # Recalculo metricas con test + missing
-        df_filled = pd.read_excel(f'{base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0) #  para calcular relleno..
-        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
-        
-        d_params = bs.define_hiperparameters(strategy='train')
-        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params) # Chequear que funciona...
-        d_metrics.update(d_roi)
-        d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
-        '''
 
         # Convierto ids de equipos a nombres
         df_teams = pd.read_excel(f'{base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)

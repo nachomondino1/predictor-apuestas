@@ -63,7 +63,11 @@ class BettingStrategy:
                 'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
                 'curva': ['linear'], # ['linear',  'kelly'],  #
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [0, -0.1, -0.25, 0.1, -0.5, 0.5], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
+                'b': [
+                    0, 
+                    -0.1, -0.25, -0.5, -0.8,
+                    0.1, 0.5, 1
+                    ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
                 'odd_weight': [0, 1, 2],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
