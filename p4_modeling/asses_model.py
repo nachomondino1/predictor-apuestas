@@ -346,14 +346,18 @@ def define_weights(df, l_metrics):
 
 # Simplificar + Moduralizar
 def calculate_basic_metrics( 
-        y_test,
-        y_pred,
+        df_pred_proba,
         country: str,
+        var_resp: str = 'result',
+        var_pred: str = 'predicted_result',
         verbose: int = 0,
         export: bool = False):
     """
     Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
     """
+    y_test = df_pred_proba[var_resp].values  # Etiquetas reales
+    y_pred = df_pred_proba[var_pred].values  # Predicciones del modelo
+    
     # Calculo métricas básicas
     d_metrics = {
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
@@ -378,19 +382,27 @@ def calculate_accuracy_by_result(df_predicciones):
     df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
     df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
     df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
-    
+
     prec_home = int(df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
     prec_draw = int(df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
     prec_away = int(df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
 
-    return prec_home, prec_draw, prec_away
+    d = {
+        'acc_home': prec_home,
+        'acc_draw': prec_draw,
+        'acc_away': prec_away
+    }
+    return d
 
 def calculate_bet_metrics(
-        y_test,
+        df_pred_proba,
         df_match_odds,
+        var_resp: str = 'result',
         var_pred_bm: str = 'bookmaker_result',
         verbose: int = 0,
         ):
+
+    y_test = df_pred_proba[var_resp].values  # Etiquetas reales
 
     # Calculo metricas de bookie
     df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
@@ -399,7 +411,6 @@ def calculate_bet_metrics(
 
     d_metrics = {
         'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
-        'dif_prec_bm': d_metrics['test_accuracy'] - accuracy_score(y_test, y_pred_bm) * 100,
     }
     if verbose >=1:
         print(d_metrics)
@@ -462,31 +473,35 @@ def calculate_nan_metrics(df_predicciones):
     """
     Calcula las métricas relacionadas con el relleno de NaN en el DataFrame.
     """
-    # Filtrar registros con y sin relleno de NaN
-    rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
-    rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
-    
     # Cálculo del promedio de columnas rellenadas
     average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
 
+    # Filtrar registros con y sin relleno de NaN
+    # if 'player_emergency_fill' in df_predicciones.columns:
+    rows_player_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
+    rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+
     # G/P por estado de relleno de NaN
-    gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
-    gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
+    gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
+    gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
     gp_total = df_predicciones['G/P_sin_bank'].sum()
 
     perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
     perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
 
+    # else:
+    #     rows_player_filled = []
+    #     gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
+    #     perc_gp_filled, perc_gp_not_filled = 0, 1
+        
     d = {
-        # Métricas de relleno de NaN
-        'n_matches_filled': len(rows_filled),
         'average_col_filled': average_col_filled,
+        'n_emer_player_filled': len(rows_player_filled),
         'gp_filled': gp_filled, 
         'gp_not_filled': gp_not_filled,
         '%_gp_filled': perc_gp_filled,
         '%_gp_not_filled': perc_gp_not_filled,
     }
-
     return d
 
 def calculate_gp_by_result(df_predicciones, classes = None):
