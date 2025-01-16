@@ -1040,14 +1040,13 @@ class Modeling:
         df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
 
         # Defino variables
-        y_test = df_pred_proba[self.var_resp].values  # Etiquetas reales
-        y_pred = df_pred_proba[self.var_pred].values  # Predicciones del modelo
         df_match, df_match_odds = asses_model.read_dfs(df_pred_proba, country=self.country,retrain=retrain)
         df_filled = pd.read_excel(f'{self.base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0)
 
         # Calculo metricas
-        d_metrics = asses_model.calculate_basic_metrics(y_test, y_pred, country=self.country, export=export)
-        d_metrics.update(asses_model.calculate_bet_metrics(y_test, df_match_odds))
+        d_metrics = asses_model.calculate_basic_metrics(df_pred_proba, country=self.country, export=export)
+        d_metrics.update(asses_model.calculate_bet_metrics(df_pred_proba, df_match_odds))
+        d_metrics.update({'dif_prec_bm': d_metrics['test_accuracy'] -  d_metrics['test_accuracy_bm']})
 
         # Concateno todos los dfs en uno solo
         df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
@@ -1082,31 +1081,7 @@ class Modeling:
         # Combinar ambos DataFrames
         df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
 
-        # Defino variables
-        y_test = df_pred_proba[self.var_resp].values  # Etiquetas reales
-        y_pred = df_pred_proba[self.var_pred].values  # Predicciones del modelo
-        df_match, df_match_odds = asses_model.read_dfs(df_pred_proba, country=self.country, retrain=retrain)
-        df_filled = pd.read_excel(f'{self.base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0)
-
-        # Calculo metricas
-        d_metrics = asses_model.calculate_basic_metrics(y_test, y_pred, country=self.country, export=export)
-        d_metrics.update(asses_model.calculate_accuracy_by_result(df_pred_proba, classes=df_pred_proba[self.var_resp].unique()))
-        d_metrics.update(asses_model.calculate_bet_metrics(y_test, df_match_odds))
-
-        # Concateno todos los dfs en uno solo --> Necesario para roi?
-        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
-
-        # Calculo ROI
-        df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.         # Construyo expected results
-        bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
-        d_params = bs.define_hiperparameters(strategy='train')
-        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
-        d_metrics.update(d_roi)
-
-        # Calculo otras metricas    
-        d_metrics.update(asses_model.calculate_nan_metrics(df_pred_proba)) # Necesita 'ROI'
-        d_metrics.update(asses_model.calculate_gp_by_result(df_pred_proba)) # Necesita 'ROI'
-        d_metrics.update(asses_model.calculate_accuracy_by_result(df_pred_proba)) # Necesita 'acerte'
+        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export)
 
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1157,6 +1132,33 @@ class Modeling:
 
         return df_pred_proba, y_pred   
 
+    def calculate_metrics(self, df_pred_proba, retrain: bool = False, export: bool = False):
+
+        # Defino variables
+        df_match, df_match_odds = asses_model.read_dfs(df_pred_proba, country=self.country, retrain=retrain)
+        df_filled = pd.read_excel(f'{self.base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0)
+
+        # Calculo metricas
+        d_metrics = asses_model.calculate_basic_metrics(df_pred_proba, country=self.country, export=export)
+        d_metrics.update(asses_model.calculate_bet_metrics(df_pred_proba, df_match_odds))
+        d_metrics.update({'dif_prec_bm': d_metrics['test_accuracy'] -  d_metrics['test_accuracy_bm']})
+
+        # Concateno todos los dfs en uno solo --> Necesario para roi?
+        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
+        logger.error(df_predicciones.columns)
+
+        # Calculo ROI
+        bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
+        d_params = bs.define_hiperparameters(strategy='train')
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
+        d_metrics.update(d_roi)
+
+        # Calculo otras metricas    
+        d_metrics.update(asses_model.calculate_nan_metrics(df_predicciones)) # Necesita 'ROI'
+        d_metrics.update(asses_model.calculate_gp_by_result(df_predicciones)) # Necesita 'ROI'
+        d_metrics.update(asses_model.calculate_accuracy_by_result(df_predicciones)) # Necesita 'acerte'
+        return df_predicciones, d_metrics
+    
     def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos, k, ruta_base_mod_seg, cont_iter, suffix: str = '', retrain: bool = False, binary_classification: bool = False, verbose: int = 0):
         """
         Pruebo varios modelos 
