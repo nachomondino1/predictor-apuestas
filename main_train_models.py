@@ -31,6 +31,7 @@ def comprehensive_search(
     update_sofifa: bool = False,
     retrain: bool = True, 
     verbose: int = 0, 
+    binary_classification: bool = False, # En desarrollo
     export: bool = True
 ):
     """
@@ -73,13 +74,13 @@ def comprehensive_search(
         evaluacion en el testeo.
 
     Posibles mejoras:
-        - Entrenar evitando integrate pero variando los l_models por ejemplo. Usa mismo: old_updated/ integrate_data/ clean_data/ y df_integrated que el entrenamiento actual... 
+        - Entrenar evitando integrate pero variando los l_models por ejemplo. Usa mismo: old_updated/ integrate_data/ clean_data/ y df_integrated que el entrenamiento actual...  pero tenes que guardar los missing en p2...
+        - Capas de modelos. Hacer un modelo que prediga si es empate o no empate. Si no es empate, otro modelo que determine si es local o visitante.
+
     """
     # Definicion de variables
     cont_iter = 0
     df_iteration, df_ite_test = pd.DataFrame(), pd.DataFrame()
-    # d_run = {'data_unders:'}
-    rows_to_features_min, min_row_test = 10, 30
     dp, mo = DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
@@ -99,7 +100,7 @@ def comprehensive_search(
  
     if not from_construct:
        
-        ####################################################################### DATA UNDERSTANDING #######################################################################
+        ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
         # Defino paths de donde levantar los datos
         df_match, df_match_player, df_match_odds = get_flashscore_data(country, update_missing=False)
         df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, retrain=retrain)
@@ -154,9 +155,13 @@ def comprehensive_search(
         # Construyo datos
         path_1 = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
         path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_1}.xlsx'
-        df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
-        if export:
-            df_constructed.to_excel(path_construct, index=True)
+        try:
+            df_constructed = pd.read_excel(path_construct, index_col=0)
+            logger.info(df_constructed)
+        except FileNotFoundError:
+            df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
+            if export:
+                df_constructed.to_excel(path_construct, index=True)
 
         # Etiqueto df_constructed
         df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=True)
@@ -213,28 +218,49 @@ def comprehensive_search(
                         print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                         logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                    # Generar el diseño de la prueba
-                    X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
-                    
-                    rows_test = len(X_test)
-                    rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
-                    if verbose >= 0:
-                        logger.info(f"Rows X_test: {rows_test}")
-                        logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
+                        if binary_classification:
+            
+                            # Separar datos para el primer modelo: Empate o No Empate
+                            df_first_model = df_sel.copy()
+                            df_first_model['result'] = df_first_model['result'].apply(lambda x: 0 if x == 0 else 12) # 0 es empate y -10 es no empate?
 
-                    # Si hay suficientes datos
-                    if (rows_test >= min_row_test) and (rows_to_features >= rows_to_features_min):
-                        
-                        df_metrics = mo.train_and_assess_models(l_modelos, X_val, y_val, X_train, y_train, X_test, y_test, k, ruta_base_modelos, cont_iter, retrain=retrain)
+                            # Filtrar datos para el segundo modelo: Local o Visitante
+                            df_second_model = df_sel[df_sel['result'] != 0].copy()
+                            df_second_model['result'] = df_second_model['result'].apply(lambda x: 1 if x == 1 else 2) # 1 es local y 0 es visita?
 
+                            # Dividir los datos para cada modelo
+                            X_train_first, X_val_first, X_test_first, y_train_first, y_val_first, y_test_first = mo.generate_test_design(
+                                df_first_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False
+                            )
+
+                            X_train_second, X_val_second, X_test_second, y_train_second, y_val_second, y_test_second = mo.generate_test_design(
+                                df_second_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False,
+                            )
+
+                            # Entreno modelo para empate y no empate
+                            df_metrics_1 = mo.train_and_assess_models(X_val_first, y_val_first, X_train_first, y_train_first, X_test_first, y_test_first, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification)
+                            
+                            # Entreno modelo para local y visitante
+                            df_metrics_2 = mo.train_and_assess_models(X_val_second, y_val_second, X_train_second, y_train_second, X_test_second, y_test_second, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification, suffix='_2')
+
+                            suffix = '_2'
+                            df_metrics_2_ren = df_metrics_2.add_suffix(suffix)
+                            df_metrics = pd.concat([df_metrics_1, df_metrics_2_ren], axis=1)
+
+                        else:
+                            # Generar el diseño de la prueba
+                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
+                
+                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
+
+                    if len(df_metrics) > 0:
                         # Guardo datos en dataframe
                         row_data = {'n_iteration': cont_iter, 
                                     'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
                                     'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                     'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
                                     'fill_na': fill_na, 'bal_type': bal_type,
-                                    'val_size': val_size, 'n_reg_test': n_reg_test, 'X_train': X_train.shape,
-                                    'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                                    'val_size': val_size, 'n_reg_test': n_reg_test, 
                                     'k': k}
                         
                         # Concateno y exporto datos
@@ -246,12 +272,6 @@ def comprehensive_search(
                             df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
                             df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
                             df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
-
-                    else:
-                        if rows_to_features >= rows_to_features_min:
-                            logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
-                        else:
-                            logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
                     if verbose >= 0:
                         current_train = time.time()
@@ -348,8 +368,15 @@ def get_sofifa_data(country, update_sofifa, retrain: bool = True, verbose: int =
         df_comp = pd.read_excel('./data/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
 
-        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.update_player_data(id_country, df_comp_country, n_seasons_update=2, path_save=base_path_so, verbose=1)
-    
+        # Levanto los datos viejos
+        df_player_sofifa_old, df_player_fifa_sofifa_old = update_sofifa_data.read_last_player_data(country)
+
+        # Obtengo ultimas seasons
+        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=base_path_so)
+
+        # Actualizar sofifa con las ultimas seasons
+        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=base_path_so)
+
     else:
         df_player_sofifa = pd.read_excel(f'{base_path_so}/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'{base_path_so}/df_player_fifa_sofifa.xlsx', index_col=0)
@@ -369,7 +396,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [DecisionTreeClassifier(), XGBClassifier(), SVC(), MLPClassifier()]   # , RandomForestClassifier(), GradientBoostingClassifier()
+    # l_modelos = [DecisionTreeClassifier(), XGBClassifier(), SVC(), MLPClassifier()]   # , RandomForestClassifier(), GradientBoostingClassifier()
     # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
 
     # 1728 iteraciones
@@ -392,13 +419,13 @@ def define_params_space(id_country, fast: bool = False):
         'modeling': {
             'val_size': [0.10],
             'n_reg_test': [100], 
-            'bal_type': [None, 'under'],
+            'bal_type': [None, 'under'], # None
             'k': [5] 
         }
     }
 
     if fast:
-        # l_modelos = [LogisticRegression()]
+        l_modelos = [LogisticRegression()]
 
         d_params = {  
             'construct': {
@@ -435,9 +462,10 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 55
-    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-
+    id_country = 77
+    from_construct = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = True
+    
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
 
@@ -445,11 +473,9 @@ if __name__ == "__main__":
     date = datetime.datetime.now().date() # datetime.datetime.now().date() 
     logger.info(f"Country: {country} Date: {date}")
     
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
-
     # Preparao datos, entreno modelos y evaluo en df_test
     # Defino hiperparametros a probar
     d_params, l_modelos = define_params_space(id_country, fast=True)
     
     # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-    df_iteration_comp = comprehensive_search(country=country, date=date, from_construct=from_construct, d_params=d_params, l_modelos=l_modelos)
+    df_iteration_comp = comprehensive_search(country=country, date=date, update_sofifa=update_sofifa, from_construct=from_construct, d_params=d_params, l_modelos=l_modelos)

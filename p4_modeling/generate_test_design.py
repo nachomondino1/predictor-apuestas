@@ -86,7 +86,8 @@ def read_df_match(country, iteration_date, retrain: bool = True):
         try:
             # Levanto desde los datos usados para el nuevo train
             path_new_train = f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}"
-            df_match = pd.read_excel(path_new_train, index_col=0)
+            df_match = pd.read_excel(f'{path_new_train}/df_match.xlsx', index_col=0)
+            # logger.warning(df_match)
 
         except FileNotFoundError:
             logger.warning(f"Fallo la carga del archivo df_match. No se encontró el archivo en '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
@@ -161,7 +162,7 @@ def select_test_set(df, df_match, n_reg_test: int = 100, verbose : int = 0):
 
         # Si no hay partidos de los ultimos x dias en df_test
         if dif_dias.days >= dif_dias_max:
-            logger.warning(f"No hay registros de los ultimos {dif_dias.days} dias en df_test. uede haber fallado algo en la extraccion de missing o en la seleccion del df_test.")
+            logger.warning(f"No hay registros de los ultimos {dif_dias.days} dias en df_test. Puede haber fallado algo en la extraccion de missing o en la seleccion del df_test.")
 
     if verbose >= 2:
         df_filt_2 = df[df.index.isin(index_last_matches)]

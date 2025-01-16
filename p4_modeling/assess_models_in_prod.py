@@ -9,7 +9,7 @@ from p3_data_preparation import format_data
 from p3_data_preparation.construct_data import determine_result, determine_expected_result
 from p4_modeling import asses_model, betting_strategy, compare_assess_prod
 from p6_deployment import main_next_matches
-
+from main import Modeling
 
 def update_test_with_missing(df_ite, id_country, country, iteration_date, path_save):
     """
@@ -25,12 +25,13 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     """
     # Defino variables
     df_test = pd.DataFrame()    
+    mo = Modeling(country, iteration_date)
     bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
     base_path_dp = f'./data/{country}/p3_data_preparation/{iteration_date}'
 
     # Defino que n_model use en prod (para comparar assess y prod)
-    n_model_prod, _, _ = main_next_matches.read_data_of_best_model(id_country)
+    # n_model_prod, _, _ = main_next_matches.read_data_of_best_model(id_country)
 
     # Por modelo
     for idx, row in df_ite.iterrows():
@@ -59,17 +60,21 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
 
         # Concateno df_pred y df_pred missing.
         df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
-        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
+        df_pred_proba = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
 
+        # Recalculo metricas con test + missing
+        df_predicciones, d_metrics = mo.calculate_metrics(df_pred_proba, retrain=True)
+    
+        '''
         # Recalculo metricas con test + missing
         df_filled = pd.read_excel(f'{base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0) #  para calcular relleno..
         df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
-        df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
         
         d_params = bs.define_hiperparameters(strategy='train')
         df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params) # Chequear que funciona...
         d_metrics.update(d_roi)
         d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
+        '''
 
         # Convierto ids de equipos a nombres
         df_teams = pd.read_excel(f'{base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
@@ -132,7 +137,7 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
     """
     ## Levanto df_match_miss para obtener goals? ??
     df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
-    l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
+    l_columns_to_copy = ['goals_home', 'goals_away'] #, 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
     
     # Ordeno df por date
     df = df.sort_values(by='date', ascending=False)
@@ -146,7 +151,7 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
 
     ## Determino result y expected result segun goals
     df = determine_result(df) # Intento hacerlo antes con df_match pero rompia.
-    df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+    # df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

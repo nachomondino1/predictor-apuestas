@@ -10,7 +10,7 @@ from p2_data_understanding.collect_initial_data import scraper_sofifa
 from tqdm import tqdm
 
 
-def get_player_data(id_country, df_comp_country, n_seasons_update, path_save, verbose: int = 1):
+def get_player_data(id_country, country, df_comp_country, n_seasons_update, path_save):
     """
     Levanta datos de sofifa ya extraidos y actualiza las ultimas temporadas
     """
@@ -45,7 +45,7 @@ def get_player_data(id_country, df_comp_country, n_seasons_update, path_save, ve
     print(f"Shape final: {df_player_sofifa.shape} {df_player_fifa_sofifa.shape}")
     return df_player_sofifa, df_player_fifa_sofifa
 
-def read_last_player_data(verbose: int = 0):
+def read_last_player_data(country, verbose: int = 0):
     
     base_path = f'data/{country}/p2_data_understanding'
 
@@ -102,6 +102,12 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
     df_player_fifa_sofifa_filt.to_excel(f'{path_save}/df_player_fifa_sofifa.xlsx', index=True)
 
     return df_player_sofifa_filt, df_player_fifa_sofifa_filt
+
+def format_data():
+    """
+    Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
+    """
+    pass
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
