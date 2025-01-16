@@ -31,7 +31,7 @@ def comprehensive_search(
     update_sofifa: bool = False,
     retrain: bool = True, 
     verbose: int = 0, 
-    binary_classification: bool = True,
+    binary_classification: bool = False, # En desarrollo
     export: bool = True
 ):
     """
@@ -218,7 +218,6 @@ def comprehensive_search(
                         print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                         logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-
                         if binary_classification:
             
                             # Separar datos para el primer modelo: Empate o No Empate
@@ -238,7 +237,10 @@ def comprehensive_search(
                                 df_second_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False,
                             )
 
+                            # Entreno modelo para empate y no empate
                             df_metrics_1 = mo.train_and_assess_models(X_val_first, y_val_first, X_train_first, y_train_first, X_test_first, y_test_first, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification)
+                            
+                            # Entreno modelo para local y visitante
                             df_metrics_2 = mo.train_and_assess_models(X_val_second, y_val_second, X_train_second, y_train_second, X_test_second, y_test_second, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification, suffix='_2')
 
                             suffix = '_2'
@@ -249,7 +251,7 @@ def comprehensive_search(
                             # Generar el diseño de la prueba
                             X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
                 
-                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, bal_type, val_size, n_reg_test, retrain=retrain)
+                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
 
                     if len(df_metrics) > 0:
                         # Guardo datos en dataframe
@@ -366,8 +368,15 @@ def get_sofifa_data(country, update_sofifa, retrain: bool = True, verbose: int =
         df_comp = pd.read_excel('./data/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
 
-        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.update_player_data(id_country, df_comp_country, n_seasons_update=2, path_save=base_path_so, verbose=1)
-    
+        # Levanto los datos viejos
+        df_player_sofifa_old, df_player_fifa_sofifa_old = update_sofifa_data.read_last_player_data(country)
+
+        # Obtengo ultimas seasons
+        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=base_path_so)
+
+        # Actualizar sofifa con las ultimas seasons
+        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=base_path_so)
+
     else:
         df_player_sofifa = pd.read_excel(f'{base_path_so}/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'{base_path_so}/df_player_fifa_sofifa.xlsx', index_col=0)
@@ -454,8 +463,9 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 77
-    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-
+    from_construct = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = True
+    
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
 
@@ -463,11 +473,9 @@ if __name__ == "__main__":
     date = datetime.datetime.now().date() # datetime.datetime.now().date() 
     logger.info(f"Country: {country} Date: {date}")
     
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}
-
     # Preparao datos, entreno modelos y evaluo en df_test
     # Defino hiperparametros a probar
     d_params, l_modelos = define_params_space(id_country, fast=True)
     
     # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-    df_iteration_comp = comprehensive_search(country=country, date=date, from_construct=from_construct, d_params=d_params, l_modelos=l_modelos)
+    df_iteration_comp = comprehensive_search(country=country, date=date, update_sofifa=update_sofifa, from_construct=from_construct, d_params=d_params, l_modelos=l_modelos)
