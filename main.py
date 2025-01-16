@@ -440,11 +440,6 @@ class DataPreparation:
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
-            # Expected Result and Expected Points (xPts) (from Expected Goals) --> Aun no se si el threshold es correcto... no quiero meter ruido.
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
-            df = construct_data.determine_expected_points(df)
-            df = df.drop(['expected_result'], axis=1) # si no lo borras, la tenes que construir como variable historica (para FRA y no se GER no la borré...)
-
             ## OFENSIVE
             ## Goal ratio
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
@@ -457,8 +452,8 @@ class DataPreparation:
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
             # Attacking efficiency --> (lo evito por cantidad de NaN)
-            # df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
-            # df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
+            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
+            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
@@ -471,12 +466,12 @@ class DataPreparation:
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
             # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
-            # df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
-            # df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
+            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
+            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
 
             # Efficiency --> (lo evito por cantidad de NaN)
-            # df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
-            # df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
+            df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
+            df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
             # Numero de partidos jugados en ultimos n days
@@ -495,13 +490,13 @@ class DataPreparation:
             relevant_stats_columns = [
                 # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
                 # Ofensive
-                'expected_goals_(xg)', 'expected_points', # 'expected_result', --> la tengo que eliminar? si no la uso, si. Es medio dificil calcular el promedio en ultimos partidos... es como el historial...
+                'expected_goals_(xg)', 
                 'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', # 'shots_off_goal' # 'SG2G',
                 'dead_balls', # 'goal_ratio_dead_balls',
-                'ball_possession', 'total_passes', # 'pass_success_%', 'attacking_efficiency',
+                'ball_possession', 'total_passes', 'attacking_efficiency', # 'pass_success_%', 
                 # Defensive
                 'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls', 'interceptions'
-                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency", 'goalkeeper_saves'
+                'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" # 'goalkeeper_saves'
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
@@ -922,7 +917,16 @@ class Modeling:
         self.base_path = path
         self.base_path_dp = path_dp
 
-        
+    def split_classifiaction(self, df):
+
+
+        # Separo dataframe para primera clasificacion (empate o no empate)
+        df['result'] = 
+
+        # Separo dataframe para segunda clasificacion (local o visitante)
+        df
+        pass
+
     def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, n_reg_test: float = 100, retrain: bool = False, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
