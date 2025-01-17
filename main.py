@@ -172,7 +172,7 @@ class DataPreparation:
         ]  
         directories.make_directories(l_directorios=l_directorios)
 
-    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = False, export: bool = True):
+    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = True, export: bool = True):
         """
         Arreglo el data data_type de algunas variables.
 
