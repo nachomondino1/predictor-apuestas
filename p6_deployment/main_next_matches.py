@@ -1089,22 +1089,23 @@ def main(
     logger.info("\n" + "+"*120 + "\n" + "MISSING DATA".center(120) + "\n" + "+"*120 + "\n")
     if d_run['run_missing']: 
         
+        # Levanto datos viejos + los ultimos missing extraidos
+        df_match, df_match_player, df_match_odds = mis.read_last_flashscore_data()
+
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         if extract_missing:
-            
-            # Levanto datos viejos + los ultimos missing extraidos
-            df_match, df_match_player, df_match_odds = mis.read_last_flashscore_data()
-
             # Extraigo missing (si hay)
             df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
-            
-            # Exporto datos (tarda banda en la concatenacion, simplificar...)
+
             if export and len(df_match_miss) > 0:
                 mis.concat_with_missing_already_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all
-                mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
-
         else:
             df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
+
+        # Exporto datos (tarda banda en la concatenacion, simplificar...)
+        if export and len(df_match_miss) > 0:
+            mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
+
         logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
         # Si extrajo missingnot
@@ -1336,8 +1337,8 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 77
-    key, value = 'predict', 'try_a_specific_model'
+    id_country = 48
+    key, value = 'missing', 'only_preparation'
     # data_unders = False
     n_days = 15
 
