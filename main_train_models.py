@@ -403,7 +403,7 @@ def define_params_space(id_country, fast: bool = False):
     d_params = {
         'construct': {
             'n_dias_ult_part': [[60], [30, 180]], # [30, 180] 
-            'n_years_h2h': [3],
+            'n_years_h2h': [2],
             'segun_localia': [True, False],
             'dif_con_against': [False, True] 
         },

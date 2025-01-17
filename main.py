@@ -411,7 +411,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, 
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = True, with_historic: bool = True, 
                        dif_con_against: bool = True, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
@@ -474,23 +474,21 @@ class DataPreparation:
             df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
-            ## EN ULTIMOS N PARTIDOS
+            ## 1) EN ULTIMOS N years
+            if with_h2h:
+                df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+                df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
+
+            ## 2) EN ULTIMOS N PARTIDOS
             for n_matches in n_last_matches:
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
                 df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
-                raise ValueError
 
-            ## EN PARTIDOS EN ULTIMOS N DAYS
+            ## 3) EN PARTIDOS EN ULTIMOS N DAYS
             # Numero de partidos jugados en ultimos n days
             for n_days in l_days:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
-
-            # Historiales
-            if with_h2h:
-                df = construct_data.h2h_by_date(df, n_years=-1)
-                df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-                df = construct_data.h2h_by_date_by_localia(df, n_years=-1)  # TENEMOOS QUE DARLE EL DF ADICIONAL CON EL CUAL CALCULAR EL HISTORIAL SOLO PARA EL DF ORIGINAL
-                df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
             # Determino cuales son las variables stats automaticamente
             stats_columns = construct_data.determine_stats_columns(df)
@@ -611,7 +609,7 @@ class DataPreparation:
         # (2) Eliminacion de columnas   
         ## usadas solo para construir y constantes
         cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        cols_avoid_noise = [] # ['id_team_home', 'id_team_away']  #  'id_coach_home', 'id_coach_away', 'referee'       
+        cols_avoid_noise = ['id_team_home', 'id_team_away']
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
         cols_to_drop = cols_for_construct + cols_avoid_noise + cols_constants
         X.drop(columns=cols_to_drop, inplace=True)
