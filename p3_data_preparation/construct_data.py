@@ -216,7 +216,8 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
     # logger.warning(f"1: {df.shape}")
 
     # Inicializar columnas para evitar errores con columnas inexistentes
-    for col in ['n_wins_last', 'n_draws_last', 'n_loss_last']:
+    l_suf = ['n_wins_last', 'n_draws_last', 'n_loss_last']
+    for col in l_suf:
         for location in ['home', 'away']:
             df[f'{col}_{n_matches}_matches_{location}'] = np.nan
     # logger.warning(f"2: {df.shape}")
@@ -271,9 +272,14 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
                     df.at[idx, f'n_loss_last_{n_matches}_matches_{home_or_away}'] = n_loss
   
     # Calculo diferencia entre local y visitate
-    # df[f'dif_n_matches_last_{n_days}_days'] = df[f'n_matches_last_{n_days}_days_home'] - df[f'n_matches_last_{n_days}_days_away']  
-    # df = df.drop(columns=[f'n_matches_last_{n_days}_days_home', f'n_matches_last_{n_days}_days_away'])
-    # logger.warning(f"3: {df.shape}")
+    for col in l_suf:
+        dif_col = f'dif_{col}_{n_matches}_matches_by_loc' if segun_localia else f'dif_{col}_{n_matches}_matches'
+        col_home, col_away = f'{col}_{n_matches}_matches_home', f'{col}_{n_matches}_matches_away'
+        
+        df[dif_col] = df[col_home] - df[col_away]  
+        df = df.drop(columns=[col_home, col_away])
+    
+    logger.warning(f"3: {df.shape}")
     return df
 
 ## Rendimiento del equipo
