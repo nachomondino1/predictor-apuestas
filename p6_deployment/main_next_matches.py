@@ -220,6 +220,7 @@ class DataPreparationNew(DataPreparation):
         if self.export:
             df_match.to_excel(f'{self.BASE_DIR}/format_data/df_match_form.xlsx')
             df_match_odds.to_excel(f'{self.BASE_DIR}/format_data/df_match_odds_form.xlsx')
+            
         return df_match, df_match_odds
 
     def clean_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, verbose:int = 0):
@@ -911,23 +912,38 @@ class MissingData:
         df_concat_match_odds.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx')
         logger.info(f"Shape de df_match concatenado con missing:: {len_inicial} --> {len_final}")
 
-    def concat_with_missing_already_extracted(self, df_match_miss, df_match_player_miss, df_match_odds_miss):
+    def concat_with_missing_already_extracted(self, df_match_miss, df_match_player_miss, df_match_odds_miss): # probar. Ahora no deberia concatenar si los missing nuevos ya estan en los extraidos...
         """
-        Guardo los nuevos partidos missing con los que ya tenia
+        Guarda los nuevos partidos missing con los que ya tenía, evitando duplicados.
         """
+        # Leer los datos previos
         df_match_miss_comp, df_match_player_miss_comp, df_match_odds_miss_comp = self.read_last_missing_data()
         n_missing_ya_extraidos = len(df_match_miss_comp)
 
-        df_match_miss_comp_ct = pd.concat([df_match_miss_comp, df_match_miss], axis=0)
-        df_match_player_miss_comp_ct = pd.concat([df_match_player_miss_comp, df_match_player_miss], axis=0)
-        df_match_odds_miss_comp_ct = pd.concat([df_match_odds_miss_comp, df_match_odds_miss], axis=0)      
+        # Identificar las claves primarias únicas en los datos previos
+        keys_match = df_match_miss_comp.index if df_match_miss_comp.index.is_unique else df_match_miss_comp['id_match']
+        keys_player = df_match_player_miss_comp.index if df_match_player_miss_comp.index.is_unique else df_match_player_miss_comp['id_player']
+        keys_odds = df_match_odds_miss_comp.index if df_match_odds_miss_comp.index.is_unique else df_match_odds_miss_comp['id_match']
 
-        n_missing_nuevos = len(df_match_miss)
-        len_final = len(df_match_miss_comp_ct)
-        verif = (n_missing_ya_extraidos + n_missing_nuevos) == len_final
-        if not verif:
-            logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
-        logger.info(f"Shape de todos los partidos missing hasta hoy : {n_missing_ya_extraidos} --> {len_final}")
+        # Filtrar nuevos registros que no estén ya en los datos previos
+        df_match_miss_new = df_match_miss[~df_match_miss.index.isin(keys_match)]
+        df_match_player_miss_new = df_match_player_miss[~df_match_player_miss.index.isin(keys_player)]
+        df_match_odds_miss_new = df_match_odds_miss[~df_match_odds_miss.index.isin(keys_odds)]
+
+        # Concatenar solo los registros nuevos
+        df_match_miss_comp_ct = pd.concat([df_match_miss_comp, df_match_miss_new], axis=0)
+        df_match_player_miss_comp_ct = pd.concat([df_match_player_miss_comp, df_match_player_miss_new], axis=0)
+        df_match_odds_miss_comp_ct = pd.concat([df_match_odds_miss_comp, df_match_odds_miss_new], axis=0)
+
+        logger.info(f"Se han añadido {len(df_match_miss_new)} nuevos registros a df_match_miss.")
+        logger.info(f"Se han añadido {len(df_match_player_miss_new)} nuevos registros a df_match_player_miss.")
+        logger.info(f"Se han añadido {len(df_match_odds_miss_new)} nuevos registros a df_match_odds.")
+        # n_missing_nuevos = len(df_match_miss)
+        # len_final = len(df_match_miss_comp_ct)
+        # verif = (n_missing_ya_extraidos + n_missing_nuevos) == len_final
+        # if not verif:
+        #     logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
+        # logger.info(f"Shape de todos los partidos missing hasta hoy : {n_missing_ya_extraidos} --> {len_final}")
 
         # Exporto datos
         df_match_miss_comp_ct.to_excel(f'{self.BASE_DIR_MISSING_ALL_du}/df_match_miss.xlsx', index=True)
@@ -1098,7 +1114,7 @@ def main(
             df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
 
             if export and len(df_match_miss) > 0:
-                mis.concat_with_missing_already_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all
+                mis.concat_with_missing_already_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
         else:
             df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
 
@@ -1274,17 +1290,14 @@ def main(
 
         # Realizo predicciones sobre los nuevos partidos
         df_probabilities, y_pred = mo.predict(model=loaded_model, X_test=df)
-        df_pred_proba = pd.DataFrame({
-            'predicted_result': y_pred,
-            }, index=df.index)
-        # Combinar ambos DataFrames
-        df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
-
+        df_pred_proba = pd.DataFrame({'predicted_result': y_pred,}, index=df.index)
+                
         # Concateno conjunto de datos # df_fill puede tirar error. Si tira, arreglar.
         df_predicciones = pd.concat(
             [df_match, 
              df_match_odds, 
              df_pred_proba, 
+             df_probabilities,
              df_c1['copiado_formaciones'], 
              df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]
              ], 
@@ -1337,8 +1350,8 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 48
-    key, value = 'missing', 'only_preparation'
+    id_country = 148
+    key, value = 'predict', 'try_a_specific_model'
     # data_unders = False
     n_days = 15
 
@@ -1349,12 +1362,12 @@ if __name__ == "__main__":
         55: ["france", '2025-01-08'], 
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
-        # 148: ["spain", '2025-01-07'], 
-        148: ["spain", '2025-01-09'], 
+        148: ["spain", '2025-01-07'], 
+        # 148: ["spain", '2025-01-09'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1339, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 860, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
