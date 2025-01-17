@@ -1066,7 +1066,7 @@ class Modeling:
     
     def predict(self, model, X_test: pd.DataFrame):
         """
-        Predigo sobre X_test
+        Predigo sobre X_test + Mapeo clases entre test y pred (pred genera clases con ≠ valor).
         """
         # Predecir las etiquetas para los datos de prueba
         try:
@@ -1088,15 +1088,13 @@ class Modeling:
 
             # Reemplazar los índices por las clases del modelo
             y_pred = np.array([model_classes[idx] for idx in y_pred_indices])
-            logger.warning(y_pred)
-
+            
             # Verificar el mapeo de índices a clases (opcional)
-            print("Mapeo de índices a clases:", dict(enumerate(model_classes)))
-
+            if self.verbose >= 1:
+                logger.info(f"Mapeo de índices a clases: {dict(enumerate(model_classes))}")
+                logger.info(y_pred)
         else:
             raise ValueError("El modelo no tiene el atributo 'classes_', no se puede determinar el mapeo.")
-
-        # y_pred = np.argmax(y_pred_prob, axis=1)  # Obtengo la clase predicha segun la que tenga mayor probabilidad  # y_pred = model.predict(X_test)  # es un numpy array
 
         # Crear un DataFrame para visualizar las probabilidades con sus clases
         df_pred_proba = pd.DataFrame(
@@ -1104,7 +1102,9 @@ class Modeling:
             columns=[f'prob_class_{cls}' for cls in model_classes],
             index=X_test.index
         )
-        logger.error(df_pred_proba)
+
+        if self.verbose >= 1:
+            logger.info(df_pred_proba)
 
         return df_pred_proba, y_pred   
 
@@ -1121,7 +1121,6 @@ class Modeling:
 
         # Concateno todos los dfs en uno solo --> Necesario para roi?
         df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
-        logger.error(df_predicciones.columns)
 
         if not binary_classification:
             # Calculo ROI
