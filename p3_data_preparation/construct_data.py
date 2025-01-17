@@ -167,19 +167,16 @@ def determine_number_matches_last_days(df: pd.DataFrame, n_days):
     Determinar numero de partidos jugados en los ultimos dias. 
     
     Posibles mejoras:
-        - Agregar el calculo de numero de wins, draws y losses.
         - Hacerlo por localia usando "segun_localia"
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=False)
     l_teams = df['id_team_home'].unique()
-    # logger.warning(f"1: {df.shape}")
 
     # Inicializar columnas para evitar errores con columnas inexistentes
-    for col in ['n_matches_last']: # , 'n_wins_last', 'n_draws_last', 'n_loss_last']:
+    for col in ['n_matches_last']:
         for location in ['home', 'away']:
             df[f'{col}_{n_days}_days_{location}'] = np.nan
-    # logger.warning(f"2: {df.shape}")
 
     # Por team
     for team in l_teams:
@@ -197,30 +194,85 @@ def determine_number_matches_last_days(df: pd.DataFrame, n_days):
             df_match_team_filt = df_match_team.loc[(df_match_team['date'] >= limit_date) & (df_match_team['date'] < row['date'])]
             n_games = len(df_match_team_filt)
 
-            df_match_team_filt_home = df_match_team_filt[df_match_team_filt['id_team_home'] == team]
-            df_match_team_filt_away = df_match_team_filt[df_match_team_filt['id_team_away'] == team]
-            
-            if n_games != (len(df_match_team_filt_home) + len(df_match_team_filt_away)):
-                logger.error(f"Error en filtrado de partidos en la construccion... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_match_team_filt)}")
-
-            # Construyo variables
-            n_wins = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 1]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 2])
-            n_draws = len(df_match_team_filt[df_match_team_filt['result'] == 0])
-            n_loss = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 1])
-
-            if n_games != (n_wins + n_draws + n_loss):
-                logger.error(f"Error en determinacion de resultados en ultimos dias {n_wins} + {n_draws} + {n_loss} != {n_games}")
-
             # Asignar valores al DataFrame original
             if n_games > 0:
                 df.at[idx, f'n_matches_last_{n_days}_days_{home_or_away}'] = n_games
-                # df.at[idx, f'n_wins_last_{n_days}_days_{home_or_away}'] = n_wins
-                # df.at[idx, f'n_draws_last_{n_days}_days_{home_or_away}'] = n_draws
-                # df.at[idx, f'n_loss_last_{n_days}_days_{home_or_away}'] = n_loss
   
     # Calculo diferencia entre local y visitate
     df[f'dif_n_matches_last_{n_days}_days'] = df[f'n_matches_last_{n_days}_days_home'] - df[f'n_matches_last_{n_days}_days_away']  
     df = df.drop(columns=[f'n_matches_last_{n_days}_days_home', f'n_matches_last_{n_days}_days_away'])
+    return df
+
+def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_localia):
+    """
+    Determinar numero de triunfos, empates y derrotas en los ultimos n partidos por equipo.
+    
+    Posibles mejoras:
+        - Hacerlo por localia usando "segun_localia"
+    """
+    # Ordeno por fecha ascendente
+    df = df.sort_values(by='date', ascending=False) # Fundamental par
+    l_teams = df['id_team_home'].unique()
+    # logger.warning(f"1: {df.shape}")
+
+    # Inicializar columnas para evitar errores con columnas inexistentes
+    for col in ['n_wins_last', 'n_draws_last', 'n_loss_last']:
+        for location in ['home', 'away']:
+            df[f'{col}_{n_matches}_matches_{location}'] = np.nan
+    # logger.warning(f"2: {df.shape}")
+
+    # Por team
+    for team in l_teams:
+    
+        # Obtengo los matchs que jugó el team --> Deberia tomarlo distinto segun "segun_localia" True o False...
+        if segun_localia:
+            lst = [
+                df[df['id_team_home'] == team],
+                df[df['id_team_away'] == team]
+            ]
+        else:
+            lst = [
+                df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
+            ]
+            
+        for df_match_team in lst:
+
+            # Por match del team
+            for idx, row in df_match_team.iterrows():
+
+                home_or_away = 'home' if row['id_team_home'] == team else 'away'
+                
+                # Obtener el índice posicional del registro actual
+                current_pos = df_match_team.index.get_loc(idx)
+
+                # Seleccionar los 10 registros debajo del actual
+                df_match_team_filt = df_match_team.iloc[current_pos + 1 : current_pos + n_matches + 1]
+                n_games = len(df_match_team_filt)
+                # logger.info(df_match_team_filt)
+
+                df_match_team_filt_home = df_match_team_filt[df_match_team_filt['id_team_home'] == team]
+                df_match_team_filt_away = df_match_team_filt[df_match_team_filt['id_team_away'] == team]
+                
+                if n_games != (len(df_match_team_filt_home) + len(df_match_team_filt_away)):
+                    logger.error(f"Error en filtrado de partidos en la construccion... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_match_team_filt)}")
+
+                # Construyo variables
+                n_wins = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 1]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 2])
+                n_draws = len(df_match_team_filt[df_match_team_filt['result'] == 0])
+                n_loss = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 1])
+
+                if n_games != (n_wins + n_draws + n_loss):
+                    logger.error(f"Error en determinacion de resultados en ultimos dias {n_wins} + {n_draws} + {n_loss} != {n_games}")
+
+                # Asignar valores al DataFrame original
+                if n_games > 0:
+                    df.at[idx, f'n_wins_last_{n_matches}_matches_{home_or_away}'] = n_wins
+                    df.at[idx, f'n_draws_last_{n_matches}_matches_{home_or_away}'] = n_draws
+                    df.at[idx, f'n_loss_last_{n_matches}_matches_{home_or_away}'] = n_loss
+  
+    # Calculo diferencia entre local y visitate
+    # df[f'dif_n_matches_last_{n_days}_days'] = df[f'n_matches_last_{n_days}_days_home'] - df[f'n_matches_last_{n_days}_days_away']  
+    # df = df.drop(columns=[f'n_matches_last_{n_days}_days_home', f'n_matches_last_{n_days}_days_away'])
     # logger.warning(f"3: {df.shape}")
     return df
 
@@ -464,7 +516,6 @@ def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = 
     
     return df
 
-
 def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str=None, laplace: bool = False):
     """
     Nueva columna siendo el porcentaje resultante de la division de otras dos columnas.
@@ -491,7 +542,7 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, calculate_dif: bool = True, dif_con_against: bool = True, _print: bool = False):
+def determine_mean_in_last_matches(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, calculate_dif: bool = True, dif_con_against: bool = True, _print: bool = False): # mean or sum?
     """
     Obtiene el promedio de las stats en los ultimos matchs
 

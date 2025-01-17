@@ -147,19 +147,19 @@ def comprehensive_search(
     for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
         # Asigno valor a cada hiperpametro
-        n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2  # n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
+        n_last_matches, n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2  # n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
         if verbose >= 0:
             logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
-            print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
+            print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 
         # Construyo datos
-        path_1 = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
+        path_1 = f"{n_last_matches}_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
         path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_1}.xlsx'
         try:
             df_constructed = pd.read_excel(path_construct, index_col=0)
             logger.info(df_constructed)
         except FileNotFoundError:
-            df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
+            df_constructed = dp.construct_data(df_integrated, n_last_matches=n_last_matches,l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
             if export:
                 df_constructed.to_excel(path_construct, index=True)
 
@@ -429,7 +429,8 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'construct': {
-                'n_dias_ult_part': [[30, 180]],
+                'n_last_matches': [[10]],  # Variables historicas en ultimos n partidos
+                'n_dias_ult_part': [[30, 180]], # Variables historicas en partidos de ultimos n_days
                 'n_years_h2h': [3],
                 'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
@@ -462,9 +463,9 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
-    from_construct = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    update_sofifa = True
+    id_country = 148
+    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]

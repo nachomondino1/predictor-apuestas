@@ -411,7 +411,7 @@ class DataPreparation:
 
         return df
 
-    def construct_data(self, df: pd.DataFrame, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, 
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = False, with_historic: bool = True, 
                        dif_con_against: bool = True, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
@@ -440,11 +440,6 @@ class DataPreparation:
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
-            # Expected Result and Expected Points (xPts) --> SACARLO UNA VEZ QUE YA NO TENGO MODELOS VIEJOS.
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=1) # 0.32 en GER y tolerance 7%. FRA: 0.27 y tol 0.08
-            df = construct_data.determine_expected_points(df)
-            df = df.drop(['expected_result'], axis=1) # si no lo borras, la tenes que construir como variable historica (para FRA y no se GER no la borré...)
-
             ## OFENSIVE
             ## Goal ratio
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
@@ -457,8 +452,8 @@ class DataPreparation:
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
             # Attacking efficiency --> (lo evito por cantidad de NaN)
-            # df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
-            # df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
+            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
+            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
@@ -471,18 +466,25 @@ class DataPreparation:
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
             # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
-            # df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
-            # df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
+            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
+            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
 
             # Efficiency --> (lo evito por cantidad de NaN)
-            # df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
-            # df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
+            df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
+            df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
+            ## EN ULTIMOS N PARTIDOS
+            for n_matches in n_last_matches:
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
+                df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
+                raise ValueError
+
+            ## EN PARTIDOS EN ULTIMOS N DAYS
             # Numero de partidos jugados en ultimos n days
             for n_days in l_days:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
-            
+
             # Historiales
             if with_h2h:
                 df = construct_data.h2h_by_date(df, n_years=-1)
@@ -494,15 +496,14 @@ class DataPreparation:
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
                 # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
-                'expected_points', # --> SACARLO UNA VEZ QUE YA NO TENGO MODELOS VIEJOS.
                 # Ofensive
                 'expected_goals_(xg)', 
                 'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', # 'shots_off_goal' # 'SG2G',
                 'dead_balls', # 'goal_ratio_dead_balls',
-                'ball_possession', 'total_passes', # 'attacking_efficiency', # 'pass_success_%', 
+                'ball_possession', 'total_passes', 'attacking_efficiency', # 'pass_success_%', 
                 # Defensive
                 'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls', 'interceptions'
-                'PPDA', 'clean_sheet', # 'defensive_efficiency',  "efficiency" # 'goalkeeper_saves'
+                'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" # 'goalkeeper_saves'
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
