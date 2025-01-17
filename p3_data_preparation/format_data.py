@@ -117,9 +117,9 @@ def format_percentage_columns(df, base_columns):
     Returns:
         pd.DataFrame: DataFrame con las columnas formateadas.
     """
-    columns = [col for col in base_columns if col in df.columns]  # Evita KeyError dentro del for en caso que no exista la stat en los nuevos partidos missing
+    # columns = [col for col in base_columns if col in df.columns]  # Evita KeyError dentro del for en caso que no exista la stat en los nuevos partidos missing
 
-    for base_col in columns:
+    for base_col in base_columns:
 
         home_col = f"{base_col}_home"
         away_col = f"{base_col}_away"
@@ -132,18 +132,73 @@ def format_percentage_columns(df, base_columns):
         total_col_home = f'n_{home_col}'  # No uso total por si ya existe "total_passes" en missing.
         total_col_away = f'n_{away_col}'
 
-        # Procesar la columna `_home` (con warning) --> No usar .loc[] porque reformatea mal (no termina uniendo columnas nuevas a las viejas..)
-        df[[accuracy_col_home, completed_col_home, total_col_home]] = df[home_col].str.extract(
-            r'(\d+)% \((\d+)/(\d+)\)').astype(float)
+        # Extraer datos de `home_col`
+        # Paso 1: Aplicar la expresión regular 
+        extracted_home = df[home_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+        extracted_away = df[away_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+        # logger.info(f'1) Extracted home: {extracted_home} Extracted away: {extracted_away}')
+        
+        # Paso 2: Convertir a float los valores extraídos
+        extracted_home = extracted_home.astype(float)
+        extracted_away = extracted_away.astype(float)
+        # logger.info(f'2) Extracted home: {extracted_home} Extracted away: {extracted_away}')
 
-        # Procesar la columna `_away`
-        df[[accuracy_col_away, completed_col_away, total_col_away]] = df[away_col].str.extract(
-            r'(\d+)% \((\d+)/(\d+)\)').astype(float)
-    
+        # Paso 3: Asignar los valores extraídos a nuevas columnas
+        df[[accuracy_col_home, completed_col_home, total_col_home]] = extracted_home
+        df[[accuracy_col_away, completed_col_away, total_col_away]] = extracted_away
+
+        # Verificacion de formato
+        verify_columns(df, col=accuracy_col_home, rango=[0, 100], dtypes=(int, float))
+        verify_columns(df, col=completed_col_home, rango=[0, 2000], dtypes=(int, float))
+        verify_columns(df, col=total_col_home, rango=[0, 2000], dtypes=(int, float))
+        verify_columns(df, col=accuracy_col_away, rango=[0, 100], dtypes=(int, float))
+        verify_columns(df, col=completed_col_away, rango=[0, 2000], dtypes=(int, float))
+        verify_columns(df, col=total_col_away, rango=[0, 2000], dtypes=(int, float))
+
         # Eliminar las columnas originales
         df.drop(columns=[home_col, away_col], inplace=True)
     
     return df
+
+def verify_columns(df, col, rango: list = [0, 100], dtypes: tuple = (int, float)):
+    """
+    Verifica que las columnas cumplen los criterios de tipo y rango, ignorando valores NaN.
+    
+    Args:
+        df (pd.DataFrame): DataFrame que contiene la columna a verificar.
+        col (str): Nombre de la columna a verificar.
+        rango (list): Lista con el mínimo y máximo permitido [min, max].
+        dtypes (tuple): Tipos de datos permitidos en la columna.
+    """
+    errors = []
+    val_min, val_max = rango[0], rango[1]
+
+    # Filtrar valores no nulos
+    non_nan_values = df[col].dropna()
+
+    # Verificar si todos los valores son del tipo esperado
+    if not non_nan_values.apply(lambda x: isinstance(x, dtypes)).all():
+        errors.append(f"Columna '{col}' contiene valores que no son del tipo {dtypes}.")
+
+    # Verificar si los valores están dentro del rango especificado
+    if not non_nan_values.apply(lambda x: val_min <= x <= val_max).all():
+        min_val = non_nan_values.min()
+        max_val = non_nan_values.max()
+        errors.append(
+            f"Columna '{col}' contiene valores fuera del rango [{val_min}, {val_max}]. "
+            f"Valores min y max: {min_val} --> {max_val}"
+        )
+
+    # Resultado de la verificación
+    if errors:
+        logger.error(f"Errores encontrados en la columna '{col}':")
+        for error in errors:
+            logger.error(error)
+            raise ValueError
+    else:
+        logger.critical(f"La columna '{col}' está correctamente formateada.")
+
+    print()
 
 def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
     """
