@@ -194,6 +194,7 @@ def verify_columns(df, col, rango: list = [0, 100], dtypes: tuple = (int, float)
         logger.error(f"Errores encontrados en la columna '{col}':")
         for error in errors:
             logger.error(error)
+            raise ValueError
     else:
         logger.critical(f"La columna '{col}' está correctamente formateada.")
 
