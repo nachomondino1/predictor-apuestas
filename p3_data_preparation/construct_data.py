@@ -326,12 +326,13 @@ def determine_expected_points(df: pd.DataFrame):
     return df
 
 ## Teams
-def h2h_by_date(df: pd.DataFrame, n_years: int, _print: bool = False):
+def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, _print: bool = False):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
     :param df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
     :param n_years: Integer. Número de años a tener en cuenta para determine el h2h entre dos equipos.
+    prod: Permite construir todos los equipos o solo los mas frecuentes. En prod necesito todos. En train los mas frecuentes (x tiempo). (bool)
     :return: DataFrame pasado por parámetro con nueva columna, 'h2h_date', que permite determine a cuál de los dos
     equipos de un match le favorece más el h2h entre ellos.
     """
@@ -345,8 +346,10 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, _print: bool = False):
     h2h_col_name = f'h2h_{n_years}'
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    # l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
-    l_equipos = determine_most_frequent_teams(df)
+    if prod:
+        l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+    else:
+        l_equipos = determine_most_frequent_teams(df)
 
     # Por equipo 1
     for i in range(len(l_equipos)):
@@ -391,12 +394,13 @@ def determine_most_frequent_teams(df, _print: bool = False):
         print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
     return l_equipos
 
-def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, _print: bool = False):
+def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, prod: bool = False, _print: bool = False):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
     :param df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
     :param n_years: Integer. Número de años a tener en cuenta para determine el h2h entre dos equipos.
+    prod: Permite construir todos los equipos o solo los mas frecuentes. En prod necesito todos. En train los mas frecuentes (x tiempo). (bool)
     :return: DataFrame pasado por parámetro con nueva columna, 'h2h_date', que permite determine a cuál de los dos
     equipos de un match le favorece más el h2h entre ellos.
     """
@@ -410,8 +414,10 @@ def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, _print: bool = False)
     h2h_col_name = f'h2h_{n_years}_segun_loc'
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    # l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
-    l_equipos = determine_most_frequent_teams(df)
+    if prod:
+        l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+    else:
+        l_equipos = determine_most_frequent_teams(df)
     
     # Por equipo 1
     for i in range(len(l_equipos)):

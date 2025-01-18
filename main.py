@@ -455,6 +455,17 @@ class DataPreparation:
         ## Elimino stats irrelevantes
         # Determino cuales son las variables stats automaticamente
         stats_columns = construct_data.determine_stats_columns(df)
+        self.relevant_stats()
+        df = clean_data.delete_not_relevant_stats(df, stats_columns, self.relevant_stats_columns)
+        print(df.shape)
+
+        return df
+    
+    def relevant_stats(self):
+        """
+        Es necesaria para usarla desde prod.
+        Mejoras: Garantizar que esten en df.columns...
+        """
         self.relevant_stats_columns = [
             # Ofensive
             'expected_goals_(xg)', 
@@ -465,10 +476,6 @@ class DataPreparation:
             'yellow_cards', 'red_cards', 'defensive_actions', 
             'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
         ] 
-        df = clean_data.delete_not_relevant_stats(df, stats_columns, self.relevant_stats_columns)
-        print(df.shape)
-
-        return df
 
     def construct_data(self, df: pd.DataFrame, n_last_matches: list, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = True, with_historic: bool = True, 
                        dif_con_against: bool = True, export: bool = True):

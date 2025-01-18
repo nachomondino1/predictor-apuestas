@@ -375,7 +375,8 @@ class DataPreparationNew(DataPreparation):
         df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)  # usar with_h2h=False para no reemplazarlo.
 
         # Si hay "ultimos partidos"
-        if len(df_last_old_matches) > 0:            
+        if len(df_last_old_matches) > 0:
+            self.relevant_stats()
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
             df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, l_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
@@ -404,15 +405,17 @@ class DataPreparationNew(DataPreparation):
     def construct_h2h_next_matches(self, df_next_matches, df_old_matches, n_years_h2h, columns_used):
         """
         Construccion de variables historiales para proximos partidos.
-        Mejora a hacer: podria evitar la construccion de las variables si no estan en columns_used...
+        Mejora a hacer: 
+        - Evitar construir historial para todos los partidos de df_old_matches y solo construirle a los de df_next_matches.
+        - podria evitar la construccion de las variables si no estan en columns_used...
         """
         # Construyo columna "result" para poder calcular h2h
         df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
 
         ## Construyo historiales
         df = pd.concat([df_next_matches, df_old_matches], axis=0)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
+        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=True)
+        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h, prod=True)
 
         ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
         columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
@@ -1238,13 +1241,15 @@ def main(
         n_days_max = max(d_hiper['n_dias_ult_part'])
         n_days_period = n_days_max * 2 if d_hiper['segun_localia'] == True else n_days_max
         df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
+        df_last_old_matches_h2h = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=d_hiper['n_years_h2h']*365 + 100) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
         # Sigo con la preparacion de datos desde fill_data
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill, comp_to_select=comp_public)
         df = dp.construct_data_new(
-            df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, 
+            df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
             n_last_matches=d_hiper['n_last_matches'], n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], 
-            segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], columns_used=columns_scaled
+            segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], 
+            columns_used=columns_scaled
             )
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
         df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
