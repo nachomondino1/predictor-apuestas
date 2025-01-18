@@ -351,7 +351,8 @@ class DataPreparationNew(DataPreparation):
 
         return df_new, df_copiado
     
-    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches, n_days: list, n_years_h2h: int, 
+    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
+                           n_last_matches:list, n_days: list, n_years_h2h: int, 
                            segun_localia: bool, columns_used: list, dif_con_against: bool = True, verbose: int = 0):
         """
         Construye nuevos datos a partir de un dataframe existente.
@@ -371,14 +372,13 @@ class DataPreparationNew(DataPreparation):
         start = time.time()
 
         # 1) Construyo historial entre si  (podria evitar construirlas si no estan en columns_used...)
-        # df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)
+        df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)  # usar with_h2h=False para no reemplazarlo.
 
         # Si hay "ultimos partidos"
         if len(df_last_old_matches) > 0:            
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
-            n_rows_inic = len(df_next_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(df_concat_last, n_days, n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
+            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, l_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
 
         # Si no hay "ultimos partidos"
@@ -406,19 +406,12 @@ class DataPreparationNew(DataPreparation):
         Construccion de variables historiales para proximos partidos.
         Mejora a hacer: podria evitar la construccion de las variables si no estan en columns_used...
         """
-        # Determine years to construct h2h
-        df_integrated = pd.read_excel(f'data/{self.country}/p3_data_preparation/df_integrated.xlsx', index_col=0)  # no puedo usar df_old_matches porque tiene missing y la date se estira... (intente usar df_match pero falla n_years)
-        n_years = (max(df_integrated['date']) - min(df_integrated['date'])).days / 365  # Determino n_years solo con partidos ya jugados
-        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
-
         # Construyo columna "result" para poder calcular h2h
         df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
 
         ## Construyo historiales
-        df_concat = pd.concat([df_next_matches, df_old_matches], axis=0)
-        df = construct_data.h2h_by_date(df_concat, n_years=n_years)
+        df = pd.concat([df_next_matches, df_old_matches], axis=0)
         df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years)
         df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
         ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
@@ -619,8 +612,6 @@ class TrainingDataLoader():
         self.construct_directories()
 
     def construct_directories(self):
-        # self.BASE_DIR_ALL_MISSING = f'./data/{self.country}/p6_deployment/missing/data_understanding/all'
-        # self.BASE_DIR_NEXT_MATCHES = f'./data/{self.country}/p6_deployment/data_understanding'
         self.BASE_DIR_dp = f"./data/{self.country}/p3_data_preparation/{self.iteration_date}"
         self.BASE_DIR_mod = f"./data/{self.country}/p4_modeling/{self.iteration_date}"
     
@@ -634,7 +625,7 @@ class TrainingDataLoader():
         # Si se levanta de main_find_best_hyper.py
         if self.n_model is not None:
             
-            df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_train.xlsx")
+            df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")
             
             # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
             row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
@@ -655,6 +646,7 @@ class TrainingDataLoader():
 
         # Guardo hiperparametros en diccionario
         ## Construct_data
+        d['n_last_matches'] = [10] # eval(row_hiper['n_dias_ult_part']) 
         d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part']) # eval(row_hiper['n_dias_ult_part'].values[0])
         d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
         d['segun_localia'] = row_hiper['segun_localia'] # .values[0]
@@ -666,17 +658,19 @@ class TrainingDataLoader():
         ## Select_data
         d['selected_columns'] = selected_columns
 
+        self.path_construct = f'{d['n_last_matches']}_{d['n_dias_ult_part']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['dif_con_against']}'
+        self.path_scale = f'{self.path_construct}_{d['n_years_to_select']}_{d['comp_to_select']}'
+
         if self.verbose >= 0:
             logger.info("Hiperparametros cargados:")
             for key, value in d.items():
                 logger.info(f'\t {key}: {value}')
         return d
 
-    def load_df_etiquetas(self, d):
+    def load_df_etiquetas(self):
 
         logger.info("Levento etiquetas con el que entrené")
-        n_ult_part, n_years_h2h, segun_localia, dif_con_against = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against']
-        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}.xlsx'       
+        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.path_construct}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
         if self.verbose >= 1:  
@@ -684,12 +678,11 @@ class TrainingDataLoader():
 
         return df_etiquetas
 
-    def load_scaler_model(self, d):
+    def load_scaler_model(self):
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        n_ult_part, n_years_h2h, segun_localia, dif_con_against, n_years_sel, comp = d['n_dias_ult_part'], d['n_years_h2h'], d['segun_localia'], d['dif_con_against'], d['n_years_to_select'], d['comp_to_select']
-        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{n_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}_{n_years_sel}_{comp}.pkl'
+        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{self.path_scale}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
@@ -1204,8 +1197,8 @@ def main(
 
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
         d_hiper = lo.load_data_preparation_hyperparameters()
-        df_etiquetas = lo.load_df_etiquetas(d_hiper)
-        scaler, columns_scaled = lo.load_scaler_model(d_hiper)
+        df_etiquetas = lo.load_df_etiquetas()
+        scaler, columns_scaled = lo.load_scaler_model()
 
         # Preparacion de datos hasta integrate
         df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
@@ -1245,7 +1238,11 @@ def main(
 
         # Sigo con la preparacion de datos desde fill_data
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill, comp_to_select=comp_public)
-        df = dp.construct_data_new(df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], columns_used=columns_scaled)
+        df = dp.construct_data_new(
+            df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_integrated_updated, 
+            n_last_matches=d_hiper['n_last_matches'], n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], 
+            segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], columns_used=columns_scaled
+            )
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
         df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
         df = dp.select_data_new(df, d_hiper['selected_columns'])
