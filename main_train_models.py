@@ -256,7 +256,7 @@ def comprehensive_search(
                     if len(df_metrics) > 0:
                         # Guardo datos en dataframe
                         row_data = {'n_iteration': cont_iter, 
-                                    'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
+                                    'n_last_matches': n_last_matches, 'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
                                     'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                     'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
                                     'fill_na': fill_na, 'bal_type': bal_type,
@@ -431,7 +431,7 @@ def define_params_space(id_country, fast: bool = False):
             'construct': {
                 'n_last_matches': [[10]],  # Variables historicas en ultimos n partidos
                 'n_dias_ult_part': [[30, 180]], # Variables historicas en partidos de ultimos n_days
-                'n_years_h2h': [3],
+                'n_years_h2h': [2],
                 'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
             },
