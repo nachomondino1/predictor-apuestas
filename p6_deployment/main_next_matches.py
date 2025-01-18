@@ -455,8 +455,8 @@ class DataPreparationNew(DataPreparation):
         # Reemplazo infinitos
         df = clean_data.replace_infinite(df)
 
-        # Para evitar ciertas competencias
-        n_reg_inic, n_col_inic= len(df), len(df.columns)
+        # Para evitar ciertas competencias --> Moverlo a clean antes de construir?
+        n_reg_inic, n_col_inic = len(df), len(df.columns)
         df = df[df['id_competition'].isin(comp_to_select)]
         
         if verbose >= 1:
@@ -658,8 +658,11 @@ class TrainingDataLoader():
         ## Select_data
         d['selected_columns'] = selected_columns
 
+        self.path_clean = f'{d['n_years_to_select']}_{d['comp_to_select']}'
         self.path_construct = f'{d['n_last_matches']}_{d['n_dias_ult_part']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['dif_con_against']}'
-        self.path_scale = f'{self.path_construct}_{d['n_years_to_select']}_{d['comp_to_select']}'
+
+        self.path_1 = f'{self.path_clean}_{self.path_construct}'
+        self.path_2 = f'{self.path_construct}_{self.path_clean}' # temporal para scale... pues lo tenia mal..
 
         if self.verbose >= 0:
             logger.info("Hiperparametros cargados:")
@@ -670,7 +673,7 @@ class TrainingDataLoader():
     def load_df_etiquetas(self):
 
         logger.info("Levento etiquetas con el que entrené")
-        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.path_construct}.xlsx'       
+        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.path_1}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
         if self.verbose >= 1:  
@@ -682,7 +685,7 @@ class TrainingDataLoader():
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{self.path_scale}.pkl'
+        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{self.path_2}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
