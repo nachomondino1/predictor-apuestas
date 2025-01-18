@@ -345,7 +345,8 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, _print: bool = False):
     h2h_col_name = f'h2h_{n_years}'
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+    # l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+    l_equipos = determine_most_frequent_teams(df)
 
     # Por equipo 1
     for i in range(len(l_equipos)):
@@ -381,6 +382,15 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, _print: bool = False):
     print(f"Construccion de historiales in {(end - start) / 60:.1f} minutes")
     return df
 
+def determine_most_frequent_teams(df, _print: bool = False):
+    # Determinar equipos a calcular el historial
+    frecuencias = df['id_team_home'].value_counts()
+    threshold = int(0.001 * len(df))
+    l_equipos = frecuencias[frecuencias > threshold].index.tolist()
+    if _print:
+        print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
+    return l_equipos
+
 def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, _print: bool = False):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
@@ -400,7 +410,8 @@ def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, _print: bool = False)
     h2h_col_name = f'h2h_{n_years}_segun_loc'
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+    # l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+    l_equipos = determine_most_frequent_teams(df)
     
     # Por equipo 1
     for i in range(len(l_equipos)):
