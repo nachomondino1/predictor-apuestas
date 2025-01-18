@@ -406,16 +406,16 @@ class DataPreparationNew(DataPreparation):
         """
         Construccion de variables historiales para proximos partidos.
         Mejora a hacer: 
-        - Evitar construir historial para todos los partidos de df_old_matches y solo construirle a los de df_next_matches.
         - podria evitar la construccion de las variables si no estan en columns_used...
         """
         # Construyo columna "result" para poder calcular h2h
         df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
+        idxs_to_construct = df_next_matches.index
 
         ## Construyo historiales
         df = pd.concat([df_next_matches, df_old_matches], axis=0)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=True)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h, prod=True)
+        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct)
+        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct)
 
         ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
         columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
@@ -1368,11 +1368,11 @@ if __name__ == "__main__":
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         148: ["spain", '2025-01-07'], 
-        # 148: ["spain", '2025-01-09'], 
+        148: ["spain", '2025-01-18'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 860, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 4, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         

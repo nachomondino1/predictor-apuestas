@@ -326,7 +326,7 @@ def determine_expected_points(df: pd.DataFrame):
     return df
 
 ## Teams
-def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, _print: bool = False):
+def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, idxs_to_construct: list = None, _print: bool = False):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
@@ -347,7 +347,8 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, _print: bool
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
     if prod:
-        l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+        df_next_matches = df[df.index.isin(idxs_to_construct)]
+        l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
     else:
         l_equipos = determine_most_frequent_teams(df)
 
@@ -365,21 +366,23 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, _print: bool
             # Por partido entre equipos
             for idx, row in df_hist.iterrows():
 
-                # Selecciono los ultimos matchs
-                limit_date = row['date'] - timedelta(days=n_days)
-                df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
-                
-                # Por ultimos matchs
-                h2h = 0
-                for _, fila in df_hist_filt.iterrows():
-                    if fila['result'] == 1:
-                        h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
-                    elif fila['result'] == 2:
-                        h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+                if idx in idxs_to_construct:
 
-                # Guardo h2h
-                if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
-                    df.loc[idx, h2h_col_name] = h2h
+                    # Selecciono los ultimos matchs
+                    limit_date = row['date'] - timedelta(days=n_days)
+                    df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
+                    
+                    # Por ultimos matchs
+                    h2h = 0
+                    for _, fila in df_hist_filt.iterrows():
+                        if fila['result'] == 1:
+                            h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
+                        elif fila['result'] == 2:
+                            h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+
+                    # Guardo h2h
+                    if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
+                        df.loc[idx, h2h_col_name] = h2h
 
     end = time.time()
     print(f"Construccion de historiales in {(end - start) / 60:.1f} minutes")
@@ -394,7 +397,7 @@ def determine_most_frequent_teams(df, _print: bool = False):
         print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
     return l_equipos
 
-def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, prod: bool = False, _print: bool = False):
+def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, prod: bool = False, idxs_to_construct: list = None, _print: bool = False):
     """
     Determina el h2h entre los equipos que disputan el match según los resultados en los últimos matchs entre ellos.
 
@@ -415,10 +418,11 @@ def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, prod: bool = False, _
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
     if prod:
-        l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
+        df_next_matches = df[df.index.isin(idxs_to_construct)]
+        l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
     else:
         l_equipos = determine_most_frequent_teams(df)
-    
+
     # Por equipo 1
     for i in range(len(l_equipos)):
         eq1 = l_equipos[i]
@@ -437,21 +441,23 @@ def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, prod: bool = False, _
                 # Por partido entre equipos
                 for idx, row in df_hist.iterrows():
 
-                    # Selecciono los ultimos matchs
-                    limit_date = row['date'] - timedelta(days=n_days)
-                    df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
+                    if idx in idxs_to_construct:
 
-                    # Por ultimos matchs
-                    h2h = 0
-                    for _, fila in df_hist_filt.iterrows():
-                        if fila['result'] == 1:
-                            h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
-                        elif fila['result'] == 2:
-                            h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+                        # Selecciono los ultimos matchs
+                        limit_date = row['date'] - timedelta(days=n_days)
+                        df_hist_filt = df_hist.loc[(df_hist['date'] >= limit_date) & (df_hist['date'] < row['date'])]
 
-                    # Guardo h2h
-                    if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
-                        df.loc[idx, h2h_col_name] = h2h
+                        # Por ultimos matchs
+                        h2h = 0
+                        for _, fila in df_hist_filt.iterrows():
+                            if fila['result'] == 1:
+                                h2h += +1 if fila['id_team_home'] == row['id_team_home'] else -1
+                            elif fila['result'] == 2:
+                                h2h += -1 if fila['id_team_home'] == row['id_team_home'] else +1
+
+                        # Guardo h2h
+                        if len(df_hist_filt) > 0:  # Para evitar guardar h2h = 0 en matchs donde df_sel no tiene registros porque no jugaron entre si en los ultimos años
+                            df.loc[idx, h2h_col_name] = h2h
 
     end = time.time()
     print(f"Construccion de historiales in {(end - start) / 60:.1f} minutes")
