@@ -119,7 +119,7 @@ def main(
                 logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
                 # Usar mnm.py con predict_missing=True y data_unders=False.
                 d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-                main_next_matches.main(d_run, id_country, export=d_run['export'], verbose=-1) 
+                main_next_matches.main(d_run, id_country, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
 
             # Por modelo: Predict missing + Concatenar a df_predicciones test
             df_ite_filt = assess_models_in_prod.update_test_with_missing(
@@ -168,7 +168,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 48
+    id_country = 148
 
     # Defino hiperparametros
     assess = True
@@ -178,7 +178,6 @@ if __name__ == "__main__":
         6: ["argentina", '2024-12-05'], 
         48: ["england", '2025-01-07'],
         55: ["france", '2025-01-08'], 
-        # 55: ["france", '2025-01-12'], 
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         148: ["spain", '2025-01-07'], 
@@ -189,5 +188,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=False, assess_already_extracted=True
+        assess=assess, extract_missing=True, assess_already_extracted=False
         )

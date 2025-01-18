@@ -913,9 +913,11 @@ class MissingData:
         df_concat_match_odds.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx')
         logger.info(f"Shape de df_match concatenado con missing:: {len_inicial} --> {len_final}")
 
-    def concat_with_missing_already_extracted(self, df_match_miss, df_match_player_miss, df_match_odds_miss): # probar. Ahora no deberia concatenar si los missing nuevos ya estan en los extraidos...
+    def concat_with_missing_already_extracted(self, df_match_miss, df_match_player_miss, df_match_odds_miss):
         """
         Guarda los nuevos partidos missing con los que ya tenía, evitando duplicados.
+
+        Funciona pero hay que ver cuando hay repetidos si los evita... (si corres bien, nunca deberia siquiera tener que evitarlo... pero bueno).
         """
         # Leer los datos previos
         df_match_miss_comp, df_match_player_miss_comp, df_match_odds_miss_comp = self.read_last_missing_data()
@@ -1357,7 +1359,6 @@ if __name__ == "__main__":
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         148: ["spain", '2025-01-07'], 
-        # 148: ["spain", '2025-01-09'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
