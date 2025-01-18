@@ -651,7 +651,7 @@ class TrainingDataLoader():
 
         # Guardo hiperparametros en diccionario
         ## Construct_data
-        d['n_last_matches'] = [10] # eval(row_hiper['n_dias_ult_part']) 
+        d['n_last_matches'] = eval(row_hiper['n_last_matches']) 
         d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part']) # eval(row_hiper['n_dias_ult_part'].values[0])
         d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
         d['segun_localia'] = row_hiper['segun_localia'] # .values[0]
@@ -659,7 +659,7 @@ class TrainingDataLoader():
         ## Clean_data_2
         n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
         d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
-        d['comp_to_select'] = row_hiper['comp_to_select'] # .values[0]
+        d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
         ## Select_data
         d['selected_columns'] = selected_columns
 
