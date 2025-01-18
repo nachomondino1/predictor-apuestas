@@ -279,7 +279,7 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
         df[dif_col] = df[col_home] - df[col_away]  
         df = df.drop(columns=[col_home, col_away])
     
-    logger.warning(f"3: {df.shape}")
+    # logger.warning(f"3: {df.shape}")
     return df
 
 ## Rendimiento del equipo
@@ -345,12 +345,7 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, _print: bool = False):
     h2h_col_name = f'h2h_{n_years}'
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    # Determinar equipos a calcular el historial
-    frecuencias = df['id_team_home'].value_counts()
-    threshold = int(0.001 * len(df))
-    l_equipos = frecuencias[frecuencias > threshold].index.tolist()
-    if _print:
-        print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
+    l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
 
     # Por equipo 1
     for i in range(len(l_equipos)):
@@ -401,20 +396,11 @@ def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, _print: bool = False)
 
     # Ordeno por fecha descendiente (ya se extrae ordenado por fecha descendente pero por las dudas)
     df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
-
-    if n_years == -1:
-        n_years = (max(df['date']) - min(df['date'])).days / 365
-        n_years = int(-(-n_years // 1)) # redondeo hacia arriba numero de años
     n_days =  365 * n_years
     h2h_col_name = f'h2h_{n_years}_segun_loc'
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    # Determinar equipos a calcular el historial
-    frecuencias = df['id_team_home'].value_counts()
-    threshold = int(0.001 * len(df))
-    l_equipos = frecuencias[frecuencias > threshold].index.tolist()
-    if _print:
-        print(f"Integer {threshold} ; Cantidad de equipos: {len(l_equipos)}")
+    l_equipos = list(set(df['id_team_home']).union(set(df['id_team_away'])))
     
     # Por equipo 1
     for i in range(len(l_equipos)):
