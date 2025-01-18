@@ -278,7 +278,7 @@ class DataPreparationNew(DataPreparation):
             df.to_excel(f'{self.BASE_DIR}/df_integrated.xlsx')
         return df
 
-    def fill_data_not_available_yet(self, df_next_matches: pd.DataFrame, df_last_old_matches: pd.DataFrame, comp_to_select=list, verbose: int = 0):
+    def fill_data_not_available_yet(self, df_next_matches: pd.DataFrame, df_last_old_matches: pd.DataFrame, verbose: int = 0):
         """
         Relleno datos aun no disponibles debido a que aun falta mas de 30 min para el partido. Asi, poder predecir a pesar de tener datos aun no 
         disponibles.
@@ -291,11 +291,6 @@ class DataPreparationNew(DataPreparation):
             Dataframe con proximos partidos habiendo reemplezaso los datos aun no disponible por valores en ultimos partidos. 
         """
         logger.info("Rellenando datos aun no disponibles...")
-
-        # Filtro df_last_old_matches con competencias a predecir...
-        n_inic = df_last_old_matches.shape
-        df_last_old_matches = df_last_old_matches[df_last_old_matches['id_competition'].isin(comp_to_select)]  # Para rellenar solo con los partidos de la misma liga...
-        print(n_inic, df_last_old_matches.shape)
 
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos
         l_player_cols  = [col for col in df_last_old_matches.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
@@ -350,6 +345,17 @@ class DataPreparationNew(DataPreparation):
                             break
 
         return df_new, df_copiado
+    
+    def clean_data_3_new(self, df, competencies_to_select = None):
+        """
+        Es clave para que no prediga todas las comp?
+        """
+        n_reg_inic = len(df)
+        df = df[df['id_competition'].isin(competencies_to_select)]
+        
+        if self.verbose >= 1:
+            logger.info(f"Filas luego de filtrar x competencia: {n_reg_inic} --> {len(df)}")
+        return df
     
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
                            n_last_matches:list, n_days: list, n_years_h2h: int, 
@@ -459,11 +465,7 @@ class DataPreparationNew(DataPreparation):
         df = clean_data.replace_infinite(df)
 
         # Para evitar ciertas competencias --> Moverlo a clean antes de construir?
-        n_reg_inic, n_col_inic = len(df), len(df.columns)
-        df = df[df['id_competition'].isin(comp_to_select)]
-        
-        if verbose >= 1:
-            logger.info(f"Filas luego de filtrar x competencia: {n_reg_inic} --> {len(df)}")
+        n_col_inic = len(df.columns)
 
         # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
         try:
@@ -1230,6 +1232,9 @@ def main(
                     logger.info(df_integrated_updated.shape)
                 else:
                     raise KeyError
+                
+        # Filtro partidos por comptencia --> # Para construir como en train, solo las comp que corresponden # Para rellenar solo con los partidos de la misma liga...
+        df_integrated_updated = df_integrated_updated[df_integrated_updated['id_competition'].isin(d_hiper['comp_to_select'])] 
 
         # Selecciono los ultimos partidos de los ya jugados
         initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
@@ -1244,7 +1249,8 @@ def main(
         df_last_old_matches_h2h = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=d_hiper['n_years_h2h']*365 + 100) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
         # Sigo con la preparacion de datos desde fill_data
-        df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill, comp_to_select=comp_public)
+        df = dp.clean_data_3_new(df, competencies_to_select=d_hiper['comp_to_select'])
+        df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
         df = dp.construct_data_new(
             df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
             n_last_matches=d_hiper['n_last_matches'], n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], 
