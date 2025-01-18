@@ -411,6 +411,65 @@ class DataPreparation:
 
         return df
 
+    def clean_data_3(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, export: bool = True):
+        '''
+        CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
+        '''
+        # Ordeno valores por fecha y separo X e y
+        df = df.sort_values(by='date', ascending=False)
+
+        # (1) Eliminacion de filas 
+        if self.verbose >= 0:
+            print("Eliminacion de filas...")
+            n_reg_inic = len(df)
+
+        ## Para evitar partidos muy viejos
+        if n_years_to_select is not None:
+            fecha_limite = df.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+            df = df[df['date'] >= fecha_limite] 
+
+            if self.verbose >= 0:
+                print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(df)}")
+
+        ## Para evitar ciertas competencias
+        if competencies_to_select is not None:
+            n_reg_inic_2 = len(df)
+            df = df[df['id_competition'].isin(competencies_to_select)]
+
+            if self.verbose >= 0:
+                print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(df)}")
+
+        # (2) Eliminacion de columnas         
+        ## usadas solo para construir y constantes
+        cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
+        cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        col_players_noise = [col for col in df.columns if 'rep_player' in col or 'hei_player' in col] # 'wage_player' in col  # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+        cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
+        df.drop(columns=cols_to_drop, inplace=True)
+        if self.verbose >= 0:
+            print("Eliminación de columnas...")
+            print(f"Columnas constantes eliminadas: {cols_constants}")
+            print(f"Columnas eliminadas x posible ruido: {cols_to_drop}")
+            print(df.shape)
+
+        ## Elimino stats irrelevantes
+        # Determino cuales son las variables stats automaticamente
+        stats_columns = construct_data.determine_stats_columns(df)
+        self.relevant_stats_columns = [
+            # Ofensive
+            'expected_goals_(xg)', 
+            'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', 
+            'dead_balls', 
+            'ball_possession', 'total_passes', 'attacking_efficiency',
+            # Defensive
+            'yellow_cards', 'red_cards', 'defensive_actions', 
+            'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
+        ] 
+        df = clean_data.delete_not_relevant_stats(df, stats_columns, self.relevant_stats_columns)
+        print(df.shape)
+
+        return df
+
     def construct_data(self, df: pd.DataFrame, n_last_matches: list, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = True, with_historic: bool = True, 
                        dif_con_against: bool = True, export: bool = True):
         """
@@ -424,14 +483,6 @@ class DataPreparation:
         start = time.time()
         logger.info("Constructing data...")
 
-        # CLEAN DATA ANTES DE CONSTRUIR
-        # Elimino columnas "Ruido"
-        cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        col_players_noise = [col for col in df.columns if 'rep_player' in col or 'hei_player' in col] # 'wage_player' in col  # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
-        cols_to_drop = cols_basics_noise + col_players_noise
-        df = df.drop(columns=cols_to_drop)         # Dropear las columnas seleccionadas
-        logger.warning(f"Columnas eliminadas x posible ruido: {cols_to_drop}")
-        
         # Si quiero construir variables historicas
         if with_historic:
 
@@ -490,23 +541,9 @@ class DataPreparation:
             for n_days in l_days:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
 
-            # Determino cuales son las variables stats automaticamente
-            stats_columns = construct_data.determine_stats_columns(df)
-            relevant_stats_columns = [
-                # Ofensive
-                'expected_goals_(xg)', 
-                'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', 
-                'dead_balls', 
-                'ball_possession', 'total_passes', 'attacking_efficiency',
-                # Defensive
-                'yellow_cards', 'red_cards', 'defensive_actions', 
-                'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
-            ] 
-            df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
-            logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
-
             # Por stat (e.g. shots_on_goal)
-            for var in relevant_stats_columns: 
+            logger.info(f"Stats a promediar en ultimos partidos: {self.relevant_stats_columns}")
+            for var in self.relevant_stats_columns: 
                 logger.info(f"Estadistica a promediar: {var}")
                 
                 # Por periodo de tiempo en el que calcular promedio
@@ -564,7 +601,7 @@ class DataPreparation:
             df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, fill_na: str = None, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, fill_na: str = None, export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -583,50 +620,21 @@ class DataPreparation:
         # Ordeno valores por fecha y separo X e y
         df = df.sort_values(by='date', ascending=False)
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
-        
-        # (1) Eliminacion de filas 
-        if self.verbose >= 1:
-            print("Eliminacion de filas...")
-            n_reg_inic = len(X)
 
-        ## Para evitar partidos muy viejos
-        if n_years_to_select is not None:
-            fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
-            X = X[X['date'] >= fecha_limite] 
-
-            if self.verbose >= 1:
-                print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(X)}")
-
-        ## Para evitar ciertas competencias
-        if competencies_to_select is not None:
-            n_reg_inic_2 = len(X)
-            X = X[X['id_competition'].isin(competencies_to_select)]
-
-            if self.verbose >= 1:
-                print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(X)}")
-
-        # (2) Eliminacion de columnas   
-        ## usadas solo para construir y constantes
+        # (1) Eliminacion de columnas usadas para construir
         cols_for_construct = ['date', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
-        cols_to_drop = cols_for_construct + cols_constants
-        X.drop(columns=cols_to_drop, inplace=True)
-        if self.verbose >= 1:
-            print("Eliminación de columnas...")
-            print(f"Columnas constantes eliminadas: {cols_constants}")
+        X.drop(columns=cols_for_construct, inplace=True)
 
-        # (3) Tratamiento de NaN values
+        # (2) Tratamiento de NaN values
         shape_inicial = X.shape
         X = self.treat_nan_values(X=X, fill_na=fill_na)
         if self.verbose >= 1:
             print(f"Tras fill_na={fill_na}. Shape X_sin_col_mucho_nan: {shape_inicial} --> {X.shape}")
 
-        # (4) Escalado de datos
+        # (3) Escalado de datos
         if self.verbose >= 1:
             print("\nEscalado de datos...")
-
         scaler = StandardScaler()
-        # X_sin_col_mucho_nan = X.select_dtypes(exclude=['datetime64[ns]'])  # Excluy escalado de columnas datetime -->  The DType <class 'numpy.dtypes.DateTime64DType'> could not be promoted by <class 'numpy.dtypes.Float64DType'>. This means that no common DType exists for the given inputs. For example they cannot be stored in a single array unless the dtype is object.
         scaler.fit(X) # Paso 1: Ajusta el StandardScaler a tus datos
         X_scaled = scaler.transform(X) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
         X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
@@ -744,7 +752,7 @@ class DataPreparation:
             X.to_excel(f'{self.base_path}/df_selected_nan.xlsx', index=True)
 
         return X
-    
+        
     def emergency_fill_for_test(self, df, export: bool = True):
         """
         Remoción de valores NaN en df_test
