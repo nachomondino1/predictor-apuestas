@@ -426,8 +426,8 @@ class DataPreparation:
 
         # CLEAN DATA ANTES DE CONSTRUIR
         # Elimino columnas "Ruido"
-        cols_basics_noise = ['attendance', 'capacity', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        col_players_noise = [col for col in df.columns if 'rep_player' in col] # 'wage_player' in col or 'hei_player' in col # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+        cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        col_players_noise = [col for col in df.columns if 'rep_player' in col or 'hei_player' in col] # 'wage_player' in col  # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_basics_noise + col_players_noise
         df = df.drop(columns=cols_to_drop)         # Dropear las columnas seleccionadas
         logger.warning(f"Columnas eliminadas x posible ruido: {cols_to_drop}")
@@ -474,16 +474,16 @@ class DataPreparation:
             df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
             # VARIABLES HISTORICAS
-            ## 1) EN ULTIMOS N years
-            if with_h2h:
-                df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
-                df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
-
-            ## 2) EN ULTIMOS N PARTIDOS
+            ## 1) EN ULTIMOS N PARTIDOS
             for n_matches in n_last_matches:
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
                 df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
+
+            ## 2) EN ULTIMOS N years
+            if with_h2h:
+                df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
+                df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
             ## 3) EN PARTIDOS EN ULTIMOS N DAYS
             # Numero de partidos jugados en ultimos n days
@@ -493,15 +493,14 @@ class DataPreparation:
             # Determino cuales son las variables stats automaticamente
             stats_columns = construct_data.determine_stats_columns(df)
             relevant_stats_columns = [
-                # Agregar n_wins, n_draws y eso aca? El tema es que ya fueron calculadas en los ultimos partidos... Seria como points...
                 # Ofensive
                 'expected_goals_(xg)', 
-                'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', # 'shots_off_goal' # 'SG2G',
-                'dead_balls', # 'goal_ratio_dead_balls',
-                'ball_possession', 'total_passes', 'attacking_efficiency', # 'pass_success_%', 
+                'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', 
+                'dead_balls', 
+                'ball_possession', 'total_passes', 'attacking_efficiency',
                 # Defensive
-                'yellow_cards', 'red_cards', 'defensive_actions', # 'fouls', 'interceptions'
-                'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" # 'goalkeeper_saves'
+                'yellow_cards', 'red_cards', 'defensive_actions', 
+                'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
             ] 
             df = clean_data.delete_not_relevant_stats(df, stats_columns, relevant_stats_columns)
             logger.info(f"Stats a promediar en ultimos partidos: {relevant_stats_columns}")
@@ -586,11 +585,11 @@ class DataPreparation:
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
         
         # (1) Eliminacion de filas 
-        ## Para evitar partidos muy viejos
         if self.verbose >= 1:
             print("Eliminacion de filas...")
             n_reg_inic = len(X)
 
+        ## Para evitar partidos muy viejos
         if n_years_to_select is not None:
             fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
             X = X[X['date'] >= fecha_limite] 
@@ -608,10 +607,9 @@ class DataPreparation:
 
         # (2) Eliminacion de columnas   
         ## usadas solo para construir y constantes
-        cols_for_construct = ['date', 'venue']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        cols_avoid_noise = ['id_team_home', 'id_team_away']
+        cols_for_construct = ['date', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         cols_constants = list(X.columns[X.nunique() == 1])  # Elimino columnas constantes
-        cols_to_drop = cols_for_construct + cols_avoid_noise + cols_constants
+        cols_to_drop = cols_for_construct + cols_constants
         X.drop(columns=cols_to_drop, inplace=True)
         if self.verbose >= 1:
             print("Eliminación de columnas...")
@@ -646,7 +644,7 @@ class DataPreparation:
 
         return df, scaler, X.columns
     
-    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_min_no_nan: float = 0.7, percentil_nan: int = 75, export: bool = True):
+    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
         """
         Tratamiento de nan values
 
@@ -656,7 +654,7 @@ class DataPreparation:
         # Parameters
             df: Dataframe a tratar nan values. (DataFrame)
             fill_na: Tipo de rellenado de NaN values.
-            porc_min_no_nan: Porcentaje minimo de no NaN value que debe tener una columna para evitar ser eliminada. (float)
+            porc_nan_max: Porcentaje de NaN values maximo tolerado (tanto en filas como columnas) (float)
             percentil_nan: Percentil para definir que columnas son consideradas con mucho nan y cuales con poco nan. Solo cuando haces fillna.
             export: 
             _print:
@@ -678,28 +676,25 @@ class DataPreparation:
 
         # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic = len(df_train_val)
-        df_train_val = clean_data.delete_rows_nan(df_train_val, porc_min_no_nan)
-
-        if self.verbose >= 1:
+        df_train_val = clean_data.delete_rows_nan(df_train_val, porc_nan_max=porc_nan_max) # no mas del 50% de nan 
+        if self.verbose >= 0:
             print(f"(1) Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
 
         # (2) Eliminacion de columnas con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        n_reg_min = int(porc_min_no_nan*len(df_train_val)) # no uso n_features_min porque hay tengo un millon de columnas extra que eliminare en select...
         X_sin_col_mucho_nan = df_train_val.copy()
-        df_train_val = clean_data.drop_columns_until_drop_na_min_rows(df_train_val, n_reg_min=n_reg_min) # elimina las columnas hasta que pueda hacer dropna()
+        df_train_val = clean_data.delete_columns_nan(df_train_val, porc_nan_max=porc_nan_max)
         l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(df_train_val.columns))
-
         if self.verbose >= 0 and len(df_train_val.columns) != len(X_sin_col_mucho_nan.columns):
-            logger.warning(f"(2) Eliminacion de columnas con mucho Nan. Se han tenido que eliminar {len(X_sin_col_mucho_nan.columns) - len(df_train_val.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} porque no se alcanzaba el minimo de {n_reg_min} registros para entrenar el modelo. Columnas eliminadas: {l_col_eliminated}")
-            logger.info(f"Tras eliminar columnas con mas de {(1-porc_min_no_nan)*100:.0f}% de NaN values. Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {df_train_val.shape} ")
+            logger.warning(f"(2) Eliminacion de columnas con mucho Nan. Se eliminaron {len(X_sin_col_mucho_nan.columns) - len(df_train_val.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} por tener mas de {porc_nan_max*100:.0f}% de NaN values. Columnas eliminadas: {l_col_eliminated}")
+            logger.info(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {df_train_val.shape} ")
 
         # (3) Eliminacion de todo NaN ya sea drop o fill_na
         ## Reemplazo NaN en TRAIN y VALIDATION 
         if fill_na is not None:
             
             # Determino las columns con mucho NaN (mas de nan_threshold%)
-            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(df_train_val, percentil_nan=percentil_nan) #  porc_max_fixed=(1-porc_min_no_nan) ?
+            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(df_train_val, percentil_nan=percentil_nan) 
 
             # Elimino registros con al menos un NaN 
             largo_inic = len(df_train_val)
@@ -1180,9 +1175,9 @@ class Modeling:
                     df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
                     # Exporto datos del modelo
-                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}_{suffix}.pkl", "wb"))
-                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params_{suffix}.xlsx')
-                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones_{suffix}.xlsx', index=True)
+                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}{suffix}.pkl", "wb"))
+                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params{suffix}.xlsx')
+                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones{suffix}.xlsx', index=True)
 
                 except KeyboardInterrupt as e:
                     logger.warning(f"Se evitó entrenar este modelo mediante {e}")
