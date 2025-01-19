@@ -8,7 +8,7 @@ import datetime
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 from p6_deployment import main_next_matches
 
-def initialize_directories(country, iteration_date, assess_already_extracted):
+def initialize_directories(country, iteration_date, predict_missing):
     """
     Guardar seleccion de modelo vieja en carpeta
     """
@@ -27,7 +27,7 @@ def initialize_directories(country, iteration_date, assess_already_extracted):
         'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
 
-    if not assess_already_extracted:
+    if predict_missing:
         create_and_move_directories(d_paths=d_paths)
     return d_paths
 
@@ -65,7 +65,7 @@ def main(
         iteration_date,
         assess: bool = True,                        # Assess
         extract_missing: bool = True,               # Assess
-        assess_already_extracted: bool = False,     # Assess
+        predict_missing: bool = False,     # Assess
         strategy: str = 'general',                  # Betting Strategy
         ):
     """
@@ -86,7 +86,7 @@ def main(
         - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
     # Creo objeto de clase select_best_model
-    d_paths = initialize_directories(country, iteration_date, assess_already_extracted)
+    d_paths = initialize_directories(country, iteration_date, predict_missing)
 
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
@@ -111,29 +111,33 @@ def main(
     if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
-        if not assess_already_extracted:
-            # Evaluo modelos en test y missing
+        # Extraer missing
+        if extract_missing:
+            logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
+            # Usar mnm.py con predict_missing=True y data_unders=False.
+            d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+            main_next_matches.main(d_run, id_country, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
 
-            # Extraer missing
-            if extract_missing:
-                logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
-                # Usar mnm.py con predict_missing=True y data_unders=False.
-                d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-                main_next_matches.main(d_run, id_country, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
-
-            # Por modelo: Predict missing + Concatenar a df_predicciones test
-            df_ite_filt = assess_models_in_prod.update_test_with_missing(
+        # Por modelo: Predict missing + Concatenar a df_predicciones test
+        if predict_missing:
+            df_test_assess = assess_models_in_prod.update_test_with_missing(
                 df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-        
-        # Usar test + missing ya actualizado
         else:
-            df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
-        
+            logger.warning("Se evita predecir los ultimos partidos missing y se levanta los ya predichos.")
+            df_test_assess = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration_test.xlsx')
+
+        # Concateno y exporto.
+        df_ite_filt = assess_models_in_prod.concat_test_and_assess(df_ite=df_ite_filt, df_test=df_test_assess, path_save=d_paths['path_assess'])
+
         # Recalculo metrica con assess
         metric_col_assess = 'metric_sin_ea'
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
         print(df_ite_filt.shape)
-        
+
+    # Usar test + missing ya actualizado
+    else:
+        df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
+               
 
     # (3) SELECCION DEL MODELO
     # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
@@ -181,6 +185,7 @@ if __name__ == "__main__":
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
         148: ["spain", '2025-01-07'], 
+        # 148: ["spain", '2025-01-18'], 
         167: ["usa", '2024-12-05']
         }
     country = d_countries[id_country][0]
@@ -188,5 +193,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=True, assess_already_extracted=False
+        assess=assess, extract_missing=False, predict_missing=False
         )

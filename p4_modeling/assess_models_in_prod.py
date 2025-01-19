@@ -26,7 +26,6 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     # Defino variables
     df_test = pd.DataFrame()    
     mo = Modeling(country, iteration_date)
-    # bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
     base_path_dp = f'./data/{country}/p3_data_preparation/{iteration_date}'
 
@@ -70,7 +69,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         df_predicciones = format_data.map_teams(df_predicciones, df_teams=df_teams)
 
         # Guardo datos + Exporto
-        row_test = {'n_iteration': n_model, 'model_name': model_name, **d_metrics}
+        row_test = {'n_iteration': n_model, 'model_name': model_name, **d_metrics, 'n_part_assess': len(df_pred_missing)}
         df_row_test = pd.DataFrame([row_test])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
         df_test = pd.concat([df_test, df_row_test], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
         ## Exporto datos del modelo
@@ -80,22 +79,36 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         progress_bar.update(1)
 
     progress_bar.close()
+    return df_test
 
-    # Concateno df_test actualizado con df_ite
+def concat_test_and_assess(df_ite, df_test, path_save):
+    """
+    Concateno resultados en assess y prod y genero un df_iteration actualizado.
+    """
+  # Concateno df_test actualizado con df_ite
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
     df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  
     
-    # Creo columna 'dif_roi_pp'
-    df_ite_updated['dif_roi_pp'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
-    ave_dif = df_ite_updated['dif_roi_pp'].mean() * 100
-    if ave_dif > 0:
-        logger.critical(f"La variacion del ROIpp de prod respecto de prod+asses es de {ave_dif:.0f}%.")
+    # Calculo metricas de variacion de ROI en nuevos partidos
+    n_models = len(df_test)
+    df_ite_updated['var_roi'] = (df_ite_updated['roi'] - df_ite_updated['roi_train']) / df_ite_updated['roi_train']
+    df_ite_updated['ritmo_var_roi'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
+    crecimiento = df_ite_updated['var_roi'].mean() * 100
+    tasa_crecim = df_ite_updated['ritmo_var_roi'].mean() * 100
+    
+    n_part = df_test['n_part_assess'].values[0]
+
+    # Imprimo mensaje
+    logger.info(" Resultados en assess ".center(80, "%"))
+    if crecimiento > 0 and tasa_crecim > 0:
+        logger.critical(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
+    elif crecimiento > 0:
+        logger.warning(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
     else:
-        logger.error(f"La variacion del ROIpp de prod respecto de prod+asses es de {ave_dif:.0f}%. Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
+        logger.error(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim:.0f}%. \t Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
 
     # Exporto df_iteration actualizado
     df_ite_updated.to_excel(f'{path_save}/df_iteration.xlsx', index=False)
-
     return df_ite_updated
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
