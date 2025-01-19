@@ -92,18 +92,20 @@ def comprehensive_search(
     # DIRECTORIOS
     # Defino rutas segun country y date
     BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated/{date}"
+    BASE_DIR_flashscore = f'data/{country}/p6_deployment/missing/old_updated'
+    BASE_DIR_sofifa = f'data/{country}/p2_data_understanding/sofifa_update/{date}' if retrain else f'data/{country}/p2_data_understanding'
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     # save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
-    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
+    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
  
     if not from_construct:
        
         ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
         # Defino paths de donde levantar los datos
-        df_match, df_match_player, df_match_odds = get_flashscore_data(country, update_missing=False)
-        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, retrain=retrain)
+        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=False)
+        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
         df_match.to_excel(f'{BASE_DIR_du}/df_match.xlsx', index=True)
@@ -336,21 +338,19 @@ def save_old_train(l_directories, base_path_old): # Por ahora lo hago manual por
         #     os.makedirs(directorio)
         directories.mover_archivo(origen=directorio, destino=base_path_old)
 
-def get_flashscore_data(country, update_missing: bool = False, verbose: int = 0):
+def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
-    """
-    base_path_fs = f'data/{country}/p6_deployment/missing/old_updated'
-    
+    """    
     # Podria recolectar missing para tener lo ultimos partidos actualzados
     if update_missing:
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
 
     # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
-    df_match = pd.read_excel(f'{base_path_fs}/df_match.xlsx', index_col=0)
-    df_match_player = pd.read_excel(f'{base_path_fs}/df_match_player.xlsx', index_col=0)
-    df_match_odds = pd.read_excel(f'{base_path_fs}/df_match_odds.xlsx', index_col=0)
+    df_match = pd.read_excel(f'{BASE_DIR_flashscore}/df_match.xlsx', index_col=0)
+    df_match_player = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_player.xlsx', index_col=0)
+    df_match_odds = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_odds.xlsx', index_col=0)
     
     print("Flashscore data:")
     if verbose >= 0:
@@ -365,33 +365,27 @@ def get_flashscore_data(country, update_missing: bool = False, verbose: int = 0)
 
     return df_match, df_match_player, df_match_odds
 
-def get_sofifa_data(country, update_sofifa, retrain: bool = True, verbose: int = 0):
+def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, verbose: int = 0):
     """
     Obtengo datos de Sofifa a usar en el nuevo entrenamiento.
     """
-    if retrain:
-        base_path_so = f'data/{country}/p2_data_understanding/sofifa_update'        
-    else:
-        base_path_so = f'data/{country}/p2_data_understanding'
-        logger.warning("Using Sofifa old")
-
     if update_sofifa:
         # Actualizar sofifa con las ultimas seasons
         df_comp = pd.read_excel('./data/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
-
+        
         # Levanto los datos viejos
         df_player_sofifa_old, df_player_fifa_sofifa_old = update_sofifa_data.read_last_player_data(country)
 
         # Obtengo ultimas seasons
-        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=base_path_so)
+        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=f'{BASE_DIR_sofifa}/data_seg')
 
         # Actualizar sofifa con las ultimas seasons
-        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=base_path_so)
+        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=BASE_DIR_sofifa)
 
     else:
-        df_player_sofifa = pd.read_excel(f'{base_path_so}/df_player_sofifa.xlsx', index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f'{base_path_so}/df_player_fifa_sofifa.xlsx', index_col=0)
+        df_player_sofifa = pd.read_excel(f'{BASE_DIR_sofifa}/df_player_sofifa.xlsx', index_col=0)
+        df_player_fifa_sofifa = pd.read_excel(f'{BASE_DIR_sofifa}/df_player_fifa_sofifa.xlsx', index_col=0)
 
     if verbose >= 0: 
         print("\n\nSofifa data:")
@@ -478,8 +472,8 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 148
-    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    update_sofifa = False
+    from_construct = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
