@@ -1224,6 +1224,7 @@ def main(
                 logger.info(df_integrated_updated.shape)
                 df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
                 logger.info(df_integrated_updated.shape)
+
             else:
                 user_input = str(input("Escribe 'y' para eliminar indices duplicados y seguir la prediccion: "))
                 if user_input == 'y':
@@ -1232,9 +1233,10 @@ def main(
                     logger.info(df_integrated_updated.shape)
                 else:
                     raise KeyError
-                
-        # Filtro partidos por comptencia --> # Para construir como en train, solo las comp que corresponden # Para rellenar solo con los partidos de la misma liga...
-        df_integrated_updated = df_integrated_updated[df_integrated_updated['id_competition'].isin(d_hiper['comp_to_select'])] 
+
+        # Clean data antes de construir   
+        df_integrated_updated = df_integrated_updated[df_integrated_updated['id_competition'].isin(d_hiper['comp_to_select'])]  # Filtro partidos por comptencia --> # Para construir como en train, solo las comp que corresponden # Para rellenar solo con los partidos de la misma liga...
+        df = dp.clean_data_3_new(df, competencies_to_select=d_hiper['comp_to_select'])
 
         # Selecciono los ultimos partidos de los ya jugados
         initial_date = datetime.datetime.now()  # initial_date = datetime.datetime(2024, 8, 16)  # Prueba para establecer initial date en una fecha especifica (e.g. 16/08/2024)
@@ -1249,7 +1251,7 @@ def main(
         df_last_old_matches_h2h = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=d_hiper['n_years_h2h']*365 + 100) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
         # Sigo con la preparacion de datos desde fill_data
-        df = dp.clean_data_3_new(df, competencies_to_select=d_hiper['comp_to_select'])
+        df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas.
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
         df = dp.construct_data_new(
             df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
