@@ -81,31 +81,47 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     progress_bar.close()
     return df_test
 
-def concat_test_and_assess(df_ite, df_test, path_save):
+def concat_test_and_assess(df_ite, df_test, path_save, id_country):
     """
     Concateno resultados en assess y prod y genero un df_iteration actualizado.
     """
-  # Concateno df_test actualizado con df_ite
+    # Concateno df_test actualizado con df_ite
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
     df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  
     
+    # Defino que n_model use en prod (para comparar assess y prod)
+    n_model_prod, _, _ = main_next_matches.read_data_of_best_model(id_country)
+
     # Calculo metricas de variacion de ROI en nuevos partidos
-    n_models = len(df_test)
     df_ite_updated['var_roi'] = (df_ite_updated['roi'] - df_ite_updated['roi_train']) / df_ite_updated['roi_train']
     df_ite_updated['ritmo_var_roi'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
+    ## Metricas modelo de prod
+    df_filt = df_ite_updated[df_ite_updated['n_iteration'] == n_model_prod]
+    crecimiento_prod = df_filt['var_roi'].values[0] * 100
+    tasa_crecim_prod = df_filt['ritmo_var_roi'].values[0] * 100
+    ## Metricas promedio
     crecimiento = df_ite_updated['var_roi'].mean() * 100
     tasa_crecim = df_ite_updated['ritmo_var_roi'].mean() * 100
-    
+    n_models = len(df_test)
     n_part = df_test['n_part_assess'].values[0]
+ 
+    # Imprimo mensaje sobre el modelo en prod
+    print(" Resultados en assess (modelo en prod) ".center(80, "%"))
+    if crecimiento_prod > 0 and tasa_crecim_prod > 0:
+        logger.critical(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
+    elif crecimiento_prod > 0:
+        logger.warning(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
+    else:
+        logger.error(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim_prod:.0f}%.")
 
     # Imprimo mensaje
-    logger.info(" Resultados en assess ".center(80, "%"))
+    print(" Resultados en assess (modelos candidatos) ".center(80, "%"))
     if crecimiento > 0 and tasa_crecim > 0:
         logger.critical(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
     elif crecimiento > 0:
         logger.warning(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
     else:
-        logger.error(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim:.0f}%. \t Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
+        logger.error(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim:.0f}%. \n Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
 
     # Exporto df_iteration actualizado
     df_ite_updated.to_excel(f'{path_save}/df_iteration.xlsx', index=False)

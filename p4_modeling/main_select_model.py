@@ -127,7 +127,7 @@ def main(
             df_test_assess = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration_test.xlsx')
 
         # Concateno y exporto.
-        df_ite_filt = assess_models_in_prod.concat_test_and_assess(df_ite=df_ite_filt, df_test=df_test_assess, path_save=d_paths['path_assess'])
+        df_ite_filt = assess_models_in_prod.concat_test_and_assess(df_ite=df_ite_filt, df_test=df_test_assess, path_save=d_paths['path_assess'], id_country=id_country)
 
         # Recalculo metrica con assess
         metric_col_assess = 'metric_sin_ea'
@@ -172,7 +172,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 148
+    id_country = 59
 
     # Defino hiperparametros
     assess = True
@@ -193,5 +193,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=False, predict_missing=False
+        assess=assess, extract_missing=True, predict_missing=True
         )
