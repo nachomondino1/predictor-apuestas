@@ -160,7 +160,7 @@ def format_percentage_columns(df, base_columns):
     
     return df
 
-def verify_columns(df, col, rango: list = [0, 100], dtypes: tuple = (int, float)):
+def verify_columns(df, col, rango: list = None, dtypes: tuple = (int, float)):
     """
     Verifica que las columnas cumplen los criterios de tipo y rango, ignorando valores NaN.
     
@@ -171,23 +171,29 @@ def verify_columns(df, col, rango: list = [0, 100], dtypes: tuple = (int, float)
         dtypes (tuple): Tipos de datos permitidos en la columna.
     """
     errors = []
-    val_min, val_max = rango[0], rango[1]
+    if col not in df.columns:
+        raise KeyError(f"La columna '{col}' no existe en el DataFrame.")
 
     # Filtrar valores no nulos
     non_nan_values = df[col].dropna()
+    col_dtype = df[col].dtype
 
     # Verificar si todos los valores son del tipo esperado
     if not non_nan_values.apply(lambda x: isinstance(x, dtypes)).all():
         errors.append(f"Columna '{col}' contiene valores que no son del tipo {dtypes}.")
 
     # Verificar si los valores están dentro del rango especificado
-    if not non_nan_values.apply(lambda x: val_min <= x <= val_max).all():
-        min_val = non_nan_values.min()
-        max_val = non_nan_values.max()
-        errors.append(
-            f"Columna '{col}' contiene valores fuera del rango [{val_min}, {val_max}]. "
-            f"Valores min y max: {min_val} --> {max_val}"
-        )
+    if col_dtype in [int, float] and rango is not None:
+        val_min, val_max = rango[0], rango[1]
+
+        if not non_nan_values.apply(lambda x: val_min <= x <= val_max).all():
+
+            min_val = non_nan_values.min()
+            max_val = non_nan_values.max()
+            errors.append(
+                f"Columna '{col}' contiene valores fuera del rango [{val_min}, {val_max}]. "
+                f"Valores min y max: {min_val} --> {max_val}"
+            )
 
     # Resultado de la verificación
     if errors:
