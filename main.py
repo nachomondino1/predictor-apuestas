@@ -337,11 +337,7 @@ class DataPreparation:
 
             # Matcheo jugadores de Sofifa y Flashscore
             logger.info("Mapeo jugadores de Sofifa y Flashscore")
-            df_map_players_fs_so = integrate_sofifa_to_flashscore.map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country=self.id_country)
-
-            if export:
-                # df_player.to_excel(f"{self.base_path}/integrate_data/df_player.xlsx", index=True)
-                df_map_players_fs_so.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so.xlsx")
+            df_map_players_fs_so = integrate_sofifa_to_flashscore.map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country=self.id_country, base_path=self.base_path)
 
         # Integro datos de jugadores a df_match usando el mapeo
         df, df_aux = integrate_sofifa_to_flashscore.integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
