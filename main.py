@@ -3,14 +3,14 @@ import pandas as pd
 import numpy as np
 import os
 import datetime
+import time
 from utils.set_up_logging import logger
 from utils import directories
 ## Data understanding
 from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
 ## Data preparation
-from p3_data_preparation import format_data, select_data, clean_data, construct_data
-from p3_data_preparation.integrate_sofifa_to_flashscore import *
+from p3_data_preparation import format_data, select_data, clean_data, construct_data, integrate_sofifa_to_flashscore
 from sklearn.preprocessing import StandardScaler
 import joblib
 ## Modeling
@@ -27,7 +27,6 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 ### Assess model
-from sklearn.metrics import accuracy_score, recall_score, f1_score
 import pickle
 from types import SimpleNamespace
 
@@ -319,7 +318,7 @@ class DataPreparation:
 
         # (Temporalmente) Obtengo el listado de equipos unicos de Flashscore
         # if export:
-        df_teams = create_df_teams(df_match)
+        df_teams = integrate_sofifa_to_flashscore.create_df_teams(df_match)
         if not prod:
             df_teams.to_excel(f"{self.base_path}/integrate_data/df_teams.xlsx", index=True)
 
@@ -338,64 +337,14 @@ class DataPreparation:
 
             # Matcheo jugadores de Sofifa y Flashscore
             logger.info("Mapeo jugadores de Sofifa y Flashscore")
-
-            df_map_players_fs_so, df_player = pd.DataFrame(), pd.DataFrame()
-
-            # Seleccionar ligas
-            d_comps = select_data.determine_country_competitions(self.id_country)            
-            print(f"Competiciones: {d_comps['comp_sin_cups']}")
-
-            # Por Liga:
-            for id_comp in d_comps['comp_sin_cups']:                        
-
-                print(f"Competicion: {id_comp}")
-
-                # filtrar df_match y df_match_player y df_player_sofifa
-                ## Flashscore
-                print(f"Flashscore (todas las ligas): {len(df_match)} {len(df_match_player)}")
-                df_match_league = df_match[df_match['id_competition'] == id_comp]
-                if self.id_country == 6:
-                    df_match_league = df_match[df_match['id_competition'].isin([61, 62])]  # Argentina
-
-                df_match_player_league = df_match_player[df_match_player.index.isin(df_match_league.index)]
-                df_player_league = create_df_player(df_match_player_league)
-                print(f"Flashscore comp {id_comp}: {len(df_match_league)} {len(df_match_player_league)} {len(df_player_league)}")
-
-                ## Sofifa
-                print(f"Sofifa (todas las ligas): {len(df_player_sofifa)} {len(df_player_fifa_sofifa)}")
-                df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
-                ids_players = df_player_fifa_sofifa_league['id_player'].unique()
-                df_player_sofifa_league = df_player_sofifa[df_player_sofifa.index.isin(ids_players)]
-                print(f"Sofifa comp {id_comp}: {len(df_player_sofifa_league)} {len(df_player_fifa_sofifa_league)}")
-
-                # Mapeo jugadores...
-                df_map_players_fs_so_league = match_dataframes_by_str_column(df1=df_player_league, df2=df_player_sofifa_league, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
-
-                # Concateno mapeos de ligas
-                df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_league], axis=0)
-                df_player = pd.concat([df_player, df_player_league], axis=0)
-                print(f"Players map: {len(df_map_players_fs_so)}")                        
-
-                # df_map_players_fs_so.drop_duplicates()
-                if export:
-                    df_player_league.to_excel(f"{self.base_path}/integrate_data/df_player_{id_comp}.xlsx", index=True)
-                    df_map_players_fs_so_league.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so_{id_comp}.xlsx")
-
-                if self.id_country == 6:
-                    print("La copa de la liga prof es una mezcla entre liga y no... A dichos partidos los integro con los jugadores de la liga 61 (y no aparte).")
-                    break
-
-            print(f"Players map final: {len(df_map_players_fs_so)}")
-                # Eliminar jugadores duplicados (x jugar en ambas competicioens)
-            df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
-            print(f"Players map final sin dup: {len(df_map_players_fs_so)}")
+            df_map_players_fs_so = integrate_sofifa_to_flashscore.map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country=self.id_country)
 
             if export:
-                df_player.to_excel(f"{self.base_path}/integrate_data/df_player.xlsx", index=True)
+                # df_player.to_excel(f"{self.base_path}/integrate_data/df_player.xlsx", index=True)
                 df_map_players_fs_so.to_excel(f"{self.base_path}/integrate_data/df_map_players_fs_so.xlsx")
 
         # Integro datos de jugadores a df_match usando el mapeo
-        df, df_aux = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
+        df, df_aux = integrate_sofifa_to_flashscore.integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away'] # main_next a veces no tiene coaches.. deeberia copiar antes...
@@ -1100,7 +1049,7 @@ class Modeling:
             logger.warning(y_pred)
 
             # Verificar el mapeo de índices a clases (opcional)
-            print("Mapeo de índices a clases:", dict(enumerate(model_classes)))
+            # print("Mapeo de índices a clases:", dict(enumerate(model_classes)))
 
         else:
             raise ValueError("El modelo no tiene el atributo 'classes_', no se puede determinar el mapeo.")
@@ -1113,7 +1062,7 @@ class Modeling:
             columns=[f'prob_class_{cls}' for cls in model_classes],
             index=X_test.index
         )
-        logger.error(df_pred_proba)
+        # logger.error(df_pred_proba)
 
         return df_pred_proba, y_pred   
 
