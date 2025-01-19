@@ -435,9 +435,8 @@ class BettingStrategy:
             # df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
             # d_metrics.update(d_expected_roi)
 
-            if self.verbose >= 0:
+            if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
-                # df_pred_with_metrics.to_excel("/Users/nachomondino/Desktop/bs.xlsx")
 
             # Guardo resultados
             d_predic[cont] = df_pred_with_metrics
