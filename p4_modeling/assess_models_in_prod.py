@@ -107,7 +107,7 @@ def concat_test_and_assess(df_ite, df_test, path_save, id_country):
  
     # Imprimo mensaje sobre el modelo en prod
     print(" Resultados en assess (modelo en prod) ".center(80, "%"))
-    if crecimiento_prod > 0 and tasa_crecim_prod > 0:
+    if crecimiento_prod > 0 and tasa_crecim_prod > -0.1:
         logger.critical(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
     elif crecimiento_prod > 0:
         logger.warning(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
@@ -116,7 +116,7 @@ def concat_test_and_assess(df_ite, df_test, path_save, id_country):
 
     # Imprimo mensaje
     print(" Resultados en assess (modelos candidatos) ".center(80, "%"))
-    if crecimiento > 0 and tasa_crecim > 0:
+    if crecimiento > 0 and tasa_crecim > -0.1:
         logger.critical(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
     elif crecimiento > 0:
         logger.warning(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
