@@ -401,18 +401,20 @@ class DataPreparation:
         ## Elimino stats irrelevantes
         # Determino cuales son las variables stats automaticamente
         stats_columns = construct_data.determine_stats_columns(df)
-        self.relevant_stats()
-        df = clean_data.delete_not_relevant_stats(df, stats_columns, self.relevant_stats_columns)
+        relevant_stats = self.determine_stats_to_use()
+        df = clean_data.delete_not_relevant_stats(df, stats_columns=stats_columns, relevant_stats_columns=relevant_stats)
         print(df.shape)
 
         return df
     
-    def relevant_stats(self):
+    def determine_stats_to_use(self):
         """
         Es necesaria para usarla desde prod.
         Mejoras: Garantizar que esten en df.columns...
         """
-        self.relevant_stats_columns = [
+        self.stats_to_derive = ['fouls', 'tackles', 'interceptions', 'clearances_total', 'blocked_shots', 'throw-ins', 'corner_kicks', 'free_kicks']
+
+        self.stats_to_construct = [
             # Ofensive
             'expected_goals_(xg)', 
             'shots_on_goal', 'goal_attempts', 'goals', 'points','PPS', 'goal_ratio', 
@@ -421,7 +423,8 @@ class DataPreparation:
             # Defensive
             'yellow_cards', 'red_cards', 'defensive_actions', 
             'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
-        ] 
+        ]
+        return self.stats_to_derive + self.stats_to_construct
 
     def construct_data(self, df: pd.DataFrame, n_last_matches: list, l_days: list , n_years_h2h: int, segun_localia: bool, with_h2h: bool = True, with_historic: bool = True, 
                        dif_con_against: bool = True, export: bool = True):
@@ -461,7 +464,7 @@ class DataPreparation:
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
-            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
+            df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances_total', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
             df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
             df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
 
@@ -477,12 +480,17 @@ class DataPreparation:
             df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
             df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
+            # Elimino columnas solo usadas para derivar otras
+            cols_to_drop = [col for col in df.columns if any(stat in col for stat in self.stats_to_derive)]
+            df.drop(columns=cols_to_drop, inplace=True)
+            logger.warning(f"Columnas eliminadas (solo usadas para derivar otras): {cols_to_drop}") # Cuidado en que se eliminen todas las stats usadas para derivar.
+
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
             for n_matches in n_last_matches:
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
-                df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
+                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True) # Hay que ver si funciona tanto sin como con localia.
+                # df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
 
             ## 2) EN ULTIMOS N years
             if with_h2h:
@@ -495,8 +503,8 @@ class DataPreparation:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
 
             # Por stat (e.g. shots_on_goal)
-            logger.info(f"Stats a promediar en ultimos partidos: {self.relevant_stats_columns}")
-            for var in self.relevant_stats_columns: 
+            logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
+            for var in self.stats_to_construct: 
                 logger.info(f"Estadistica a promediar: {var}")
                 
                 # Por periodo de tiempo en el que calcular promedio

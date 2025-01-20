@@ -381,7 +381,7 @@ class DataPreparationNew(DataPreparation):
 
         # Si hay "ultimos partidos"
         if len(df_last_old_matches) > 0:
-            self.relevant_stats()
+            self.determine_stats_to_use()
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
             df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, l_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
@@ -1360,7 +1360,7 @@ if __name__ == "__main__":
     id_country = 148
     key, value = 'predict', 'try_a_specific_model'
     # data_unders = False
-    n_days = 15
+    n_days = 2
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1382,18 +1382,18 @@ if __name__ == "__main__":
 
         if value == 'only_extract':
             logger.warning("Extract last missing matches")
-            df = main(d_run, id_country, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
+            df = main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, n_seasons_missing=3, export=d_run['export']) 
         
         elif value == 'only_preparation':
             logger.warning("Prepare missing matches")
-            df = main(d_run, id_country, iteration_date_dt=iteration_date, extract_missing=False, prepare_missing=True, export=d_run['export']) 
+            df = main(d_run, id_country, iteration_date=iteration_date, extract_missing=False, prepare_missing=True, export=d_run['export']) 
         
         elif value == 'all':
             logger.warning("Extract and prepare missing matches")
-            df = main(d_run, id_country, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+            df = main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
 
     elif key == 'predict':
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False} 
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False} 
             
         if value == "predict_missing":
             logger.warning("Get predictions in missing matches of specific model")
@@ -1401,7 +1401,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, no_strategy=True, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=False) 
 
     elif key == 'prod':
         logger.warning("Get predictions for model in prod")
