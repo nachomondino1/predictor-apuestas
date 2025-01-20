@@ -381,6 +381,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     df_map_fs_so['id_player_fs'] = df_map_fs_so['id_player_fs'].astype(str)
     df_map_fs_so = df_map_fs_so.dropna(subset=['id_player_so'])  # Eliminar filas con NaN
     df_map_fs_so['id_player_so'] = df_map_fs_so['id_player_so'].astype(int).astype(str) # Si es float, lo paso a int y luego a str.
+    df_player_sofifa.index = df_player_sofifa.index.astype(str)
+    df_player_fifa_sofifa['id_player'] = df_player_fifa_sofifa['id_player'].astype(str)
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -432,7 +434,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 logger.critical("Hay mapeo!")
 
                             # Busco id_team_sofifa
-                            id_player_sofifa = row_map['id_player_so'].values[0]
+                            id_player_sofifa = str(row_map['id_player_so'].values[0])
 
                             # Busco el id y la fecha en df_player (Sofifa)
                             df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'].astype(str) == str(id_player_sofifa))]
