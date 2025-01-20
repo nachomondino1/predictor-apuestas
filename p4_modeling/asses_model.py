@@ -427,10 +427,6 @@ def read_dfs(
     df_match = load_file_by_condition(country=country, retrain=retrain, file_name="df_match.xlsx")
     df_match_odds = load_file_by_condition(country=country, retrain=retrain, file_name="df_match_odds.xlsx")
 
-
-    df_match = df_match[~df_match.index.duplicated(keep='first')]
-    df_match_odds = df_match_odds[~df_match.index.duplicated(keep='first')]
-
     if verbose >= 2:
         logger.info(df_match)
         logger.info(df_match_odds)
