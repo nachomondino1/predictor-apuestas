@@ -352,6 +352,12 @@ def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbo
     df_match_player = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_player.xlsx', index_col=0)
     df_match_odds = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_odds.xlsx', index_col=0)
     
+    # Verificacion 
+    df_match_sin_dup = df_match[~df_match.index.duplicated()]
+    if len(df_match) != len(df_match_sin_dup):
+        logger.error("Hay partidos repetidos en df_match. Probablemente fallo la concatenacion de old y missing, habiendo concatenado mas de una vez un partido missing.")
+        raise ValueError
+
     print("Flashscore data:")
     if verbose >= 0:
         print(df_match.shape)
@@ -472,8 +478,8 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 148
-    from_construct = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    update_sofifa = True
+    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
