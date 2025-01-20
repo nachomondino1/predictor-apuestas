@@ -837,8 +837,8 @@ class MissingData:
     def read_last_sofifa_data(self):
 
         try:
-            df_player_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/sofifa_update/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
-            df_player_fifa_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/sofifa_update/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
+            df_player_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/sofifa_update/{self.iteration_date}/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
+            df_player_fifa_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/sofifa_update/{self.iteration_date}/df_player_fifa_sofifa.xlsx') # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
 
         except FileNotFoundError:            
             df_player_sofifa = pd.read_excel(f'{self.BASE_DIR_du}/df_player_sofifa.xlsx', index_col=0) # Podria recolectar nueva version del ultimo fifa. # ACTUALIZAR TAMBIEN
@@ -908,6 +908,11 @@ class MissingData:
             logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
 
         # Exporto datos
+        # Temporalmente hasta que haga pull request.
+        df_concat_match = df_concat_match[~df_concat_match.index.duplicated(keep='first')]
+        df_concat_match_player = df_concat_match_player[~df_concat_match_player.index.duplicated(keep='first')]
+        df_concat_match_odds = df_concat_match_odds[~df_concat_match_odds.index.duplicated(keep='first')]
+    
         df_concat_match.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match.xlsx')
         df_concat_match_player.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_player.xlsx')
         df_concat_match_odds.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx')
@@ -1116,12 +1121,14 @@ def main(
 
             if export and len(df_match_miss) > 0:
                 mis.concat_with_missing_already_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
+                mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
+
         else:
             df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
 
         # Exporto datos (tarda banda en la concatenacion, simplificar...)
-        if export and len(df_match_miss) > 0:
-            mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
+        # if export and len(df_match_miss) > 0:
+            # mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
 
         logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
@@ -1364,7 +1371,7 @@ if __name__ == "__main__":
     }
 
     id_country = 148
-    key, value = 'predict', 'try_a_specific_model'
+    key, value = 'missing', 'only_preparation'
     # data_unders = False
     n_days = 15
 
@@ -1375,8 +1382,8 @@ if __name__ == "__main__":
         55: ["france", '2025-01-08'], 
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
-        148: ["spain", '2025-01-07'], 
-        148: ["spain", '2025-01-18'], 
+        # 148: ["spain", '2025-01-07'], 
+        148: ["spain", '2025-01-19'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
@@ -1392,7 +1399,7 @@ if __name__ == "__main__":
         
         elif value == 'only_preparation':
             logger.warning("Prepare missing matches")
-            df = main(d_run, id_country, extract_missing=False, prepare_missing=True, export=d_run['export']) 
+            df = main(d_run, id_country, extract_missing=False, prepare_missing=True, iteration_date_dt=iteration_date, export=d_run['export']) 
         
         elif value == 'all':
             logger.warning("Extract and prepare missing matches")
