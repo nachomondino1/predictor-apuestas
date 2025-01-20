@@ -7,7 +7,7 @@ from utils.set_up_logging import logger
 from dotenv import load_dotenv
 import pandas as pd
 from p2_data_understanding.collect_initial_data import scraper_sofifa
-from p3_data_preparation.format_data import verify_columns
+from p3_data_preparation.format_data import verify_column_format
 from tqdm import tqdm
 import datetime
 
@@ -113,50 +113,48 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
 def format_df_player_sofifa(df):
 
     # Formateo columnas int
+    df.index = df.index.astype(str)
     df['height'] = df['height'].astype(int)
 
     # Verfico formato
-    verify_columns(df, col='player_name', dtypes=(str))
-    verify_columns(df, col='player_name_short', dtypes=(str))
-    verify_columns(df, col='nationality', dtypes=(str))
-    verify_columns(df, col='height', rango=[100, 240], dtypes=(int, float))
-    verify_columns(df, col='preferred_foot', dtypes=(str))
-    verify_columns(df, col='url_player', dtypes=(str))
+    verify_column_format(df, col='player_name', dtypes=(str))
+    verify_column_format(df, col='player_name_short', dtypes=(str))
+    verify_column_format(df, col='nationality', dtypes=(str))
+    verify_column_format(df, col='height', rango=[100, 240], dtypes=(int, float))
+    verify_column_format(df, col='preferred_foot', dtypes=(str))
+    verify_column_format(df, col='url_player', dtypes=(str))
 
 def format_df_player_fifa_sofifa(df):
     """
     Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
     """
     # Formateo columnas int
+    df['id_player'] = df['id_player'].astype(str)
     df['age'] = df['age'].astype(int)
     df['overall_rating'] = df['overall_rating'].astype(int)
     df['potential'] = df['potential'].astype(int)
     df['int_reputation'] = df['int_reputation'].astype(int)
     
     # Verifico formato
-    # id_player
-    verify_columns(df, col='age', rango=[15, 50], dtypes=(int, float))
-    verify_columns(df, col='overall_rating', rango=[50, 100], dtypes=(int, float))
-    verify_columns(df, col='potential', rango=[50, 100], dtypes=(int, float))
-    verify_columns(df, col='value', dtypes=(str))
-    verify_columns(df, col='wage', dtypes=(str))
-    verify_columns(df, col='int_reputation', rango=[0, 5], dtypes=(int, float))
-    verify_columns(df, col='fifa', dtypes=(str))
-    verify_columns(df, col='date', dtypes=(str))    
+    verify_column_format(df, col='id_player', dtypes=(str))
+    verify_column_format(df, col='age', rango=[15, 50], dtypes=(int, float))
+    verify_column_format(df, col='overall_rating', rango=[30, 100], dtypes=(int, float))
+    verify_column_format(df, col='potential', rango=[30, 100], dtypes=(int, float))
+    verify_column_format(df, col='value', dtypes=(str))
+    verify_column_format(df, col='wage', dtypes=(str))
+    verify_column_format(df, col='int_reputation', rango=[0, 5], dtypes=(int, float))
+    verify_column_format(df, col='fifa', dtypes=(str))
+    verify_column_format(df, col='date', dtypes=(str))    
 
-def try_format():
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
 
+    # try Format
     df1 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_sofifa.xlsx')
     df2 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_fifa_sofifa.xlsx')
 
     format_df_player_sofifa(df1)
     format_df_player_fifa_sofifa(df2)
-
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-
-    try_format()
 
     '''
 

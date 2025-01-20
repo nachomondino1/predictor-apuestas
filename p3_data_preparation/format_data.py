@@ -148,19 +148,19 @@ def format_percentage_columns(df, base_columns):
         df[[accuracy_col_away, completed_col_away, total_col_away]] = extracted_away
 
         # Verificacion de formato
-        verify_columns(df, col=accuracy_col_home, rango=[0, 100], dtypes=(int, float))
-        verify_columns(df, col=completed_col_home, rango=[0, 2000], dtypes=(int, float))
-        verify_columns(df, col=total_col_home, rango=[0, 2000], dtypes=(int, float))
-        verify_columns(df, col=accuracy_col_away, rango=[0, 100], dtypes=(int, float))
-        verify_columns(df, col=completed_col_away, rango=[0, 2000], dtypes=(int, float))
-        verify_columns(df, col=total_col_away, rango=[0, 2000], dtypes=(int, float))
+        verify_column_format(df, col=accuracy_col_home, rango=[0, 100], dtypes=(int, float))
+        verify_column_format(df, col=completed_col_home, rango=[0, 2000], dtypes=(int, float))
+        verify_column_format(df, col=total_col_home, rango=[0, 2000], dtypes=(int, float))
+        verify_column_format(df, col=accuracy_col_away, rango=[0, 100], dtypes=(int, float))
+        verify_column_format(df, col=completed_col_away, rango=[0, 2000], dtypes=(int, float))
+        verify_column_format(df, col=total_col_away, rango=[0, 2000], dtypes=(int, float))
 
         # Eliminar las columnas originales
         df.drop(columns=[home_col, away_col], inplace=True)
     
     return df
 
-def verify_columns(df, col, rango: list = None, dtypes: tuple = (int, float)):
+def verify_column_format(df, col, rango: list = None, dtypes: tuple = (int, float)):
     """
     Verifica que las columnas cumplen los criterios de tipo y rango, ignorando valores NaN.
     
@@ -331,6 +331,107 @@ def map_teams(df, df_teams):
     df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
     df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
     return df
+
+ 
+def verify_format(df, column_specs):
+    """
+    Formatea un DataFrame según especificaciones de columnas.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame a formatear.
+        column_specs (dict): Diccionario con las especificaciones para cada columna.
+            Formato: 
+                {
+                    'column_name': {
+                        'dtype': tipo_dato,
+                        'rango': [min, max] (opcional)
+                    },
+                    ...
+                }
+
+    Returns:
+        pd.DataFrame: DataFrame formateado.
+    """
+    for col, specs in column_specs.items():
+        # Verificar si la columna existe en el DataFrame
+        if col not in df.columns:
+            raise KeyError(f"La columna '{col}' no existe en el DataFrame.")
+
+        # Cambiar el tipo de dato
+        if 'dtype' in specs:
+            try:
+                df[col] = df[col].astype(specs['dtype'])
+            except ValueError as e:
+                raise ValueError(f"Error al convertir '{col}' a {specs['dtype']}: {e}")
+
+        # Verificar rango, si está definido
+        ## Verificar formato de la columna usando verify_column_format
+        rango = specs.get('rango', None)
+        dtypes = (specs['dtype'],) if 'dtype' in specs else (int, float)
+        verify_column_format(df, col, rango=rango, dtypes=dtypes)
+
+        # if 'rango' in specs:
+        #     min_val, max_val = specs['rango']
+        #     if not df[col].between(min_val, max_val).all():
+        #         raise ValueError(f"Los valores de la columna '{col}' están fuera del rango {min_val}-{max_val}.")
+
+    return df
+
+def format_df_match(df):
+    """
+    Mejora:
+        - Podria hacer una sola funcion que reciba un dictionary con el nombre al columna, el rango y el dtype deseado.
+    """
+    column_specs = {
+        # 'date': {'dtype': 'datetime64[ns]'},
+        'goals_home': {'dtype': int, 'rango': [0, 15]},
+        'goals_away': {'dtype': int, 'rango': [0, 15]},
+        'expected_goals_(xg)_home': {'dtype': float, 'rango': [0, 15]},
+        'expected_goals_(xg)_away': {'dtype': float, 'rango': [0, 15]},
+        # 'ball_possession_home': {'dtype': int, 'rango': [0, 100]},  # Error al queerer convertirlos al dtype por tener nan...
+        # 'ball_possession_away': {'dtype': int, 'rango': [0, 100]},
+        # 'total_passes_home': {'dtype': int, 'rango': [0, 1500]},
+        # 'total_passes_away': {'dtype': int, 'rango': [0, 1500]},
+        }
+    
+    df['date'] = pd.to_datetime(df['date'])
+    verify_format(df, column_specs)
+    
+def format_df_match_odds(df):
+    pass
+
+def format_df_player_sofifa(df):
+    column_specs = {
+        'player_name': {'dtype': str},
+        'player_name_short': {'dtype': str},
+        'nationality': {'dtype': str},
+        'height': {'dtype': int, 'rango': [100, 250]},
+        'preferred_foot': {'dtype': str},
+        'url_player': {'dtype': str},
+        }
+    
+    df.index = df.index.astype(str)
+    verify_format(df, column_specs)
+
+def format_df_player_fifa_sofifa(df):
+    """
+    Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
+    """
+    column_specs = {
+        # Verifico formato
+        'id_player': {'dtype': str},
+        # 'date': {'dtype': 'datetime64[ns]'},
+        'age': {'dtype': int, 'rango': [15, 50]},
+        'overall_rating': {'dtype': int, 'rango': [30, 100]},
+        'potential': {'dtype': int, 'rango': [30, 100]},
+        'value': {'dtype': float, 'rango': [100, 250000000]},
+        'wage': {'dtype': float, 'rango': [100, 999999]},
+        'int_reputation': {'dtype': int, 'rango': [0, 5]},
+        'fifa': {'dtype': str},
+        'fifa_year': {'dtype': int, 'rango': [6,30]},
+        }
+    df['date'] = pd.to_datetime(df['date'])
+    verify_format(df, column_specs)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

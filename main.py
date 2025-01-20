@@ -283,8 +283,10 @@ class DataPreparation:
             print("\nCorrecion de valores")
         df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     
-        # Verificar que no haya outliers
-        # algo (sacar de mi tesis)
+        # Verificacion de formato
+        format_data.format_df_match(df_match)
+        format_data.format_df_player_sofifa(df_player_sofifa)
+        format_data.format_df_player_fifa_sofifa(df_player_fifa_sofifa)
 
         end = time.time()
         print(f"Clean data in {(end - start) / 60:.1f} minutes")
@@ -329,8 +331,8 @@ class DataPreparation:
         if prod:
             logger.critical("Integración para produccion")
 
-            df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx')
-            logger.info("No vuelvo a mapear sino que levanto df_map del pais (para producción)")
+            df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
+            logger.info(f"No vuelvo a mapear sino que levanto df_map del pais (para producción) \n {df_map_players_fs_so.head(3)}")
 
         else: 
             logger.critical("Integración para train")

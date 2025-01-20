@@ -355,7 +355,7 @@ def integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa):
     return df_match
 
 # DF_PLAYER, DF_PLAYER_FIFA_SOFIFA Y DF_MATCH_PLAYER TO DF_MATCH
-def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_player_sofifa, df_player_fifa_sofifa, verbose: int = 1):
+def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_player_sofifa, df_player_fifa_sofifa, verbose: int = -1):
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de age, overall rating, value de mercado y height del equipo titular,
@@ -377,11 +377,10 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     d_n_reg_min = {'start': 8, 'sub': 5, 'miss': 1}
     n_fif_ant, n_fif_act = 0, 0
 
-    # Reformateo (puede causar falla en match)
+    # Reformateo (puede causar falla en el match mas adelante)
     df_map_fs_so['id_player_fs'] = df_map_fs_so['id_player_fs'].astype(str)
-    df_map_fs_so['id_player_so'] = df_map_fs_so['id_player_so'].astype(str)
-    df_player_sofifa.index = df_player_sofifa.index.astype(str)
-    df_player_fifa_sofifa['id_player'] = df_player_fifa_sofifa['id_player'].astype(str)
+    df_map_fs_so = df_map_fs_so.dropna(subset=['id_player_so'])  # Eliminar filas con NaN
+    df_map_fs_so['id_player_so'] = df_map_fs_so['id_player_so'].astype(int).astype(str) # Si es float, lo paso a int y luego a str.
 
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
@@ -495,7 +494,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                         df_match.loc[id_match, f'mean_pot_player_{titularidad}_{condicion}'] = calcular_media(l_potential)
                         df_match.loc[id_match, f'mean_rep_player_{titularidad}_{condicion}'] = calcular_media(l_int_reputation)
                 else:
-                    logger.warning(f"Se evitó promediar {titularidad} {condicion} por ser {len(l_age)} menor al minimo de {n_reg_min}")
+                    if verbose >= 0:
+                        logger.warning(f"Se evitó promediar {titularidad} {condicion} por ser {len(l_age)} menor al minimo de {n_reg_min}")
    
                 progress_bar.update(1)
             progress_bar.close()
