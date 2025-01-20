@@ -350,6 +350,7 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, idxs_to_cons
         df_next_matches = df[df.index.isin(idxs_to_construct)]
         l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
     else:
+        idxs_to_construct = df.index
         l_equipos = determine_most_frequent_teams(df)
 
     # Por equipo 1
@@ -421,6 +422,7 @@ def h2h_by_date_by_localia(df: pd.DataFrame, n_years: int, prod: bool = False, i
         df_next_matches = df[df.index.isin(idxs_to_construct)]
         l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
     else:
+        idxs_to_construct = df.index
         l_equipos = determine_most_frequent_teams(df)
 
     # Por equipo 1

@@ -336,14 +336,13 @@ class DataPreparation:
             logger.critical("Integración para train")
 
             # Matcheo jugadores de Sofifa y Flashscore
-            logger.info("Mapeo jugadores de Sofifa y Flashscore")
             df_map_players_fs_so = integrate_sofifa_to_flashscore.map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country=self.id_country, base_path=self.base_path)
 
         # Integro datos de jugadores a df_match usando el mapeo
         df, df_aux = integrate_sofifa_to_flashscore.integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
-        cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away'] # main_next a veces no tiene coaches.. deeberia copiar antes...
+        cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away', 'fifa_year'] # main_next a veces no tiene coaches.. deeberia copiar antes...
         cols_to_drop_filt = [col for col in cols_to_drop if col in df.columns]
         df = df.drop(cols_to_drop_filt, axis=1)
 
@@ -1084,7 +1083,8 @@ class Modeling:
             df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
             d_metrics.update(d_roi)
 
-            # Calculo otras metricas    
+            # Calculo otras metricas
+            d_metrics.update(asses_model.determine_distribution(df_predicciones))
             d_metrics.update(asses_model.calculate_nan_metrics(df_predicciones)) # Necesita 'ROI'
             d_metrics.update(asses_model.calculate_gp_by_result(df_predicciones)) # Necesita 'ROI'
             d_metrics.update(asses_model.calculate_accuracy_by_result(df_predicciones)) # Necesita 'acerte'
