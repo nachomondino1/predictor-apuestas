@@ -92,18 +92,20 @@ def comprehensive_search(
     # DIRECTORIOS
     # Defino rutas segun country y date
     BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated/{date}"
+    BASE_DIR_flashscore = f'data/{country}/p6_deployment/missing/old_updated'
+    BASE_DIR_sofifa = f'data/{country}/p2_data_understanding/sofifa_update/{date}' if retrain else f'data/{country}/p2_data_understanding'
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     # save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
-    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
+    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
  
     if not from_construct:
        
         ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
         # Defino paths de donde levantar los datos
-        df_match, df_match_player, df_match_odds = get_flashscore_data(country, update_missing=False)
-        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, retrain=retrain)
+        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=False)
+        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
         df_match.to_excel(f'{BASE_DIR_du}/df_match.xlsx', index=True)
@@ -141,148 +143,160 @@ def comprehensive_search(
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
     
-
+    
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
-    # Construct_data
-    for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
+     # Clean data 3
+    for zz, param_values_00 in enumerate(product(*d_params['clean_data_3'].values()), start=1):
 
-        # Asigno valor a cada hiperpametro
-        n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2  # n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
+        comp_to_select, n_years_to_select =  param_values_00[0], param_values_00[1]
+
+        path_2 = f'{n_years_to_select}_{comp_to_select}'
+        path_clean_data = f'{BASE_DIR_dp}/clean_data_3/df_clean_data_3_{path_2}.xlsx'
         if verbose >= 0:
-            logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
-            print(f'Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
+            logger.info(f" Iteracion clean_data 3".center(120, "#"))
+            print(f"Hiper clean_data_3 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
 
-        # Construyo datos
-        path_1 = f"{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
-        path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_1}.xlsx'
-        try:
-            df_constructed = pd.read_excel(path_construct, index_col=0)
-            logger.info(df_constructed)
-        except FileNotFoundError:
-            df_constructed = dp.construct_data(df_integrated, l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
-            if export:
-                df_constructed.to_excel(path_construct, index=True)
+        df_int_clean = dp.clean_data_3(df=df_integrated, n_years_to_select=n_years_to_select, competencies_to_select=comp_to_select, export=True)
+        if verbose >= 2:
+            df_int_clean.to_excel(path_clean_data, index=True)
 
-        # Etiqueto df_constructed
-        df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=True)
-        path_etiqueta = f'{BASE_DIR_dp}/tag/df_etiquetas_{path_1}.xlsx'
-        if export:
-            df_etiquetas.to_excel(path_etiqueta, index=True)
+        # Construct_data
+        for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
-        # Clean data 2 + Treat nan
-        for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
-
-            comp_to_select, n_years_to_select, fill_na =  param_values_00[0], param_values_00[1], param_values_00[2]
-
-            path_2 = f'{n_years_to_select}_{comp_to_select}'
-            path_clean_data = f'{BASE_DIR_dp}/clean_data_2/df_clean_data_2_{path_1}_{path_2}_{fill_na}.xlsx'
+            # Asigno valor a cada hiperpametro
+            n_last_matches, n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2  # n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
             if verbose >= 0:
-                logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
-                print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select} ; fill_na: {fill_na}")            
+                logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
+                print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 
-            df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, competencies_to_select=comp_to_select, 
-                                                                    fill_na=fill_na, export=True)
-            joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_1}_{path_2}.pkl')
+            # Construyo datos
+            path_1 = f"{n_last_matches}_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
+            path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_2}_{path_1}.xlsx'
+            try:
+                df_constructed = pd.read_excel(path_construct, index_col=0)
+                logger.info(df_constructed)
+            except FileNotFoundError:
+                df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches,l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
+                if export:
+                    df_constructed.to_excel(path_construct, index=True)
 
-            if verbose >= 2:
-                df_cons_clean.to_excel(path_clean_data, index=True)
+            # Etiqueto df_constructed
+            df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=True)
+            path_etiqueta = f'{BASE_DIR_dp}/tag/df_etiquetas_{path_2}_{path_1}.xlsx'
+            if export:
+                df_etiquetas.to_excel(path_etiqueta, index=True)
 
-            # Select data
-            for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
+            # Clean data 2 (Treat nan + Escalado)
+            for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
 
-                # Asigno valor a cada hiperpametro
-                thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                path_3 = f'{thr_corr}_{thr_fs}'
+                fill_na = param_values_00[0]
+                path_clean_data = f'{BASE_DIR_dp}/clean_data_2/df_clean_data_2_{path_2}_{path_1}_{fill_na}.xlsx'
                 if verbose >= 0:
-                    logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
-                    print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
+                    logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
+                    print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select} ; fill_na: {fill_na}")            
 
-                # Selecciono datos
-                path_select = f'{BASE_DIR_dp}/select_data/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
-                try:
-                    df_sel = pd.read_excel(path_select, index_col=0)
-                except FileNotFoundError:
-                    df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+                df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, fill_na=fill_na, export=True)
+                joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_2}_{path_1}.pkl')
 
-                    if verbose >= 2:
-                        df_sel.to_excel(path_select, index=True)
-        
-                ####################################################################### MODELING #######################################################################
-                for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-                    
-                    # Asigno valor a cada hiperparametro
-                    val_size, n_reg_test, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                if verbose >= 2:
+                    df_cons_clean.to_excel(path_clean_data, index=True)
+
+                # Select data
+                for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
+
+                    # Asigno valor a cada hiperpametro
+                    thr_corr, thr_fs = param_values_4[0], param_values_4[1]
+                    path_3 = f'{thr_corr}_{thr_fs}'
                     if verbose >= 0:
-                        cont_iter += 1
-                        logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                        print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
-                        logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
+                        logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
+                        print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
-                        if binary_classification:
+                    # Selecciono datos
+                    path_select = f'{BASE_DIR_dp}/select_data/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
+                    try:
+                        df_sel = pd.read_excel(path_select, index_col=0)
+                    except FileNotFoundError:
+                        df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+
+                        if verbose >= 2:
+                            df_sel.to_excel(path_select, index=True)
             
-                            # Separar datos para el primer modelo: Empate o No Empate
-                            df_first_model = df_sel.copy()
-                            df_first_model['result'] = df_first_model['result'].apply(lambda x: 0 if x == 0 else 12) # 0 es empate y -10 es no empate?
-
-                            # Filtrar datos para el segundo modelo: Local o Visitante
-                            df_second_model = df_sel[df_sel['result'] != 0].copy()
-                            df_second_model['result'] = df_second_model['result'].apply(lambda x: 1 if x == 1 else 2) # 1 es local y 0 es visita?
-
-                            # Dividir los datos para cada modelo
-                            X_train_first, X_val_first, X_test_first, y_train_first, y_val_first, y_test_first = mo.generate_test_design(
-                                df_first_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False
-                            )
-
-                            X_train_second, X_val_second, X_test_second, y_train_second, y_val_second, y_test_second = mo.generate_test_design(
-                                df_second_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False,
-                            )
-
-                            # Entreno modelo para empate y no empate
-                            df_metrics_1 = mo.train_and_assess_models(X_val_first, y_val_first, X_train_first, y_train_first, X_test_first, y_test_first, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification)
-                            
-                            # Entreno modelo para local y visitante
-                            df_metrics_2 = mo.train_and_assess_models(X_val_second, y_val_second, X_train_second, y_train_second, X_test_second, y_test_second, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification, suffix='_2')
-
-                            suffix = '_2'
-                            df_metrics_2_ren = df_metrics_2.add_suffix(suffix)
-                            df_metrics = pd.concat([df_metrics_1, df_metrics_2_ren], axis=1)
-
-                        else:
-                            # Generar el diseño de la prueba
-                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
-                
-                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
-
-                    if len(df_metrics) > 0:
-                        # Guardo datos en dataframe
-                        row_data = {'n_iteration': cont_iter, 
-                                    'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
-                                    'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                    'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
-                                    'fill_na': fill_na, 'bal_type': bal_type,
-                                    'val_size': val_size, 'n_reg_test': n_reg_test, 
-                                    'k': k}
+                    ####################################################################### MODELING #######################################################################
+                    for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                         
-                        # Concateno y exporto datos
-                        df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                        df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
-                        df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                        # Asigno valor a cada hiperparametro
+                        val_size, n_reg_test, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                        if verbose >= 0:
+                            cont_iter += 1
+                            logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
+                            print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
+                            logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                        if export:    
-                            df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
-                            df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
-                            df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
+                            if binary_classification:
+                
+                                # Separar datos para el primer modelo: Empate o No Empate
+                                df_first_model = df_sel.copy()
+                                df_first_model['result'] = df_first_model['result'].apply(lambda x: 0 if x == 0 else 12) # 0 es empate y -10 es no empate?
 
-                    if verbose >= 0:
-                        current_train = time.time()
-                        ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
-                        ite_restantes = n_iter - cont_iter
-                        horas_restantes = ite_restantes / ritmo
-                        min_restantes = horas_restantes * 60
-                        horas_train = n_iter / ritmo
-                        logger.info(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
-                        logger.info(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
-                        print()
+                                # Filtrar datos para el segundo modelo: Local o Visitante
+                                df_second_model = df_sel[df_sel['result'] != 0].copy()
+                                df_second_model['result'] = df_second_model['result'].apply(lambda x: 1 if x == 1 else 2) # 1 es local y 0 es visita?
+
+                                # Dividir los datos para cada modelo
+                                X_train_first, X_val_first, X_test_first, y_train_first, y_val_first, y_test_first = mo.generate_test_design(
+                                    df_first_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False
+                                )
+
+                                X_train_second, X_val_second, X_test_second, y_train_second, y_val_second, y_test_second = mo.generate_test_design(
+                                    df_second_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False,
+                                )
+
+                                # Entreno modelo para empate y no empate
+                                df_metrics_1 = mo.train_and_assess_models(X_val_first, y_val_first, X_train_first, y_train_first, X_test_first, y_test_first, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification)
+                                
+                                # Entreno modelo para local y visitante
+                                df_metrics_2 = mo.train_and_assess_models(X_val_second, y_val_second, X_train_second, y_train_second, X_test_second, y_test_second, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification, suffix='_2')
+
+                                suffix = '_2'
+                                df_metrics_2_ren = df_metrics_2.add_suffix(suffix)
+                                df_metrics = pd.concat([df_metrics_1, df_metrics_2_ren], axis=1)
+
+                            else:
+                                # Generar el diseño de la prueba
+                                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
+                    
+                                df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
+
+                        if len(df_metrics) > 0:
+                            # Guardo datos en dataframe
+                            row_data = {'n_iteration': cont_iter, 
+                                        'n_last_matches': n_last_matches, 'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
+                                        'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                                        'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
+                                        'fill_na': fill_na, 'bal_type': bal_type,
+                                        'val_size': val_size, 'n_reg_test': n_reg_test, 
+                                        'k': k}
+                            
+                            # Concateno y exporto datos
+                            df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
+                            df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
+                            df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+
+                            if export:    
+                                df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
+                                df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
+                                df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
+
+                        if verbose >= 0:
+                            current_train = time.time()
+                            ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
+                            ite_restantes = n_iter - cont_iter
+                            horas_restantes = ite_restantes / ritmo
+                            min_restantes = horas_restantes * 60
+                            horas_train = n_iter / ritmo
+                            logger.info(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
+                            logger.info(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
+                            print()
 
     if verbose >= 0:
         end_train = time.time()
@@ -324,22 +338,26 @@ def save_old_train(l_directories, base_path_old): # Por ahora lo hago manual por
         #     os.makedirs(directorio)
         directories.mover_archivo(origen=directorio, destino=base_path_old)
 
-def get_flashscore_data(country, update_missing: bool = False, verbose: int = 0):
+def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
-    """
-    base_path_fs = f'data/{country}/p6_deployment/missing/old_updated'
-    
+    """    
     # Podria recolectar missing para tener lo ultimos partidos actualzados
     if update_missing:
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
         main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
 
     # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
-    df_match = pd.read_excel(f'{base_path_fs}/df_match.xlsx', index_col=0)
-    df_match_player = pd.read_excel(f'{base_path_fs}/df_match_player.xlsx', index_col=0)
-    df_match_odds = pd.read_excel(f'{base_path_fs}/df_match_odds.xlsx', index_col=0)
+    df_match = pd.read_excel(f'{BASE_DIR_flashscore}/df_match.xlsx', index_col=0)
+    df_match_player = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_player.xlsx', index_col=0)
+    df_match_odds = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_odds.xlsx', index_col=0)
     
+    # Verificacion 
+    df_match_sin_dup = df_match[~df_match.index.duplicated()]
+    if len(df_match) != len(df_match_sin_dup):
+        logger.error("Hay partidos repetidos en df_match. Probablemente fallo la concatenacion de old y missing, habiendo concatenado mas de una vez un partido missing.")
+        raise ValueError
+
     print("Flashscore data:")
     if verbose >= 0:
         print(df_match.shape)
@@ -353,33 +371,27 @@ def get_flashscore_data(country, update_missing: bool = False, verbose: int = 0)
 
     return df_match, df_match_player, df_match_odds
 
-def get_sofifa_data(country, update_sofifa, retrain: bool = True, verbose: int = 0):
+def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, verbose: int = 0):
     """
     Obtengo datos de Sofifa a usar en el nuevo entrenamiento.
     """
-    if retrain:
-        base_path_so = f'data/{country}/p2_data_understanding/sofifa_update'        
-    else:
-        base_path_so = f'data/{country}/p2_data_understanding'
-        logger.warning("Using Sofifa old")
-
     if update_sofifa:
         # Actualizar sofifa con las ultimas seasons
         df_comp = pd.read_excel('./data/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
-
+        
         # Levanto los datos viejos
         df_player_sofifa_old, df_player_fifa_sofifa_old = update_sofifa_data.read_last_player_data(country)
 
         # Obtengo ultimas seasons
-        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=base_path_so)
+        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=f'{BASE_DIR_sofifa}/data_seg')
 
         # Actualizar sofifa con las ultimas seasons
-        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=base_path_so)
+        df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=BASE_DIR_sofifa)
 
     else:
-        df_player_sofifa = pd.read_excel(f'{base_path_so}/df_player_sofifa.xlsx', index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f'{base_path_so}/df_player_fifa_sofifa.xlsx', index_col=0)
+        df_player_sofifa = pd.read_excel(f'{BASE_DIR_sofifa}/df_player_sofifa.xlsx', index_col=0)
+        df_player_fifa_sofifa = pd.read_excel(f'{BASE_DIR_sofifa}/df_player_fifa_sofifa.xlsx', index_col=0)
 
     if verbose >= 0: 
         print("\n\nSofifa data:")
@@ -403,7 +415,7 @@ def define_params_space(id_country, fast: bool = False):
     d_params = {
         'construct': {
             'n_dias_ult_part': [[60], [30, 180]], # [30, 180] 
-            'n_years_h2h': [3],
+            'n_years_h2h': [2],
             'segun_localia': [True, False],
             'dif_con_against': [False, True] 
         },
@@ -428,15 +440,18 @@ def define_params_space(id_country, fast: bool = False):
         l_modelos = [LogisticRegression()]
 
         d_params = {  
+            'clean_data_3': {
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
+                'n_years_to_select': [2, 3, 5, 10],
+            },
             'construct': {
-                'n_dias_ult_part': [[30, 180]],
-                'n_years_h2h': [3],
+                'n_last_matches': [[10]],  # Variables historicas en ultimos n partidos
+                'n_dias_ult_part': [[30, 180]], # Variables historicas en partidos de ultimos n_days
+                'n_years_h2h': [2],
                 'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
-                'n_years_to_select': [2, 3, 5, 10],
                 'fill_na': [None, "0", 'ml'], 
             },
             'select': {
@@ -462,9 +477,9 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
-    from_construct = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    update_sofifa = True
+    id_country = 148
+    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]

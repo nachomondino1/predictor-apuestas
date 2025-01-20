@@ -1,9 +1,12 @@
+import sys
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from fuzzywuzzy import fuzz
 import time
 from tqdm import tqdm
 import datetime
 from utils.set_up_logging import logger
+from p3_data_preparation import select_data
 
 def create_df_teams(df: pd.DataFrame):
     """
@@ -214,6 +217,99 @@ def calculate_coincidence(str1, str2):
     coincidencia = fuzz.token_set_ratio(str1, str2)
     return coincidencia
     
+def map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country, base_path: str = None, verbose: int = 0):
+    """
+    Mapeo jugadores de Flashscore y Sofifa
+
+    Mejoras:
+        - Mapeo por año
+    """
+    logger.info("Mapeo jugadores de Sofifa y Flashscore")
+
+    # Definicion de variables
+    df_map_players_fs_so, df_player = pd.DataFrame(), pd.DataFrame()
+
+    # Obtengo listado de competencias
+    d_comps = select_data.determine_country_competitions(id_country)            
+    print(f"Competiciones: {d_comps['comp_sin_cups']}")
+
+    # Crear columna auxiliar de a que fifa corresponde cada date
+    df_match['fifa_year'] = df_match.apply(lambda row: search_fecha_fifa(row['date'])[0], axis=1)
+    df_match['fifa_year'] = (df_match['fifa_year'].astype(int))
+    df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa_year'].astype(int)
+    
+    # Obtengo listado de fifas (ya como int)
+    l_years = df_player_fifa_sofifa['fifa_year'].unique()
+    print(f"Años de fifa: {l_years}")
+
+    if verbose >= 1:
+        print(f"Flashscore (todas las ligas): {len(df_match)}")
+        print(f"Sofifa (todas las ligas): {len(df_player_fifa_sofifa)}")
+
+    # Por Liga:
+    for id_comp in d_comps['comp_sin_cups']:  
+        print(f" Competicion: {id_comp} ".center(120, "#"))                      
+    
+        # Filtro por competicion
+        ## En Flashscore
+        df_match_league = df_match[df_match['id_competition'] == id_comp]
+        print(f"Nº partidos en Flashscore comp {id_comp}: {len(df_match_league)}")
+
+        ## En Sofifa
+        df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
+        print(f"Sofifa comp {id_comp}: {len(df_player_fifa_sofifa_league)}")
+
+        # Por año 
+        for year in l_years:
+            print(f"Fifa: {year}".center(120, "-"))
+
+            # Filtro por año
+            ## En Flashscore
+            df_match_filt = df_match_league[df_match_league['fifa_year'] == year]
+            df_match_player_filt = df_match_player[df_match_player.index.isin(df_match_filt.index)]
+            print(f"Nº partidos en Flashscore (comp: {id_comp} y year={year}): {len(df_match_filt)} = {len(df_match_player_filt)} ")
+          
+            ## Obtengo jugadores unicos
+            df_player_filt = create_df_player(df_match_player_filt)
+            df_player_filt = df_player_filt.dropna(subset=["player_name"]) # Hay que eliminar jugadores "nan"
+            print(f"Jugadores unicos Flashscore (comp={id_comp} year={year}): {len(df_player_filt)}")
+
+            ## Obtengo jugadores unicos
+            df_player_fifa_sofifa_filt = df_player_fifa_sofifa_league[df_player_fifa_sofifa_league['fifa_year'] == year]
+            # print(f"Sofifa (year={year}): {len(df_player_fifa_sofifa_filt)}")
+
+            ## en Sofifa
+            ids_players = df_player_fifa_sofifa_filt['id_player'].unique()
+            df_player_sofifa_filt = df_player_sofifa[df_player_sofifa.index.isin(ids_players)]
+            print(f"Jugadores unicos Sofifa (comp={id_comp} year={year}): {len(ids_players)} = {len(df_player_sofifa_filt)}")
+
+            # Mapeo jugadores unicos entre Flashscore y Sofifa
+            df_map_players_fs_so_filt = match_dataframes_by_str_column(df1=df_player_filt, df2=df_player_sofifa_filt, column_to_match1="player_name", column_to_match2="player_name", column_to_match2_aux='player_name_short', column_to_integrate='id_player', thr_coincidence_min=90)
+
+            # Concateno mapeos de ligas
+            df_map_players_fs_so = pd.concat([df_map_players_fs_so, df_map_players_fs_so_filt], axis=0)
+            df_player = pd.concat([df_player, df_player_filt], axis=0)
+            print(f"Players map: {len(df_map_players_fs_so)}")                        
+
+            # df_map_players_fs_so.drop_duplicates()
+            if base_path is not None:
+                df_player_filt.to_excel(f"{base_path}/integrate_data/df_player_{id_comp}_{year}.xlsx", index=True)
+                df_map_players_fs_so_filt.to_excel(f"{base_path}/integrate_data/df_map_players_fs_so_{id_comp}_{year}.xlsx")
+
+    print(f"Players map final: {len(df_map_players_fs_so)}")
+    
+    # Eliminar jugadores duplicados (x jugar en ambas competicioens)
+    df_map_players_fs_so = df_map_players_fs_so.sort_values(by=['tipo', 'porcentaje_coincidencia'], ascending=[True, False])  # Primero long y luego por coincidencia # dejo matches arriba y al eliminar keep first me quedo con ellos.
+    df_map_players_fs_so = df_map_players_fs_so.drop_duplicates(subset=['id_player_fs'], keep='first')
+    print(f"Players map final sin dup: {len(df_map_players_fs_so)}")
+    df_player = df_player[~df_player.index.duplicated()]
+
+    if base_path is not None:
+        df_player.to_excel(f"{base_path}/integrate_data/df_player.xlsx", index=True)
+        df_map_players_fs_so.to_excel(f"{base_path}/integrate_data/df_map_players_fs_so.xlsx")
+
+    return df_map_players_fs_so
+
 # DF_TEAMS TO DF_MATCH
 def integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa):
     """
@@ -259,7 +355,7 @@ def integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa):
     return df_match
 
 # DF_PLAYER, DF_PLAYER_FIFA_SOFIFA Y DF_MATCH_PLAYER TO DF_MATCH
-def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_player_sofifa, df_player_fifa_sofifa, _print: bool = False):  # Mejorar. Agregar potential
+def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_player_sofifa, df_player_fifa_sofifa, verbose: int = 1):
     """
     Integra la entidad jugador en la entidad partido. Es decir, sintetiza los datos de los jugadores a cada partido en
     particular. Se determinan los promedios de age, overall rating, value de mercado y height del equipo titular,
@@ -281,6 +377,12 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     d_n_reg_min = {'start': 8, 'sub': 5, 'miss': 1}
     n_fif_ant, n_fif_act = 0, 0
 
+    # Reformateo (puede causar falla en match)
+    df_map_fs_so['id_player_fs'] = df_map_fs_so['id_player_fs'].astype(str)
+    df_map_fs_so['id_player_so'] = df_map_fs_so['id_player_so'].astype(str)
+    df_player_sofifa.index = df_player_sofifa.index.astype(str)
+    df_player_fifa_sofifa['id_player'] = df_player_fifa_sofifa['id_player'].astype(str)
+
     # Por titularidad (Titular, suplente o ausente)
     for titularidad in l_titularidad:
         n_reg_min = d_n_reg_min[titularidad]
@@ -292,18 +394,19 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
             pattern = f'id_player_{titularidad}_[a-z]*[_]*{condicion}_[0-9]+'
             l_col_to_preprocess = df_match_player.filter(regex=pattern, axis=1).columns.tolist()
             print(f"Integrating players: {titularidad} {condicion}")
-            if _print:
+            if verbose >= 1:
                 print(f'Columnas a procesar: {l_col_to_preprocess}')
 
             # Inicializo barra de progreso
             progress_bar = tqdm(total=len(df_match_player), ncols=80)
 
+            # Por partido
             for id_match, row_match in df_match.iterrows():  # Podria mapear o usar where() en vez de hacer este for?
                 l_age, l_height, l_rating, l_int_reputation, l_market_value, l_potential, l_wages = [], [], [], [], [], [], []
                 
                 # Busco el fifa correspondiente segun la fecha del partido
                 year_fifa, year_fifa_ant = search_fecha_fifa(row_match['date'])  
-                if _print:
+                if verbose >= 1:
                     print(f' Partido Nº: {id_match} '.center(120, '#'))
                     print(f"Fecha partido: {row_match['date']} --> Fifa a buscar: {year_fifa}")
 
@@ -315,7 +418,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                         id_player_fs = df_match_player.loc[id_match, col_player].values[0]  # fallo en assess_model_in_prod de Argentina
                     except:
                         id_player_fs = df_match_player.loc[id_match, col_player]  # fallo en assess_model_in_prod de Argentina
-                    if _print:
+                    if verbose >= 1:
                         print(f"\t Id jugador Flashscore: {id_player_fs}")
                         print("ES NAN? ", pd.isna(id_player_fs))
 
@@ -326,12 +429,14 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                         row_map = df_map_fs_so[df_map_fs_so['id_player_fs'].astype(str) == str(id_player_fs)]
 
                         if len(row_map) > 0:
+                            if verbose >= 1:
+                                logger.critical("Hay mapeo!")
 
                             # Busco id_team_sofifa
                             id_player_sofifa = row_map['id_player_so'].values[0]
 
                             # Busco el id y la fecha en df_player (Sofifa)
-                            df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'] == id_player_sofifa)]
+                            df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'].astype(str) == str(id_player_sofifa))]
                             df_player_fifa_actual = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
                             # df_player_filt = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
                             
@@ -346,7 +451,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 df_player_filt = df_player_fifa_actual
                                 n_fif_act += 1
 
-                            if _print:
+                            if verbose >= 2:
                                 print(f"Cantidad de jugadores fs: {len(df_map_fs_so)}, Encontró jugador de fs: {len(row_map)}")
                                 print(f"\t\t Hizo match para este jugador! Id jugador en Sofifa: {id_player_sofifa}")       
                                 print(f"\t\t Shape df_player_filt (debe ser 1 o 2): {df_player_filt.shape[0]}")       
@@ -364,7 +469,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 l_market_value.append(df_player_filt.value.values[0])
                                 l_potential.append(df_player_filt.potential.values[0])
                                 l_int_reputation.append(df_player_filt.int_reputation.values[0])
-                                if _print:
+                                if verbose >=2:
                                     print(f"\t\t DATOS DEL JUGADOR: Age: {df_player_filt.age.values[0]}; Height: {height}; Rating: {df_player_filt.overall_rating.values[0]}; Market value: {df_player_filt.value.values[0]}; Potencial: {df_player_filt.potential.values[0]}; Int rep: {df_player_filt.int_reputation.values[0]}")       
 
                 # Guardo promedios de age, height, overall_rating y market value
@@ -389,8 +494,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                         df_match.loc[id_match, f'mean_value_player_{titularidad}_{condicion}'] = calcular_media(l_market_value)
                         df_match.loc[id_match, f'mean_pot_player_{titularidad}_{condicion}'] = calcular_media(l_potential)
                         df_match.loc[id_match, f'mean_rep_player_{titularidad}_{condicion}'] = calcular_media(l_int_reputation)
-                # else:
-                #     logger.warning(f"Se evitó promediar {titularidad} {condicion} por ser {len(l_age)} menor al minimo de {n_reg_min}")
+                else:
+                    logger.warning(f"Se evitó promediar {titularidad} {condicion} por ser {len(l_age)} menor al minimo de {n_reg_min}")
    
                 progress_bar.update(1)
             progress_bar.close()
@@ -413,6 +518,10 @@ def search_fecha_fifa(fecha_part):
     # Returns:
         Año del fifa que corresponde segun la fecha pasada como parametro (e.g. partido del 23/12/2023 le corresponde FIFA 24) (string)
     """
+    # Asegúrate de que `fecha_part` es un objeto datetime
+    if not isinstance(fecha_part, pd.Timestamp):
+        fecha_part = pd.to_datetime(fecha_part)
+
     # Definicion de variables
     year_part = fecha_part.year  # e.g. "2021"
 
@@ -438,34 +547,42 @@ if __name__ == "__main__":
 
     start = time.time()
     print("\nIntegrando los datos...")
-    country = 'spain'
+    id_country = 148
+    
+    # Defino variables
+    d_countries = {
+        6: ["argentina", '2024-12-05'], 
+        48: ["england", '2025-01-07'],
+        55: ["france", '2025-01-08'], 
+        # 55: ["france", '2025-01-12'], 
+        59: ["germany", '2025-01-08'], 
+        77: ["italy", '2025-01-06'],
+        148: ["spain", '2025-01-19'], 
+        167: ["usa", '2024-12-05']
+        }
+    country = d_countries[id_country][0]
+    iteration_date = d_countries[id_country][1]
 
     # Levanto datasets para pruebas
-    df_match = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)
-    df_match_player = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_match_player_cleaned.xlsx",  index_col=0)
-    df_player = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_player_cleaned.xlsx", index_col=0)
-    df_player_sofifa = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0) 
-    df_player_fifa_sofifa = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
-    df_teams_sofifa = pd.read_excel(f"./data/{country}/p3_data_preparation/clean_data/df_teams_sofifa_cleaned.xlsx", index_col=0)  
-    print(f"df_match: \n{df_match.head(1)} \n\ndf_match_player: \n{df_match_player.head(1)} \n\n df_player: \n{df_player.head(1)}")
+    base_path = f'./data/{country}/p3_data_preparation/{iteration_date}'
+    df_match = pd.read_excel(f"{base_path}/clean_data/df_match_cleaned.xlsx", index_col=0)
+    df_match_player = pd.read_excel(f"{base_path}/clean_data/df_match_player_cleaned.xlsx",  index_col=0)
+    df_player_sofifa = pd.read_excel(f"{base_path}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0) 
+    df_player_fifa_sofifa = pd.read_excel(f"{base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx", index_col=0)
 
-    df_match = df_match.head(100)
-    df_match_player = df_match_player.head(100)
-    df_player = df_player.head(200)
-    # df_player_sofifa = df_player_sofifa.head(200)
-    
-    # TEAMS --> MATCH  (Mapeo df_teams_sofifa con df_teams e integro a df_match)
-    # print("\nIntegrating team's data to df_match...")
-    # df_map_teams_fs_so = match_dataframes_by_str_column(df_teams, df_teams_sofifa, column_to_relation='team_name', column_to_integrate='id_team', thr_coincidence_min=90)
-    # df_match = integrate_team_data_in_match(df_match, df_map_teams_fs_so, df_teams_sofifa)
-    # df_map_teams_fs_so.to_excel(f"{BASE_DIR_LOCAL}/df_map_teams_fs_so.xlsx")
+    print(df_match_player.head(2))
+    print(df_player_fifa_sofifa.head(2))
 
     # PLAYERS --> MATCH (Mapeo df_player_sofifa con df_player e integro a df_match)
     print("\nIntegrating player's data to df_match...")
-    df_map_players_fs_so = match_dataframes_by_str_column(df_player, df_player_sofifa, column_to_relation="player_name", column_to_integrate='id_player', thr_coincidence_min=90)
-    df_map_players_fs_so.to_excel(f'{BASE_DIR_LOCAL}/df_map_players_fs_so.xlsx', index=True)
-    df = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa,  _print=True)
+    map_players = False
+    if map_players:
+        df_map_players_fs_so = map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country=id_country, base_path=base_path)
+    else:
+        df_map_players_fs_so = pd.read_excel('data/spain/p3_data_preparation/2025-01-19/integrate_data/df_map_players_fs_so.xlsx')
+        logger.info("Levanto df_map ya usado.")
 
+    df, df_aux = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
     df.to_excel(f'{BASE_DIR_LOCAL}/df_integrated_prueba.xlsx', index=True)
 
     end = time.time()

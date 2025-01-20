@@ -7,7 +7,9 @@ from utils.set_up_logging import logger
 from dotenv import load_dotenv
 import pandas as pd
 from p2_data_understanding.collect_initial_data import scraper_sofifa
+from p3_data_preparation.format_data import verify_columns
 from tqdm import tqdm
+import datetime
 
 
 def get_player_data(id_country, country, df_comp_country, n_seasons_update, path_save):
@@ -43,6 +45,11 @@ def get_player_data(id_country, country, df_comp_country, n_seasons_update, path
     df_player_sofifa.to_excel(f'{path_save}/df_player_sofifa.xlsx', index=True)
     df_player_fifa_sofifa.to_excel(f'{path_save}/df_player_fifa_sofifa.xlsx', index=True)
     print(f"Shape final: {df_player_sofifa.shape} {df_player_fifa_sofifa.shape}")
+
+    # Verificar formato de datos
+    format_df_player_sofifa(df_player_sofifa)
+    format_df_player_fifa_sofifa(df_player_fifa_sofifa)
+
     return df_player_sofifa, df_player_fifa_sofifa
 
 def read_last_player_data(country, verbose: int = 0):
@@ -103,14 +110,56 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
 
     return df_player_sofifa_filt, df_player_fifa_sofifa_filt
 
-def format_data():
+def format_df_player_sofifa(df):
+
+    # Formateo columnas int
+    df['height'] = df['height'].astype(int)
+
+    # Verfico formato
+    verify_columns(df, col='player_name', dtypes=(str))
+    verify_columns(df, col='player_name_short', dtypes=(str))
+    verify_columns(df, col='nationality', dtypes=(str))
+    verify_columns(df, col='height', rango=[100, 240], dtypes=(int, float))
+    verify_columns(df, col='preferred_foot', dtypes=(str))
+    verify_columns(df, col='url_player', dtypes=(str))
+
+def format_df_player_fifa_sofifa(df):
     """
     Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
     """
-    pass
+    # Formateo columnas int
+    df['age'] = df['age'].astype(int)
+    df['overall_rating'] = df['overall_rating'].astype(int)
+    df['potential'] = df['potential'].astype(int)
+    df['int_reputation'] = df['int_reputation'].astype(int)
+    
+    # Verifico formato
+    # id_player
+    verify_columns(df, col='age', rango=[15, 50], dtypes=(int, float))
+    verify_columns(df, col='overall_rating', rango=[50, 100], dtypes=(int, float))
+    verify_columns(df, col='potential', rango=[50, 100], dtypes=(int, float))
+    verify_columns(df, col='value', dtypes=(str))
+    verify_columns(df, col='wage', dtypes=(str))
+    verify_columns(df, col='int_reputation', rango=[0, 5], dtypes=(int, float))
+    verify_columns(df, col='fifa', dtypes=(str))
+    verify_columns(df, col='date', dtypes=(str))    
+
+def try_format():
+
+    df1 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_sofifa.xlsx')
+    df2 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_fifa_sofifa.xlsx')
+
+    format_df_player_sofifa(df1)
+    format_df_player_fifa_sofifa(df2)
+
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+
+    try_format()
+
+    '''
+
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
@@ -125,9 +174,9 @@ if __name__ == "__main__":
     df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
     print(f' COUNTRY: {country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
     
-
-    path_save = f'data/{country}/p2_data_understanding/sofifa_update'
-    path_save_seg = f'data/{country}/p2_data_understanding/sofifa_update/data_seg'
+    date = datetime.datetime.now().date()
+    path_save = f'data/{country}/p2_data_understanding/sofifa_update/{date}'
+    path_save_seg = f'{path_save}/data_seg'
 
     # Levanto los datos viejos
     df_player_sofifa_old, df_player_fifa_sofifa_old = read_last_player_data()
@@ -137,3 +186,4 @@ if __name__ == "__main__":
 
     # Actualizar sofifa con las ultimas seasons
     concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=path_save)
+    '''
