@@ -21,9 +21,9 @@ def initialize_directories(country, iteration_date, predict_missing):
         'base_path': base_path,
         'base_path_sbm': base_path_sbm,
         'path_old': f'{base_path}/best_model_old/{fecha_hoy}',
-        'path_select': f'{base_path_sbm}/1_filter_models/',
-        'path_assess': f'{base_path_sbm}/2_assess/',
-        'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
+        'path_select': f'{base_path_sbm}/1_filter_models',
+        'path_assess': f'{base_path_sbm}/2_assess',
+        'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy',
         'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
 
@@ -105,9 +105,9 @@ def main(
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por METRIC
-    df_ite_filt = sbm.filter_models_by_distribution(df_ite, l_variables=['acc_home', 'acc_draw', 'acc_away'], l_values=[0.55, 0.4, 0.45])
-    df_ite_filt = sbm.filter_models_by_accuracy(df_ite_filt, dif_prob_bet_min=1) # Antes pues sino elimina mal por metrica.
-    df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, prop_to_max=0.8, perc_cutoff=1, metric_col='metric_sin_ea_test') # 0.6 y 1.5
+    df_ite_filt = sbm.filter_models_by_distribution(df_ite, l_variables=['acc_home', 'acc_draw', 'acc_away'], l_values=[0.55, 0.37, 0.4])
+    df_ite_filt = sbm.filter_models_by_accuracy(df_ite_filt, dif_prob_bet_min=0) # Antes pues sino elimina mal por metrica.
+    df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, prop_to_max=0.5, perc_cutoff=5, n_models_max=5, metric_col='metric_sin_ea_test') # 0.6 y 1.5
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
@@ -118,7 +118,7 @@ def main(
             logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
             # Usar mnm.py con predict_missing=True y data_unders=False.
             d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-            main_next_matches.main(d_run, id_country, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
+            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
 
         # Por modelo: Predict missing + Concatenar a df_predicciones test
         if predict_missing:
@@ -129,16 +129,20 @@ def main(
             df_test_assess = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration_test.xlsx')
 
         # Concateno y exporto.
-        df_ite_filt = assess_models_in_prod.concat_test_and_assess(df_ite=df_ite_filt, df_test=df_test_assess, path_save=d_paths['path_assess'], id_country=id_country)
+        # Defino que n_model use en prod (para comparar assess y prod)
+        # n_model_prod, _, = main_next_matches.read_data_of_best_model(id_country)
+        # n_model_prod = 1538
+
+        df_ite_filt = assess_models_in_prod.concat_test_and_assess(df_ite=df_ite_filt, df_test=df_test_assess, path_save=d_paths['path_assess'])
 
         # Recalculo metrica con assess
         metric_col_assess = 'metric_sin_ea'
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
         print(df_ite_filt.shape)
 
-    # Usar test + missing ya actualizado
-    else:
-        df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
+    # # Usar test + missing ya actualizado
+    # else:
+    #     df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
                
 
     # (3) SELECCION DEL MODELO
@@ -174,10 +178,12 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 59
+    id_country = 148
 
     # Defino hiperparametros
     assess = True
+    extract_missing=False
+    predict_missing=False
 
     # Defino variables
     d_countries = {
@@ -186,8 +192,8 @@ if __name__ == "__main__":
         55: ["france", '2025-01-08'], 
         59: ["germany", '2025-01-08'], 
         77: ["italy", '2025-01-06'],
-        148: ["spain", '2025-01-07'], 
-        # 148: ["spain", '2025-01-18'], 
+        # 148: ["spain", '2025-01-07'], 
+        148: ["spain", '2025-01-19'], 
         167: ["usa", '2024-12-05']
         }
     country = d_countries[id_country][0]
@@ -195,5 +201,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=True, predict_missing=True
+        assess=assess, extract_missing=extract_missing, predict_missing=predict_missing
         )

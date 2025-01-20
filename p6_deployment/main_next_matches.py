@@ -664,9 +664,7 @@ class TrainingDataLoader():
 
         self.path_clean = f'{d['n_years_to_select']}_{d['comp_to_select']}'
         self.path_construct = f'{d['n_last_matches']}_{d['n_dias_ult_part']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['dif_con_against']}'
-
         self.path_1 = f'{self.path_clean}_{self.path_construct}'
-        self.path_2 = f'{self.path_construct}_{self.path_clean}' # temporal para scale... pues lo tenia mal..
 
         if self.verbose >= 0:
             logger.info("Hiperparametros cargados:")
@@ -689,7 +687,7 @@ class TrainingDataLoader():
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{self.path_2}.pkl'
+        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{self.path_1}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
@@ -1013,24 +1011,26 @@ def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int 
     return df_match, df_match_player, df_match_odds
     
 # Generales
-def read_data_of_best_model(id_country, verbose : int = 1):
+def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
     
-    # Levanto dataframe con los modelos a usar por pais
-    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+    if d_model is not None:
+        logger.warning("Se usa modelo especificado como parametro y no necesariamente es el que se esta usando en produccion.")
+        n_model, model_name = d_model['n_model'], d_model['model_name']
+    else:
+        # Levanto dataframe con los modelos a usar por pais
+        df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
-    # Selcciono fila del pais
-    row_country = df_best_models[df_best_models['id_country'] == id_country]
+        # Selcciono fila del pais
+        row_country = df_best_models[df_best_models['id_country'] == id_country]
 
-    # Obtengo el modelo a usar
-    n_model = int(row_country['n_model'].values[0])
-    model_name = str(row_country['model_name'].values[0])
-    iteration_date_str = row_country['iteration_date'].values[0]
-    iteration_date_dt = pd.to_datetime(iteration_date_str, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
-
+        # Obtengo el modelo a usar
+        n_model = int(row_country['n_model'].values[0])
+        model_name = str(row_country['model_name'].values[0])
+    
     if verbose >= 1:
-        logger.info(f"Model: {n_model} Date ite: {iteration_date_dt}")
+        logger.info(f"Model: {n_model} ; Model name: {model_name}")
 
-    return n_model, model_name, iteration_date_dt
+    return n_model, model_name
 
 def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
     """
@@ -1061,13 +1061,12 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
 
 ########################################################################## MAIN #######################################################################
 def main(
-        d_run: dict, id_country: int, d_model: dict = None,                                             # Params
+        d_run: dict, id_country: int, iteration_date: str,
         n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = 0.35, no_strategy: bool = False,                                                # Modeling
+        porc_m: float = 0.35, no_strategy: bool = False, d_model: dict = None,                          # Modeling
         verbose: int = 1, export: bool = True,
-        iteration_date_dt: str = None
         ):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1077,7 +1076,8 @@ def main(
     load_dotenv()
     env = os.getenv('ENVIRONMENT')
     logger.info(f"Environment: {env}")
-    
+    iteration_date_dt = pd.to_datetime(iteration_date, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
+
     # Determino country y competence
     df_countries = pd.read_excel('./data/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
@@ -1088,25 +1088,15 @@ def main(
     elif env == 'prod':
         comp_public = df_comp_country[df_comp_country['is_public'] == 1]['id_competition'].values  # prod
 
-    # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
-    if d_model is not None:
-        logger.warning("Se usa modelo especificado como parametro y no necesariamente es el que se esta usando en produccion.")
-        n_model, model_name, iteration_date_dt = d_model['n_model'], d_model['model_name'], d_model['iteration_date']
-    elif iteration_date_dt is not None:
-        n_model, model_name, _ = read_data_of_best_model(id_country)
-    else:
-        n_model, model_name, iteration_date_dt = read_data_of_best_model(id_country)
-
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
         logger.info(f'Competencias: \n {df_comp_country}  \n Competencias publicas: {comp_public}')
-        logger.critical(f"n_model: {n_model} ; iteration_date: {iteration_date_dt}")
+        logger.warning(iteration_date_dt)
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export=export) # Creo objeto de clase DataUnderstanding
     dp = DataPreparationNew(id_country=id_country, country=country, iteration_date=iteration_date_dt, export=export) # Creo objeto de clase DataPreparation
     mo = Modeling(country=country) # Creo objeto de clase DataPreparation
-    lo = TrainingDataLoader(country=country, n_model=n_model, model_name=model_name, iteration_date=iteration_date_dt)
     mis = MissingData(country=country, iteration_date=iteration_date_dt)
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
@@ -1201,7 +1191,13 @@ def main(
     logger.info("\n" + "+"*120 + "\n" + "DATA PREPARATION".center(120) + "\n" + "+"*120 + "\n")
     if d_run['data_prep']:
 
+        # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
+        n_model, model_name = read_data_of_best_model(id_country, d_model)
+        if verbose >= 0:
+            logger.critical(f"n_model: {n_model} ; model_name: {model_name}")
+
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
+        lo = TrainingDataLoader(country=country, n_model=n_model, model_name=model_name, iteration_date=iteration_date_dt)
         d_hiper = lo.load_data_preparation_hyperparameters()
         df_etiquetas = lo.load_df_etiquetas()
         scaler, columns_scaled = lo.load_scaler_model()
@@ -1362,7 +1358,7 @@ if __name__ == "__main__":
     }
 
     id_country = 148
-    key, value = 'missing', 'only_preparation'
+    key, value = 'predict', 'try_a_specific_model'
     # data_unders = False
     n_days = 15
 
@@ -1378,7 +1374,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 4, 'model_name': "LogisticRegression", 'iteration_date': iteration_date} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1538, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1390,7 +1386,7 @@ if __name__ == "__main__":
         
         elif value == 'only_preparation':
             logger.warning("Prepare missing matches")
-            df = main(d_run, id_country, extract_missing=False, prepare_missing=True, iteration_date_dt=iteration_date, export=d_run['export']) 
+            df = main(d_run, id_country, iteration_date_dt=iteration_date, extract_missing=False, prepare_missing=True, export=d_run['export']) 
         
         elif value == 'all':
             logger.warning("Extract and prepare missing matches")
@@ -1401,11 +1397,11 @@ if __name__ == "__main__":
             
         if value == "predict_missing":
             logger.warning("Get predictions in missing matches of specific model")
-            df = main(d_run, id_country, d_model=d_model, predict_missing=True, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, predict_missing=True, export=False) 
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, d_model=d_model, no_strategy=True, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, no_strategy=True, export=False) 
 
     elif key == 'prod':
         logger.warning("Get predictions for model in prod")

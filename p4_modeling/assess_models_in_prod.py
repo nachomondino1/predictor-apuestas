@@ -81,7 +81,7 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     progress_bar.close()
     return df_test
 
-def concat_test_and_assess(df_ite, df_test, path_save, id_country):
+def concat_test_and_assess(df_ite, df_test, path_save, n_model_prod: int = None):
     """
     Concateno resultados en assess y prod y genero un df_iteration actualizado.
     """
@@ -89,31 +89,31 @@ def concat_test_and_assess(df_ite, df_test, path_save, id_country):
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
     df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  
     
-    # Defino que n_model use en prod (para comparar assess y prod)
-    n_model_prod, _, _ = main_next_matches.read_data_of_best_model(id_country)
-
     # Calculo metricas de variacion de ROI en nuevos partidos
     df_ite_updated['var_roi'] = (df_ite_updated['roi'] - df_ite_updated['roi_train']) / df_ite_updated['roi_train']
     df_ite_updated['ritmo_var_roi'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
-    ## Metricas modelo de prod
-    df_filt = df_ite_updated[df_ite_updated['n_iteration'] == n_model_prod]
-    crecimiento_prod = df_filt['var_roi'].values[0] * 100
-    tasa_crecim_prod = df_filt['ritmo_var_roi'].values[0] * 100
+
+    if n_model_prod:
+        ## Metricas modelo de prod
+        df_filt = df_ite_updated[df_ite_updated['n_iteration'] == n_model_prod]
+        crecimiento_prod = df_filt['var_roi'].values[0] * 100
+        tasa_crecim_prod = df_filt['ritmo_var_roi'].values[0] * 100
+
+        # Imprimo mensaje sobre el modelo en prod
+        print(" Resultados en assess (modelo en prod) ".center(80, "%"))
+        if crecimiento_prod > 0 and tasa_crecim_prod > -0.1:
+            logger.critical(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
+        elif crecimiento_prod > 0:
+            logger.warning(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
+        else:
+            logger.error(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim_prod:.0f}%.")
+
     ## Metricas promedio
     crecimiento = df_ite_updated['var_roi'].mean() * 100
     tasa_crecim = df_ite_updated['ritmo_var_roi'].mean() * 100
     n_models = len(df_test)
     n_part = df_test['n_part_assess'].values[0]
  
-    # Imprimo mensaje sobre el modelo en prod
-    print(" Resultados en assess (modelo en prod) ".center(80, "%"))
-    if crecimiento_prod > 0 and tasa_crecim_prod > -0.1:
-        logger.critical(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
-    elif crecimiento_prod > 0:
-        logger.warning(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
-    else:
-        logger.error(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim_prod:.0f}%.")
-
     # Imprimo mensaje
     print(" Resultados en assess (modelos candidatos) ".center(80, "%"))
     if crecimiento > 0 and tasa_crecim > -0.1:
@@ -135,10 +135,10 @@ def predict_missing(id_country, n_model, model_name, iteration_date): # No se si
     """
     # Defino variables (no tocar)
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
-    d_model = {'n_model': n_model, 'model_name': model_name, 'iteration_date': iteration_date} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': n_model, 'model_name': model_name} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     # Usar mnm.py con predict_missing=True y data_unders=False.
-    df = main_next_matches.main(d_run, id_country, d_model=d_model, predict_missing=True, export=False, verbose=0) 
+    df = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, predict_missing=True, export=False, verbose=0) 
 
     if not isinstance(df, pd.DataFrame):
         raise ValueError("No se generó un dataframe.")
