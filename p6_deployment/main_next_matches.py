@@ -893,31 +893,37 @@ class MissingData:
 
     def concat_old_with_missing(self, df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss):
         """
-        Exporto datos de partidos con los que entreno el modelo y los partidos missing.
+        Exporta datos de partidos con los que se entrena el modelo y los partidos missing,
+        evitando duplicar datos ya existentes en los DataFrames originales.
         """
         len_inicial = len(df_match)
         len_inicial_miss = len(df_match_miss)
-        # Concateno old (que puede tener ya algunos missing) y nuevos missing
-        df_concat_match = pd.concat([df_match, df_match_miss], axis=0)
-        df_concat_match_player = pd.concat([df_match_player, df_match_player_miss], axis=0)
-        df_concat_match_odds = pd.concat([df_match_odds, df_match_odds_miss], axis=0)
-        len_final = len(df_concat_match)
-        logger.warning(f"Old:{df_match.shape} + Missing: {df_match_miss.shape} = {df_concat_match.shape}")
 
+        # Función auxiliar para evitar duplicados antes de concatenar
+        def avoid_duplicate_concat(df_original, df_miss):
+            return pd.concat(
+                [df_original, df_miss.loc[~df_miss.index.isin(df_original.index)]],
+                axis=0
+            )
+        
+        # Concatenar evitando duplicados
+        df_concat_match = avoid_duplicate_concat(df_match, df_match_miss)
+        df_concat_match_player = avoid_duplicate_concat(df_match_player, df_match_player_miss)
+        df_concat_match_odds = avoid_duplicate_concat(df_match_odds, df_match_odds_miss)
+
+        len_final = len(df_concat_match)
+        logger.warning(f"Old: {df_match.shape} + Missing: {df_match_miss.shape} = {df_concat_match.shape}")
+
+        # Verificación
         verif = (len_inicial + len_inicial_miss) == len_final
         if not verif:
-            logger.error("Fallo la concatenacion de partidos missing a los datos viejos")
+            logger.error("Fallo la concatenación de partidos missing a los datos viejos")
 
-        # Exporto datos
-        # Temporalmente hasta que haga pull request.
-        df_concat_match = df_concat_match[~df_concat_match.index.duplicated(keep='first')]
-        df_concat_match_player = df_concat_match_player[~df_concat_match_player.index.duplicated(keep='first')]
-        df_concat_match_odds = df_concat_match_odds[~df_concat_match_odds.index.duplicated(keep='first')]
-    
+        # Exportar datos
         df_concat_match.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match.xlsx')
         df_concat_match_player.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_player.xlsx')
         df_concat_match_odds.to_excel(f'{self.BASE_DIR_MISSING_AND_OLD}/df_match_odds.xlsx')
-        logger.info(f"Shape de df_match concatenado con missing:: {len_inicial} --> {len_final}")
+        logger.info(f"Shape de df_match concatenado con missing: {len_inicial} --> {len_final}")
 
     def concat_with_missing_already_extracted(self, df_match_miss, df_match_player_miss, df_match_odds_miss):
         """
@@ -1122,10 +1128,6 @@ def main(
         else:
             df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
 
-        # Exporto datos (tarda banda en la concatenacion, simplificar...)
-        # if export and len(df_match_miss) > 0:
-            # mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
-
         logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
         # Si extrajo missingnot
@@ -1151,14 +1153,7 @@ def main(
                 df_integrated_missing.to_excel(f'{mis.BASE_DIR_MISSING_DP}/df_integrated_missing.xlsx', index=True)
                 df_integrated_updated.to_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index=True)
                 df_integrated_missing_all.to_excel(f'{mis.BASE_DIR_MISSING_ALL_dp}/df_integrated_missing.xlsx', index=True)
-    
-            # Verificacion de concatatenacion de nuevos partidos missing con partidos ya jugados --> Falla cuando es la primera vez que guarda el concatenado..
-            # if len(df_integrated_updated) != (len(df_match_miss) + len(df_integrated)):
-            #     logger.info(f"\nShape of df_integrated_with_missing (siempre es un poco menor a df_match_with_missing pero no se por qué): {df_integrated_updated.shape}")  # Calculo que debe ser por la eliminacion de partidos con goles="-" que hice de df_integrated en main.py
-            #     logger.info(df_integrated_updated.head(3))
-            #     logger.error("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
-            #     raise ValueError("Falló la concatenación de nuevos partidos missing con los partidos ya jugados.")
-    
+  
         else:
             df_integrated_updated = pd.read_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index_col=0)
             logger.warning(f"Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos. {df_integrated_updated.shape}")
