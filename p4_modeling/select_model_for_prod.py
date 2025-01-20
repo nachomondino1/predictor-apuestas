@@ -16,49 +16,59 @@ class SelectBestModel():
         self.verbose = verbose
  
     # Paso 1
-    def filter_models_by_distribution(self, df, diff_max=0.3, diff_max_draw=0.3):
+    def filter_models_by_accuracy(self, df, dif_prob_bet_min=1):
         """
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
-
-        Mejoras:
-            - Tal vez eliminar por distribucion cuando dif_loc + dif_vis sea muy ≠ de 0.
         """
-        logger.info("Paso 2: Descartando modelos según distribución en df_test")
+        logger.info("Descartando modelos según precision...")
 
-        # Defino variables
-        l_idx_to_remove = []
-
-        # Por modelo
-        for idx, row in df.iterrows():
-            l_difs = [abs(row['dif_loc']), abs(row['dif_vis'])]  # No considero la diff de empate.
-            l_difs_2 =  [abs(row['dif_emp'])]
-
-            # # Si alguna diferencia es menor o igual a diff_min, no eliminar el modelo
-            # if any(diff <= diff_min for diff in l_difs):
-            #     continue  # Salta este modelo y no lo elimina
-
-            if any(diff >= diff_max_draw for diff in l_difs_2):
-                l_idx_to_remove.append(idx)
-
-            # Si alguna diferencia es mayor o igual a diff_max, eliminar el modelo
-            if any(diff >= diff_max for diff in l_difs):
-                l_idx_to_remove.append(idx)
-
-        # Filtrar DataFrame eliminando los índices a remover
-        df_filtered = df.drop(index=l_idx_to_remove)
+        df_filtered = df[df['dif_prec_bm'] > dif_prob_bet_min]
 
         if self.verbose >= 0:
-            logger.warning(f'Descarte por distribucion: {len(df)} --> {len(df_filtered)}' )
-            logger.info(f"Se eliminaron {len(l_idx_to_remove)} modelos por distribucion muy distinta a la de results.")
+            logger.warning(f'Descarte por accuracy: {len(df)} --> {len(df_filtered)}' )
             self.error_empty_dataframe(df_filtered)
 
         df_filtered.set_index('n_iteration', inplace=True)
 
         if self.path_save is not None:
-            df_filtered.to_excel(f'{self.path_save}/df_filt_by_distrib.xlsx', index=True)
+            df_filtered.to_excel(f'{self.path_save}/df_filt_by_acc.xlsx', index=True)
 
         return df_filtered
+    
+    def filter_models_by_distribution(self, df, l_variables, l_values):
+        """
+        Filtra el DataFrame eliminando los índices que no cumplen con el valor mínimo 
+        especificado para cada variable en l_variables y l_values.
+
+        Args:
+            df (pd.DataFrame): DataFrame a filtrar.
+            l_variables (list): Lista de variables a evaluar.
+            l_values (list): Lista de valores mínimos correspondientes a cada variable.
+
+        Returns:
+            pd.DataFrame: DataFrame filtrado.
+        """
+        logger.info("Descartando modelos según distribución en df_test")
+        len_inic = len(df)
+        # Asegurarse de que l_variables y l_values tengan la misma longitud
+        if len(l_variables) != len(l_values):
+            raise ValueError("Las listas l_variables y l_values deben tener la misma longitud.")
+
+        # Crear un DataFrame filtrado
+        for var, val in zip(l_variables, l_values):
+            df = df[df[var] >= val]
+
+        if self.verbose >= 0:
+            logger.warning(f'Descarte por distribucion: {len(len_inic)} --> {len(df)}' )
+            self.error_empty_dataframe(df)
+
+        df.set_index('n_iteration', inplace=True)
+
+        if self.path_save is not None:
+            df.to_excel(f'{self.path_save}/df_filt_by_distrib.xlsx', index=True)
+
+        return df
 
     # Paso 2
     def filter_models_by_fill_nan(self, df, type_: str = 'percentile', gp_fill_max: float = 0.1, n_col_fill_max: int = 5):
