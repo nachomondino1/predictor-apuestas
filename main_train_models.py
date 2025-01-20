@@ -27,8 +27,9 @@ def comprehensive_search(
     date, 
     d_params, 
     l_modelos, 
-    from_construct: bool = False,
-    update_sofifa: bool = False,
+    data_unders: bool = True,
+    data_prep_int: bool = True,
+    update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
     binary_classification: bool = False, # En desarrollo
@@ -98,13 +99,14 @@ def comprehensive_search(
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     # save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
-    directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa, BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
+    directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
  
-    if not from_construct:
-       
+    if data_unders:
+        directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa])
+
         ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
         # Defino paths de donde levantar los datos
-        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=False)
+        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore)
         df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
@@ -113,6 +115,15 @@ def comprehensive_search(
         df_match_odds.to_excel(f'{BASE_DIR_du}/df_match_odds.xlsx', index=True)
         df_player_sofifa.to_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index=True)
         df_player_fifa_sofifa.to_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index=True)
+    
+    else:
+        df_match = pd.read_excel(f'{BASE_DIR_du}/df_match.xlsx', index_col=0)
+        df_match_player = pd.read_excel(f'{BASE_DIR_du}/df_match_player.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'{BASE_DIR_du}/df_match_odds.xlsx', index_col=0)
+        df_player_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index_col=0)
+        df_player_fifa_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index_col=0)
+
+    if data_prep_int:
 
         ####################################################################### DATA PREPARATION (hasta integrate) #######################################################################
         # Format data
@@ -125,7 +136,6 @@ def comprehensive_search(
         # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
         df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
     
-
         ####################################################################### DATA PREPARATION (MISSING) #######################################################################
         # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
         ## Eliminar preparacion de missing actual
@@ -172,13 +182,9 @@ def comprehensive_search(
             # Construyo datos
             path_1 = f"{n_last_matches}_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
             path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_2}_{path_1}.xlsx'
-            try:
-                df_constructed = pd.read_excel(path_construct, index_col=0)
-                logger.info(df_constructed)
-            except FileNotFoundError:
-                df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches,l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
-                if export:
-                    df_constructed.to_excel(path_construct, index=True)
+            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches,l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
+            if export:
+                df_constructed.to_excel(path_construct, index=True)
 
             # Etiqueto df_constructed
             df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=True)
@@ -338,7 +344,7 @@ def save_old_train(l_directories, base_path_old): # Por ahora lo hago manual por
         #     os.makedirs(directorio)
         directories.mover_archivo(origen=directorio, destino=base_path_old)
 
-def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbose: int = 0):
+def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = True, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
     """    
@@ -477,9 +483,10 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 148
-    from_construct = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    update_sofifa = False
+    id_country = 77
+    data_unders = False
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    update_sofifa = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
@@ -493,4 +500,7 @@ if __name__ == "__main__":
     d_params, l_modelos = define_params_space(id_country, fast=True)
     
     # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-    df_iteration_comp = comprehensive_search(country=country, date=date, update_sofifa=update_sofifa, from_construct=from_construct, d_params=d_params, l_modelos=l_modelos)
+    df_iteration_comp = comprehensive_search(country=country, date=date, 
+                                             data_unders=data_unders, update_sofifa=update_sofifa, 
+                                             data_prep_int=data_prep_int, 
+                                             d_params=d_params, l_modelos=l_modelos)
