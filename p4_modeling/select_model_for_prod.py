@@ -21,15 +21,13 @@ class SelectBestModel():
         Selecciono solo los modelos con una distribución de predicted_result similar 
         a la distribución de resultados en la realidad.
         """
-        logger.info("Descartando modelos según precision...")
+        logger.info("Descartando modelos según precision respecto de BET...")
 
         df_filtered = df[df['dif_prec_bm'] > dif_prob_bet_min]
 
         if self.verbose >= 0:
             logger.warning(f'Descarte por accuracy: {len(df)} --> {len(df_filtered)}' )
             self.error_empty_dataframe(df_filtered)
-
-        df_filtered.set_index('n_iteration', inplace=True)
 
         if self.path_save is not None:
             df_filtered.to_excel(f'{self.path_save}/df_filt_by_acc.xlsx', index=True)
@@ -49,7 +47,7 @@ class SelectBestModel():
         Returns:
             pd.DataFrame: DataFrame filtrado.
         """
-        logger.info("Descartando modelos según distribución en df_test")
+        logger.info("Descartando modelos según valor minimo de ciertas variables")
         len_inic = len(df)
         # Asegurarse de que l_variables y l_values tengan la misma longitud
         if len(l_variables) != len(l_values):
@@ -60,13 +58,13 @@ class SelectBestModel():
             df = df[df[var] >= val]
 
         if self.verbose >= 0:
-            logger.warning(f'Descarte por distribucion: {len(len_inic)} --> {len(df)}' )
+            logger.warning(f'Descarte por distribucion: {len_inic} --> {len(df)}' )
             self.error_empty_dataframe(df)
 
         df.set_index('n_iteration', inplace=True)
 
         if self.path_save is not None:
-            df.to_excel(f'{self.path_save}/df_filt_by_distrib.xlsx', index=True)
+            df.to_excel(f'{self.path_save}/df_filt_by_acc_result.xlsx', index=True)
 
         return df
 
@@ -99,7 +97,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 3
-    def filter_models_by_metric(self, df, prop_to_max: float = 0.6, perc_cutoff: float = 1, metric_col: str = 'metric_sin_ea'):
+    def filter_models_by_metric(self, df, prop_to_max: float = 0.6, perc_cutoff: float = 1, n_models_max: int = 20, metric_col: str = 'metric_sin_ea'):
         """
         Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
 
@@ -116,24 +114,27 @@ class SelectBestModel():
         La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
         """
         logger.info("Paso 1: Descartando modelos segun metrica en df_test")
+        df = df.sort_values(by=metric_col, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
-        # Determino roi cut segun roi proporcional al max
+        # Determino metrica de corte
+        ## segun roi proporcional al max
         max_metric = df[metric_col].max()
         metric_cut_prop = max_metric * prop_to_max
 
-        # Determino roi cut segun percentil 
+        ## segun percentil 
         metric_cut_perc = np.percentile(df[metric_col], (100-perc_cutoff)) # Seleccionar el 20% de los registros con los valores más altos de 'metric'
         
+        ## segun cantidad maxima de modelos
+        metric_cut_fixed = df.iloc[n_models_max][metric_col]
+
         # Determino el minimo
-        roi_cut = max(metric_cut_prop, metric_cut_perc)
-        logger.info(f"\n(1) Metric Max: {max_metric} --> Metric cut: {max_metric * prop_to_max} \n(2) Metric cut percentile {perc_cutoff}: {metric_cut_perc}")
-        logger.info(f"Metric cut: {metric_cut_prop} y {metric_cut_perc} --> {roi_cut}")
+        metric_cut = max(metric_cut_prop, metric_cut_perc, metric_cut_fixed)
+        logger.info(f"\nMetricas de corte: (1) {metric_cut_prop} \n(2) {metric_cut_perc} \n (3) {metric_cut_fixed} \n => {metric_cut} ")
 
         # Filtro modelos segun roi to cut
-        df_filt = df[df[metric_col] >= roi_cut]
+        df_filt = df[df[metric_col] >= metric_cut]
 
         if self.verbose >= 1:
-            logger.info(df_filt.head())
             logger.warning(f"Descarte por metrica: {len(df)} --> {len(df_filt)}")
             self.error_empty_dataframe(df_filt)
 

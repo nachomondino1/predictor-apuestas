@@ -137,7 +137,7 @@ def comprehensive_search(
 
         ## Volver a preaparar missing
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
+        main_next_matches.main(d_run, id_country, iteration_date=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
 
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
@@ -345,7 +345,7 @@ def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbo
     # Podria recolectar missing para tener lo ultimos partidos actualzados
     if update_missing:
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        main_next_matches.main(d_run, id_country, iteration_date_dt=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
+        main_next_matches.main(d_run, id_country, iteration_date=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
 
     # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
     df_match = pd.read_excel(f'{BASE_DIR_flashscore}/df_match.xlsx', index_col=0)

@@ -370,11 +370,6 @@ def verify_format(df, column_specs):
         dtypes = (specs['dtype'],) if 'dtype' in specs else (int, float)
         verify_column_format(df, col, rango=rango, dtypes=dtypes)
 
-        # if 'rango' in specs:
-        #     min_val, max_val = specs['rango']
-        #     if not df[col].between(min_val, max_val).all():
-        #         raise ValueError(f"Los valores de la columna '{col}' están fuera del rango {min_val}-{max_val}.")
-
     return df
 
 def format_df_match(df):
