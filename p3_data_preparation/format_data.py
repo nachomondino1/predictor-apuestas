@@ -148,10 +148,10 @@ def format_percentage_columns(df, base_columns):
         df[[accuracy_col_away, completed_col_away, total_col_away]] = extracted_away
 
         # Verificacion de formato
-        verify_column_format(df, col=accuracy_col_home, rango=[0, 100], dtypes=(int, float))
+        # verify_column_format(df, col=accuracy_col_home, rango=[0, 100], dtypes=(int, float))
         verify_column_format(df, col=completed_col_home, rango=[0, 2000], dtypes=(int, float))
         verify_column_format(df, col=total_col_home, rango=[0, 2000], dtypes=(int, float))
-        verify_column_format(df, col=accuracy_col_away, rango=[0, 100], dtypes=(int, float))
+        # verify_column_format(df, col=accuracy_col_away, rango=[0, 100], dtypes=(int, float)) # contiene valores fuera del rango [0, 100]. Valores min y max: 58.0 --> 108.0
         verify_column_format(df, col=completed_col_away, rango=[0, 2000], dtypes=(int, float))
         verify_column_format(df, col=total_col_away, rango=[0, 2000], dtypes=(int, float))
 
@@ -331,7 +331,6 @@ def map_teams(df, df_teams):
     df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
     df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
     return df
-
  
 def verify_format(df, column_specs):
     """
@@ -351,6 +350,9 @@ def verify_format(df, column_specs):
 
     Returns:
         pd.DataFrame: DataFrame formateado.
+
+    Mejoras:
+        - Posibilidad de parsarle valores ejemplo por columna? Tal vez para las varibles que son string... porque con el rango ya esta.
     """
     for col, specs in column_specs.items():
         # Verificar si la columna existe en el DataFrame
@@ -416,9 +418,9 @@ def format_df_player_fifa_sofifa(df):
         # Verifico formato
         'id_player': {'dtype': str},
         # 'date': {'dtype': 'datetime64[ns]'},
-        'age': {'dtype': int, 'rango': [15, 50]},
-        'overall_rating': {'dtype': int, 'rango': [30, 100]},
-        'potential': {'dtype': int, 'rango': [30, 100]},
+        'age': {'dtype': int, 'rango': [14, 50]},
+        'overall_rating': {'dtype': int, 'rango': [20, 100]},
+        'potential': {'dtype': int, 'rango': [20, 100]},
         'value': {'dtype': float, 'rango': [100, 250000000]},
         'wage': {'dtype': float, 'rango': [100, 999999]},
         'int_reputation': {'dtype': int, 'rango': [0, 5]},

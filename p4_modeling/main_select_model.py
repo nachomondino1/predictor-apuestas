@@ -64,8 +64,9 @@ def main(
         country, 
         iteration_date,
         assess: bool = True,                        # Assess
-        extract_missing: bool = True,               # Assess
+        update_missing: bool = True,               # Assess
         predict_missing: bool = False,     # Assess
+        select_model: bool = True,
         strategy: str = 'general',                  # Betting Strategy
         ):
     """
@@ -114,7 +115,7 @@ def main(
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
         # Extraer missing
-        if extract_missing:
+        if update_missing:
             logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
             # Usar mnm.py con predict_missing=True y data_unders=False.
             d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
@@ -139,21 +140,19 @@ def main(
         metric_col_assess = 'metric_sin_ea'
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
         print(df_ite_filt.shape)
-
-    # # Usar test + missing ya actualizado
-    # else:
-    #     df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
-               
+        
 
     # (3) SELECCION DEL MODELO
     # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
-    metric_col = metric_col_assess if assess else metric_col_test
-    row = sbm.select_model(df_ite_filt, metric_col=metric_col)
+    if select_model:
+        metric_col = metric_col_assess if assess else metric_col_test
+        row = sbm.select_model(df_ite_filt, metric_col=metric_col)
+        n_model, model_name = row.index[0], row['model_name'].values[0]
+    else:
+        n_model, model_name = 930, "LogisticRegression"
 
     # (4) ESTRATRAGIA DE APUESTA PARA MODELO SELECCIONADO
     # Levanto df_predicciones
-    n_model, model_name = row.index[0], row['model_name'].values[0]
-    # n_model, model_name = 930, "LogisticRegression"
     df_pred = read_predicciones(n_model, model_name, assess, d_paths)
 
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
@@ -178,12 +177,12 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 148
+    id_country = 77
 
     # Defino hiperparametros
-    assess = True
-    extract_missing=False
-    predict_missing=False
+    assess = False
+    update_missing = False  # Extract + Prepare
+    predict_missing = True
 
     # Defino variables
     d_countries = {
@@ -191,7 +190,8 @@ if __name__ == "__main__":
         48: ["england", '2025-01-07'],
         55: ["france", '2025-01-08'], 
         59: ["germany", '2025-01-08'], 
-        77: ["italy", '2025-01-06'],
+        # 77: ["italy", '2025-01-06'],
+        77: ["italy", '2025-01-20'],
         # 148: ["spain", '2025-01-07'], 
         148: ["spain", '2025-01-19'], 
         167: ["usa", '2024-12-05']
@@ -201,5 +201,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=extract_missing, predict_missing=predict_missing
+        assess=assess, update_missing=update_missing, predict_missing=predict_missing
         )
