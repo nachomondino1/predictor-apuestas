@@ -357,7 +357,7 @@ class DataPreparation:
 
         return df
 
-    def clean_data_3(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, export: bool = True):
+    def clean_data_3(self, df: pd.DataFrame, competencies_to_select: list = None, export: bool = True):
         '''
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
         '''
@@ -365,25 +365,14 @@ class DataPreparation:
         df = df.sort_values(by='date', ascending=False)
 
         # (1) Eliminacion de filas 
-        if self.verbose >= 0:
-            print("Eliminacion de filas...")
-            n_reg_inic = len(df)
-
-        ## Para evitar partidos muy viejos
-        if n_years_to_select is not None:
-            fecha_limite = df.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
-            df = df[df['date'] >= fecha_limite] 
-
-            if self.verbose >= 0:
-                print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(df)}")
-
         ## Para evitar ciertas competencias
         if competencies_to_select is not None:
-            n_reg_inic_2 = len(df)
+            n_reg_inic = len(df)
             df = df[df['id_competition'].isin(competencies_to_select)]
 
             if self.verbose >= 0:
-                print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic_2} --> {len(df)}")
+                print("Eliminacion de filas...")
+                print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic} --> {len(df)}")
 
         # (2) Eliminacion de columnas         
         ## usadas solo para construir y constantes
@@ -480,11 +469,6 @@ class DataPreparation:
             df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
             df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
 
-            # Elimino columnas solo usadas para derivar otras
-            cols_to_drop = [col for col in df.columns if any(stat in col for stat in self.stats_to_derive)]
-            df.drop(columns=cols_to_drop, inplace=True)
-            logger.warning(f"Columnas eliminadas (solo usadas para derivar otras): {cols_to_drop}") # Cuidado en que se eliminen todas las stats usadas para derivar.
-
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
             for n_matches in n_last_matches:
@@ -562,7 +546,7 @@ class DataPreparation:
             df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, fill_na: str = None, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, fill_na: str = None, export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -582,9 +566,24 @@ class DataPreparation:
         df = df.sort_values(by='date', ascending=False)
         X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
 
-        # (1) Eliminacion de columnas usadas para construir
+        # (1) Eliminacion de filas 
+        ## Para evitar partidos muy viejos
+        if n_years_to_select is not None:
+            n_reg_inic = len(X)
+            fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+            X = X[X['date'] >= fecha_limite] 
+
+            if self.verbose >= 0:
+                print("Eliminacion de filas...")
+                print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(X)}")
+
+        # (2) Eliminacion de columnas usadas para construir
         cols_for_construct = ['date', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        X.drop(columns=cols_for_construct, inplace=True)
+        cols_to_derive_others = [col for col in X.columns if any(stat in col for stat in self.stats_to_derive)]
+        cols_to_drop = cols_for_construct + cols_to_derive_others
+        X.drop(columns=cols_to_drop, inplace=True)
+        logger.warning(f"Columnas eliminadas: {cols_for_construct}")
+        logger.warning(f"Columnas eliminadas (solo usadas para derivar otras): {cols_to_derive_others}") # Cuidado en que se eliminen todas las stats usadas para derivar.
 
         # (2) Tratamiento de NaN values
         shape_inicial = X.shape

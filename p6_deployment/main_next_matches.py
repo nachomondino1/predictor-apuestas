@@ -659,12 +659,13 @@ class TrainingDataLoader():
         n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
         d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
         d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
+        d['fill_na'] = row_hiper['fill_na'] # .values[0]
         ## Select_data
         d['selected_columns'] = selected_columns
 
-        self.path_clean = f'{d['n_years_to_select']}_{d['comp_to_select']}'
+        self.path_clean = f'{d['comp_to_select']}'
         self.path_construct = f'{d['n_last_matches']}_{d['n_dias_ult_part']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['dif_con_against']}'
-        self.path_1 = f'{self.path_clean}_{self.path_construct}'
+        self.path_clean_2 = f'{d['n_years_to_select']}_{d['fill_na']}'
 
         if self.verbose >= 0:
             logger.info("Hiperparametros cargados:")
@@ -675,7 +676,8 @@ class TrainingDataLoader():
     def load_df_etiquetas(self):
 
         logger.info("Levento etiquetas con el que entrené")
-        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.path_1}.xlsx'       
+        subpath = f'{self.path_clean}_{self.path_construct}'
+        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.subpath}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
         if self.verbose >= 1:  
@@ -687,7 +689,8 @@ class TrainingDataLoader():
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{self.path_1}.pkl'
+        subpath = f'{self.path_clean}_{self.path_construct}_{self.path_clean_2}'
+        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{subpath}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
@@ -1357,10 +1360,10 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 148
+    id_country = 77
     key, value = 'predict', 'try_a_specific_model'
-    # data_unders = False
-    n_days = 2
+    data_unders = True
+    n_days = 10
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1368,13 +1371,14 @@ if __name__ == "__main__":
         48: ["england", '2025-01-07'], 
         55: ["france", '2025-01-08'], 
         59: ["germany", '2025-01-08'], 
-        77: ["italy", '2025-01-06'],
+        # 77: ["italy", '2025-01-06'],
+        77: ["italy", '2025-01-20'],
         # 148: ["spain", '2025-01-07'], 
         148: ["spain", '2025-01-19'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1538, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 42, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1393,7 +1397,7 @@ if __name__ == "__main__":
             df = main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
 
     elif key == 'predict':
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': False} 
+        d_run = {'run_missing': False, 'data_unders': data_unders, 'data_prep': True, 'modeling': True, 'export': False} 
             
         if value == "predict_missing":
             logger.warning("Get predictions in missing matches of specific model")
@@ -1401,7 +1405,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=True) 
 
     elif key == 'prod':
         logger.warning("Get predictions for model in prod")

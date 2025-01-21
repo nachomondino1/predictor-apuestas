@@ -158,15 +158,15 @@ def comprehensive_search(
      # Clean data 3
     for zz, param_values_00 in enumerate(product(*d_params['clean_data_3'].values()), start=1):
 
-        comp_to_select, n_years_to_select =  param_values_00[0], param_values_00[1]
+        comp_to_select =  param_values_00[0]
 
-        path_2 = f'{n_years_to_select}_{comp_to_select}'
-        path_clean_data = f'{BASE_DIR_dp}/clean_data_3/df_clean_data_3_{path_2}.xlsx'
+        path_clean = f'{comp_to_select}'
+        path_clean_data = f'{BASE_DIR_dp}/clean_data_3/df_clean_data_3_{path_clean}.xlsx'
         if verbose >= 0:
             logger.info(f" Iteracion clean_data 3".center(120, "#"))
-            print(f"Hiper clean_data_3 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select}")            
+            print(f"Hiper clean_data_3 --> comp_to_select: {comp_to_select}")            
 
-        df_int_clean = dp.clean_data_3(df=df_integrated, n_years_to_select=n_years_to_select, competencies_to_select=comp_to_select, export=True)
+        df_int_clean = dp.clean_data_3(df=df_integrated, competencies_to_select=comp_to_select, export=True)
         if verbose >= 2:
             df_int_clean.to_excel(path_clean_data, index=True)
 
@@ -180,29 +180,30 @@ def comprehensive_search(
                 print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
 
             # Construyo datos
-            path_1 = f"{n_last_matches}_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
-            path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_2}_{path_1}.xlsx'
+            path_cons = f"{path_clean}_{n_last_matches}_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
+            path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_cons}.xlsx'
             df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches,l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
             if export:
                 df_constructed.to_excel(path_construct, index=True)
 
             # Etiqueto df_constructed
             df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=True)
-            path_etiqueta = f'{BASE_DIR_dp}/tag/df_etiquetas_{path_2}_{path_1}.xlsx'
+            path_etiqueta = f'{BASE_DIR_dp}/tag/df_etiquetas_{path_cons}.xlsx'
             if export:
                 df_etiquetas.to_excel(path_etiqueta, index=True)
 
             # Clean data 2 (Treat nan + Escalado)
             for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
 
-                fill_na = param_values_00[0]
-                path_clean_data = f'{BASE_DIR_dp}/clean_data_2/df_clean_data_2_{path_2}_{path_1}_{fill_na}.xlsx'
+                n_years_to_select, fill_na = param_values_00[0], param_values_00[1]
+                path_clean_2 = f'{path_cons}_{n_years_to_select}_{fill_na}'
+                path_clean_data = f'{BASE_DIR_dp}/clean_data_2/df_clean_data_2_{path_clean_2}.xlsx'
                 if verbose >= 0:
                     logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
-                    print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; comp_to_select: {comp_to_select} ; fill_na: {fill_na}")            
+                    print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; fill_na: {fill_na}")            
 
-                df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, fill_na=fill_na, export=True)
-                joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_2}_{path_1}.pkl')
+                df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, fill_na=fill_na, export=True)
+                joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_clean_2}.pkl')
 
                 if verbose >= 2:
                     df_cons_clean.to_excel(path_clean_data, index=True)
@@ -212,13 +213,13 @@ def comprehensive_search(
 
                     # Asigno valor a cada hiperpametro
                     thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                    path_3 = f'{thr_corr}_{thr_fs}'
+                    path_sel = f'{path_clean_2}_{thr_corr}_{thr_fs}'
                     if verbose >= 0:
                         logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
                         print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
 
                     # Selecciono datos
-                    path_select = f'{BASE_DIR_dp}/select_data/df_selected_{path_1}_{path_2}_{path_3}.xlsx'
+                    path_select = f'{BASE_DIR_dp}/select_data/df_selected_{path_sel}.xlsx'
                     try:
                         df_sel = pd.read_excel(path_select, index_col=0)
                     except FileNotFoundError:
@@ -275,13 +276,15 @@ def comprehensive_search(
 
                         if len(df_metrics) > 0:
                             # Guardo datos en dataframe
-                            row_data = {'n_iteration': cont_iter, 
-                                        'n_last_matches': n_last_matches, 'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
-                                        'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                        'n_years_to_select': n_years_to_select, 'comp_to_select': comp_to_select,
-                                        'fill_na': fill_na, 'bal_type': bal_type,
-                                        'val_size': val_size, 'n_reg_test': n_reg_test, 
-                                        'k': k}
+                            row_data = {
+                                'n_iteration': cont_iter, 
+                                'comp_to_select': comp_to_select,
+                                'n_last_matches': n_last_matches, 'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
+                                'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                                'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
+                                'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
+                                'k': k
+                                }
                             
                             # Concateno y exporto datos
                             df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
@@ -448,7 +451,6 @@ def define_params_space(id_country, fast: bool = False):
         d_params = {  
             'clean_data_3': {
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
-                'n_years_to_select': [2, 3, 5, 10],
             },
             'construct': {
                 'n_last_matches': [[10]],  # Variables historicas en ultimos n partidos
@@ -458,6 +460,7 @@ def define_params_space(id_country, fast: bool = False):
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
+                'n_years_to_select': [2, 3, 5, 10],
                 'fill_na': [None, "0", 'ml'], 
             },
             'select': {
@@ -485,8 +488,8 @@ if __name__ == "__main__":
     # Parametros de ejecucion
     id_country = 77
     data_unders = False
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     update_sofifa = True
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]
