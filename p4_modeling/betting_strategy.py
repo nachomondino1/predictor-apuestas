@@ -66,9 +66,9 @@ class BettingStrategy:
                 'b': [
                     0, 
                     -0.1, -0.2, -0.4, 
-                    0.1, 0.2, 0.4, 
+                    0.1, 0.2,
                     ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
-                'odd_weight': [0, 1, 2],
+                'odd_weight': [0, 1, 2, 3],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
@@ -84,9 +84,8 @@ class BettingStrategy:
                 'lim_sup': [0, 1]
             }
 
-        if self.verbose >= 0:
+        if self.verbose >= 1:
             logger.info(f"Hiperparametros estrategia de apuesta: {dic}")
-            # logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas} \n- Pesos cuotas: {l_odd_weight} \n- Limite para afectar stake con cuotas: {l_lim_sup}")
     
         return dic
 
