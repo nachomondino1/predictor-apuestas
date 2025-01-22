@@ -150,6 +150,10 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
     # Returns
         ROI del modelo. (float)
     """
+    # Converito date a datetime y ordeno por fecha
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+     
     # Definicion de variables
     bank_inicial = 100 # CUIDADO! NO ES sum(df['stake_mod'])
     bank_final = bank_inicial
@@ -163,7 +167,7 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         cont += 1
 
         # Defino stake a apostar en pesos (a partir del stake como porcentaje del bank)
-        stake_a_apostar =  bank_final * row['stake_to_bet'] / 100
+        stake_a_apostar = bank_final * row['stake_to_bet'] / 100
         df.loc[idx, f'{name_extension}bank_inicial'] = bank_final
         df.loc[idx, f'{name_extension}stake_to_bet_en_$'] = stake_a_apostar
 
@@ -178,6 +182,12 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         ingresos_sin_bank = row['stake_to_bet'] * row['odd_to_bet'] if row[f'{name_extension}acerte'] == 1 else 0
         ganancia_sin_bank = ingresos_sin_bank - row['stake_to_bet']
         df.loc[idx, f'{name_extension}G/P_sin_bank'] = ganancia_sin_bank
+
+        # Calculo stake y G/P sin estrategia ?
+        stake_sin_ea = 10 * row['prob_result_to_bet']
+        G_P_sin_ea = stake_sin_ea * (row['odd_to_bet']-1) if row[f'{name_extension}acerte'] == 1 else - stake_sin_ea
+        df.loc[idx, f'{name_extension}stake_sin_ea'] = stake_sin_ea
+        df.loc[idx, f'{name_extension}G_P_sin_ea'] = G_P_sin_ea
 
         # Guardo ROI en partidos especificados
         if save_roi:
