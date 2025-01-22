@@ -8,7 +8,7 @@ import datetime
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 from p6_deployment import main_next_matches
 
-def initialize_directories(country, iteration_date, assess_already_extracted):
+def initialize_directories(country, iteration_date, predict_missing):
     """
     Guardar seleccion de modelo vieja en carpeta
     """
@@ -21,13 +21,13 @@ def initialize_directories(country, iteration_date, assess_already_extracted):
         'base_path': base_path,
         'base_path_sbm': base_path_sbm,
         'path_old': f'{base_path}/best_model_old/{fecha_hoy}',
-        'path_select': f'{base_path_sbm}/1_filter_models/',
-        'path_assess': f'{base_path_sbm}/2_assess/',
-        'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy/',
+        'path_select': f'{base_path_sbm}/1_filter_models',
+        'path_assess': f'{base_path_sbm}/2_assess',
+        'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy',
         'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
 
-    if not assess_already_extracted:
+    if predict_missing:
         create_and_move_directories(d_paths=d_paths)
     return d_paths
 
@@ -64,8 +64,9 @@ def main(
         country, 
         iteration_date,
         assess: bool = True,                        # Assess
-        extract_missing: bool = True,               # Assess
-        assess_already_extracted: bool = False,     # Assess
+        update_missing: bool = True,               # Assess
+        predict_missing: bool = False,     # Assess
+        select_model: bool = True,
         strategy: str = 'general',                  # Betting Strategy
         ):
     """
@@ -86,7 +87,7 @@ def main(
         - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
     # Creo objeto de clase select_best_model
-    d_paths = initialize_directories(country, iteration_date, assess_already_extracted)
+    d_paths = initialize_directories(country, iteration_date, predict_missing)
 
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
@@ -105,30 +106,36 @@ def main(
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por METRIC
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, prop_to_max=0.3, perc_cutoff=5, metric_col='metric_sin_ea_test') # 0.6 y 1.5
+    df_ite_filt = sbm.filter_models_by_distribution(df_ite, l_variables=['acc_home', 'acc_draw', 'acc_away'], l_values=[0.55, 0.37, 0.4])
+    df_ite_filt = sbm.filter_models_by_accuracy(df_ite_filt, dif_prob_bet_min=0) # Antes pues sino elimina mal por metrica.
+    df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, prop_to_max=0.5, perc_cutoff=5, n_models_max=9, metric_col='metric_sin_ea_test') # 0.6 y 1.5
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
-        if not assess_already_extracted:
-            # Evaluo modelos en test y missing
+        # Extraer missing
+        if update_missing:
+            logger.warning(f"Se definió extract_missing={update_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
+            # Usar mnm.py con predict_missing=True y data_unders=False.
+            d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
 
-            # Extraer missing
-            if extract_missing:
-                logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
-                # Usar mnm.py con predict_missing=True y data_unders=False.
-                d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-                main_next_matches.main(d_run, id_country, export=d_run['export'], verbose=-1) 
-
-            # Por modelo: Predict missing + Concatenar a df_predicciones test
-            df_ite_filt = assess_models_in_prod.update_test_with_missing(
+        # Por modelo: Predict missing + Concatenar a df_predicciones test
+        if predict_missing:
+            df_test_assess = assess_models_in_prod.update_test_with_missing(
                 df_ite=df_ite_filt, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-        
-        # Usar test + missing ya actualizado
         else:
-            df_ite_filt = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration.xlsx')
-        
+            logger.warning("Se evita predecir los ultimos partidos missing y se levanta los ya predichos.")
+            df_test_assess = pd.read_excel(f'{d_paths["path_assess"]}/df_iteration_test.xlsx')
+
+        # Concateno y exporto.
+        # Defino que n_model use en prod (para comparar assess y prod)
+        # n_model_prod, _, = main_next_matches.read_data_of_best_model(id_country)
+        # n_model_prod = 1538
+
+        df_ite_filt = assess_models_in_prod.concat_test_and_assess(df_ite=df_ite_filt, df_test=df_test_assess, path_save=d_paths['path_assess'])
+
         # Recalculo metrica con assess
         metric_col_assess = 'metric_sin_ea'
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
@@ -137,12 +144,15 @@ def main(
 
     # (3) SELECCION DEL MODELO
     # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
-    metric_col = metric_col_assess if assess else metric_col_test
-    row = sbm.select_model(df_ite_filt, metric_col=metric_col)
+    if select_model:
+        metric_col = metric_col_assess if assess else metric_col_test
+        row = sbm.select_model(df_ite_filt, metric_col=metric_col)
+        n_model, model_name = row.index[0], row['model_name'].values[0]
+    else:
+        n_model, model_name = 930, "LogisticRegression"
 
     # (4) ESTRATRAGIA DE APUESTA PARA MODELO SELECCIONADO
     # Levanto df_predicciones
-    n_model, model_name = row.index[0], row['model_name'].values[0]
     df_pred = read_predicciones(n_model, model_name, assess, d_paths)
 
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
@@ -160,7 +170,7 @@ def main(
     
     # Paso 3: Defino las odds por resultado (usando el mismo m) --> Le paso d_params a usar.
     df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_new)
-    
+   
     # Exporto datos
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
     df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
@@ -170,17 +180,18 @@ if __name__ == "__main__":
     id_country = 48
 
     # Defino hiperparametros
-    assess = True
+    assess = False
+    update_missing = False  # Extract + Prepare
+    predict_missing = True
 
     # Defino variables
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2025-01-07'],
-        55: ["france", '2025-01-08'], 
-        # 55: ["france", '2025-01-12'], 
-        59: ["germany", '2025-01-08'], 
-        77: ["italy", '2025-01-06'],
-        148: ["spain", '2025-01-07'], 
+        48: ["england", '2025-01-21'],
+        55: ["france", '2025-01-21'], 
+        59: ["germany", '2025-01-21'], 
+        77: ["italy", '2025-01-20'],
+        148: ["spain", '2025-01-20'], 
         167: ["usa", '2024-12-05']
         }
     country = d_countries[id_country][0]
@@ -188,5 +199,5 @@ if __name__ == "__main__":
 
     main(
         id_country=id_country, country=country, iteration_date=iteration_date, 
-        assess=assess, extract_missing=False, assess_already_extracted=True
+        assess=assess, update_missing=update_missing, predict_missing=predict_missing
         )

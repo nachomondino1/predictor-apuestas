@@ -9,7 +9,7 @@ from p3_data_preparation import format_data
 from p3_data_preparation.construct_data import determine_result, determine_expected_result
 from p4_modeling import asses_model, betting_strategy, compare_assess_prod
 from p6_deployment import main_next_matches
-
+from main import Modeling
 
 def update_test_with_missing(df_ite, id_country, country, iteration_date, path_save):
     """
@@ -25,12 +25,12 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
     """
     # Defino variables
     df_test = pd.DataFrame()    
-    bs = betting_strategy.BettingStrategy() # no le paso iteration_date para que no guarde datos
+    mo = Modeling(country, iteration_date)
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
     base_path_dp = f'./data/{country}/p3_data_preparation/{iteration_date}'
 
     # Defino que n_model use en prod (para comparar assess y prod)
-    n_model_prod, _, _ = main_next_matches.read_data_of_best_model(id_country)
+    # n_model_prod, _, _ = main_next_matches.read_data_of_best_model(id_country)
 
     # Por modelo
     for idx, row in df_ite.iterrows():
@@ -59,24 +59,17 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
 
         # Concateno df_pred y df_pred missing.
         df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
-        df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
+        df_pred_proba = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
 
         # Recalculo metricas con test + missing
-        df_filled = pd.read_excel(f'{base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0) #  para calcular relleno..
-        df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, country=country, df_filled=df_filled, retrain=True, export=False)  # --> Sobreescribe metricas de df_pred...
-        df_predicciones = determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
-        
-        d_params = bs.define_hiperparameters(strategy='train')
-        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params) # Chequear que funciona...
-        d_metrics.update(d_roi)
-        d_metrics.update(asses_model.calculate_advanced_metrics(df_predicciones=df_predicciones))
+        df_predicciones, d_metrics = mo.calculate_metrics(df_pred_proba, retrain=True)
 
         # Convierto ids de equipos a nombres
         df_teams = pd.read_excel(f'{base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
         df_predicciones = format_data.map_teams(df_predicciones, df_teams=df_teams)
 
         # Guardo datos + Exporto
-        row_test = {'n_iteration': n_model, 'model_name': model_name, **d_metrics}
+        row_test = {'n_iteration': n_model, 'model_name': model_name, **d_metrics, 'n_part_assess': len(df_pred_missing)}
         df_row_test = pd.DataFrame([row_test])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
         df_test = pd.concat([df_test, df_row_test], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
         ## Exporto datos del modelo
@@ -86,22 +79,52 @@ def update_test_with_missing(df_ite, id_country, country, iteration_date, path_s
         progress_bar.update(1)
 
     progress_bar.close()
+    return df_test
 
+def concat_test_and_assess(df_ite, df_test, path_save, n_model_prod: int = None):
+    """
+    Concateno resultados en assess y prod y genero un df_iteration actualizado.
+    """
     # Concateno df_test actualizado con df_ite
     df_ite = df_ite.rename(columns={col: f"{col}_train" for col in df_ite.columns if col != 'n_iteration'})
     df_ite_updated = pd.merge(df_ite, df_test, on='n_iteration', how='outer')  
     
-    # Creo columna 'dif_roi_pp'
-    df_ite_updated['dif_roi_pp'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
-    ave_dif = df_ite_updated['dif_roi_pp'].mean() * 100
-    if ave_dif > 0:
-        logger.critical(f"La variacion del ROIpp de prod respecto de prod+asses es de {ave_dif:.0f}%.")
+    # Calculo metricas de variacion de ROI en nuevos partidos
+    df_ite_updated['var_roi'] = (df_ite_updated['roi'] - df_ite_updated['roi_train']) / df_ite_updated['roi_train']
+    df_ite_updated['ritmo_var_roi'] = (df_ite_updated['roi_por_partido'] - df_ite_updated['roi_por_partido_train']) / df_ite_updated['roi_por_partido_train']
+
+    if n_model_prod:
+        ## Metricas modelo de prod
+        df_filt = df_ite_updated[df_ite_updated['n_iteration'] == n_model_prod]
+        crecimiento_prod = df_filt['var_roi'].values[0] * 100
+        tasa_crecim_prod = df_filt['ritmo_var_roi'].values[0] * 100
+
+        # Imprimo mensaje sobre el modelo en prod
+        print(" Resultados en assess (modelo en prod) ".center(80, "%"))
+        if crecimiento_prod > 0 and tasa_crecim_prod > -0.1:
+            logger.critical(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
+        elif crecimiento_prod > 0:
+            logger.warning(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim_prod:.0f}%.")
+        else:
+            logger.error(f"\n En {n_part} partidos predichos por el modelo {n_model_prod}: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento_prod:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim_prod:.0f}%.")
+
+    ## Metricas promedio
+    crecimiento = df_ite_updated['var_roi'].mean() * 100
+    tasa_crecim = df_ite_updated['ritmo_var_roi'].mean() * 100
+    n_models = len(df_test)
+    n_part = df_test['n_part_assess'].values[0]
+ 
+    # Imprimo mensaje
+    print(" Resultados en assess (modelos candidatos) ".center(80, "%"))
+    if crecimiento > 0 and tasa_crecim > -0.1:
+        logger.critical(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
+    elif crecimiento > 0:
+        logger.warning(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El crecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de: {tasa_crecim:.0f}%.")
     else:
-        logger.error(f"La variacion del ROIpp de prod respecto de prod+asses es de {ave_dif:.0f}%. Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
+        logger.error(f"\n En {n_part} partidos predichos por los mejores {n_models} modelos: \n - El decrecimiento promedio del ROI en los ultimos partidos fue de {crecimiento:.0f}%. \n - La tasa de crecimiento respecto de test fue de : {tasa_crecim:.0f}%. \n Hay un declive general en el ROI tras los nuevos partidos assess. Puede ser por tener mucho nan en produccion aunque tal vez fueron pocos partidos aun.")
 
     # Exporto df_iteration actualizado
     df_ite_updated.to_excel(f'{path_save}/df_iteration.xlsx', index=False)
-
     return df_ite_updated
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
@@ -112,10 +135,10 @@ def predict_missing(id_country, n_model, model_name, iteration_date): # No se si
     """
     # Defino variables (no tocar)
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
-    d_model = {'n_model': n_model, 'model_name': model_name, 'iteration_date': iteration_date} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': n_model, 'model_name': model_name} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     # Usar mnm.py con predict_missing=True y data_unders=False.
-    df = main_next_matches.main(d_run, id_country, d_model=d_model, predict_missing=True, export=False, verbose=0) 
+    df = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, predict_missing=True, export=False, verbose=0) 
 
     if not isinstance(df, pd.DataFrame):
         raise ValueError("No se generó un dataframe.")
@@ -132,7 +155,7 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
     """
     ## Levanto df_match_miss para obtener goals? ??
     df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
-    l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
+    l_columns_to_copy = ['goals_home', 'goals_away'] #, 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
     
     # Ordeno df por date
     df = df.sort_values(by='date', ascending=False)
@@ -146,7 +169,7 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
 
     ## Determino result y expected result segun goals
     df = determine_result(df) # Intento hacerlo antes con df_match pero rompia.
-    df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+    # df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
     return df
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente

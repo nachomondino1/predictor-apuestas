@@ -1,1 +1,2 @@
 ~
+df.to_excel('/Users/nachomondino/Desktop/prueba.xlsx')

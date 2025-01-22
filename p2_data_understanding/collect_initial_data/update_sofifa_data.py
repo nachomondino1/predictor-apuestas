@@ -7,10 +7,12 @@ from utils.set_up_logging import logger
 from dotenv import load_dotenv
 import pandas as pd
 from p2_data_understanding.collect_initial_data import scraper_sofifa
+from p3_data_preparation.format_data import verify_column_format
 from tqdm import tqdm
+import datetime
 
 
-def get_player_data(id_country, df_comp_country, n_seasons_update, path_save, verbose: int = 1):
+def get_player_data(id_country, country, df_comp_country, n_seasons_update, path_save):
     """
     Levanta datos de sofifa ya extraidos y actualiza las ultimas temporadas
     """
@@ -43,9 +45,14 @@ def get_player_data(id_country, df_comp_country, n_seasons_update, path_save, ve
     df_player_sofifa.to_excel(f'{path_save}/df_player_sofifa.xlsx', index=True)
     df_player_fifa_sofifa.to_excel(f'{path_save}/df_player_fifa_sofifa.xlsx', index=True)
     print(f"Shape final: {df_player_sofifa.shape} {df_player_fifa_sofifa.shape}")
+
+    # Verificar formato de datos
+    format_df_player_sofifa(df_player_sofifa)
+    format_df_player_fifa_sofifa(df_player_fifa_sofifa)
+
     return df_player_sofifa, df_player_fifa_sofifa
 
-def read_last_player_data(verbose: int = 0):
+def read_last_player_data(country, verbose: int = 0):
     
     base_path = f'data/{country}/p2_data_understanding'
 
@@ -81,6 +88,7 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
     # Determinar que fifas a actualizar
     l_fifas_extracted = df_player_fifa['fifa'].unique()
     print(f"Fifas a actualizar: {l_fifas_extracted}")
+    print(f'Shapes new_data: \n df_player_sofifa {df_player.shape} \n df_player_fifa_sofifa: {df_player_fifa.shape}')
 
     # Elimino fifas actualizados en los datos viejos
     df_player_fifa_sofifa_old_filt = df_player_fifa_sofifa_old[~df_player_fifa_sofifa_old['fifa'].isin(l_fifas_extracted)]
@@ -91,11 +99,12 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
     # Concateno datos 1) viejos sin fifas actualziados + 2) datos recien extraidos
     df_player_ct = pd.concat([df_player, df_player_sofifa_old_filt], axis=0)
     df_player_fifa_ct = pd.concat([df_player_fifa, df_player_fifa_sofifa_old_filt], axis=0)
+    print(f"Shape concat: \n {df_player_ct.shape} \n {df_player_fifa_ct.shape}")
 
     # Elimino duplicados (Por que no funciona como el de clean_data de main.py? Deja duplicados... y en clean los elimina bien. Tal vez x formato del idx?)
     df_player_sofifa_filt = df_player_ct[~df_player_ct.index.duplicated(keep='first')]  # Esta es la que uso en clean_data
     df_player_fifa_sofifa_filt = df_player_fifa_ct.drop_duplicates(subset=['id_player', 'fifa', 'date'])  # No uso id_competition? Creo que no pues ya mapié por competicion antes... y no lo hare a futuro pues usare este df
-    print(f"Eliminacion de duplicados: \n {df_player_ct.shape} --> {df_player_sofifa_filt.shape} \n {df_player_fifa_ct.shape} --> {df_player_fifa_sofifa_filt.shape}")
+    print(f"Shape concat sin duplicados: \n {df_player_ct.shape} --> {df_player_sofifa_filt.shape} \n {df_player_fifa_ct.shape} --> {df_player_fifa_sofifa_filt.shape}")
 
     # Exporto datos
     df_player_sofifa_filt.to_excel(f'{path_save}/df_player_sofifa.xlsx', index=True)
@@ -103,8 +112,54 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
 
     return df_player_sofifa_filt, df_player_fifa_sofifa_filt
 
+def format_df_player_sofifa(df):
+
+    # Formateo columnas int
+    df.index = df.index.astype(str)
+    df['height'] = df['height'].astype(int)
+
+    # Verfico formato
+    verify_column_format(df, col='player_name', dtypes=(str))
+    verify_column_format(df, col='player_name_short', dtypes=(str))
+    verify_column_format(df, col='nationality', dtypes=(str))
+    verify_column_format(df, col='height', rango=[100, 240], dtypes=(int, float))
+    verify_column_format(df, col='preferred_foot', dtypes=(str))
+    verify_column_format(df, col='url_player', dtypes=(str))
+
+def format_df_player_fifa_sofifa(df):
+    """
+    Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
+    """
+    # Formateo columnas int
+    df['id_player'] = df['id_player'].astype(str)
+    df['age'] = df['age'].astype(int)
+    df['overall_rating'] = df['overall_rating'].astype(int)
+    df['potential'] = df['potential'].astype(int)
+    df['int_reputation'] = df['int_reputation'].astype(int)
+    
+    # Verifico formato
+    verify_column_format(df, col='id_player', dtypes=(str))
+    verify_column_format(df, col='age', rango=[15, 50], dtypes=(int, float))
+    verify_column_format(df, col='overall_rating', rango=[30, 100], dtypes=(int, float))
+    verify_column_format(df, col='potential', rango=[30, 100], dtypes=(int, float))
+    verify_column_format(df, col='value', dtypes=(str))
+    verify_column_format(df, col='wage', dtypes=(str))
+    verify_column_format(df, col='int_reputation', rango=[0, 5], dtypes=(int, float))
+    verify_column_format(df, col='fifa', dtypes=(str))
+    verify_column_format(df, col='date', dtypes=(str))    
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
+
+    # try Format
+    df1 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_sofifa.xlsx')
+    df2 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_fifa_sofifa.xlsx')
+
+    format_df_player_sofifa(df1)
+    format_df_player_fifa_sofifa(df2)
+
+    '''
+
     load_dotenv() # Cargar las variables de entorno desde el archivo .env
     BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
 
@@ -119,9 +174,9 @@ if __name__ == "__main__":
     df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
     print(f' COUNTRY: {country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
     
-
-    path_save = f'data/{country}/p2_data_understanding/sofifa_update'
-    path_save_seg = f'data/{country}/p2_data_understanding/sofifa_update/data_seg'
+    date = datetime.datetime.now().date()
+    path_save = f'data/{country}/p2_data_understanding/sofifa_update/{date}'
+    path_save_seg = f'{path_save}/data_seg'
 
     # Levanto los datos viejos
     df_player_sofifa_old, df_player_fifa_sofifa_old = read_last_player_data()
@@ -131,3 +186,4 @@ if __name__ == "__main__":
 
     # Actualizar sofifa con las ultimas seasons
     concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=path_save)
+    '''

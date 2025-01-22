@@ -63,8 +63,12 @@ class BettingStrategy:
                 'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
                 'curva': ['linear'], # ['linear',  'kelly'],  #
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [0, -0.2, -0.5, 0.2],
-                'odd_weight': [0, 1, 2],
+                'b': [
+                    0, 
+                    -0.1, -0.2, -0.4, 
+                    0.1, 0.2,
+                    ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
+                'odd_weight': [0, 1, 2, 3],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
@@ -80,9 +84,8 @@ class BettingStrategy:
                 'lim_sup': [0, 1]
             }
 
-        if self.verbose >= 0:
+        if self.verbose >= 1:
             logger.info(f"Hiperparametros estrategia de apuesta: {dic}")
-            # logger.info(f"Hiperparametros estrategia de apuesta: \n- Doble oportunidad: {l_thr_dif_prob} \n- Rectas: {d_rectas} \n- Pesos cuotas: {l_odd_weight} \n- Limite para afectar stake con cuotas: {l_lim_sup}")
     
         return dic
 
@@ -424,10 +427,15 @@ class BettingStrategy:
             df_aux = self.apply_strategy(df, param_dict, prod=False)
 
             # Calculo de metricas (ROI y expected roi)
-            df_pred_with_metrics, d_metrics = self.calculate_roi_in_combination(df_aux)
-            if self.verbose >= 0:
+            df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
+            # df_pred_2, d_expected_roi = calculate_roi(df, name_extension='expected_')     
+            # # Concateno datos de ROI y Expected ROI
+            # missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
+            # df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+            # d_metrics.update(d_expected_roi)
+
+            if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
-                # df_pred_with_metrics.to_excel("/Users/nachomondino/Desktop/bs.xlsx")
 
             # Guardo resultados
             d_predic[cont] = df_pred_with_metrics
@@ -492,28 +500,13 @@ class BettingStrategy:
         # Determino acierto de prediccion
         if not prod:
             df = self.determine_winning_bets(df)
-            df = self.determine_winning_bets(df, name_extension='expected_')
+            # df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
         d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b']}
         d_params_odds = {'odd_weight': param_dict['odd_weight'], 'dif_prob_sup_cap': param_dict['lim_sup']}
         df = self.determine_stake_to_bet(df, **d_params_stake, **d_params_odds)
         return df
-    
-    def calculate_roi_in_combination(self, df):
-   
-        # Calculo ROI
-        df_pred, d_metrics = calculate_roi(df)
-
-        # Calculo expected ROI
-        df_pred_2, d_expected_roi = calculate_roi(df, name_extension='expected_')     
-
-        # Concateno datos de ROI y Expected ROI
-        missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
-        df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
-        d_metrics.update(d_expected_roi)
-
-        return df_pred, d_metrics
 
     def select_best_parameters(self, data, verbose: int = 0):
         
@@ -574,10 +567,7 @@ class BettingStrategy:
 
                 # Determinar mejor estrategia para el resultado            
                 n_comb = self.select_best_parameters(d_metricas)
-            
-                if pred == 0 and d_params['lim_sup'] == [0]:  # El empate no cambia con las cuotas y tira error el select porque todas las combinaciones tienen el mismo ROI
-                    n_comb = 1
-                   
+
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
                 d_metrics_res[pred] = d_metricas[n_comb]

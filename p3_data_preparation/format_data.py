@@ -117,9 +117,9 @@ def format_percentage_columns(df, base_columns):
     Returns:
         pd.DataFrame: DataFrame con las columnas formateadas.
     """
-    columns = [col for col in base_columns if col in df.columns]  # Evita KeyError dentro del for en caso que no exista la stat en los nuevos partidos missing
+    # columns = [col for col in base_columns if col in df.columns]  # Evita KeyError dentro del for en caso que no exista la stat en los nuevos partidos missing
 
-    for base_col in columns:
+    for base_col in base_columns:
 
         home_col = f"{base_col}_home"
         away_col = f"{base_col}_away"
@@ -132,18 +132,79 @@ def format_percentage_columns(df, base_columns):
         total_col_home = f'n_{home_col}'  # No uso total por si ya existe "total_passes" en missing.
         total_col_away = f'n_{away_col}'
 
-        # Procesar la columna `_home` (con warning) --> No usar .loc[] porque reformatea mal (no termina uniendo columnas nuevas a las viejas..)
-        df[[accuracy_col_home, completed_col_home, total_col_home]] = df[home_col].str.extract(
-            r'(\d+)% \((\d+)/(\d+)\)').astype(float)
+        # Extraer datos de `home_col`
+        # Paso 1: Aplicar la expresión regular 
+        extracted_home = df[home_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+        extracted_away = df[away_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+        # logger.info(f'1) Extracted home: {extracted_home} Extracted away: {extracted_away}')
+        
+        # Paso 2: Convertir a float los valores extraídos
+        extracted_home = extracted_home.astype(float)
+        extracted_away = extracted_away.astype(float)
+        # logger.info(f'2) Extracted home: {extracted_home} Extracted away: {extracted_away}')
 
-        # Procesar la columna `_away`
-        df[[accuracy_col_away, completed_col_away, total_col_away]] = df[away_col].str.extract(
-            r'(\d+)% \((\d+)/(\d+)\)').astype(float)
-    
+        # Paso 3: Asignar los valores extraídos a nuevas columnas
+        df[[accuracy_col_home, completed_col_home, total_col_home]] = extracted_home
+        df[[accuracy_col_away, completed_col_away, total_col_away]] = extracted_away
+
+        # Verificacion de formato
+        # verify_column_format(df, col=accuracy_col_home, rango=[0, 100], dtypes=(int, float))
+        verify_column_format(df, col=completed_col_home, rango=[0, 2000], dtypes=(int, float))
+        verify_column_format(df, col=total_col_home, rango=[0, 2000], dtypes=(int, float))
+        # verify_column_format(df, col=accuracy_col_away, rango=[0, 100], dtypes=(int, float)) # contiene valores fuera del rango [0, 100]. Valores min y max: 58.0 --> 108.0
+        verify_column_format(df, col=completed_col_away, rango=[0, 2000], dtypes=(int, float))
+        verify_column_format(df, col=total_col_away, rango=[0, 2000], dtypes=(int, float))
+
         # Eliminar las columnas originales
         df.drop(columns=[home_col, away_col], inplace=True)
     
     return df
+
+def verify_column_format(df, col, rango: list = None, dtypes: tuple = (int, float)):
+    """
+    Verifica que las columnas cumplen los criterios de tipo y rango, ignorando valores NaN.
+    
+    Args:
+        df (pd.DataFrame): DataFrame que contiene la columna a verificar.
+        col (str): Nombre de la columna a verificar.
+        rango (list): Lista con el mínimo y máximo permitido [min, max].
+        dtypes (tuple): Tipos de datos permitidos en la columna.
+    """
+    errors = []
+    if col not in df.columns:
+        raise KeyError(f"La columna '{col}' no existe en el DataFrame.")
+
+    # Filtrar valores no nulos
+    non_nan_values = df[col].dropna()
+    col_dtype = df[col].dtype
+
+    # Verificar si todos los valores son del tipo esperado
+    if not non_nan_values.apply(lambda x: isinstance(x, dtypes)).all():
+        errors.append(f"Columna '{col}' contiene valores que no son del tipo {dtypes}.")
+
+    # Verificar si los valores están dentro del rango especificado
+    if col_dtype in [int, float] and rango is not None:
+        val_min, val_max = rango[0], rango[1]
+
+        if not non_nan_values.apply(lambda x: val_min <= x <= val_max).all():
+
+            min_val = non_nan_values.min()
+            max_val = non_nan_values.max()
+            errors.append(
+                f"Columna '{col}' contiene valores fuera del rango [{val_min}, {val_max}]. "
+                f"Valores min y max: {min_val} --> {max_val}"
+            )
+
+    # Resultado de la verificación
+    if errors:
+        logger.error(f"Errores encontrados en la columna '{col}':")
+        for error in errors:
+            logger.error(error)
+            raise ValueError
+    else:
+        logger.critical(f"La columna '{col}' está correctamente formateada.")
+
+    print()
 
 def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
     """
@@ -270,6 +331,104 @@ def map_teams(df, df_teams):
     df['id_team_home'] = df['id_team_home'].replace(d_mapeo)
     df['id_team_away'] = df['id_team_away'].replace(d_mapeo)
     return df
+ 
+def verify_format(df, column_specs):
+    """
+    Formatea un DataFrame según especificaciones de columnas.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame a formatear.
+        column_specs (dict): Diccionario con las especificaciones para cada columna.
+            Formato: 
+                {
+                    'column_name': {
+                        'dtype': tipo_dato,
+                        'rango': [min, max] (opcional)
+                    },
+                    ...
+                }
+
+    Returns:
+        pd.DataFrame: DataFrame formateado.
+
+    Mejoras:
+        - Posibilidad de parsarle valores ejemplo por columna? Tal vez para las varibles que son string... porque con el rango ya esta.
+    """
+    for col, specs in column_specs.items():
+        # Verificar si la columna existe en el DataFrame
+        if col not in df.columns:
+            raise KeyError(f"La columna '{col}' no existe en el DataFrame.")
+
+        # Cambiar el tipo de dato
+        if 'dtype' in specs:
+            try:
+                df[col] = df[col].astype(specs['dtype'])
+            except ValueError as e:
+                raise ValueError(f"Error al convertir '{col}' a {specs['dtype']}: {e}")
+
+        # Verificar rango, si está definido
+        ## Verificar formato de la columna usando verify_column_format
+        rango = specs.get('rango', None)
+        dtypes = (specs['dtype'],) if 'dtype' in specs else (int, float)
+        verify_column_format(df, col, rango=rango, dtypes=dtypes)
+
+    return df
+
+def format_df_match(df):
+    """
+    Mejora:
+        - Podria hacer una sola funcion que reciba un dictionary con el nombre al columna, el rango y el dtype deseado.
+    """
+    column_specs = {
+        # 'date': {'dtype': 'datetime64[ns]'},
+        'goals_home': {'dtype': int, 'rango': [0, 15]},
+        'goals_away': {'dtype': int, 'rango': [0, 15]},
+        'expected_goals_(xg)_home': {'dtype': float, 'rango': [0, 15]},
+        'expected_goals_(xg)_away': {'dtype': float, 'rango': [0, 15]},
+        # 'ball_possession_home': {'dtype': int, 'rango': [0, 100]},  # Error al queerer convertirlos al dtype por tener nan...
+        # 'ball_possession_away': {'dtype': int, 'rango': [0, 100]},
+        # 'total_passes_home': {'dtype': int, 'rango': [0, 1500]},
+        # 'total_passes_away': {'dtype': int, 'rango': [0, 1500]},
+        }
+    
+    df['date'] = pd.to_datetime(df['date'])
+    verify_format(df, column_specs)
+    
+def format_df_match_odds(df):
+    pass
+
+def format_df_player_sofifa(df):
+    column_specs = {
+        'player_name': {'dtype': str},
+        'player_name_short': {'dtype': str},
+        'nationality': {'dtype': str},
+        'height': {'dtype': int, 'rango': [100, 250]},
+        'preferred_foot': {'dtype': str},
+        'url_player': {'dtype': str},
+        }
+    
+    df.index = df.index.astype(str)
+    verify_format(df, column_specs)
+
+def format_df_player_fifa_sofifa(df):
+    """
+    Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
+    """
+    column_specs = {
+        # Verifico formato
+        'id_player': {'dtype': str},
+        # 'date': {'dtype': 'datetime64[ns]'},
+        'age': {'dtype': int, 'rango': [14, 50]},
+        'overall_rating': {'dtype': int, 'rango': [20, 100]},
+        'potential': {'dtype': int, 'rango': [20, 100]},
+        'value': {'dtype': float, 'rango': [100, 250000000]},
+        'wage': {'dtype': float, 'rango': [100, 999999]},
+        'int_reputation': {'dtype': int, 'rango': [0, 5]},
+        'fifa': {'dtype': str},
+        'fifa_year': {'dtype': int, 'rango': [6,30]},
+        }
+    df['date'] = pd.to_datetime(df['date'])
+    verify_format(df, column_specs)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

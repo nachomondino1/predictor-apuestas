@@ -27,7 +27,7 @@ def confusion_matrix(y_real, y_pred):
     return df_cm
 
 # Bookies 
-def determine_result_by_bookmaker(df, col_name):
+def determine_result_by_bookmaker(df, col_name, classes: list = None):
     """
     Determina el resultado del partido predicho segun la casa de apuestas. 
 
@@ -44,8 +44,16 @@ def determine_result_by_bookmaker(df, col_name):
         # Determino la cuota minima de las 3 posibles
         odds_min = min(row['odds_home'], row['odds_draw'], row['odds_away'])
 
+        # para clasificacion binaria
+        if classes is not None:
+            class_home = 12 if 12 in classes else 1
+            class_draw = 0
+            class_away = 12 if 12 in classes else 2
+        else:
+            class_home, class_draw, class_away = 1, 0, 2
+
         # Determino resultado predicho segun casa de apuestas (el de la cuota minima) y lo guardo
-        result_pred_bm = 1 if row['odds_home'] == odds_min else (2 if row['odds_away'] == odds_min else 0)
+        result_pred_bm = class_home if row['odds_home'] == odds_min else (class_away if row['odds_away'] == odds_min else class_draw)
         df.loc[id_match, col_name] = result_pred_bm
 
     return df
@@ -142,6 +150,10 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
     # Returns
         ROI del modelo. (float)
     """
+    # Converito date a datetime y ordeno por fecha
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+     
     # Definicion de variables
     bank_inicial = 100 # CUIDADO! NO ES sum(df['stake_mod'])
     bank_final = bank_inicial
@@ -155,7 +167,7 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         cont += 1
 
         # Defino stake a apostar en pesos (a partir del stake como porcentaje del bank)
-        stake_a_apostar =  bank_final * row['stake_to_bet'] / 100
+        stake_a_apostar = bank_final * row['stake_to_bet'] / 100
         df.loc[idx, f'{name_extension}bank_inicial'] = bank_final
         df.loc[idx, f'{name_extension}stake_to_bet_en_$'] = stake_a_apostar
 
@@ -170,6 +182,12 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         ingresos_sin_bank = row['stake_to_bet'] * row['odd_to_bet'] if row[f'{name_extension}acerte'] == 1 else 0
         ganancia_sin_bank = ingresos_sin_bank - row['stake_to_bet']
         df.loc[idx, f'{name_extension}G/P_sin_bank'] = ganancia_sin_bank
+
+        # Calculo stake y G/P sin estrategia ?
+        stake_sin_ea = 10 * row['prob_result_to_bet']
+        G_P_sin_ea = stake_sin_ea * (row['odd_to_bet']-1) if row[f'{name_extension}acerte'] == 1 else - stake_sin_ea
+        df.loc[idx, f'{name_extension}stake_sin_ea'] = stake_sin_ea
+        df.loc[idx, f'{name_extension}G_P_sin_ea'] = G_P_sin_ea
 
         # Guardo ROI en partidos especificados
         if save_roi:
@@ -337,24 +355,19 @@ def define_weights(df, l_metrics):
     return weights_1
 
 # Simplificar + Moduralizar
-def calculate_metrics( 
-        df_pred_proba: pd.DataFrame,
+def calculate_basic_metrics( 
+        df_pred_proba,
         country: str,
-        df_filled: pd.DataFrame = None,
         var_resp: str = 'result',
         var_pred: str = 'predicted_result',
-        var_pred_bm: str = 'bookmaker_result',
-        retrain: bool = False,
         verbose: int = 0,
         export: bool = False):
     """
     Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
     """
-    # Defino variables
     y_test = df_pred_proba[var_resp].values  # Etiquetas reales
     y_pred = df_pred_proba[var_pred].values  # Predicciones del modelo
-    base_path = f'./data/{country}/p4_modeling'
-
+    
     # Calculo métricas básicas
     d_metrics = {
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
@@ -362,15 +375,68 @@ def calculate_metrics(
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
     }
 
-    if verbose >= 1:
+    if verbose >= 0:
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
         df_conf_mat = confusion_matrix(y_test, y_pred)
         if export:
+            base_path = f'./data/{country}/p4_modeling'
             df_conf_mat.to_excel(f'{base_path}/modeling/df_conf_matrix.xlsx')
 
+    return d_metrics
+
+def calculate_accuracy_by_result(df_predicciones):
+    """
+    Calcula la precisión (accuracy) por tipo de resultado.
+    """
+    # Dividir DataFrame por tipo de resultado
+    df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
+    df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
+    df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
+
+    prec_home = int(df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
+    prec_draw = int(df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
+    prec_away = int(df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
+
+    d = {
+        'acc_home': prec_home,
+        'acc_draw': prec_draw,
+        'acc_away': prec_away
+    }
+    return d
+
+def calculate_bet_metrics(
+        df_pred_proba,
+        df_match_odds,
+        var_resp: str = 'result',
+        var_pred_bm: str = 'bookmaker_result',
+        verbose: int = 0,
+        ):
+
+    y_test = df_pred_proba[var_resp].values  # Etiquetas reales
+
+    # Calculo metricas de bookie
+    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
+    df_match_odds = determine_result_by_bookmaker(df_match_odds, var_pred_bm, classes=set(y_test))  # Determino resultado predicho segun cuota minima (e.g. "Home")
+    y_pred_bm = df_match_odds[var_pred_bm].values
+
+    d_metrics = {
+        'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
+    }
+    if verbose >=1:
+        print(d_metrics)
+
+    return d_metrics
+
+def read_dfs(
+        df_pred_proba: pd.DataFrame,
+        country: str,
+        retrain: bool = False,
+        verbose: int = 0,
+        ):
     # Procesar df_match y df_match_odds
     df_match = load_file_by_condition(country=country, retrain=retrain, file_name="df_match.xlsx")
     df_match_odds = load_file_by_condition(country=country, retrain=retrain, file_name="df_match_odds.xlsx")
+
     if verbose >= 2:
         logger.info(df_match)
         logger.info(df_match_odds)
@@ -378,114 +444,114 @@ def calculate_metrics(
     indices_to_use = df_pred_proba.index  # Selecciono los partidos que estan en df_test
     df_match = df_match[df_match.index.isin(indices_to_use)].reindex(indices_to_use)
     df_match_odds = df_match_odds[df_match_odds.index.isin(indices_to_use)].reindex(indices_to_use) # ".reindex()" tapa el error de que indices_to_use no está en df_match_odds. Sin embargo, el reindex es necesario pues: Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-    if verbose >= 0:
+    if verbose >= 2:
         print(indices_to_use)
         print("Shapes: ", df_match.shape, df_match_odds.shape) # Deberia coindicir con el largo de indices_to_use
         print(df_match.head())
+    return df_match, df_match_odds
 
-    # Calculo metricas de bookie
-    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-    df_match_odds = determine_result_by_bookmaker(df_match_odds, var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
-    y_pred_bm = df_match_odds[var_pred_bm].values
+def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
+    if retrain:
+        subpath = f"data/{country}/p6_deployment/missing/old_updated" 
+    else:
+        logger.warning("Estas levantando df_match y df_match_odds viejo. Si no es lo deseado, no tendra los indices de df_pred_proba y quedara todo nan en el df_predicciones concatenado. Asegurate de usar retrain = True (en vez de False)")
+        subpath = f'data/{country}/p2_data_understanding'
 
-    d_metrics.update({
-        'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
-        'dif_prec_bm': d_metrics['test_accuracy'] - accuracy_score(y_test, y_pred_bm) * 100,
-    })
+    return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
 
+def concatenate_dfs( 
+        df_pred_proba: pd.DataFrame,
+        df_match: pd.DataFrame,
+        df_match_odds: pd.DataFrame,
+        df_filled: pd.DataFrame = None,
+        ):
     # Concatenación selectiva
     columns_to_concat = [
         df_match[['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']],
         df_match_odds,
         df_pred_proba,
     ]
+
     if df_filled is not None:
         l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
         columns_to_concat.append(df_filled[l_cols])
     
-    df_predicciones = pd.concat(columns_to_concat, axis=1)  # Queda vacio salvo por df_pred_proba
-    
-    '''
-    df_match_filt = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']]
-    l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-    df_filled_filt = df_filled.loc[:, l_cols]
-    df_predicciones = pd.concat([df_match_filt, df_match_odds, df_pred_proba, df_filled_filt], axis=1)
-    '''
-
-    if verbose >=1:
-        print(d_metrics)
-
-    return df_predicciones, d_metrics
-
-def calculate_advanced_metrics(df_predicciones):
+    df_predicciones = pd.concat(columns_to_concat, axis=1)
+    return df_predicciones
+        
+def calculate_nan_metrics(df_predicciones):
     """
-    Calculo metricas mas avanzadas que precision o recall.
-
-    Posibles mejoras:
-        - l_col_filled = # Listado de columnas que rellena....
-        - Mas o mejores metricas
+    Calcula las métricas relacionadas con el relleno de NaN en el DataFrame.
     """
-    # RELLENO DE NAN
-    # Calculo metricas sobre relleno de nan
-    rows_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
-    rows_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+    # Cálculo del promedio de columnas rellenadas
     average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
-    # l_col_filled = # Listado de columnas que rellena....
-    # print(len(rows_filled), len(rows_not_filled))
 
-    # G/P segun relleno de NaN
-    gp_filled = df_predicciones.loc[rows_filled, 'G/P_sin_bank'].sum()
-    gp_not_filled = df_predicciones.loc[rows_not_filled, 'G/P_sin_bank'].sum()
+    # Filtrar registros con y sin relleno de NaN
+    # if 'player_emergency_fill' in df_predicciones.columns:
+    rows_player_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
+    rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+
+    # G/P por estado de relleno de NaN
+    gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
+    gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
     gp_total = df_predicciones['G/P_sin_bank'].sum()
+
     perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
     perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
 
-    # POR RESULTADO
-    # Calculo numero de predicciones por resultado
-    d_distrib = determine_distribution(df_predicciones)
-    df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
-    df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
-    df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
-    ## G/P por resultado
-    gp_home = df_pred_home['G/P_sin_bank'].sum()
-    gp_draw = df_pred_draw['G/P_sin_bank'].sum()
-    gp_away = df_pred_away['G/P_sin_bank'].sum()
-    gp_total = gp_home + gp_draw + gp_away
-    # G/P por resultado %
-    perc_gp_home = calculate_perc_gp(gp_home, gp_total)
-    perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
-    perc_gp_away = calculate_perc_gp(gp_away, gp_total)
-    ## Precision por resultado
-    prec_home = int( df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
-    prec_draw = int( df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
-    prec_away = int( df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
-
+    # else:
+    #     rows_player_filled = []
+    #     gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
+    #     perc_gp_filled, perc_gp_not_filled = 0, 1
+        
     d = {
-        # RELLENO DE NAN
-        # Cantidad de registros rellenados y average de columnas rellenadas
-        'n_matches_filled': len(rows_filled),
         'average_col_filled': average_col_filled,
-        # G/P cuando relleno y G/P cuando no relleno
+        'n_emer_player_filled': len(rows_player_filled),
         'gp_filled': gp_filled, 
         'gp_not_filled': gp_not_filled,
         '%_gp_filled': perc_gp_filled,
         '%_gp_not_filled': perc_gp_not_filled,
+    }
+    return d
 
-        # POR RESULTADO
-        **d_distrib,
-        # Precision por resultado
-        'acc_home': prec_home,
-        'acc_draw': prec_draw,
-        'acc_away': prec_away,
-        # G/P por resultado
+def calculate_gp_by_result(df_predicciones, classes = None):
+    """
+    Calcula el G/P por resultado (local, empate, visitante).
+    """
+    # para clasificacion binaria
+    if classes is not None:
+        class_home = 12 if 12 in classes else 1
+        class_draw = 0
+        class_away = 12 if 12 in classes else 2
+    else:
+        class_home, class_draw, class_away = 1, 0, 2
+
+    # Dividir DataFrame por tipo de resultado
+    df_pred_home = df_predicciones[df_predicciones['predicted_result'] == class_home]
+    df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == class_draw]
+    df_pred_away = df_predicciones[df_predicciones['predicted_result'] == class_away]
+    
+    # Calcular G/P por resultado
+    gp_home = df_pred_home['G/P_sin_bank'].sum()
+    gp_draw = df_pred_draw['G/P_sin_bank'].sum()
+    gp_away = df_pred_away['G/P_sin_bank'].sum()
+    gp_total = gp_home + gp_draw + gp_away
+
+    perc_gp_home = calculate_perc_gp(gp_home, gp_total)
+    perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
+    perc_gp_away = calculate_perc_gp(gp_away, gp_total)
+
+    # Crear el diccionario de resultados
+    d = {
+        # Resultados por tipo
         'gp_home': gp_home,
         'gp_draw': gp_draw,
         'gp_away': gp_away,
         'gp_total': gp_total,
         '%_gp_home': perc_gp_home,
         '%_gp_draw': perc_gp_draw,
-        '%_gp_away': perc_gp_away
-        }
+        '%_gp_away': perc_gp_away,
+    }
     return d
 
 def calculate_perc_gp(gp, gp_total):
@@ -496,15 +562,6 @@ def calculate_perc_gp(gp, gp_total):
     else:
         return 0
     
-def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
-    if retrain:
-        subpath = f"data/{country}/p6_deployment/missing/old_updated" 
-    else:
-        logger.warning("Estas levantando df_match y df_match_odds viejo. Si no es lo deseado, no tendra los indices de df_pred_proba y quedara todo nan en el df_predicciones concatenado. Asegurate de usar retrain = True (en vez de False)")
-        subpath = f'data/{country}/p2_data_understanding'
-
-    return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     pass

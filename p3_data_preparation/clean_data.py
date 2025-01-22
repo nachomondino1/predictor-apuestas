@@ -171,7 +171,7 @@ def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False)
         logger.warning(f"De las {len(df)} rows, se delete {len(rows_to_delete)/len(df)*100:.0f}%, quedan {len(df) - len(rows_to_delete)} rows.")
     return df_filtrado
 
-def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False):
+def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, verbose: int = 0):
     """
     Elimina las columns de un DataFrame que contienen un percentage alto de valores NaN.
 
@@ -187,7 +187,13 @@ def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = Fal
 
     # Elimina las columns identificadas del DataFrame
     df_sin_nan = df.drop(columns_delete, axis=1)
-    if _print:
+
+    if verbose >= 0:
+        df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
+        logger.warning("Las 10 variables con más valores NaN:")
+        logger.warning(df_nan_col_sorted.head(10))
+
+    if verbose >= 1:
         logger.warning(f"De las {len(df.columns)} columns, se eliminaron {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
     return df_sin_nan
 
