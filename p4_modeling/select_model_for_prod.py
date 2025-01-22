@@ -125,7 +125,10 @@ class SelectBestModel():
         metric_cut_perc = np.percentile(df[metric_col], (100-perc_cutoff)) # Seleccionar el 20% de los registros con los valores más altos de 'metric'
         
         ## segun cantidad maxima de modelos
-        metric_cut_fixed = df.iloc[n_models_max][metric_col]
+        if len(df) >= n_models_max:
+            metric_cut_fixed = df.iloc[n_models_max][metric_col]
+        else:
+            metric_cut_fixed = 0
 
         # Determino el minimo
         metric_cut = max(metric_cut_prop, metric_cut_perc, metric_cut_fixed)

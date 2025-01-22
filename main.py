@@ -473,15 +473,12 @@ class DataPreparation:
             ## 1) EN ULTIMOS N PARTIDOS
             for n_matches in n_last_matches:
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
-                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True) # Hay que ver si funciona tanto sin como con localia.
-                # df.to_excel('/Users/nachomondino/Desktop/df_constructed.xlsx')
 
-            ## 2) EN ULTIMOS N years
+            ## 2) EN PARTIDOS EN ULTIMOS N DAYS
             if with_h2h:
                 df = construct_data.h2h_by_date(df, n_years=n_years_h2h)
                 df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h)
 
-            ## 3) EN PARTIDOS EN ULTIMOS N DAYS
             # Numero de partidos jugados en ultimos n days
             for n_days in l_days:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days) 
@@ -1090,6 +1087,9 @@ class Modeling:
             d_params = bs.define_hiperparameters(strategy='train')
             df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
             d_metrics.update(d_roi)
+            
+            if self.verbose >= 0:
+                print(d_metrics)
 
             # Calculo otras metricas
             d_metrics.update(asses_model.determine_distribution(df_predicciones))
@@ -1106,7 +1106,7 @@ class Modeling:
         """
         # Defino variables
         df_metrics = pd.DataFrame()
-        rows_to_features_min, min_row_test = 2, 30
+        rows_to_features_min, min_row_test = 5, 30
         rows_test = len(X_test)
         rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
         

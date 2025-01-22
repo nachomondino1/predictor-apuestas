@@ -659,7 +659,10 @@ class TrainingDataLoader():
         n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
         d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
         d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
-        d['fill_na'] = row_hiper['fill_na'] # .values[0]
+        if pd.isna(row_hiper['fill_na']):  # Verifica si es NaN o None
+            d['fill_na'] = row_hiper['fill_na'] = None
+        else:
+            d['fill_na'] = row_hiper['fill_na'] # .values[0]
         ## Select_data
         d['selected_columns'] = selected_columns
 
@@ -677,7 +680,7 @@ class TrainingDataLoader():
 
         logger.info("Levento etiquetas con el que entrené")
         subpath = f'{self.path_clean}_{self.path_construct}'
-        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.subpath}.xlsx'       
+        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{subpath}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
         if self.verbose >= 1:  
@@ -1015,6 +1018,13 @@ def load_data_to_prepare(country, iteration_date, predict_missing, verbose: int 
     
 # Generales
 def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
+    """
+    # Parameters
+
+    # Return
+        n_model: Numero del modelo (int)
+        model_name: Tipo de modelo (str)    
+    """
     
     if d_model is not None:
         logger.warning("Se usa modelo especificado como parametro y no necesariamente es el que se esta usando en produccion.")

@@ -75,9 +75,8 @@ def comprehensive_search(
         evaluacion en el testeo.
 
     Posibles mejoras:
+        - Separar paths entre clean, construct y demas por dos underscore "__" en vez de uno solo "_"
         - Entrenar evitando integrate pero variando los l_models por ejemplo. Usa mismo: old_updated/ integrate_data/ clean_data/ y df_integrated que el entrenamiento actual...  pero tenes que guardar los missing en p2...
-        - Capas de modelos. Hacer un modelo que prediga si es empate o no empate. Si no es empate, otro modelo que determine si es local o visitante.
-
     """
     # Definicion de variables
     cont_iter = 0
@@ -486,10 +485,10 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 77
-    data_unders = False
+    id_country = 48
+    data_unders = True
     update_sofifa = True
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]

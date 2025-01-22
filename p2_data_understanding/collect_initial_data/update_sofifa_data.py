@@ -88,7 +88,7 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
     # Determinar que fifas a actualizar
     l_fifas_extracted = df_player_fifa['fifa'].unique()
     print(f"Fifas a actualizar: {l_fifas_extracted}")
-    print(f'Shapes new_data: \n df_player_sofifa {df_player.shape} \n df_player_fifa_sofifa: {df_player_sofifa_old.shape}')
+    print(f'Shapes new_data: \n df_player_sofifa {df_player.shape} \n df_player_fifa_sofifa: {df_player_fifa.shape}')
 
     # Elimino fifas actualizados en los datos viejos
     df_player_fifa_sofifa_old_filt = df_player_fifa_sofifa_old[~df_player_fifa_sofifa_old['fifa'].isin(l_fifas_extracted)]
@@ -99,7 +99,7 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
     # Concateno datos 1) viejos sin fifas actualziados + 2) datos recien extraidos
     df_player_ct = pd.concat([df_player, df_player_sofifa_old_filt], axis=0)
     df_player_fifa_ct = pd.concat([df_player_fifa, df_player_fifa_sofifa_old_filt], axis=0)
-    print(f"Shape concat:{df_player_ct.shape} \n {df_player_fifa_ct.shape}")
+    print(f"Shape concat: \n {df_player_ct.shape} \n {df_player_fifa_ct.shape}")
 
     # Elimino duplicados (Por que no funciona como el de clean_data de main.py? Deja duplicados... y en clean los elimina bien. Tal vez x formato del idx?)
     df_player_sofifa_filt = df_player_ct[~df_player_ct.index.duplicated(keep='first')]  # Esta es la que uso en clean_data

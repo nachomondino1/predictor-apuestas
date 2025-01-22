@@ -108,7 +108,7 @@ def main(
     # 1.1. Descarte por METRIC
     df_ite_filt = sbm.filter_models_by_distribution(df_ite, l_variables=['acc_home', 'acc_draw', 'acc_away'], l_values=[0.55, 0.37, 0.4])
     df_ite_filt = sbm.filter_models_by_accuracy(df_ite_filt, dif_prob_bet_min=0) # Antes pues sino elimina mal por metrica.
-    df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, prop_to_max=0.5, perc_cutoff=5, n_models_max=5, metric_col='metric_sin_ea_test') # 0.6 y 1.5
+    df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, prop_to_max=0.5, perc_cutoff=5, n_models_max=9, metric_col='metric_sin_ea_test') # 0.6 y 1.5
 
     # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
@@ -116,7 +116,7 @@ def main(
 
         # Extraer missing
         if update_missing:
-            logger.warning(f"Se definió extract_missing={extract_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
+            logger.warning(f"Se definió extract_missing={update_missing}, por lo que, se está extrayendo los ultimos partidos missing...")
             # Usar mnm.py con predict_missing=True y data_unders=False.
             d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
             main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export'], verbose=-1) 
@@ -170,14 +170,14 @@ def main(
     
     # Paso 3: Defino las odds por resultado (usando el mismo m) --> Le paso d_params a usar.
     df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_new)
-    
+   
     # Exporto datos
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
     df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 77
+    id_country = 48
 
     # Defino hiperparametros
     assess = False
@@ -187,13 +187,11 @@ if __name__ == "__main__":
     # Defino variables
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2025-01-07'],
-        55: ["france", '2025-01-08'], 
-        59: ["germany", '2025-01-08'], 
-        # 77: ["italy", '2025-01-06'],
+        48: ["england", '2025-01-21'],
+        55: ["france", '2025-01-21'], 
+        59: ["germany", '2025-01-21'], 
         77: ["italy", '2025-01-20'],
-        # 148: ["spain", '2025-01-07'], 
-        148: ["spain", '2025-01-19'], 
+        148: ["spain", '2025-01-20'], 
         167: ["usa", '2024-12-05']
         }
     country = d_countries[id_country][0]
