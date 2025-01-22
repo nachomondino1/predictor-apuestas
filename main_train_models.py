@@ -33,7 +33,6 @@ def comprehensive_search(
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
-    binary_classification: bool = False, # En desarrollo
     export: bool = True
 ):
     """
@@ -250,40 +249,11 @@ def comprehensive_search(
                             print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                             logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                            if binary_classification:
-                
-                                # Separar datos para el primer modelo: Empate o No Empate
-                                df_first_model = df_sel.copy()
-                                df_first_model['result'] = df_first_model['result'].apply(lambda x: 0 if x == 0 else 12) # 0 es empate y -10 es no empate?
+                            # Generar el diseño de la prueba
+                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
 
-                                # Filtrar datos para el segundo modelo: Local o Visitante
-                                df_second_model = df_sel[df_sel['result'] != 0].copy()
-                                df_second_model['result'] = df_second_model['result'].apply(lambda x: 1 if x == 1 else 2) # 1 es local y 0 es visita?
-
-                                # Dividir los datos para cada modelo
-                                X_train_first, X_val_first, X_test_first, y_train_first, y_val_first, y_test_first = mo.generate_test_design(
-                                    df_first_model, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False
-                                )
-
-                                X_train_second, X_val_second, X_test_second, y_train_second, y_val_second, y_test_second = mo.generate_test_design(
-                                    df_second_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, index_test_set=index_test_set, export=False,
-                                )
-
-                                # Entreno modelo para empate y no empate
-                                df_metrics_1 = mo.train_and_assess_models(X_val_first, y_val_first, X_train_first, y_train_first, X_test_first, y_test_first, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification)
-                                
-                                # Entreno modelo para local y visitante
-                                df_metrics_2 = mo.train_and_assess_models(X_val_second, y_val_second, X_train_second, y_train_second, X_test_second, y_test_second, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification, suffix='_2')
-
-                                suffix = '_2'
-                                df_metrics_2_ren = df_metrics_2.add_suffix(suffix)
-                                df_metrics = pd.concat([df_metrics_1, df_metrics_2_ren], axis=1)
-
-                            else:
-                                # Generar el diseño de la prueba
-                                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
-                    
-                                df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
+                            # Entreno y evaluo modelos
+                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
 
                         if len(df_metrics) > 0:
                             # Guardo datos en dataframe

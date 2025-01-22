@@ -988,7 +988,7 @@ class Modeling:
 
         return model_best_params, params, train_accuracy, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False, binary_classification: bool = False):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -1015,7 +1015,7 @@ class Modeling:
         df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
 
         # Calculo metricas
-        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export, binary_classification=binary_classification)
+        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export)
 
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1066,7 +1066,7 @@ class Modeling:
 
         return df_pred_proba, y_pred   
 
-    def calculate_metrics(self, df_pred_proba, retrain: bool = False, export: bool = False, binary_classification: bool = False):
+    def calculate_metrics(self, df_pred_proba, retrain: bool = False, export: bool = False):
 
         # Defino variables
         df_match, df_match_odds = asses_model.read_dfs(df_pred_proba, country=self.country, retrain=retrain)
@@ -1080,25 +1080,24 @@ class Modeling:
         # Concateno todos los dfs en uno solo --> Necesario para roi?
         df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
 
-        if not binary_classification:
-            # Calculo ROI
-            bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
-            d_params = bs.define_hiperparameters(strategy='train')
-            df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
-            d_metrics.update(d_roi)
-            
-            if self.verbose >= 0:
-                print(d_metrics)
+        # Calculo ROI
+        bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
+        d_params = bs.define_hiperparameters(strategy='train')
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
+        d_metrics.update(d_roi)
+        
+        if self.verbose >= 0:
+            print(d_metrics)
 
-            # Calculo otras metricas
-            d_metrics.update(asses_model.determine_distribution(df_predicciones))
-            d_metrics.update(asses_model.calculate_nan_metrics(df_predicciones)) # Necesita 'ROI'
-            d_metrics.update(asses_model.calculate_gp_by_result(df_predicciones)) # Necesita 'ROI'
-            d_metrics.update(asses_model.calculate_accuracy_by_result(df_predicciones)) # Necesita 'acerte'
+        # Calculo otras metricas
+        d_metrics.update(asses_model.determine_distribution(df_predicciones))
+        d_metrics.update(asses_model.calculate_nan_metrics(df_predicciones)) # Necesita 'ROI'
+        d_metrics.update(asses_model.calculate_gp_by_result(df_predicciones)) # Necesita 'ROI'
+        d_metrics.update(asses_model.calculate_accuracy_by_result(df_predicciones)) # Necesita 'acerte'
 
         return df_predicciones, d_metrics
     
-    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos, k, ruta_base_mod_seg, cont_iter, suffix: str = '', retrain: bool = False, binary_classification: bool = False, verbose: int = 0):
+    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, verbose: int = 0):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -1128,7 +1127,7 @@ class Modeling:
                     model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
 
                     # Evaluo modelo en test
-                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain, binary_classification=binary_classification)
+                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain)
 
                     # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
                     df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
@@ -1142,9 +1141,9 @@ class Modeling:
                     df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
                     # Exporto datos del modelo
-                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}{suffix}.pkl", "wb"))
-                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params{suffix}.xlsx')
-                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones{suffix}.xlsx', index=True)
+                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
+                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
                 except KeyboardInterrupt as e:
                     logger.warning(f"Se evitó entrenar este modelo mediante {e}")
