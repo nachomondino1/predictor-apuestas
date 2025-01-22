@@ -6,9 +6,7 @@ import numpy as np
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
-from p3_data_preparation.select_data import select_league_matches
 from random import randint
-import datetime
 
 def balance_dataset(X, y, bal_type: str, verbose: int = 0):
     """
@@ -76,111 +74,6 @@ def separate_train_val_and_test(X, y, test_val_size=0.8, test_size=0.5, shuffle=
     # Separo en test y val
     X_val, X_test, y_val, y_test = train_test_split(X_val_and_test, y_val_and_test, test_size=test_size, random_state=randint(1, 1000), shuffle=shuffle)
     return X_train, X_val, X_test, y_train, y_val, y_test
-
-def read_df_match(country, iteration_date, retrain: bool = True):
-    """
-    Levanto el df_match
-    """
-    # Levanto df_match del pais
-    if retrain:
-        try:
-            # Levanto desde los datos usados para el nuevo train
-            path_new_train = f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}"
-            df_match = pd.read_excel(f'{path_new_train}/df_match.xlsx', index_col=0)
-            # logger.warning(df_match)
-
-        except FileNotFoundError:
-            logger.warning(f"Fallo la carga del archivo df_match. No se encontró el archivo en '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
-
-        except IsADirectoryError:
-            logger.warning(f"Fallo la carga del archivo df_match. No existe el directorio '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
-
-        # Levanto desde deployment/missing
-        path = f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx' 
-        df_match = pd.read_excel(path, index_col=0)
-
-    else:
-        logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
-        df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
-
-    if 'Unnamed: 0' in df_match.columns:
-        df_match = df_match.drop(columns=['Unnamed: 0'])
-
-    return df_match
-
-def select_test_set(df, df_match, n_reg_test: int = 100, verbose : int = 0):
-    """
-    Determina qué registros pueden ser utilizados en el test
-    Requisitos para el test
-        -1: Que id_competition sea publica (lo mismo que hago en assess).
-        -2: Que sean partidos jugados en los ultimos meses.
-
-    # Parameters
-        df: Dataframe.
-        df_match: Del cual determinar que partidos son los ultimos partidos y la competicion (tiene date e id_comp)
-        n_reg_test: Numero de registros los ultimos partidos a selecciona los cuales iran al df_test.
-
-    # Return
-        X_test: Dataframe de testeo sin variable respuesta.
-        y_test: Dataframe de testeo solo la variable respuesta.
-    """
-    # Ordeno por fecha descendiente
-    df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df_match = df_match.sort_values(by='date', ascending=False)
-
-    if verbose >= 2:
-        logger.info(df_match['date'].head(10))
-
-    # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
-    df1 = select_league_matches(df_match)
-    index_comp = df1.index
-
-    if verbose >= 2:
-        df_filt_1 = df[df.index.isin(index_comp)]
-        logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
-    
-    # Requisito 2: Last matches 
-    df_match_comp = df_match[df_match.index.isin(index_comp)]  # Dejo solo las ligas / comp publicas
-    df2 = df_match_comp.head(n_reg_test)
-    index_last_matches = df2.index
-
-    # Imprimo rango de fechas de df_test
-    if verbose >= 0:
-        date_hoy = datetime.datetime.now().date()
-        col_index = df_match_comp.columns.get_loc('date')  # Índice de la columna "date"
-        date_final = df_match_comp.iloc[0, col_index]
-        date_inic = df_match_comp.iloc[100, col_index]
-
-        # Los convierto a datetime
-        date_final = pd.to_datetime(date_final, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
-        date_inic =  pd.to_datetime(date_inic, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
-
-        logger.info(f"Date hoy: {date_hoy}. Dates en df_test: {date_inic} --> {date_final}")
-
-        dif_dias = date_hoy - date_final
-        dif_dias_max = 20
-
-        # Si no hay partidos de los ultimos x dias en df_test
-        if dif_dias.days >= dif_dias_max:
-            logger.warning(f"No hay registros de los ultimos {dif_dias.days} dias en df_test. Puede haber fallado algo en la extraccion de missing o en la seleccion del df_test.")
-
-    if verbose >= 2:
-        df_filt_2 = df[df.index.isin(index_last_matches)]
-        logger.info(f"Registros que pasan el requisito 2 (solo last matches): {len(df_filt_2)}")
-    
-    # Selecciono registros que cumplen los requisitos
-    filters = df.index.isin(index_comp) & df.index.isin(index_last_matches)
-    df_test = df[filters]
-
-    '''
-    df_aux = df_match[df_match.index.isin(index_last_matches)]
-    if len(df_filt) != len(df_aux):
-        logger.warning(f"(1 de 3) PROBLEMA DE NAN EN ULTIMOS PARTIDOS. De los {len(index_last_matches)}, solo hay {len(df_aux)} en el df que recibe select_test_data(). Deberian ser iguales --> {len(index_last_matches)} = {len(df_aux)}")
-        logger.warning(f"(2 de 3) Por que no son iguales? Se estan eliminando 'ultimos partidos' en 1) clean_data_2 (eliminacion de filas por tener mucho NaN) o 2) treat nan values (dropna de columnas con 'poco' nan).")
-        logger.warning(f"(3 de 3) Que podes hacer? No podemos hacer mucho sino investigar por qué los ultimos partidos tienen tanto NaN y evitar que tenga NaN. Seguramente el problema es en la extraccion de missing debido a algun cambio de Flashscore")
-    '''
-    # No hay forma de poder ordenar df_test descendetemente por fecha. Al menos el ROI no cambia con el orden de los registros y todos los modelos tienen el mismo orden. 
-    return df_test
 
 def n_rows_to_test(df, df_test, verbose: int = 1):
     """

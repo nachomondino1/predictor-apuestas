@@ -72,7 +72,10 @@ class DataUnderstanding:
             print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
             # Extraigo partidos de Flashscore (df_match y df_match_player)
-            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=export)
+            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], 
+                                                                                       row['competition_flashscore'], row['is_cup'], n_seasons_max=11,
+                                                                                       export=export
+                                                                                       )
             
             # Guardo datos
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
@@ -543,7 +546,7 @@ class DataPreparation:
             df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, fill_na: str = None, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, fill_na: str = None, index_test_set: list = None, export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -584,7 +587,7 @@ class DataPreparation:
 
         # (2) Tratamiento de NaN values
         shape_inicial = X.shape
-        X = self.treat_nan_values(X=X, fill_na=fill_na)
+        X = self.treat_nan_values(X=X, fill_na=fill_na, index_test_set=index_test_set)
         if self.verbose >= 1:
             print(f"Tras fill_na={fill_na}. Shape X_sin_col_mucho_nan: {shape_inicial} --> {X.shape}")
 
@@ -609,7 +612,7 @@ class DataPreparation:
 
         return df, scaler, X.columns
     
-    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
+    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, index_test_set: list = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
         """
         Tratamiento de nan values
 
@@ -630,13 +633,9 @@ class DataPreparation:
         start = time.time()
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
 
-        # Determino que registros usaré en df_test
-        df_match_old = generate_test_design.read_df_match(country=self.country, iteration_date=self.date)
-        df_test_inic = generate_test_design.select_test_set(X, df_match=df_match_old)
-
         # Separo test y train/val
-        df_test = X[X.index.isin(df_test_inic.index)]
-        df_train_val = X[~X.index.isin(df_test_inic.index)]
+        df_test = X[X.index.isin(index_test_set)]
+        df_train_val = X[~X.index.isin(index_test_set)]
         logger.info(f"{X.shape} --> {df_train_val.shape} {df_test.shape}")
 
         # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones)
@@ -697,7 +696,7 @@ class DataPreparation:
         if self.verbose >= 0:        
             n_rows = generate_test_design.n_rows_to_test(X, df_test_filled)
 
-            if n_rows != len(df_test_inic):
+            if n_rows != len(index_test_set):
                 logger.warning(f" Se han eliminado registros de df_test por tener NaN values cuando no deberia borrarse ninguno.")
 
         logger.info(f"(3) Tras eliminar todo NaN con drop o fill_na: {df_train_val_filled.shape} {df_test_filled.shape} --> {X.shape}")
@@ -882,7 +881,7 @@ class Modeling:
         self.base_path = path
         self.base_path_dp = path_dp
 
-    def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, n_reg_test: float = 100, retrain: bool = False, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, index_test_set: list = None, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -900,8 +899,8 @@ class Modeling:
             print("\nSeparating data in train, val and test...")
 
         # Selecciono test set
-        df_match_old = generate_test_design.read_df_match(country=self.country, iteration_date=self.date, retrain=retrain)
-        df_test = generate_test_design.select_test_set(df, df_match=df_match_old, n_reg_test=n_reg_test)
+        df_test = df[df.index.isin(index_test_set)]
+        logger.info(f"Test set: {len(df_test)} (deberia ser = n_reg_test)")
         X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
 
         # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
@@ -1252,8 +1251,8 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 48
-    d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': False, 'from_integrate': True}
+    id_country = 6
+    d_run = {'data_unders': True, 'data_prep': False, 'modeling': False, 'until_integrate': False, 'from_integrate': True}
 
     # Hiperparametros
     d_comps = select_data.determine_country_competitions(id_country)
