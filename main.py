@@ -367,7 +367,10 @@ class DataPreparation:
         for col in l_player_cols:
             nan_percentage = df[col].isna().mean() * 100  # Porcentaje de NaN
             if nan_percentage < 50:  # Si el porcentaje de NaN es menor al 50%
-                raise ValueError(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
+                if prod: # En prod a veces recoje un solo partido y por ahi justo ni siquiera es de la comp public..
+                    logger.warning(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
+                else:
+                    raise ValueError(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")

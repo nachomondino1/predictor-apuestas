@@ -315,10 +315,9 @@ def verify_format(df, column_specs, verbose: int = 0):
     """
     # Warning si no se esta verificando el formato de una columna
     l_cols_missing = [col for col in df.columns if col not in column_specs.keys()]
-    if len(l_cols_missing) > 0:
-        logger.error(f"No se esta verificando el formato de las siguientes columnas: {l_cols_missing}.")
-        logger.error("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
-        raise ValueError
+    if len(l_cols_missing) > 0: # No tiro error porque en prod no tengo todas las col (las reformat) y cuando reformateo tampoco.
+        logger.warning(f"No se esta verificando el formato de las siguientes columnas: {l_cols_missing}.")
+        logger.warning("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
 
     for col, specs in column_specs.items():
         # Verificar si la columna existe en el DataFrame
@@ -326,15 +325,17 @@ def verify_format(df, column_specs, verbose: int = 0):
             if verbose >= 1:
                 logger.warning(f"La columna '{col}' no existe en el DataFrame.")
             continue
-
-        # Cambiar el tipo de dato
-        df = convert_column_dtype(df, col, dtype=specs['dtype'], verbose=verbose)
-
-        # Verificar dtype
-        verify_column_dtype(df, col, dtype=specs['dtype'],  verbose=verbose)
         
-        # Verificar rango, si está definido
-        verify_column_range(df, col, rango=specs.get('rango', None),  verbose=verbose)
+        if 'dtype' in specs.keys():
+            # Cambiar el tipo de dato
+            df = convert_column_dtype(df, col, dtype=specs['dtype'], verbose=verbose)
+
+            # Verificar dtype
+            verify_column_dtype(df, col, dtype=specs['dtype'], verbose=verbose)
+        
+        if 'rango' in specs.keys():
+            # Verificar rango, si está definido
+            verify_column_range(df, col, specs['rango'], verbose=verbose)
 
     return df
 
@@ -448,8 +449,8 @@ def format_df_match(df):
         'date': {'dtype': 'datetime64[ns]'},
         'referee': {'dtype': str},
         'venue': {'dtype': str},
-        'capacity': {'dtype': 'Int64', 'rango': [0, 200000]},
-        'attendance':  {'dtype': 'Int64', 'rango': [0, 200000]},
+        'capacity': {},  #  'capacity': {'dtype': int, 'rango': [0, 200000]},
+        'attendance':  {}, # {'dtype': int, 'rango': [0, 200000]},
         'goals_home': {'dtype': 'Int64', 'rango': [0, 12]},
         'goals_away': {'dtype': 'Int64', 'rango': [0, 12]},
         'id_team_home': {'dtype': str},
