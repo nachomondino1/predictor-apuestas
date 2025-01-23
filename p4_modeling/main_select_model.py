@@ -101,7 +101,7 @@ def main(
     # (2) Calculo metrica con la cual seleccionar modelos y estrategia --> Antes para normalizar bien....
     ## Defino variables para calcular metrica
     l_metrics = ['roi_por_partido', 'f1_score'] # si usas cv_acc ojo que en el recalculo de emtricas por assess deberia ser "cv_accuracy_train"
-    l_weights = [0.3, 0.7]
+    l_weights = [0.5, 0.5]
     ## Calculo metrica    
     metric_col_test = 'metric_sin_ea_test'
     df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea_test')
@@ -171,7 +171,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 59
+    id_country = 77
 
     # Defino hiperparametros
     assess = False
