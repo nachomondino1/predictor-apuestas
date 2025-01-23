@@ -1143,6 +1143,8 @@ def main(
             df_player_sofifa, df_player_fifa_sofifa = mis.read_last_sofifa_data()  # Levanto datos para preparar missing
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, export=False)
+            df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa)
+
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
             # Si no existen columnas player, raise error

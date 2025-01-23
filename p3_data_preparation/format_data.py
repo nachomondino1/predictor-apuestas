@@ -156,7 +156,7 @@ def format_percentage_columns(df, base_columns):
             'total_col_away': {'dtype': 'Int64', 'rango': [0, 3500]},
         }
         # Verificacion de formato
-        verify_format(df, column_specs=columm_specs)
+        df = verify_format(df, column_specs=columm_specs, verbose=1)
 
         # Eliminar las columnas originales
         df.drop(columns=[home_col, away_col], inplace=True)
@@ -313,6 +313,13 @@ def verify_format(df, column_specs, verbose: int = 0):
         - Verificar numero de valores unicos. 
         - Posibilidad de parsarle valores ejemplo por columna? Tal vez para las varibles que son string... porque con el rango ya esta.
     """
+    # Warning si no se esta verificando el formato de una columna
+    l_cols_missing = [col for col in df.columns if col not in column_specs.keys()]
+    if len(l_cols_missing) > 0:
+        logger.error(f"No se esta verificando el formato de las siguientes columnas: {l_cols_missing}.")
+        logger.error("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
+        raise ValueError
+
     for col, specs in column_specs.items():
         # Verificar si la columna existe en el DataFrame
         if col not in df.columns: # en prod no existen todas las col de df_match como las stats o goals, etc.
@@ -485,6 +492,8 @@ def format_df_match(df):
         'id_coach_away': {'dtype': str},
         'id_country': {'dtype': int, 'rango': [0, 300]},
         'id_competition': {'dtype': int, 'rango': [0, 10000]},
+        'country': {'dtype': str},
+        'competition': {'dtype': str},
         'is_cup': {'dtype': int, 'rango': [0, 1]},
         'season': {'dtype': str},
         'red_cards_home': {'dtype': 'Int64', 'rango': [0, 5]},
@@ -562,11 +571,17 @@ def format_df_player_fifa_sofifa(df):
     Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
     """
     logger.info("Formatting df_player_fifa_sofifa de Sofifa...")
+    
+    if 'Unnamed: 0' in df.columns:
+        df = df.drop(columns=['Unnamed: 0'])
 
     column_specs = {
         # Verifico formato
         'id_player': {'dtype': str},
         'date': {'dtype': 'datetime64[ns]'},
+        'id_country': {'dtype': int, 'rango': [0, 300]},
+        'id_competition': {'dtype': int, 'rango': [0, 10000]},
+        'id_team': {'dtype': int},
         'age': {'dtype': int, 'rango': [14, 50]},
         'overall_rating': {'dtype': int, 'rango': [20, 100]},
         'potential': {'dtype': int, 'rango': [20, 100]},
@@ -574,7 +589,7 @@ def format_df_player_fifa_sofifa(df):
         'wage': {'dtype': float, 'rango': [100, 999999]},
         'int_reputation': {'dtype': int, 'rango': [0, 5]},
         'fifa': {'dtype': str},
-        'fifa_year': {'dtype': int, 'rango': [6,30]},
+        'fifa_year': {'dtype': int, 'rango': [6, 30]},
         }
 
     return verify_format(df, column_specs)
