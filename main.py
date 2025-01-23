@@ -184,7 +184,7 @@ class DataPreparation:
         :return: Dataframe formateado. (DataFrame)
         """
         start = time.time()
-        logger.info("\nFormatting data...")
+        logger.info("Formatting data...")
 
         # Dataframe match
         ## Date
@@ -286,11 +286,6 @@ class DataPreparation:
             print("\nCorrecion de valores")
         df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     
-        # Verificacion de formato
-        format_data.format_df_match(df_match)
-        format_data.format_df_player_sofifa(df_player_sofifa)
-        format_data.format_df_player_fifa_sofifa(df_player_fifa_sofifa)
-
         end = time.time()
         print(f"Clean data in {(end - start) / 60:.1f} minutes")
 
@@ -301,6 +296,22 @@ class DataPreparation:
             df_player_fifa_sofifa.to_excel(f'{self.base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
     
         return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa
+
+    def verify_format(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
+        """
+        Verificacion de formato
+        """
+        logger.info("\nVerifying data format...")
+
+        # Flashscore
+        df_match = format_data.format_df_match(df_match)
+        # df_match_player = format_data.format_df_match_player(df_match_player)
+        df_match_odds = format_data.format_df_match_odds(df_match_odds)
+
+        # Sofifa
+        df_player_sofifa = format_data.format_df_player_sofifa(df_player_sofifa)
+        df_player_fifa_sofifa = format_data.format_df_player_fifa_sofifa(df_player_fifa_sofifa)
+        return df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa
 
     def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False, export: bool = True):
         """
@@ -351,6 +362,13 @@ class DataPreparation:
         cols_to_drop_filt = [col for col in cols_to_drop if col in df.columns]
         df = df.drop(cols_to_drop_filt, axis=1)
 
+        # Verificar cantidad de NaN values en variables jugadores
+        l_player_cols  = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
+        for col in l_player_cols:
+            nan_percentage = df[col].isna().mean() * 100  # Porcentaje de NaN
+            if nan_percentage < 50:  # Si el porcentaje de NaN es menor al 50%
+                raise ValueError(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
+
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         
@@ -361,9 +379,9 @@ class DataPreparation:
         return df
 
     def clean_data_3(self, df: pd.DataFrame, competencies_to_select: list = None, export: bool = True):
-        '''
+        """
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
-        '''
+        """
         # Ordeno valores por fecha y separo X e y
         df = df.sort_values(by='date', ascending=False)
 
@@ -900,7 +918,6 @@ class Modeling:
 
         # Selecciono test set
         df_test = df[df.index.isin(index_test_set)]
-        logger.info(f"Test set: {len(df_test)} (deberia ser = n_reg_test)")
         X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
 
         # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
