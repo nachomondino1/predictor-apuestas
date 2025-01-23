@@ -66,7 +66,6 @@ def main(
         assess: bool = True,                        # Assess
         update_missing: bool = True,               # Assess
         predict_missing: bool = False,     # Assess
-        select_model: bool = True,
         strategy: str = 'general',                  # Betting Strategy
         ):
     """
@@ -92,25 +91,24 @@ def main(
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
-    # (0) Calculo metrica con la cual seleccionar modelos y estrategia
-    ## Defino variables para calcular metrica
-    l_metrics = ['roi_por_partido', 'test_accuracy']  # si usas cv_acc ojo que en el recalculo de emtricas por assess deberia ser "cv_accuracy_train"
-    l_weights = [0.5, 0.5] # asses_model.define_weights(df_ite, l_metrics=l_metrics)
-    ## Calculo metrica    
-    metric_col_test = 'metric_sin_ea_test'
-    df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea_test')
-    df_ite = df_ite.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
-    df_ite.to_excel(f'{d_paths['base_path_sbm']}/df_sort_by_metric.xlsx', index=False)
-
     # (1) SELECCION DE MODELOS CANDIDATOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por METRIC
-    df_ite_filt = sbm.filter_models_by_distribution(df_ite, l_variables=['acc_home', 'acc_draw', 'acc_away'], l_values=[0.55, 0.37, 0.4])
-    df_ite_filt = sbm.filter_models_by_accuracy(df_ite_filt, dif_prob_bet_min=0) # Antes pues sino elimina mal por metrica.
-    df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, prop_to_max=0.5, perc_cutoff=5, n_models_max=9, metric_col='metric_sin_ea_test') # 0.6 y 1.5
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col='f1_score', prop_to_max=0.7, n_models_max=10)
+    # df_ite_filt = sbm.filter_models_by_metric(df_ite_filt, metric_col='roi_por_partido', prop_to_max=0.5, n_models_max=10)
 
-    # (2) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
+    # (2) Calculo metrica con la cual seleccionar modelos y estrategia --> Antes para normalizar bien....
+    ## Defino variables para calcular metrica
+    l_metrics = ['roi_por_partido', 'f1_score'] # si usas cv_acc ojo que en el recalculo de emtricas por assess deberia ser "cv_accuracy_train"
+    l_weights = [0.3, 0.7]
+    ## Calculo metrica    
+    metric_col_test = 'metric_sin_ea_test'
+    df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea_test')
+    df_ite_filt = df_ite_filt.sort_values(by=metric_col_test, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
+    df_ite_filt.to_excel(f'{d_paths['base_path_sbm']}/df_sort_by_combined_metric.xlsx', index=False)
+    
+    # (3) ASSESS: Actualizar df_prediccion test con missing. --> Funcion ok incluso cuando no hay partidos missing. Chequeado.
     if assess:
         logger.warning("Estas por actualizar el df_iteration con los ultimos partidos missing...")
 
@@ -140,18 +138,14 @@ def main(
         metric_col_assess = 'metric_sin_ea'
         df_ite_filt = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, name_extension='_sin_ea')
         print(df_ite_filt.shape)
-        
-
-    # (3) SELECCION DEL MODELO
+    
+    # (4) SELECCION DEL MODELO
     # Seleccionar el modelo que maximiza ROI y expected ROI (sin estrategia)
-    if select_model:
-        metric_col = metric_col_assess if assess else metric_col_test
-        row = sbm.select_model(df_ite_filt, metric_col=metric_col)
-        n_model, model_name = row.index[0], row['model_name'].values[0]
-    else:
-        n_model, model_name = 930, "LogisticRegression"
+    metric_col = metric_col_assess if assess else metric_col_test
+    row = sbm.select_model(df_ite_filt, metric_col=metric_col)
+    n_model, model_name = row.index[0], row['model_name'].values[0]
 
-    # (4) ESTRATRAGIA DE APUESTA PARA MODELO SELECCIONADO
+    # (5) ESTRATRAGIA DE APUESTA PARA MODELO SELECCIONADO
     # Levanto df_predicciones
     df_pred = read_predicciones(n_model, model_name, assess, d_paths)
 
@@ -177,7 +171,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 48
+    id_country = 59
 
     # Defino hiperparametros
     assess = False
@@ -187,9 +181,9 @@ if __name__ == "__main__":
     # Defino variables
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2025-01-21'],
-        55: ["france", '2025-01-21'], 
-        59: ["germany", '2025-01-21'], 
+        48: ["england", '2025-01-22'],
+        55: ["france", '2025-01-22'], 
+        59: ["germany", '2025-01-23'], 
         77: ["italy", '2025-01-20'],
         148: ["spain", '2025-01-20'], 
         167: ["usa", '2024-12-05']

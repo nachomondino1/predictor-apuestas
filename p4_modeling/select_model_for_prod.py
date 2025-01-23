@@ -97,7 +97,7 @@ class SelectBestModel():
         return df_filt
 
     # Paso 3
-    def filter_models_by_metric(self, df, prop_to_max: float = 0.6, perc_cutoff: float = 1, n_models_max: int = 20, metric_col: str = 'metric_sin_ea'):
+    def filter_models_by_metric(self, df, metric_col, prop_to_max: float = 0, perc_cutoff: float = 100, n_models_max: int = 100):
         """
         Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
 
@@ -126,23 +126,23 @@ class SelectBestModel():
         
         ## segun cantidad maxima de modelos
         if len(df) >= n_models_max:
-            metric_cut_fixed = df.iloc[n_models_max][metric_col]
+            metric_cut_fixed = df.iloc[n_models_max-1][metric_col]
         else:
             metric_cut_fixed = 0
 
         # Determino el minimo
         metric_cut = max(metric_cut_prop, metric_cut_perc, metric_cut_fixed)
-        logger.info(f"\nMetricas de corte: (1) {metric_cut_prop} \n(2) {metric_cut_perc} \n (3) {metric_cut_fixed} \n => {metric_cut} ")
+        logger.info(f"\nMetricas de corte: \n(1) {metric_cut_prop} \n(2) {metric_cut_perc} \n (3) {metric_cut_fixed} \n => {metric_cut} ")
 
         # Filtro modelos segun roi to cut
         df_filt = df[df[metric_col] >= metric_cut]
 
         if self.verbose >= 1:
-            logger.warning(f"Descarte por metrica: {len(df)} --> {len(df_filt)}")
+            logger.warning(f"Descarte por {metric_col.upper()}: {len(df)} --> {len(df_filt)}")
             self.error_empty_dataframe(df_filt)
 
         if self.path_save is not None:
-            df_filt.to_excel(f'{self.path_save}/df_filt_by_metric.xlsx', index=False)
+            df_filt.to_excel(f'{self.path_save}/df_filt_by_{metric_col}.xlsx', index=False)
 
         return df_filt
 
