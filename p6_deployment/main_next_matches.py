@@ -632,9 +632,12 @@ class TrainingDataLoader():
             df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")
             
             # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
-            row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
-            # logger.info(row_hiper)
-            
+            try:
+                row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
+            except IndexError:
+                logger.error(f"El modelo {self.n_model} no fue entrenado en el entrenamiento del {self.iteration_date}.")
+                raise IndexError
+
             ## Levanto columnas utilizadas para entrenar el modelo
             # selected_columns = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
             selected_columns = eval(row_hiper['X_columns'])  # eval() para pasar de string a lista
@@ -1140,7 +1143,15 @@ def main(
             df_player_sofifa, df_player_fifa_sofifa = mis.read_last_sofifa_data()  # Levanto datos para preparar missing
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, export=False)
+            df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa)
+
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
+
+            # Si no existen columnas player, raise error
+            l_player_cols = [col for col in df_integrated_missing.columns if ('player_start' in col) or ('player_sub' in col)] 
+            if len(l_player_cols) == 0:
+                logger.error("No existen las columnas de jugadores en df_integrated_missing. Falló la integración de Sofifa a Flashscore. Revisar posible diferencia de formato de columnas usadas al integrar.")
+                raise ValueError
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_integrated = mis.read_last_integrate_data()
@@ -1218,6 +1229,7 @@ def main(
         # Preparacion de datos hasta integrate
         df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
         df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
+        df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
         df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
 
         # Tirar error si estoy prediciendo proximos partidos que ya se jugaron y ya fueron recolectados en missing...
@@ -1370,25 +1382,23 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 77
+    id_country = 55
     key, value = 'predict', 'try_a_specific_model'
-    data_unders = True
+    data_unders = False
     n_days = 10
 
     # Defino country, iteration date y modelo
     d_countries = {
         6: ["argentina", '2024-12-05'], 
-        48: ["england", '2025-01-07'], 
-        55: ["france", '2025-01-08'], 
-        59: ["germany", '2025-01-08'], 
-        # 77: ["italy", '2025-01-06'],
+        48: ["england", '2025-01-22'], 
+        55: ["france", '2025-01-22'], 
+        59: ["germany", '2025-01-23'], 
         77: ["italy", '2025-01-20'],
-        # 148: ["spain", '2025-01-07'], 
-        148: ["spain", '2025-01-19'], 
+        148: ["spain", '2025-01-20'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 42, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 301, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         

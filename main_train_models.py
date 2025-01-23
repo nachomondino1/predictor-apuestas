@@ -12,6 +12,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
 from p2_data_understanding.collect_initial_data import update_sofifa_data
+from p3_data_preparation.select_data import select_league_matches
 from p3_data_preparation import concat_mapeos
 from p3_data_preparation.select_data import determine_country_competitions
 from p6_deployment import main_next_matches
@@ -32,7 +33,6 @@ def comprehensive_search(
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
-    binary_classification: bool = False, # En desarrollo
     export: bool = True
 ):
     """
@@ -154,6 +154,17 @@ def comprehensive_search(
     
     
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
+
+    # Determino registros a usar en test_set
+    n_reg_test = d_params['modeling'].pop('n_reg_test', None)     # Obtener el valor de 'n_reg_test' y eliminarlo del diccionario
+    if n_reg_test is not None:
+        n_reg_test = n_reg_test[0]  # Si es una lista, obtenemos el primer elemento
+    logger.info(d_params['modeling'].values())
+    logger.info(f"N_REG_TEST: {n_reg_test}")
+
+    df_match_old = read_df_match(country=country, iteration_date=date, retrain=retrain)
+    index_test_set = determine_rows_for_test_set(df_match=df_match_old, n_reg_test=n_reg_test)  # Usar n_reg_test.
+
      # Clean data 3
     for zz, param_values_00 in enumerate(product(*d_params['clean_data_3'].values()), start=1):
 
@@ -201,7 +212,7 @@ def comprehensive_search(
                     logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
                     print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; fill_na: {fill_na}")            
 
-                df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, fill_na=fill_na, export=True)
+                df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, fill_na=fill_na, index_test_set=index_test_set, export=True)
                 joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_clean_2}.pkl')
 
                 if verbose >= 2:
@@ -231,47 +242,18 @@ def comprehensive_search(
                     for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                         
                         # Asigno valor a cada hiperparametro
-                        val_size, n_reg_test, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2], param_values_5[3]
+                        val_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2]
                         if verbose >= 0:
                             cont_iter += 1
                             logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
                             print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                             logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                            if binary_classification:
-                
-                                # Separar datos para el primer modelo: Empate o No Empate
-                                df_first_model = df_sel.copy()
-                                df_first_model['result'] = df_first_model['result'].apply(lambda x: 0 if x == 0 else 12) # 0 es empate y -10 es no empate?
+                            # Generar el diseño de la prueba
+                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
 
-                                # Filtrar datos para el segundo modelo: Local o Visitante
-                                df_second_model = df_sel[df_sel['result'] != 0].copy()
-                                df_second_model['result'] = df_second_model['result'].apply(lambda x: 1 if x == 1 else 2) # 1 es local y 0 es visita?
-
-                                # Dividir los datos para cada modelo
-                                X_train_first, X_val_first, X_test_first, y_train_first, y_val_first, y_test_first = mo.generate_test_design(
-                                    df_first_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False
-                                )
-
-                                X_train_second, X_val_second, X_test_second, y_train_second, y_val_second, y_test_second = mo.generate_test_design(
-                                    df_second_model, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False,
-                                )
-
-                                # Entreno modelo para empate y no empate
-                                df_metrics_1 = mo.train_and_assess_models(X_val_first, y_val_first, X_train_first, y_train_first, X_test_first, y_test_first, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification)
-                                
-                                # Entreno modelo para local y visitante
-                                df_metrics_2 = mo.train_and_assess_models(X_val_second, y_val_second, X_train_second, y_train_second, X_test_second, y_test_second, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain, binary_classification=binary_classification, suffix='_2')
-
-                                suffix = '_2'
-                                df_metrics_2_ren = df_metrics_2.add_suffix(suffix)
-                                df_metrics = pd.concat([df_metrics_1, df_metrics_2_ren], axis=1)
-
-                            else:
-                                # Generar el diseño de la prueba
-                                X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, n_reg_test=n_reg_test, retrain=retrain, export=False)
-                    
-                                df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
+                            # Entreno y evaluo modelos
+                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
 
                         if len(df_metrics) > 0:
                             # Guardo datos en dataframe
@@ -412,6 +394,101 @@ def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, verbose: int = 0):
 
     return df_player_sofifa, df_player_fifa_sofifa
 
+def read_df_match(country, iteration_date, retrain: bool = True):
+    """
+    Levanto el df_match
+    """
+    # Levanto df_match del pais
+    if retrain:
+        try:
+            # Levanto desde los datos usados para el nuevo train
+            path_new_train = f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}"
+            df_match = pd.read_excel(f'{path_new_train}/df_match.xlsx', index_col=0)
+            # logger.warning(df_match)
+
+        except FileNotFoundError:
+            logger.warning(f"Fallo la carga del archivo df_match. No se encontró el archivo en '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
+
+        except IsADirectoryError:
+            logger.warning(f"Fallo la carga del archivo df_match. No existe el directorio '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
+
+        # Levanto desde deployment/missing
+        path = f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx' 
+        df_match = pd.read_excel(path, index_col=0)
+
+    else:
+        logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
+        df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
+
+    if 'Unnamed: 0' in df_match.columns:
+        df_match = df_match.drop(columns=['Unnamed: 0'])
+
+    return df_match
+
+def determine_rows_for_test_set(df_match, n_reg_test: int = 100, verbose : int = 0):
+    """
+    Determina qué registros pueden ser utilizados en el test
+    Requisitos para el test
+        -1: Que id_competition sea publica (lo mismo que hago en assess).
+        -2: Que sean partidos jugados en los ultimos meses.
+
+    # Parameters
+        df: Dataframe.
+        df_match: Del cual determinar que partidos son los ultimos partidos y la competicion (tiene date e id_comp)
+        n_reg_test: Numero de registros los ultimos partidos a selecciona los cuales iran al df_test.
+
+    # Return
+        index: indice de los registros para test set
+    """
+    # Ordeno por fecha descendiente
+    df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+    df_match = df_match.sort_values(by='date', ascending=False)
+
+    if verbose >= 2:
+        logger.info(df_match['date'].head(10))
+    
+    # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
+    df1 = select_league_matches(df_match)
+    index_comp = df1.index
+
+    if verbose >= 2:
+        df_filt_1 = df[df.index.isin(index_comp)]
+        logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
+    
+    # Requisito 2: Last matches 
+    df_match_comp = df_match[df_match.index.isin(index_comp)]  # Dejo solo las ligas / comp publicas
+    df2 = df_match_comp.head(n_reg_test)
+    index_last_matches = df2.index
+
+    # Imprimo rango de fechas de df_test
+    if verbose >= 1:
+        date_hoy = datetime.datetime.now().date()
+        col_index = df_match_comp.columns.get_loc('date')  # Índice de la columna "date"
+        date_final = df_match_comp.iloc[0, col_index]
+        date_inic = df_match_comp.iloc[100, col_index]
+
+        # Los convierto a datetime
+        date_final = pd.to_datetime(date_final, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
+        date_inic =  pd.to_datetime(date_inic, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
+
+        logger.info(f"Date hoy: {date_hoy}. Dates en df_test: {date_inic} --> {date_final}")
+
+        dif_dias = date_hoy - date_final
+        dif_dias_max = 20
+
+        # Si no hay partidos de los ultimos x dias en df_test
+        if dif_dias.days >= dif_dias_max:
+            logger.warning(f"No hay registros de los ultimos {dif_dias.days} dias en df_test. Puede haber fallado algo en la extraccion de missing o en la seleccion del df_test.")
+
+    if verbose >= 2:
+        df_filt_2 = df[df.index.isin(index_last_matches)]
+        logger.info(f"Registros que pasan el requisito 2 (solo last matches): {len(df_filt_2)}")
+    
+        # Selecciono registros que cumplen los requisitos
+
+    logger.info(f"Index test set: {len(index_last_matches)}")
+    return index_last_matches
+
 def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
@@ -486,9 +563,9 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     id_country = 48
-    data_unders = True
-    update_sofifa = True
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_unders = False
+    update_sofifa = False
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
     country = d_countries[id_country]

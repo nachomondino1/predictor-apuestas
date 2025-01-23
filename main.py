@@ -72,7 +72,10 @@ class DataUnderstanding:
             print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
             # Extraigo partidos de Flashscore (df_match y df_match_player)
-            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=export)
+            df_match, df_match_player, df_match_odds = scraper_flashscore.extract_data(self.id_country, self.country, row['id_competition'], 
+                                                                                       row['competition_flashscore'], row['is_cup'], n_seasons_max=11,
+                                                                                       export=export
+                                                                                       )
             
             # Guardo datos
             df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
@@ -181,7 +184,7 @@ class DataPreparation:
         :return: Dataframe formateado. (DataFrame)
         """
         start = time.time()
-        logger.info("\nFormatting data...")
+        logger.info("Formatting data...")
 
         # Dataframe match
         ## Date
@@ -283,11 +286,6 @@ class DataPreparation:
             print("\nCorrecion de valores")
         df_player_fifa_sofifa['fifa_year'] = df_player_fifa_sofifa['fifa'].str.split(' ').str[-1]  # Agrego columna "fifa_year" quedandome solo con el año del fifa (e.g. "22" en vez de "FIFA 22")
     
-        # Verificacion de formato
-        format_data.format_df_match(df_match)
-        format_data.format_df_player_sofifa(df_player_sofifa)
-        format_data.format_df_player_fifa_sofifa(df_player_fifa_sofifa)
-
         end = time.time()
         print(f"Clean data in {(end - start) / 60:.1f} minutes")
 
@@ -298,6 +296,22 @@ class DataPreparation:
             df_player_fifa_sofifa.to_excel(f'{self.base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
     
         return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa
+
+    def verify_format(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
+        """
+        Verificacion de formato
+        """
+        logger.info("\nVerifying data format...")
+
+        # Flashscore
+        df_match = format_data.format_df_match(df_match)
+        # df_match_player = format_data.format_df_match_player(df_match_player)
+        df_match_odds = format_data.format_df_match_odds(df_match_odds)
+
+        # Sofifa
+        df_player_sofifa = format_data.format_df_player_sofifa(df_player_sofifa)
+        df_player_fifa_sofifa = format_data.format_df_player_fifa_sofifa(df_player_fifa_sofifa)
+        return df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa
 
     def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False, export: bool = True):
         """
@@ -348,6 +362,16 @@ class DataPreparation:
         cols_to_drop_filt = [col for col in cols_to_drop if col in df.columns]
         df = df.drop(cols_to_drop_filt, axis=1)
 
+        # Verificar cantidad de NaN values en variables jugadores
+        l_player_cols  = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
+        for col in l_player_cols:
+            nan_percentage = df[col].isna().mean() * 100  # Porcentaje de NaN
+            if nan_percentage < 50:  # Si el porcentaje de NaN es menor al 50%
+                if prod: # En prod a veces recoje un solo partido y por ahi justo ni siquiera es de la comp public..
+                    logger.warning(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
+                else:
+                    raise ValueError(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
+
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
         
@@ -358,9 +382,9 @@ class DataPreparation:
         return df
 
     def clean_data_3(self, df: pd.DataFrame, competencies_to_select: list = None, export: bool = True):
-        '''
+        """
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
-        '''
+        """
         # Ordeno valores por fecha y separo X e y
         df = df.sort_values(by='date', ascending=False)
 
@@ -543,7 +567,7 @@ class DataPreparation:
             df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, fill_na: str = None, export: bool = True):
+    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, fill_na: str = None, index_test_set: list = None, export: bool = True):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -584,7 +608,7 @@ class DataPreparation:
 
         # (2) Tratamiento de NaN values
         shape_inicial = X.shape
-        X = self.treat_nan_values(X=X, fill_na=fill_na)
+        X = self.treat_nan_values(X=X, fill_na=fill_na, index_test_set=index_test_set)
         if self.verbose >= 1:
             print(f"Tras fill_na={fill_na}. Shape X_sin_col_mucho_nan: {shape_inicial} --> {X.shape}")
 
@@ -609,7 +633,7 @@ class DataPreparation:
 
         return df, scaler, X.columns
     
-    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
+    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, index_test_set: list = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
         """
         Tratamiento de nan values
 
@@ -630,13 +654,9 @@ class DataPreparation:
         start = time.time()
         print("\nTreating NaN values to avoid input=NaN in Modeling...")
 
-        # Determino que registros usaré en df_test
-        df_match_old = generate_test_design.read_df_match(country=self.country, iteration_date=self.date)
-        df_test_inic = generate_test_design.select_test_set(X, df_match=df_match_old)
-
         # Separo test y train/val
-        df_test = X[X.index.isin(df_test_inic.index)]
-        df_train_val = X[~X.index.isin(df_test_inic.index)]
+        df_test = X[X.index.isin(index_test_set)]
+        df_train_val = X[~X.index.isin(index_test_set)]
         logger.info(f"{X.shape} --> {df_train_val.shape} {df_test.shape}")
 
         # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones)
@@ -697,7 +717,7 @@ class DataPreparation:
         if self.verbose >= 0:        
             n_rows = generate_test_design.n_rows_to_test(X, df_test_filled)
 
-            if n_rows != len(df_test_inic):
+            if n_rows != len(index_test_set):
                 logger.warning(f" Se han eliminado registros de df_test por tener NaN values cuando no deberia borrarse ninguno.")
 
         logger.info(f"(3) Tras eliminar todo NaN con drop o fill_na: {df_train_val_filled.shape} {df_test_filled.shape} --> {X.shape}")
@@ -882,7 +902,7 @@ class Modeling:
         self.base_path = path
         self.base_path_dp = path_dp
 
-    def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, n_reg_test: float = 100, retrain: bool = False, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, index_test_set: list = None, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -900,8 +920,7 @@ class Modeling:
             print("\nSeparating data in train, val and test...")
 
         # Selecciono test set
-        df_match_old = generate_test_design.read_df_match(country=self.country, iteration_date=self.date, retrain=retrain)
-        df_test = generate_test_design.select_test_set(df, df_match=df_match_old, n_reg_test=n_reg_test)
+        df_test = df[df.index.isin(index_test_set)]
         X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
 
         # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
@@ -989,7 +1008,7 @@ class Modeling:
 
         return model_best_params, params, train_accuracy, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False, binary_classification: bool = False):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -1016,7 +1035,7 @@ class Modeling:
         df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
 
         # Calculo metricas
-        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export, binary_classification=binary_classification)
+        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export)
 
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1067,7 +1086,7 @@ class Modeling:
 
         return df_pred_proba, y_pred   
 
-    def calculate_metrics(self, df_pred_proba, retrain: bool = False, export: bool = False, binary_classification: bool = False):
+    def calculate_metrics(self, df_pred_proba, retrain: bool = False, export: bool = False):
 
         # Defino variables
         df_match, df_match_odds = asses_model.read_dfs(df_pred_proba, country=self.country, retrain=retrain)
@@ -1081,25 +1100,24 @@ class Modeling:
         # Concateno todos los dfs en uno solo --> Necesario para roi?
         df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
 
-        if not binary_classification:
-            # Calculo ROI
-            bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
-            d_params = bs.define_hiperparameters(strategy='train')
-            df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
-            d_metrics.update(d_roi)
-            
-            if self.verbose >= 0:
-                print(d_metrics)
+        # Calculo ROI
+        bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
+        d_params = bs.define_hiperparameters(strategy='train')
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
+        d_metrics.update(d_roi)
+        
+        if self.verbose >= 0:
+            print(d_metrics)
 
-            # Calculo otras metricas
-            d_metrics.update(asses_model.determine_distribution(df_predicciones))
-            d_metrics.update(asses_model.calculate_nan_metrics(df_predicciones)) # Necesita 'ROI'
-            d_metrics.update(asses_model.calculate_gp_by_result(df_predicciones)) # Necesita 'ROI'
-            d_metrics.update(asses_model.calculate_accuracy_by_result(df_predicciones)) # Necesita 'acerte'
+        # Calculo otras metricas
+        d_metrics.update(asses_model.determine_distribution(df_predicciones))
+        d_metrics.update(asses_model.calculate_nan_metrics(df_predicciones)) # Necesita 'ROI'
+        d_metrics.update(asses_model.calculate_gp_by_result(df_predicciones)) # Necesita 'ROI'
+        d_metrics.update(asses_model.calculate_accuracy_by_result(df_predicciones)) # Necesita 'acerte'
 
         return df_predicciones, d_metrics
     
-    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos, k, ruta_base_mod_seg, cont_iter, suffix: str = '', retrain: bool = False, binary_classification: bool = False, verbose: int = 0):
+    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, verbose: int = 0):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -1129,7 +1147,7 @@ class Modeling:
                     model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
 
                     # Evaluo modelo en test
-                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain, binary_classification=binary_classification)
+                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain)
 
                     # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
                     df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
@@ -1143,9 +1161,9 @@ class Modeling:
                     df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
 
                     # Exporto datos del modelo
-                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}{suffix}.pkl", "wb"))
-                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params{suffix}.xlsx')
-                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones{suffix}.xlsx', index=True)
+                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
+                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
                 except KeyboardInterrupt as e:
                     logger.warning(f"Se evitó entrenar este modelo mediante {e}")
@@ -1252,8 +1270,8 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
 if __name__ == "__main__":
 
     # Definicion declea variables
-    id_country = 48
-    d_run = {'data_unders': False, 'data_prep': True, 'modeling': False, 'until_integrate': False, 'from_integrate': True}
+    id_country = 6
+    d_run = {'data_unders': True, 'data_prep': False, 'modeling': False, 'until_integrate': False, 'from_integrate': True}
 
     # Hiperparametros
     d_comps = select_data.determine_country_competitions(id_country)
