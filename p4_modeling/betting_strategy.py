@@ -41,7 +41,7 @@ class BettingStrategy:
         if strategy == "train":
             dic = {
                 'prob_dp': [-1],
-                'curva': ['linear'],
+                'curva': ['linear'], # Uso kelly tmb?
                 'm': [10],
                 'b': [0],
                 'odd_weight': [0],
@@ -63,9 +63,9 @@ class BettingStrategy:
                     'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
                     'curva': ['kelly'], # ['linear',  'kelly'],  #'linear', 
                     'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                    'b': [0], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
+                    'b': [0],
                     'odd_weight': [0],
-                    'lim_sup': [0] # no dar la posibilidad de inflar
+                    'lim_sup': [0] 
                 }
         elif strategy == "general":
             dic = {
