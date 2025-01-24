@@ -58,17 +58,26 @@ class BettingStrategy:
                 'lim_sup': [0]
             }
 
+        elif strategy == "kelly":
+                dic = {
+                    'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
+                    'curva': ['kelly'], # ['linear',  'kelly'],  #'linear', 
+                    'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
+                    'b': [0], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
+                    'odd_weight': [0],
+                    'lim_sup': [0] # no dar la posibilidad de inflar
+                }
         elif strategy == "general":
             dic = {
                 'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
-                'curva': ['linear'], # ['linear',  'kelly'],  #
+                'curva': ['linear'], # ['linear',  'kelly'],  #'linear', 
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [
                     0, 
                     -0.1, -0.2, 
                     0.1, 
                     ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
-                'odd_weight': [0, 1, 2, 3],
+                'odd_weight': [0, 1, 2, 3, 4],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
@@ -271,12 +280,12 @@ class BettingStrategy:
             - Separar variacion de stake por cuotas en otra funcion. 
         """
         # Limito caps segun odd_weight (para evitar stake=99 x inflado de stake con cuotas sobretodo cuando odd_weight=4). Esto pasaba en el 437 de GER. Basicamente evito overfitting de hiper de apuesta.
-        if odd_weight > 0:
-            dif_prob_inf_cap = dif_prob_inf_cap / odd_weight
-            dif_prob_sup_cap = dif_prob_sup_cap / odd_weight
+        # if dif_prob_sup_cap > 0 and odd_weight > 0:
+        #     dif_prob_inf_cap = dif_prob_inf_cap / odd_weight
+        #     dif_prob_sup_cap = dif_prob_sup_cap / odd_weight
 
-            if self.verbose >= 1:
-                logger.info(f"dif_prob_result_to_bet capped: [{dif_prob_inf_cap}, {dif_prob_sup_cap}]")
+        #     if self.verbose >= 1:
+        #         logger.info(f"dif_prob_result_to_bet capped: [{dif_prob_inf_cap}, {dif_prob_sup_cap}]")
         
         # Separo puntos en x e y
         if p1 is not None and p2 is not None:
@@ -307,11 +316,7 @@ class BettingStrategy:
 
             if b != 0:
                 b = m * b 
-
-            if dif_prob_inf_cap != dif_prob_sup_cap:
-                df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
-            else:
-                df['stake_to_bet'] = df['prob_result_to_bet'] * m + b
+            df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
             
             # Puntos para normalizar --> no tiene mucho sentido. Para eso esta exponential (modificar mas el stake ante un menor cambio en proba). Incluso con el b de linear tambien puedo lograr algo parecido.
             # p_min, p_max = (0.55 * m + b), (0.7 * m + b) # El punto min usa un stake de m_to_bet / 2. Si queres que prob=0.33 use un stake mas bajo, no tiene sentido usarlo como p_min.

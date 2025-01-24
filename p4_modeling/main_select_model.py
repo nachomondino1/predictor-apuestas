@@ -150,20 +150,8 @@ def main(
     df_pred = read_predicciones(n_model, model_name, assess, d_paths)
 
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-
-    # Paso 1: Defino m para todos los resultados
-    d_params = bs.define_hiperparameters(strategy='no_odds')  # no odds porque quiero determinar el m optimo no mas
-    df_final, best_df_pred = bs.define_model_betting_strategy_general(df_pred, d_params=d_params)
-    print(df_final)
-
-    # Paso 2: Defino d_params solo con el m que gano en el paso 1
-    d_params_new = bs.define_hiperparameters(strategy=strategy)
-    d_params_new['prob_dp'] = [df_final['prob_dp'].values[0]]  # Reemplazo los m por el dif_prob que ganó
-    d_params_new['m'] = [df_final['m'].values[0]]  # Reemplazo los m por el m que ganó
-    print(d_params_new)
-    
-    # Paso 3: Defino las odds por resultado (usando el mismo m) --> Le paso d_params a usar.
-    df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_new)
+    d_params = bs.define_hiperparameters(strategy='kelly')
+    df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
    
     # Exporto datos
     df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
@@ -171,7 +159,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 77
+    id_country = 48
 
     # Defino hiperparametros
     assess = False
