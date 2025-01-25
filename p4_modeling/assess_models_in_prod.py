@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from p3_data_preparation import format_data
 from p3_data_preparation.construct_data import determine_result
 from p6_deployment import main_next_matches
-from main import Modeling
 
 
 def get_model_predictions_with_missing(n_model, model_name, id_country, country, iteration_date, path_save):
@@ -26,18 +25,10 @@ def get_model_predictions_with_missing(n_model, model_name, id_country, country,
 
     # Concateno df_pred y df_pred missing.
     df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
-    df_pred_proba = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-
-    # Recalculo metricas con test + missing
-    mo = Modeling(country, iteration_date)
-    df_predicciones, d_metrics = mo.calculate_metrics(df_pred_proba, retrain=True)
-
-    # Convierto ids de equipos a nombres
-    df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date}/integrate_data/df_teams.xlsx', index_col=0)
-    df_predicciones = format_data.map_teams(df_predicciones, df_teams=df_teams)
+    df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
 
     # Guardo datos + Exporto      
-    df_predicciones.to_excel(f'{path_save}/{n_model}__{model_name}_predicciones.xlsx', index=True)
+    # df_predicciones.to_excel(f'{path_save}/{n_model}__{model_name}_predicciones.xlsx', index=True)
     return df_predicciones
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
