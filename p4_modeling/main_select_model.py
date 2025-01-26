@@ -75,6 +75,7 @@ def main(
     Mejoras:
         - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
+    mo = Modeling(country, iteration_date)
     # Creo objeto de clase select_best_model
     d_paths = initialize_directories(country, iteration_date, predict_missing)
 
@@ -115,7 +116,6 @@ def main(
             df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
 
         # Recalculo metricas con test + missing
-        mo = Modeling(country, iteration_date)
         df_pred, d_metrics = mo.calculate_metrics(df_pred, retrain=True)
 
         # Convierto ids de equipos a nombres
@@ -170,11 +170,11 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [148]
+    l_countries = [77]
     
     # Defino hiperparametros
     assess = True
-    # update_missing = False  # Extract + Prepare
+    update_missing = False  # Extract + Prepare
     predict_missing = True
 
     d_countries = {
@@ -200,5 +200,5 @@ if __name__ == "__main__":
         
         main(
             id_country=id_country, country=country, iteration_date=iteration_date, 
-            assess=assess, update_missing=True, predict_missing=predict_missing
+            assess=assess, update_missing=update_missing, predict_missing=predict_missing
             )

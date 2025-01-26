@@ -1295,15 +1295,12 @@ def main(
         try:
             df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']] 
         except KeyError:
-            df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'
+            df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'        
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
 
         # Realizo predicciones sobre los nuevos partidos
         df_probabilities, y_pred = mo.predict(model=loaded_model, X_test=df)
         df_pred_proba = pd.DataFrame({'predicted_result': y_pred,}, index=df.index)
-        logger.warning("ASDGASDGA")
-        logger.warning(df_probabilities)
-        logger.warning(df_pred_proba)
 
         # Concateno conjunto de datos # df_fill puede tirar error. Si tira, arreglar.
         df_predicciones = pd.concat(
@@ -1315,7 +1312,8 @@ def main(
              df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]
              ], 
             axis=1) 
-    
+        df_predicciones = df_predicciones[df_predicciones.index.isin(df.index)] # en ITA queda el partido del COMO-UDINESE pero sin prediccion (pues no lo prepara, no esta en df_integrated_missing) y falla el calculo de metricas...
+
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
         d_strategy = {'prob_dp': -1, 'curva': 'linear', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': False} if predict_missing or no_strategy else lo.load_modeling_hyperparameters()
