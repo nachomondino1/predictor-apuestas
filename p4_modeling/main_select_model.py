@@ -53,10 +53,11 @@ def main(
         id_country, 
         country, 
         iteration_date,
-        assess: bool = True,                        # Assess
         update_missing: bool = True,               # Assess
         predict_missing: bool = True,     # Assess
+        betting_strat: bool = True,
         strategy: str = 'kelly',                  # Betting Strategy
+        export: bool = True
         ):
     """
     Assess model in prod + Seleccion del modelo + Estrategia de apuesta
@@ -82,72 +83,76 @@ def main(
    # Levanto df_iteration
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
+    # Actualizo missing
+    if update_missing:
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
+        main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+
     # (1) SELECCION DE MODELOS CANDIDATOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
     # 1.1. Descarte por METRIC
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col='roi_por_partido', prop_to_max=0.3, perc_cutoff=20, n_models_max=15)
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col='roi_por_partido', prop_to_max=0.1, n_models_max=15)
     logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
 
     rows = []
     d_rows = {}
 
     # (2) ESTRATRAGIA DE APUESTA
-    if update_missing:
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-        main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+    if betting_strat:
+        
+        # Por modelo
+        for idx, row in df_ite_filt.iterrows():
 
-    # Por modelo
-    for idx, row in df_ite_filt.iterrows():
+            n_model = row['n_iteration']
+            model_name = row['model_name']
+            logger.info(f'{n_model} {model_name}')
 
-        n_model = row['n_iteration']
-        model_name = row['model_name']
-        logger.info(f'{n_model} {model_name}')
-
-        # Levanto df_predicciones
-        if assess:
-
+            # Levanto df_predicciones
             if predict_missing:
                 df_pred = assess_models_in_prod.get_model_predictions_with_missing(n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-            
-            else: # Aun no funciona...
-                df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
-        else:
-            df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+                
+            else: 
+                try:
+                    df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
+                except FileNotFoundError:
+                    df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
 
-        # Recalculo metricas con test + missing
-        df_pred, d_metrics = mo.calculate_metrics(df_pred, retrain=True)
+            # Recalculo metricas con test + missing
+            df_pred, d_metrics = mo.calculate_metrics(df_pred, retrain=True)
 
-        # Convierto ids de equipos a nombres
-        df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date}/integrate_data/df_teams.xlsx', index_col=0)
-        df_pred = format_data.map_teams(df_pred, df_teams=df_teams)
+            # Convierto ids de equipos a nombres
+            df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date}/integrate_data/df_teams.xlsx', index_col=0)
+            df_pred = format_data.map_teams(df_pred, df_teams=df_teams)
 
-        # Defino estrategia
-        bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-        d_params = bs.define_hiperparameters(strategy=strategy)
-        df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
+            # Defino estrategia
+            bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
+            d_params = bs.define_hiperparameters(strategy=strategy)
+            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
 
-        # Guardo metrics
-        roi_sin_ea = df_pred_with_stra['G_P_sin_ea'].sum()
-        roi_con_ea = df['roi'].sum()
-        multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
-        new_row = {
-            'n_model': n_model, 'model_name': model_name, **d_metrics,
-            'ROI_sin_ea': roi_sin_ea, 'ROI_con_ea': roi_con_ea, 'x ea': multiplicador
-            }
-        rows.append(new_row)
-        d_rows[n_model] = [df, df_pred_with_stra]
+            # Guardo metrics
+            roi_sin_ea = df_pred_with_stra['G_P_sin_ea'].sum()
+            roi_con_ea = df['roi'].sum()
+            multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
+            new_row = {
+                'n_model': n_model, 'model_name': model_name, **d_metrics,
+                'ROI_sin_ea': roi_sin_ea, 'ROI_con_ea': roi_con_ea, 'x ea': multiplicador
+                }
+            rows.append(new_row)
+            d_rows[n_model] = [df, df_pred_with_stra]
 
-        # Exporto datos (x seg)
-        df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True)
-        df_ite_bs = pd.DataFrame(data=rows)
-        df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
+            # Exporto datos (x seg)
+            df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True)
+            df_ite_bs = pd.DataFrame(data=rows)
+            df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
+    
+    else:
+        df_ite_bs = pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
+        logger.warning(f"Se evito redefinir estrategia de apuesta por modelo. \n{df_ite_bs}")
 
     # (3) SELECCION DEL MODELO (el que maximiza el ROI con ea)
     ## Determino componentes de metrica combinada y pesos 
-    l_pos_metrics = ['test_accuracy', 'recall', 'f1_score', 'gp_home', 'gp_draw', 'gp_away'] # 'gp_total' no pues es = ROI.  # si usas cv_acc ojo que en el recalculo de emtricas por assess deberia ser "cv_accuracy_train"
-    best_metric = asses_model.select_metrics(df_ite_bs, col_corr="ROI_con_ea", l_metrics=l_pos_metrics, n_metrics=1)
-    l_metrics = ['ROI_sin_ea', 'ROI_con_ea'] + best_metric
+    l_metrics = ['ROI_sin_ea', 'ROI_con_ea', 'test_accuracy']
     l_weights = [0.33, 0.33, 0.33]
 
     ## Calculo metrica combinada
@@ -162,28 +167,27 @@ def main(
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}")
     
     # Exporto datos
-    df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
-    df, df_pred_with_stra = d_rows[n_model]
-    df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
-    df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
+    if export:
+        df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
+
+        if betting_strat:
+            df, df_pred_with_stra = d_rows[n_model]
+            df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
+            df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
+
 
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [48, 77]
     
     # Defino hiperparametros
-    assess = True
-    update_missing = False  # Extract + Prepare
-    predict_missing = True
+    update_missing = True  # Extract missing + Prepare missing
+    betting_strat = True # Recalcular estrategia de apuesta por modelo 
+    predict_missing = True # Predecir missing x modelo. betting_strategy debe ser True.
+    export = True
 
     d_countries = {
-        # Train viejos
-        # 48: ["england", '2025-01-07'],
-        # 55: ["france", '2025-01-08'], 
-        # 59: ["germany", '2025-01-08'], 
-        # 77: ["italy", '2025-01-06'],
-        # 148: ["spain", '2025-01-07'], 
         # Train actuales
         6: ["argentina", '2024-12-05'], 
         48: ["england", '2025-01-22'],
@@ -200,5 +204,7 @@ if __name__ == "__main__":
         
         main(
             id_country=id_country, country=country, iteration_date=iteration_date, 
-            assess=assess, update_missing=update_missing, predict_missing=predict_missing
+            update_missing=update_missing, predict_missing=predict_missing,
+            betting_strat=betting_strat,
+            export=export
             )
