@@ -25,10 +25,6 @@ def get_model_predictions_with_missing(n_model, model_name, id_country, country,
 
     # Concateno df_pred y df_pred missing.
     df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
-    df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-
-    # Guardo datos + Exporto      
-    # df_predicciones.to_excel(f'{path_save}/{n_model}__{model_name}_predicciones.xlsx', index=True)
     return df_predicciones
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing

@@ -76,7 +76,13 @@ def main(
     Mejoras:
         - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
+    # Definicion de variables
     mo = Modeling(country, iteration_date)
+    rows = []
+    d_rows = {}
+    l_metrics = ['ROI_sin_ea', 'ROI_con_ea']  ## Determino componentes de metrica combinada y pesos 
+    l_weights = [0.5, 0.5]
+
     # Creo objeto de clase select_best_model
     d_paths = initialize_directories(country, iteration_date, predict_missing)
 
@@ -91,12 +97,11 @@ def main(
     # (1) SELECCION DE MODELOS CANDIDATOS
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
-    # 1.1. Descarte por METRIC
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col='roi_por_partido', prop_to_max=0.1, n_models_max=15)
+    # 1.1. Descarte por metrica --> para evitar modelos con alto ROI sin ea pero de ojete.
+    metrics = asses_model.select_metrics(df_ite, col_corr="roi_por_partido", l_metrics=['test_accuracy', 'recall', 'f1_score'] , n_metrics=1)
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metrics[0], perc_cutoff=1, n_models_max=15)
     logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
 
-    rows = []
-    d_rows = {}
 
     # (2) ESTRATRAGIA DE APUESTA
     if betting_strat:
@@ -111,14 +116,16 @@ def main(
             # Levanto df_predicciones
             if predict_missing:
                 df_pred = assess_models_in_prod.get_model_predictions_with_missing(n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-                
+                df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True)
+
             else: 
                 try:
                     df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
                 except FileNotFoundError:
                     df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-
+                    
             # Recalculo metricas con test + missing
+            df_pred = df_pred.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
             df_pred, d_metrics = mo.calculate_metrics(df_pred, retrain=True)
 
             # Convierto ids de equipos a nombres
@@ -142,7 +149,6 @@ def main(
             d_rows[n_model] = [df, df_pred_with_stra]
 
             # Exporto datos (x seg)
-            df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True)
             df_ite_bs = pd.DataFrame(data=rows)
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
     
@@ -151,10 +157,6 @@ def main(
         logger.warning(f"Se evito redefinir estrategia de apuesta por modelo. \n{df_ite_bs}")
 
     # (3) SELECCION DEL MODELO (el que maximiza el ROI con ea)
-    ## Determino componentes de metrica combinada y pesos 
-    l_metrics = ['ROI_sin_ea', 'ROI_con_ea', 'test_accuracy']
-    l_weights = [0.33, 0.33, 0.33]
-
     ## Calculo metrica combinada
     metric_col = 'metric'
     df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights)
@@ -165,7 +167,7 @@ def main(
     n_model = df_ite_bs.loc[idx_max, 'n_model']
     model_name = df_ite_bs.loc[idx_max, 'model_name']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}")
-    
+
     # Exporto datos
     if export:
         df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
@@ -179,12 +181,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 77]
+    l_countries = [77, 148]
     
     # Defino hiperparametros
-    update_missing = True  # Extract missing + Prepare missing
+    update_missing = False  # Extract missing + Prepare missing
     betting_strat = True # Recalcular estrategia de apuesta por modelo 
-    predict_missing = True # Predecir missing x modelo. betting_strategy debe ser True.
+    predict_missing = False # Predecir missing x modelo. betting_strategy debe ser True.
     export = True
 
     d_countries = {
