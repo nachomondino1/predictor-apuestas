@@ -1176,8 +1176,10 @@ def main(
             df_match = pd.read_excel(f'{BASE_DIR_NEXT_MATCHES}/df_match_next.xlsx', index_col=0)
             df_match_player = pd.read_excel(f'{BASE_DIR_NEXT_MATCHES}/df_match_player_next.xlsx', index_col=0)
             df_match_odds = pd.read_excel(f'{BASE_DIR_NEXT_MATCHES}/df_match_next_odds.xlsx', index_col=0)
-
-
+            # SOFIFA
+            df_player_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/{iteration_date_dt}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0)
+            df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p3_data_preparation/{iteration_date_dt}/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
+        
     # _____________________________________________________________ DATA PREPARATION _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "DATA PREPARATION".center(120) + "\n" + "+"*120 + "\n")
     if d_run['data_prep']:
@@ -1361,7 +1363,7 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 59
+    id_country = 148
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 10
@@ -1377,7 +1379,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 470, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 281, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
