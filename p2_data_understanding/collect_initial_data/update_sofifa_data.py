@@ -7,9 +7,7 @@ from utils.set_up_logging import logger
 from dotenv import load_dotenv
 import pandas as pd
 from p2_data_understanding.collect_initial_data import scraper_sofifa
-from p3_data_preparation.format_data import verify_column_format
-from tqdm import tqdm
-import datetime
+from p3_data_preparation.format_data import verify_format
 
 
 def get_player_data(id_country, country, df_comp_country, n_seasons_update, path_save):
@@ -25,7 +23,7 @@ def get_player_data(id_country, country, df_comp_country, n_seasons_update, path
 
         if id_country == 6 and row['id_competition'] == 62:
             logger.warning(f"Evito extraccion para {row["competition_flashscore"]}")
-            break
+            continue
 
         # Extraigo datos de Sofifa 
         ## Player
@@ -47,8 +45,8 @@ def get_player_data(id_country, country, df_comp_country, n_seasons_update, path
     print(f"Shape final: {df_player_sofifa.shape} {df_player_fifa_sofifa.shape}")
 
     # Verificar formato de datos
-    format_df_player_sofifa(df_player_sofifa)
-    format_df_player_fifa_sofifa(df_player_fifa_sofifa)
+    df_player_sofifa = format_df_player_sofifa(df_player_sofifa)
+    df_player_fifa_sofifa = format_df_player_fifa_sofifa(df_player_fifa_sofifa)
 
     return df_player_sofifa, df_player_fifa_sofifa
 
@@ -58,7 +56,7 @@ def read_last_player_data(country, verbose: int = 0):
 
     # Levanto datos viejos
     df_player_sofifa_old = pd.read_excel(f'{base_path}/df_player_sofifa.xlsx', index_col=0)
-    df_player_fifa_sofifa_old = pd.read_excel(f'{base_path}/df_player_fifa_sofifa.xlsx', index_col=0)
+    df_player_fifa_sofifa_old = pd.read_excel(f'{base_path}/df_player_fifa_sofifa.xlsx') # index_col=0
     print(f"Shape inicial: {df_player_sofifa_old.shape} {df_player_fifa_sofifa_old.shape}")
     print(df_player_sofifa_old)
     print(df_player_fifa_sofifa_old)
@@ -115,38 +113,50 @@ def concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_playe
 def format_df_player_sofifa(df):
 
     # Formateo columnas int
-    df.index = df.index.astype(str)
-    df['height'] = df['height'].astype(int)
+    # df.index = df.index.astype(str)
+    # df['height'] = df['height'].astype(int)
 
-    # Verfico formato
-    verify_column_format(df, col='player_name', dtypes=(str))
-    verify_column_format(df, col='player_name_short', dtypes=(str))
-    verify_column_format(df, col='nationality', dtypes=(str))
-    verify_column_format(df, col='height', rango=[100, 240], dtypes=(int, float))
-    verify_column_format(df, col='preferred_foot', dtypes=(str))
-    verify_column_format(df, col='url_player', dtypes=(str))
+    column_specs = {
+        'player_name': {'dtype': str},
+        'player_name_short': {'dtype': str},
+        'nationality': {'dtype': str},
+        'height': {'dtype': int, 'rango': [100, 250]},
+        'preferred_foot': {'dtype': str},
+        'url_player': {'dtype': str},
+        }
+    
+    return verify_format(df, column_specs)
+
 
 def format_df_player_fifa_sofifa(df):
     """
     Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
     """
     # Formateo columnas int
-    df['id_player'] = df['id_player'].astype(str)
-    df['age'] = df['age'].astype(int)
-    df['overall_rating'] = df['overall_rating'].astype(int)
-    df['potential'] = df['potential'].astype(int)
-    df['int_reputation'] = df['int_reputation'].astype(int)
+    # df['id_player'] = df['id_player'].astype(str)
+    # df['age'] = df['age'].astype(int)
+    # df['overall_rating'] = df['overall_rating'].astype(int)
+    # df['potential'] = df['potential'].astype(int)
+    # df['int_reputation'] = df['int_reputation'].astype(int)
     
-    # Verifico formato
-    verify_column_format(df, col='id_player', dtypes=(str))
-    verify_column_format(df, col='age', rango=[15, 50], dtypes=(int, float))
-    verify_column_format(df, col='overall_rating', rango=[30, 100], dtypes=(int, float))
-    verify_column_format(df, col='potential', rango=[30, 100], dtypes=(int, float))
-    verify_column_format(df, col='value', dtypes=(str))
-    verify_column_format(df, col='wage', dtypes=(str))
-    verify_column_format(df, col='int_reputation', rango=[0, 5], dtypes=(int, float))
-    verify_column_format(df, col='fifa', dtypes=(str))
-    verify_column_format(df, col='date', dtypes=(str))    
+    column_specs = {
+        # Verifico formato
+        'id_player': {'dtype': str},
+        'date': {'dtype': 'datetime64[ns]'},
+        'id_country': {'dtype': int, 'rango': [0, 300]},
+        'id_competition': {'dtype': int, 'rango': [0, 10000]},
+        'id_team': {'dtype': int},
+        'age': {'dtype': int, 'rango': [14, 50]},
+        'overall_rating': {'dtype': int, 'rango': [20, 100]},
+        'potential': {'dtype': int, 'rango': [20, 100]},
+        'value': {'dtype': str},  # Se extrae como str
+        'wage': {'dtype': str}, # Se extrae como str
+        'int_reputation': {'dtype': int, 'rango': [0, 5]},
+        'fifa': {'dtype': str},
+        'fifa_year': {'dtype': int, 'rango': [6, 30]},
+        }
+    
+    return verify_format(df, column_specs)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
