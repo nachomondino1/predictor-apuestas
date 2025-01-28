@@ -38,9 +38,9 @@ class BettingStrategy:
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
-        if strategy == "train":
+        if strategy == "train": # "Sin estrategia"
             dic = {
-                'prob_dp': [-1],
+                'prob_dp': [0],
                 'curva': ['linear'], # Uso kelly tmb?
                 'm': [10],
                 'b': [0],
@@ -48,28 +48,18 @@ class BettingStrategy:
                 'lim_sup': [0]
             }
         
-        elif strategy == "no_odds":
-            dic = {
-                'prob_dp': [-1], #  -0.5, -0.35, -0.25
-                'curva': ['linear'],
-                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [0],
-                'odd_weight': [0],
-                'lim_sup': [0]
-            }
-
         elif strategy == "kelly":
                 dic = {
-                    'prob_dp': [0, 0.4, 0.45, 0.5, 0.55, 0.6],  # tengo varios valores porque cambia mucho si el modelo es under o no.
+                    'prob_dp': [0, 0.45, 0.55],  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
                     'curva': ['kelly'], 
                     'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
                     'b': [0],
                     'odd_weight': [0],
                     'lim_sup': [0] 
                 }
-        elif strategy == "general":
+        elif strategy == "linear":
             dic = {
-                'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
+                'prob_dp': [0],  # tengo varios valores porque cambia mucho si el modelo es under o no.
                 'curva': ['linear'], # ['linear',  'kelly'],  #'linear', 
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [
@@ -81,11 +71,20 @@ class BettingStrategy:
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
+        elif strategy == "linear_no_odds":
+            dic = {
+                'prob_dp': [0], #  -0.5, -0.35, -0.25
+                'curva': ['linear'],
+                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
+                'b': [0],
+                'odd_weight': [0],
+                'lim_sup': [0]
+            }
+
         elif strategy == "all":
                
             dic = {
-                'l_thr_dif_prob': [-0.5, -0.3], # [-0.5, -0.35, -0.25]  # tengo varios valores porque cambia mucho si el modelo es under o no.
-
+                'prob_dp': [0],
                 'curva': ['linear'], # 'equal', 'kelly', 'exponential'
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110],
                 'b': [0],
