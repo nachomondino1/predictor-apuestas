@@ -1302,6 +1302,7 @@ def main(
         # Predigo con modelo cargado
         df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
         df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
+        df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
@@ -1315,13 +1316,8 @@ def main(
             logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
-        # Aplico reduccion a stake --> Ver si funciona.. Creo que si.
+        # Aplico reduccion a stake
         df['stake_to_bet'] = df['stake_to_bet'] * porc_m
-
-        # Ultimos preparativos
-        df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date_dt}/integrate_data/df_teams.xlsx', index_col=0)
-        df = format_data.map_teams(df, df_teams=df_teams)     # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
-        df = df[df['id_competition'].isin(comp_public)]     # Filtro partidos para quedarme solo con los de competencias publicas.
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
