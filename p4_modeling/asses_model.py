@@ -332,19 +332,60 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
     df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
     return df
 
-def define_weights(df, l_metrics):
+def select_metrics(df, col_corr: str, l_metrics: list, n_metrics=None, threshold=None):
+    """
+    Selecciona métricas basándose en correlación con ROI. Usa n_metrics o threshold, pero no ambos.
+
+    Args:
+        df (pd.DataFrame): DataFrame con los datos.
+        l_metrics (list): Lista de métricas (columnas) a evaluar.
+        n_metrics (int, optional): Número de métricas a seleccionar. Exclusivo con threshold.
+        threshold (float, optional): Umbral de correlación (positivo o negativo). Exclusivo con n_metrics.
+
+    Returns:
+        list: Lista de métricas seleccionadas.
+    """
+    correlations = {}
+
+    # Calcular correlación para cada métrica
+    for metric in l_metrics:
+        correlation = df[col_corr].corr(df[metric])
+        print(f"La correlación entre {col_corr} y {metric} es de {correlation*100:.0f}%.")
+        correlations[metric] = correlation
+
+    # Validar que no se usen ambos parámetros a la vez
+    if n_metrics is not None and threshold is not None:
+        raise ValueError("No se puede usar 'n_metrics' y 'threshold' al mismo tiempo. Especifique solo uno.")
+
+    # Selección basada en threshold
+    if threshold is not None:
+        filtered_metrics = [metric for metric, corr in correlations.items() if abs(corr) >= threshold]
+        print(f"Métricas que cumplen el umbral ({threshold}): {filtered_metrics}")
+        return filtered_metrics
+
+    # Selección basada en n_metrics
+    elif n_metrics is not None:
+        sorted_metrics = sorted(correlations, key=correlations.get, reverse=True)
+        selected_metrics = sorted_metrics[:n_metrics]
+        print(f"Métricas seleccionadas (top {n_metrics}): {selected_metrics}")
+        return selected_metrics
+
+    # Si no se especifica n_metrics ni threshold
+    else:
+        raise ValueError("Debe especificar 'n_metrics' o 'threshold'.")
+    
+def define_weights(df: pd.DataFrame, col_corr: str, l_metrics:list):
     """
     Defino pesos de variables segun correlacion con ROI
     """
     weights = []
-    roi_col = 'roi_por_partido'
 
     # Por metrica
     for metric in l_metrics:
 
         # Calculo correlacion con ROI
-        correlacion = df[roi_col].corr(df[metric])
-        logger.info(f"La correlacion entre {roi_col} y {metric} es de {correlacion*100:.0f}%.")
+        correlacion = df[col_corr].corr(df[metric])
+        logger.info(f"La correlacion entre {col_corr} y {metric} es de {correlacion*100:.0f}%.")
 
         weights.append(correlacion)
     

@@ -91,7 +91,7 @@ class SofifaCrawler(Crawler):
         Mejoras:
             - evitar actualizaciones por eventos especificos como World Cup o Uefa Euro.
         """
-        l_tags_act_year = super().extract_tags(xpath='.//select[@name="roster"]/option') # .//h2//div[@class="dropdown"][2]/div/a[not(contains(text(), "World Cup"))] # Ojo con la actualizacion World Cup 2022...  # NO HACE FALTA HACER CLICK EN FLECHITA ANTES -->  #   boton_selec_act_fifa =  crawler.extract_tag(xpath='.//h2//div[@class="dropdown"][2]/a')  # Ver si hace click, tal vez ni hace falta  # crawler.click_boton(boton_selec_act_fifa)
+        l_tags_act_year = super().extract_tags(xpath='.//select[@name="roster"]/option[not(contains(text(), "UEFA Euro")) and not(contains(text(), "World Cup"))]')
         l_urls_act_year = ["https://sofifa.com/" + tag.get_attribute('value') for tag in l_tags_act_year]
         l_urls_act_year_sel = [l_urls_act_year[0], l_urls_act_year[-1]] 
         return l_urls_act_year_sel

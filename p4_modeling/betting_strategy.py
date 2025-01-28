@@ -41,7 +41,7 @@ class BettingStrategy:
         if strategy == "train":
             dic = {
                 'prob_dp': [-1],
-                'curva': ['linear'],
+                'curva': ['linear'], # Uso kelly tmb?
                 'm': [10],
                 'b': [0],
                 'odd_weight': [0],
@@ -58,17 +58,26 @@ class BettingStrategy:
                 'lim_sup': [0]
             }
 
+        elif strategy == "kelly":
+                dic = {
+                    'prob_dp': [0, 0.4, 0.45, 0.5, 0.55, 0.6],  # tengo varios valores porque cambia mucho si el modelo es under o no.
+                    'curva': ['kelly'], 
+                    'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
+                    'b': [0],
+                    'odd_weight': [0],
+                    'lim_sup': [0] 
+                }
         elif strategy == "general":
             dic = {
                 'prob_dp': [-1],  # tengo varios valores porque cambia mucho si el modelo es under o no.
-                'curva': ['linear'], # ['linear',  'kelly'],  #
+                'curva': ['linear'], # ['linear',  'kelly'],  #'linear', 
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [
                     0, 
-                    -0.1, -0.2, -0.4, 
-                    0.1, 0.2,
+                    -0.1, -0.2, 
+                    0.1, 
                     ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
-                'odd_weight': [0, 1, 2, 3],
+                'odd_weight': [0, 1, 2, 3, 4],
                 'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
@@ -110,8 +119,7 @@ class BettingStrategy:
             prob_bm_in_pred_result = row['prob_home_bm'] if predicted_result_mod == 1 else row['prob_draw_bm'] if predicted_result_mod == 0 else row['prob_away_bm']
         
             # Calculo diferencia de probabilidad entre mi modelo y bm para el predicted_result 
-            dif_prob_mod_bm = prob_max - prob_bm_in_pred_result
-            df.loc[idx, 'dif_prob_mod_bm'] = dif_prob_mod_bm
+            df.loc[idx, 'dif_prob_mod_bm'] = prob_max - prob_bm_in_pred_result # (prob_max - prob_bm_in_pred_result) / prob_bm_in_pred_result
 
         return df
 
@@ -132,13 +140,14 @@ class BettingStrategy:
         # Por partido
         for id_match, row in df.iterrows():
 
+            prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
+
             # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
-            if row['dif_prob_mod_bm'] >= thr_prob_min:
+            if prob_result_to_bet > thr_prob_min or row['predicted_result'] == 0: #             # if row['dif_prob_mod_bm'] >= thr_prob_min:
 
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
                 dif_prob_result_to_bet = row['dif_prob_mod_bm']
-                prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
                 odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
                 strategy = f"dif_prob_mod_bm > {thr_prob_min}"
 
@@ -147,7 +156,7 @@ class BettingStrategy:
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
                 dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
-                prob_result_to_bet = 1 - max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
+                prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"dif_prob_mod_bm < {thr_prob_min}"
 
@@ -223,7 +232,7 @@ class BettingStrategy:
             elif row['result_to_bet'] == -2:
                 if (row[var_result] == 0) or (row[var_result] == 1):
                     df.loc[id_match, var_acerte] = 1
-            
+
             # Si el resultado a apostar es doble oportunidad sin Draw
             elif row['result_to_bet'] == -0:
                 if (row[var_result] == 2) or (row[var_result] == 1):
@@ -270,14 +279,6 @@ class BettingStrategy:
         Mejoras:
             - Separar variacion de stake por cuotas en otra funcion. 
         """
-        # Limito caps segun odd_weight (para evitar stake=99 x inflado de stake con cuotas sobretodo cuando odd_weight=4). Esto pasaba en el 437 de GER. Basicamente evito overfitting de hiper de apuesta.
-        if odd_weight > 0:
-            dif_prob_inf_cap = dif_prob_inf_cap / odd_weight
-            dif_prob_sup_cap = dif_prob_sup_cap / odd_weight
-
-            if self.verbose >= 1:
-                logger.info(f"dif_prob_result_to_bet capped: [{dif_prob_inf_cap}, {dif_prob_sup_cap}]")
-        
         # Separo puntos en x e y
         if p1 is not None and p2 is not None:
             x1, y1 = p1
@@ -307,11 +308,7 @@ class BettingStrategy:
 
             if b != 0:
                 b = m * b 
-
-            if dif_prob_inf_cap != dif_prob_sup_cap:
-                df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
-            else:
-                df['stake_to_bet'] = df['prob_result_to_bet'] * m + b
+            df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
             
             # Puntos para normalizar --> no tiene mucho sentido. Para eso esta exponential (modificar mas el stake ante un menor cambio en proba). Incluso con el b de linear tambien puedo lograr algo parecido.
             # p_min, p_max = (0.55 * m + b), (0.7 * m + b) # El punto min usa un stake de m_to_bet / 2. Si queres que prob=0.33 use un stake mas bajo, no tiene sentido usarlo como p_min.
@@ -340,6 +337,9 @@ class BettingStrategy:
         
         # Disminuyo stake por rellenado de emergencia
         df = self.stake_reduction_emergency_fill(df, porc_emergency=porc_emergency)
+
+        # Disminuyo stake por doble oportunidad?
+        # df.loc[df["result_to_bet"].isin([-1, -2]), "stake_to_bet"] *= 0.5
 
         # Limito stake a entre 0 y 100 
         df = self.cap_stake(df)
