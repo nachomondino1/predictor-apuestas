@@ -50,7 +50,7 @@ class BettingStrategy:
         
         elif strategy == "kelly":
                 dic = {
-                    'prob_dp': [0, 0.45, 0.55],  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+                    'prob_dp': [0, 0.45, 0.55, 0.7],  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
                     'curva': ['kelly'], 
                     'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
                     'b': [0],
@@ -146,7 +146,7 @@ class BettingStrategy:
 
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
-                dif_prob_result_to_bet = row['dif_prob_mod_bm']
+                # dif_prob_result_to_bet = row['dif_prob_mod_bm']
                 odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
                 strategy = f"dif_prob_mod_bm > {thr_prob_min}"
 
@@ -154,14 +154,14 @@ class BettingStrategy:
             else:
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
-                dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
+                # dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"dif_prob_mod_bm < {thr_prob_min}"
 
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
-            df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
+            # df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
@@ -427,12 +427,7 @@ class BettingStrategy:
 
             # Calculo de metricas (ROI y expected roi)
             df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
-            # df_pred_2, d_expected_roi = calculate_roi(df, name_extension='expected_')     
-            # # Concateno datos de ROI y Expected ROI
-            # missing_columns = [col for col in df_pred_2.columns if col not in df_pred.columns]
-            # df_pred = pd.concat([df_pred, df_pred_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
-            # d_metrics.update(d_expected_roi)
-
+          
             if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
 

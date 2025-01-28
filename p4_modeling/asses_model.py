@@ -447,7 +447,6 @@ def calculate_accuracy_by_result(df_predicciones):
 
 def calculate_bet_metrics(
         df_pred_proba,
-        df_match_odds,
         var_resp: str = 'result',
         var_pred_bm: str = 'bookmaker_result',
         verbose: int = 0,
@@ -456,9 +455,9 @@ def calculate_bet_metrics(
     y_test = df_pred_proba[var_resp].values  # Etiquetas reales
 
     # Calculo metricas de bookie
-    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-    df_match_odds = determine_result_by_bookmaker(df_match_odds, var_pred_bm, classes=set(y_test))  # Determino resultado predicho segun cuota minima (e.g. "Home")
-    y_pred_bm = df_match_odds[var_pred_bm].values
+    df_pred_proba = calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
+    df_pred_proba = determine_result_by_bookmaker(df_pred_proba, var_pred_bm, classes=set(y_test))  # Determino resultado predicho segun cuota minima (e.g. "Home")
+    y_pred_bm = df_pred_proba[var_pred_bm].values
 
     d_metrics = {
         'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
@@ -468,56 +467,29 @@ def calculate_bet_metrics(
 
     return d_metrics
 
-def read_dfs(
-        df_pred_proba: pd.DataFrame,
-        country: str,
-        retrain: bool = False,
-        verbose: int = 0,
-        ):
-    # Procesar df_match y df_match_odds
-    df_match = load_file_by_condition(country=country, retrain=retrain, file_name="df_match.xlsx")
-    df_match_odds = load_file_by_condition(country=country, retrain=retrain, file_name="df_match_odds.xlsx")
-
-    if verbose >= 2:
-        logger.info(df_match)
-        logger.info(df_match_odds)
-
-    indices_to_use = df_pred_proba.index  # Selecciono los partidos que estan en df_test
-    df_match = df_match[df_match.index.isin(indices_to_use)].reindex(indices_to_use)
-    df_match_odds = df_match_odds[df_match_odds.index.isin(indices_to_use)].reindex(indices_to_use) # ".reindex()" tapa el error de que indices_to_use no está en df_match_odds. Sin embargo, el reindex es necesario pues: Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-    if verbose >= 2:
-        print(indices_to_use)
-        print("Shapes: ", df_match.shape, df_match_odds.shape) # Deberia coindicir con el largo de indices_to_use
-        print(df_match.head())
-    return df_match, df_match_odds
-
-def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
-    if retrain:
-        subpath = f"data/{country}/p6_deployment/missing/old_updated" 
-    else:
-        logger.warning("Estas levantando df_match y df_match_odds viejo. Si no es lo deseado, no tendra los indices de df_pred_proba y quedara todo nan en el df_predicciones concatenado. Asegurate de usar retrain = True (en vez de False)")
-        subpath = f'data/{country}/p2_data_understanding'
-
-    return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
-
 def concatenate_dfs( 
         df_pred_proba: pd.DataFrame,
         df_match: pd.DataFrame,
         df_match_odds: pd.DataFrame,
         df_filled: pd.DataFrame = None,
         ):
+    
+    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+    df_match = df_match[l_cols_match]
+
     # Concatenación selectiva
     columns_to_concat = [
-        df_match[['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']],
+        df_match,
         df_match_odds,
         df_pred_proba,
     ]
 
     if df_filled is not None:
-        l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-        columns_to_concat.append(df_filled[l_cols])
-    
+        l_cols_fill = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+        columns_to_concat.append(df_filled[l_cols_fill])
+        
     df_predicciones = pd.concat(columns_to_concat, axis=1)
+    df_predicciones = df_predicciones[df_predicciones.index.isin(df_pred_proba.index)]
     return df_predicciones
         
 def calculate_nan_metrics(df_predicciones):

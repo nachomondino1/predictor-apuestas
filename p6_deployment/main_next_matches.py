@@ -718,7 +718,7 @@ class TrainingDataLoader():
 
         return loaded_model
 
-    def load_modeling_hyperparameters(self):
+    def load_modeling_hyperparameters(self, predict_missing: bool = False):
         """
         Cargo hiperparametros de Modeling()
 
@@ -727,6 +727,9 @@ class TrainingDataLoader():
         """
         d = {}
         l_curvas = ['linear', 'kelly']
+
+        if predict_missing:
+            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': True}
 
         # Estrategia por resultado
         try:
@@ -1157,17 +1160,20 @@ def main(
         if predict_missing:
             # Levanto partidos missing
             logger.info("Uso los partidos df_match MISSING ya extraidos.")
+
+            # Levanto dfs (tmb utiles en modeling)
             BASE_DIR_ALL_MISSING = f'./data/{country}/p6_deployment/missing/data_understanding/all'
-
             df_match_train = pd.read_excel(f"./data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx", index_col=0)
-            logger.error("agerngfoeinrgoierfg")
-
-            idxs_train = df_match_train.index
             df_match = pd.read_excel(f'{BASE_DIR_ALL_MISSING}/df_match_miss.xlsx', index_col=0)
             df_match_odds = pd.read_excel(f'{BASE_DIR_ALL_MISSING}/df_match_odds_miss.xlsx', index_col=0)
+
+            # Filtro dfs dejandol solo partidos con los que NO entrené 
+            idxs_train = df_match_train.index
             df_match = df_match[~df_match.index.isin(idxs_train)]
             df_match_odds = df_match_odds[~df_match_odds.index.isin(idxs_train)]
-            logger.error(df_match.shape)
+            
+            if verbose >= 1:
+                logger.warning(df_match.shape)
 
         else:
             # Levanto datos de proximos partidos ya extraidos
@@ -1200,10 +1206,12 @@ def main(
             df_int_missing = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)
             
             # Selecciono con los que no entrené
-            df = df_int_missing[~df_int_missing.index.isin(idxs_train)]    
-            logger.info("fgqwefgioargioqjf")
-            logger.critical(df.shape)
-            logger.critical(df)
+            df = df_int_missing[~df_int_missing.index.isin(idxs_train)]
+            
+            if verbose >= 1:
+                logger.info("Levanto df integreated missing sin partidos con los que entrené")
+                logger.critical(df)
+                logger.critical(df.shape)
 
         else:
             # Preparacion de datos hasta integrate
@@ -1291,47 +1299,24 @@ def main(
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
 
-        # Levanto hiperparametros de modeling
-        loaded_model = lo.load_model()
-
-        try:
-            df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']] 
-        except KeyError:
-            df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'        
-        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-
-        # Realizo predicciones sobre los nuevos partidos
-        df_probabilities, y_pred = mo.predict(model=loaded_model, X_test=df)
-        df_pred_proba = pd.DataFrame({'predicted_result': y_pred,}, index=df.index)
-
-        # Concateno conjunto de datos # df_fill puede tirar error. Si tira, arreglar.
-        df_predicciones = pd.concat(
-            [df_match, 
-             df_match_odds, 
-             df_pred_proba, 
-             df_probabilities,
-             df_c1['copiado_formaciones'], 
-             df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]
-             ], 
-            axis=1) 
-        df_predicciones = df_predicciones[df_predicciones.index.isin(df.index)] # en ITA queda el partido del COMO-UDINESE pero sin prediccion (pues no lo prepara, no esta en df_integrated_missing) y falla el calculo de metricas...
+        # Predigo con modelo cargado
+        df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
+        df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'prob_dp': -1, 'curva': 'linear', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': False} if predict_missing or no_strategy else lo.load_modeling_hyperparameters()
-        df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
+        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing or no_strategy)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
-            df = bs.apply_strategy(df, param_dict=d_strategy)
+            df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
         else:
             logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
-            df = bs.apply_strategy_by_result(df, df_hiper=d_strategy)
+            df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
         # Aplico reduccion a stake --> Ver si funciona.. Creo que si.
         df['stake_to_bet'] = df['stake_to_bet'] * porc_m
-        # logger.info(f"m_to_use: {d_strategy['curva_m']} tras aplicar {porc_m}")
 
         # Ultimos preparativos
         df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date_dt}/integrate_data/df_teams.xlsx', index_col=0)
@@ -1363,14 +1348,14 @@ if __name__ == "__main__":
         'prod': None
     }
 
-    id_country = 148
+    id_country = 6
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
-    n_days = 10
+    n_days = 2
 
     # Defino country, iteration date y modelo
     d_countries = {
-        6: ["argentina", '2024-12-05'], 
+        6: ["argentina", '2025-01-28'], 
         48: ["england", '2025-01-22'], 
         55: ["france", '2025-01-22'], 
         59: ["germany", '2025-01-23'], 
@@ -1379,7 +1364,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 281, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 40, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
