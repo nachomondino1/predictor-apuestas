@@ -1061,7 +1061,7 @@ def main(
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export=export) # Creo objeto de clase DataUnderstanding
     dp = DataPreparationNew(id_country=id_country, country=country, iteration_date=iteration_date_dt, export=export) # Creo objeto de clase DataPreparation
-    mo = Modeling(country=country) # Creo objeto de clase DataPreparation
+    mo = Modeling(country=country, date=iteration_date_dt) # Creo objeto de clase DataPreparation
     mis = MissingData(country=country, iteration_date=iteration_date_dt)
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
