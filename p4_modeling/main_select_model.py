@@ -57,7 +57,8 @@ def main(
         predict_missing: bool = True,     # Assess
         betting_strat: bool = True,
         strategy: str = 'kelly',                  # Betting Strategy
-        export: bool = True
+        export: bool = True,
+        verbose: int = 0
         ):
     """
     Assess model in prod + Seleccion del modelo + Estrategia de apuesta
@@ -151,6 +152,9 @@ def main(
             # Exporto datos (x seg)
             df_ite_bs = pd.DataFrame(data=rows)
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
+            if verbose >= 2:
+                df.to_excel(f'{d_paths['path_bet_strategy']}/__df_strategy_{n_model}_{model_name}.xlsx', index=True)
+                df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/__predicciones_{n_model}_{model_name}.xlsx')
     
     else:
         df_ite_bs = pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
@@ -171,17 +175,15 @@ def main(
     # Exporto datos
     if export:
         df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
-
-        if betting_strat:
-            df, df_pred_with_stra = d_rows[n_model]
-            df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
-            df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
+        df, df_pred_with_stra = d_rows[n_model]
+        df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
+        df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
 
 
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77, 148]
+    l_countries = [48, 55, 59, 77]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing
