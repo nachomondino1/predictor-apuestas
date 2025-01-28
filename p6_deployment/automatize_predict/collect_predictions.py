@@ -19,10 +19,8 @@ def collect_predictions(d_run: dict, d_countries: dict, l_countries:list, n_days
     # Por country
     for id_country in l_countries:
 
-        porc_m_country = porc_m/3 if id_country in [55, 59] else porc_m
-
         # Extraigo, preparo y predigo proximos partidos
-        df_predicciones_country = main_next_matches.main(d_run, id_country, iteration_date=d_countries[id_country][1], n_days_max_next_matches=n_days, porc_m=porc_m_country, d_model=None, export=d_run['export'])
+        df_predicciones_country = main_next_matches.main(d_run, id_country, iteration_date=d_countries[id_country][1], n_days_max_next_matches=n_days, porc_m=porc_m, d_model=None, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
         if isinstance(df_predicciones_country, pd.DataFrame):
@@ -70,21 +68,20 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 7
+        n_days = 10
         l_countries = [48, 55, 59, 77, 148]
-        # l_countries = [59]
-        porc_m = 0.3
+        # l_countries = [77, 148]
+        porc_m = 0.25
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
-        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
         d_countries = {
-            6: ["argentina", '2024-12-05'], 
-            48: ["england", '2025-01-21'],
-            55: ["france", '2025-01-21'], 
-            59: ["germany", '2025-01-21'], 
+            48: ["england", '2025-01-22'],
+            55: ["france", '2025-01-22'], 
+            59: ["germany", '2025-01-23'], 
             77: ["italy", '2025-01-20'],
             148: ["spain", '2025-01-20'], 
-            167: ["usa", '2024-12-05']
         }
 
     elif env == 'prod':
