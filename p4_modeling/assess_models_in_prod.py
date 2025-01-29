@@ -28,7 +28,7 @@ def get_model_predictions_with_missing(n_model, model_name, id_country, country,
     df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
 
     # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-    df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  
+    # df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # No elimino odds y eso para evitar volver a concatenar...
     return df_predicciones
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
