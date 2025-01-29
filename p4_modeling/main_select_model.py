@@ -1,12 +1,9 @@
 import sys
 sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
-import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
 import datetime
-from main import Modeling
-from p3_data_preparation import format_data
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 from p6_deployment import main_next_matches
 
@@ -78,7 +75,6 @@ def main(
     ## Betting strategy
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
     d_params = bs.define_hiperparameters(strategy=strategy)
-    mo = Modeling(country, iteration_date)
     ## Seleccion de modelo
     l_metrics = ['ROI_sin_ea', 'ROI_con_ea']  ## Determino componentes de metrica combinada y pesos 
     l_weights = [0.5, 0.5]
@@ -105,23 +101,21 @@ def main(
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
 
-            n_model = row['n_iteration']
-            model_name = row['model_name']
+            n_model, model_name= row['n_iteration'], row['model_name']
             logger.info(f'{n_model} {model_name}')
 
             # Levanto df_predicciones
             if predict_missing:
-                df_pred = assess_models_in_prod.get_model_predictions_with_missing(n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
+                df_pred = assess_models_in_prod.get_model_predictions_with_missing(n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date)
+            
+                # Recalculo metricas   
+                df_pred, d_metrics = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True)
             else: 
                 try:
                     df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
                 except FileNotFoundError:
                     df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-                    
-            # Recalculo metricas con test + missing
-            df_pred, d_metrics = mo.calculate_metrics(df_pred)
-            df_pred = format_data.map_teams(df_pred, df_teams=mo.df_teams) # Convierto ids de equipos a nombres
 
             # Defino estrategia
             df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
