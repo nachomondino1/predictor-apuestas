@@ -366,6 +366,12 @@ class BettingStrategy:
 
             # Calculo de metricas (ROI y expected roi)
             df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
+
+            # d_metrics.update({
+            #     'G/P': df_pred_with_metrics['G/P'].sum(), # Lo mismo que el ROI
+            #     'G/P_sin_bank': df_pred_with_metrics['G/P_sin_bank'].sum(),
+            #     'test_accuracy': df_pred_with_metrics['acerte'].sum() / len(df_pred_with_metrics)
+            #     })
           
             if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
@@ -375,7 +381,7 @@ class BettingStrategy:
             d_hiper[cont] = param_dict
             d_metricas[cont] = d_metrics
 
-        if len(param_combinations) == 1: # strategy == 'train':
+        if len(param_combinations) == 1: 
             d_predic, d_hiper, d_metricas = df_pred_with_metrics, param_dict, d_metrics
 
         return d_predic, d_hiper, d_metricas
@@ -437,28 +443,16 @@ class BettingStrategy:
         df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
-    def select_best_parameters(self, data, verbose: int = 0):
-        
-        name_extension = "_con_ea"
-        metric_col = f'metric{name_extension}'
+    def select_best_parameters(self, data, metric_col):
 
-        # df = pd.DataFrame(data=data)
         df = pd.DataFrame.from_dict(data, orient='index')
-        if self.verbose >= 1:
-            print(df)
-
-        # Calcular metrica combinada para determinar mejor estrategia
-        df = calculate_combined_metric(df, l_metrics=['roi_por_partido'], l_weights=[1], name_extension=name_extension)
-        if verbose >= 0:
-            df.to_excel("/Users/nachomondino/Desktop/prueba.xlsx", index=True)
-        
-        # Seleccionar mejor estrategia
         if metric_col not in df.columns:
             raise ValueError(f"La columna '{metric_col}' no existe en el DataFrame.")
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df[metric_col].idxmax()
         if self.verbose >= 1:
+            logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
             row = df.loc[n_comb]  # # Convertir a serie
             print("Row", row)
@@ -466,9 +460,16 @@ class BettingStrategy:
         return n_comb
          
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, col_to_max: str, d_params: dict = None, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
+
+        # Parameters:
+            df_pred
+            col_to_max: Columna a maximizar para determinar la mejor estrategia de apuesta (str)
+            d_params: 
+        
+        # Return
 
         Mejoras:
             - simplificar codigo cuando hago el if by_result
@@ -479,7 +480,7 @@ class BettingStrategy:
         best_df_pred = pd.DataFrame()
 
         if d_params is None:
-            d_params = self.define_hiperparameters(strategy='general')
+            d_params = self.define_hiperparameters(strategy='kelly')
 
         # Por resultado
         for pred in [1, 0, 2]:
@@ -495,7 +496,7 @@ class BettingStrategy:
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
                 # Determinar mejor estrategia para el resultado            
-                n_comb = self.select_best_parameters(d_metricas)
+                n_comb = self.select_best_parameters(d_metricas, metric_col=col_to_max)
 
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
