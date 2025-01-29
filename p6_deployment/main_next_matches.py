@@ -725,86 +725,25 @@ class TrainingDataLoader():
         Mejora: 
          - Levantar parametros por resultado...
         """
-        d = {}
-        l_curvas = ['linear', 'kelly']
-
         if predict_missing:
-            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': True}
+            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
 
         # Estrategia por resultado
         try:
-            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
-            print(df_hiper)
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
 
             # Si es por resultado
             if len(df_hiper) == 3:
                 logger.critical("Se levantó la estrategia de apuesta por resultado")
-                return df_hiper
 
-            df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
-            df_iteration.rename(columns={'n_model': 'n_iteration'}, inplace=True)  # Renombra la columna creada
+            if self.verbose >= 0:
+                logger.info("Hiperparametros cargados:")
+                logger.info(df_hiper)
 
-        # Misma Estrategia para los resultados
         except FileNotFoundError:
-            logger.warning("Falló la obtencion de hiperparametros de estrategia de apuesta")
-            try:
-                logger.warning("No está df_iteration_with_strategy")
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
+            print("Falló la carga del df_strategy")
 
-            except FileNotFoundError:
-                logger.warning("No está df_iteration_with_strategy ni df_iteration")
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
-
-            row_ite = df_iteration[df_iteration['n_iteration'] == self.n_model]
-
-            if self.verbose >= 2:
-                logger.info(df_iteration)
-                logger.info(row_ite)
-
-            if len(row_ite) > 1:
-                col_model = 'model_name' if 'model_name' in df_iteration.columns else 'model_name_test'
-                row_hiper_bet_strat = row_ite[row_ite[col_model] == self.model_name]
-                logger.warning(len(row_hiper_bet_strat))
-            else:
-                row_hiper_bet_strat = row_ite
-
-            # Verificacion de que se selecciono una sola row
-            if self.verbose >= 0 and len(row_hiper_bet_strat) != 1:
-                logger.error(f"Falló la carga de hiperparametros de la estrategia de apuesta. El modelo a cargar era el {self.n_model}, un {self.model_name}. La fila con los hiperparametros tiene un largo de {len(row_hiper_bet_strat)} (≠ de 1:).")
-                logger.info(df_iteration)
-                raise ValueError
-  
-        try:
-            d['prob_dp'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
-        except:
-            d['prob_dp'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min'))
-
-        d['curva'] = self.load_value_from_series(row_hiper_bet_strat, 'curva') # str
-        param1 = self.load_value_from_series(row_hiper_bet_strat, 'param1')  # int?
-        param2 = self.load_value_from_series(row_hiper_bet_strat, 'param2') 
-        d['m'] = param1 if d['curva'] in l_curvas else None
-        d['b'] = param2 if d['curva'] in l_curvas else None
-        d['curva_p1'] = eval(str(param1)) if d['curva'] not in l_curvas else None
-        d['curva_p2'] = eval(str(param2)) if d['curva'] not in l_curvas else None
-        d['odd_weight'] = int(self.load_value_from_series(row_hiper_bet_strat, 'odd_weight'))
-        d['lim_sup'] = float(self.load_value_from_series(row_hiper_bet_strat, 'dif_prob_sup_cap'))
-        d['normalized'] = self.load_value_from_series(row_hiper_bet_strat, 'normalized')
-
-        if self.verbose >= 0:
-            logger.info("Hiperparametros cargados:")
-            for key, value in d.items():
-                logger.info(f'\t {key}: {value}')
-        return d
-
-    def load_value_from_series(self, row, col_name):
-        try:
-            val = row[col_name].values[0]
-        except IndexError:
-            val = row[col_name]
-        
-        if self.verbose >= 2:
-            logger.warning(f'{col_name}: {val}')
-        return val
+        return df_hiper
 
 # Missing data
 class MissingData:
@@ -1360,7 +1299,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 40, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 43, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1387,7 +1326,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=True) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=False, export=True) 
 
     elif key == 'prod':
         logger.warning("Get predictions for model in prod")
