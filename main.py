@@ -1095,6 +1095,8 @@ class Modeling:
     def calculate_metrics(self, df_pred_proba, export: bool = False):
         
         d_metrics = {}
+        df_pred_proba = asses_model.calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
+        df_pred_proba = asses_model.determine_result_by_bookmaker(df_pred_proba, col_name="bookmaker_result")  # Determino resultado predicho segun cuota minima (e.g. "Home")
 
         # Calculo metricas
         d_metrics.update(asses_model.calculate_basic_metrics(df_pred_proba, country=self.country, export=export))

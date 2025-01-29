@@ -27,7 +27,7 @@ def confusion_matrix(y_real, y_pred):
     return df_cm
 
 # Bookies 
-def determine_result_by_bookmaker(df, col_name, classes: list = None):
+def determine_result_by_bookmaker(df, col_name):
     """
     Determina el resultado del partido predicho segun la casa de apuestas. 
 
@@ -38,19 +38,13 @@ def determine_result_by_bookmaker(df, col_name, classes: list = None):
     # Returns
         Dataframe pasado como parametro con nueva columna con el resultado predicho segun la casa de apuestas. (DataFrame)
     """
+    class_home, class_draw, class_away = 1, 0, 2
+
     # Por partido
     for id_match, row in df.iterrows():
 
         # Determino la cuota minima de las 3 posibles
         odds_min = min(row['odds_home'], row['odds_draw'], row['odds_away'])
-
-        # para clasificacion binaria
-        if classes is not None:
-            class_home = 12 if 12 in classes else 1
-            class_draw = 0
-            class_away = 12 if 12 in classes else 2
-        else:
-            class_home, class_draw, class_away = 1, 0, 2
 
         # Determino resultado predicho segun casa de apuestas (el de la cuota minima) y lo guardo
         result_pred_bm = class_home if row['odds_home'] == odds_min else (class_away if row['odds_away'] == odds_min else class_draw)
@@ -455,8 +449,6 @@ def calculate_bet_metrics(
     y_test = df_pred_proba[var_resp].values  # Etiquetas reales
 
     # Calculo metricas de bookie
-    df_pred_proba = calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
-    df_pred_proba = determine_result_by_bookmaker(df_pred_proba, var_pred_bm, classes=set(y_test))  # Determino resultado predicho segun cuota minima (e.g. "Home")
     y_pred_bm = df_pred_proba[var_pred_bm].values
 
     d_metrics = {
@@ -497,25 +489,27 @@ def calculate_nan_metrics(df_predicciones):
     Calcula las métricas relacionadas con el relleno de NaN en el DataFrame.
     """
     # Cálculo del promedio de columnas rellenadas
-    average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
+    if 'n_col_filled' in df_predicciones.columns:
+        average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
 
     # Filtrar registros con y sin relleno de NaN
-    # if 'player_emergency_fill' in df_predicciones.columns:
-    rows_player_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
-    rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+    if 'player_emergency_fill' in df_predicciones.columns:
+        rows_player_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
+        rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
 
-    # G/P por estado de relleno de NaN
-    gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
-    gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
-    gp_total = df_predicciones['G/P_sin_bank'].sum()
+        # G/P por estado de relleno de NaN
+        gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
+        gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
+        gp_total = df_predicciones['G/P_sin_bank'].sum()
 
-    perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
-    perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
+        perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
+        perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
 
-    # else:
-    #     rows_player_filled = []
-    #     gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
-    #     perc_gp_filled, perc_gp_not_filled = 0, 1
+    else:
+        average_col_filled = -1
+        rows_player_filled = []
+        gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
+        perc_gp_filled, perc_gp_not_filled = 0, 1
         
     d = {
         'average_col_filled': average_col_filled,
