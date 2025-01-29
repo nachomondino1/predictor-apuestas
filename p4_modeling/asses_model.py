@@ -65,10 +65,14 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     # Por partido
     for idx, row in df_match_odds.iterrows():
 
+        odds_home = float(row['odds_home'])
+        odds_draw = float(row['odds_draw'])
+        odds_away = float(row['odds_away'])
+
         # Calcular probabilidades a partir de invertir las cuotas
-        prob_home_with_over = 1 / float(row['odds_home'])
-        prob_draw_with_over = 1 / float(row['odds_draw'])
-        prob_away_with_over = 1 / float(row['odds_away'])
+        prob_home_with_over = 1 / odds_home
+        prob_draw_with_over = 1 / odds_draw
+        prob_away_with_over = 1 / odds_away
 
         # Sumo las probabilidades (deberia ser >1 por el margen de ganancia de la casa de apuesta)
         sum_prob_with_over = prob_home_with_over + prob_draw_with_over + prob_away_with_over # Si no habria overround seria 100%
@@ -132,7 +136,7 @@ def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
 
 # ROI
-def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
+def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
 
@@ -146,14 +150,13 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
     """
     # Converito date a datetime y ordeno por fecha
     df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+    df = df.sort_values(by='date', ascending=True)  # Mas antiguo a mas reciente
      
     # Definicion de variables
     bank_inicial = 100 # CUIDADO! NO ES sum(df['stake_mod'])
     bank_final = bank_inicial
     n_apuestas = len(df)
     d_rois = {}
-    l_rois_partido = [50, 100, 150, 200, 250, 300, 400, 500]
     cont = 0
 
     # Por partido
@@ -177,19 +180,6 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         ganancia_sin_bank = ingresos_sin_bank - row['stake_to_bet']
         df.loc[idx, f'{name_extension}G/P_sin_bank'] = ganancia_sin_bank
 
-        # Calculo stake y G/P sin estrategia ?
-        stake_sin_ea = 10 * row['prob_result_to_bet']
-        G_P_sin_ea = stake_sin_ea * (row['odd_to_bet']-1) if row[f'{name_extension}acerte'] == 1 else - stake_sin_ea
-        df.loc[idx, f'{name_extension}stake_sin_ea'] = stake_sin_ea
-        df.loc[idx, f'{name_extension}G_P_sin_ea'] = G_P_sin_ea
-
-        # Guardo ROI en partidos especificados
-        if save_roi:
-            if cont in l_rois_partido:
-                roi_partido = (bank_final - bank_inicial) / bank_inicial * 100
-                d_rois[f'{name_extension}roi_{cont}'] = roi_partido / cont
-                df.loc[idx, f'{name_extension}roi_partido'] = roi_partido / cont
-
         # Raise error si perdi todo el dinero de las apuestas
         if bank_final <= 0:
             logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
@@ -201,6 +191,37 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
     d_rois[f'{name_extension}roi'] = roi
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
+
+def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, extension: str = None):
+    """
+    Calculo ROI en ultimos partidos
+
+    # Parameters
+        df: Dataframe bank inicial y final ya calculados (DataFrame)
+        l_last_matches: Lista con los ultimos n dias a calcular el ROI. (list) 
+        extension: Extension en el nombre de la metrica.
+
+    # Return
+        roi_values: ROI en ultimos n partidos en l_last_matches. (dict)
+    """
+    # Converito date a datetime y ordeno por fecha
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+    df = df.sort_values(by='date', ascending=True)  # Mas antiguo a mas reciente
+
+    # Calcular ROI para cada cantidad de partidos en l_last_matches
+    roi_values = {}
+    for n_matches in l_last_matches:
+
+        col_name = f'roi_last_{n_matches}_matches' if extension is None else f'roi_last_{n_matches}_matches_{extension}' 
+
+        if len(df) < n_matches:  # Si hay menos partidos de los necesarios, se omite el cálculo
+            roi_values[col_name] = None
+            continue
+        
+        df_filt = df.tail(n_matches)  # Últimos n partidos
+        roi_values[col_name] = df_filt['G/P_sin_bank'].sum()
+
+    return roi_values
 
 def calculate_reality_roi(df: pd.DataFrame):
     """
@@ -466,6 +487,8 @@ def concatenate_dfs(
         df_filled: pd.DataFrame = None,
         ):
     
+    df_match = df_match[df_match.index.isin(df_pred_proba.index)]
+    df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
     l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
     df_match = df_match[l_cols_match]
 
@@ -477,11 +500,12 @@ def concatenate_dfs(
     ]
 
     if df_filled is not None:
-        l_cols_fill = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-        columns_to_concat.append(df_filled[l_cols_fill])
+        df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
+        # l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+        # columns_to_concat.append(df_filled[l_cols_fill])
+        columns_to_concat.append(df_filled)
         
     df_predicciones = pd.concat(columns_to_concat, axis=1)
-    df_predicciones = df_predicciones[df_predicciones.index.isin(df_pred_proba.index)]
     return df_predicciones
         
 def calculate_nan_metrics(df_predicciones):

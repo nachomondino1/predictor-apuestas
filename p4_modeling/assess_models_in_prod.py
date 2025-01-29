@@ -76,16 +76,13 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
     # df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
     return df
 
-def determine_metrics(df_pred_proba, country, iteration_date):
+def determine_metrics(df_predicciones, country, iteration_date):
     mo = Modeling(country, iteration_date)
 
-    df_match = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
-    df_match_odds = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
-    
     # Recalculo metricas con test + missing
-    df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds)
-    
     df_predicciones, d_metrics = mo.calculate_metrics(df_predicciones)
+
+    # Reformateo teams
     df_predicciones = format_data.map_teams(df_predicciones, df_teams=mo.df_teams) # Convierto ids de equipos a nombres
     return df_predicciones, d_metrics
 
