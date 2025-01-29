@@ -44,8 +44,6 @@ class BettingStrategy:
                 'curva': ['linear'], # Uso kelly tmb?
                 'm': [10],
                 'b': [0],
-                'odd_weight': [0],
-                'lim_sup': [0]
             }
         
         elif strategy == "kelly":
@@ -54,8 +52,6 @@ class BettingStrategy:
                     'curva': ['kelly'], 
                     'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
                     'b': [0],
-                    'odd_weight': [0],
-                    'lim_sup': [0] 
                 }
         elif strategy == "linear":
             dic = {
@@ -67,8 +63,6 @@ class BettingStrategy:
                     -0.1, -0.2, 
                     0.1, 
                     ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
-                'odd_weight': [0, 1, 2, 3, 4],
-                'lim_sup': [0] # no dar la posibilidad de inflar
             }
 
         elif strategy == "linear_no_odds":
@@ -77,8 +71,6 @@ class BettingStrategy:
                 'curva': ['linear'],
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
                 'b': [0],
-                'odd_weight': [0],
-                'lim_sup': [0]
             }
 
         elif strategy == "all":
@@ -88,39 +80,12 @@ class BettingStrategy:
                 'curva': ['linear'], # 'equal', 'kelly', 'exponential'
                 'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110],
                 'b': [0],
-                'odd_weight': [0, 1, 2, 3, 4],
-                'lim_sup': [0, 1]
             }
 
         if self.verbose >= 1:
             logger.info(f"Hiperparametros estrategia de apuesta: {dic}")
     
         return dic
-
-    def calculate_dif_proba_in_predicted_result(self, df: pd.DataFrame):
-        """
-        Calcula la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo.
-        
-        # Parameters:
-            df: Dataframe con probabilidades de cada resultado tanto para mi modelo como para la casa de apuestas. (DataFrame)
-
-        # Returns:
-            Dataframe pasado por parametro con nueva columna, 'dif_prob_mod_bm', siendo ésta la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo. (DataFrame)
-        """
-        # Por partido
-        for idx, row in df.iterrows():
-
-            # Obtengo probabilidad del resultado predicho por el modelo
-            prob_max = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
-
-            # Obtengo probabilidad de la casa de apuesta para el resultado predicho por el modelo
-            predicted_result_mod = row['predicted_result']
-            prob_bm_in_pred_result = row['prob_home_bm'] if predicted_result_mod == 1 else row['prob_draw_bm'] if predicted_result_mod == 0 else row['prob_away_bm']
-        
-            # Calculo diferencia de probabilidad entre mi modelo y bm para el predicted_result 
-            df.loc[idx, 'dif_prob_mod_bm'] = prob_max - prob_bm_in_pred_result # (prob_max - prob_bm_in_pred_result) / prob_bm_in_pred_result
-
-        return df
 
     # RESULT TO BET
     def determine_result_to_bet(self, df: pd.DataFrame, thr_prob_min):
@@ -146,7 +111,6 @@ class BettingStrategy:
 
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
-                # dif_prob_result_to_bet = row['dif_prob_mod_bm']
                 odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
                 strategy = f"dif_prob_mod_bm > {thr_prob_min}"
 
@@ -154,14 +118,12 @@ class BettingStrategy:
             else:
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
-                # dif_prob_result_to_bet = row['dif_prob_mod_bm'] * -1
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"dif_prob_mod_bm < {thr_prob_min}"
 
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
-            # df.loc[id_match, 'dif_prob_result_to_bet'] = dif_prob_result_to_bet
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
@@ -251,7 +213,6 @@ class BettingStrategy:
     def determine_stake_to_bet(self, 
                                df, type_relation: str = 'equal',                                                                            # Estrategia
                                p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None,                                   # Puntos de rectas
-                               odd_weight: float = 1, dif_prob_inf_cap: int = -1, dif_prob_sup_cap: int = 1,      # Cuotas en stake
                                porc_emergency: float = 0.5                                                                                  # Disminucion por relleno de emergencia
                                ):
         """
@@ -265,12 +226,6 @@ class BettingStrategy:
             p2: Segundo punto (x, y) para construir curva. (float)
             m: Pendiente de la recta. Solo cuando type_relation = 'linear'. (float)
             b: Ordenada al origen de la recta. Solo cuando type_relation = 'linear'. (float)
-            odd_weight: Peso de dif_prob_result_to_bet en el stake.
-                (e.g. 0 entonces no tenemos en cuenta cuotas en stake, con 0.5 tenemos en cuenta las cuotas pero no tanto y asi. ) 
-            dif_prob_inf_cap: Minima diferencia de probabilidad con casa de apuesta para afectar el stake con cuotas. Va de -1 a 1. 
-                (e.g. si es -0.25, si la dif de proba es menor a -25% de todas maneras afecto el stake como si esta fuera de un -25%).
-            dif_prob_sup_cap: Maxima diferencia de probabilidad  con casa de apuesta para afectar el stake con cuotas. Va de -1 a 1. 
-                (e.g. si es 0.1, si la dif de proba es mayor a 10% de todas maneras afecto el stake como si esta fuera de un 10%).
 
         # Returns
             Dataframe pasado como parametro con nueva columna 'stake_to_bet'
@@ -295,7 +250,6 @@ class BettingStrategy:
         # STRATEGY: KELLY
         elif type_relation == 'kelly':
 
-            # df['stake_to_bet'] = ((df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1)  #  (= (((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] + b) - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) * 100)
             df['stake_to_bet'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1) 
 
             # Normalizo stake  # si o si sino el stake es negativo.
@@ -305,13 +259,8 @@ class BettingStrategy:
         # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
-            if b != 0:
-                b = m * b 
-            df['stake_to_bet'] = (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap) * odd_weight) * m + b  # NO usar np.where() pues descarta los valores fuera del rango. En cambio np.clip() los ajusta dentro del rango. # Limita los valores de 'dif_prob_result_to_bet' a un rango de -0.15 a 0.15
+            df['stake_to_bet'] = df['prob_result_to_bet'] * m + b 
             
-            # Puntos para normalizar --> no tiene mucho sentido. Para eso esta exponential (modificar mas el stake ante un menor cambio en proba). Incluso con el b de linear tambien puedo lograr algo parecido.
-            # p_min, p_max = (0.55 * m + b), (0.7 * m + b) # El punto min usa un stake de m_to_bet / 2. Si queres que prob=0.33 use un stake mas bajo, no tiene sentido usarlo como p_min.
-
         # STRATEGY: POLY
         elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
             pass
@@ -328,11 +277,7 @@ class BettingStrategy:
             # Calcular b a partir de su logaritmo
             b = np.exp(log_b)   
 
-            # Calculo stake_to_bet
-            if dif_prob_inf_cap != dif_prob_sup_cap:
-                df['stake_to_bet'] = a * (b ** (df['prob_result_to_bet'] + np.clip(df['dif_prob_result_to_bet'], dif_prob_inf_cap, dif_prob_sup_cap)))
-            else:
-                df['stake_to_bet'] = a * (b ** df['prob_result_to_bet'])
+            df['stake_to_bet'] = a * (b ** df['prob_result_to_bet'])
         
         # Disminuyo stake por rellenado de emergencia
         df = self.stake_reduction_emergency_fill(df, porc_emergency=porc_emergency)
@@ -399,7 +344,6 @@ class BettingStrategy:
 
         # Eliminate rows with NaN odds or missing predictions
         df = df.dropna(subset=['odds_home', 'odds_draw', 'odds_away', 'predicted_result'])
-        df = self.calculate_dif_proba_in_predicted_result(df)  # Calculo la diferencia de probabilidad entre el modelo y la casa de apuestas para el resultado predicho por el modelo (Columna 'dif_prob_mod_bm')
 
         # Generar combinaciones de parámetros automáticamente
         param_combinations = list(product(*d_params.values()))
@@ -416,11 +360,6 @@ class BettingStrategy:
             if self.verbose >= 1:
                 print(f"\nNº Combinacion: {cont}")
                 print(param_dict)
-
-            if param_dict['odd_weight'] == 0 and param_dict['lim_sup'] != 0:
-                if self.verbose >= 1:
-                    logger.warning("Se evitó calcular combinacion porque si odd_weight es 0, no tiene sentido lim_sup != 0.")
-                continue
 
             # Aplicar estrategia a df_pred
             df_aux = self.apply_strategy(df, param_dict, prod=False)
@@ -464,16 +403,13 @@ class BettingStrategy:
                 curva = row_pred['curva']
                 m = row_pred['m']
                 b = row_pred['b']
-                odd_weight = row_pred['odd_weight']
-                lim_sup = row_pred['lim_sup']
         
                 # Determino result to bet
                 df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
 
                 # Determino stake to bet
                 d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
-                d_params_odds = {'odd_weight': odd_weight, 'dif_prob_sup_cap': lim_sup}
-                df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake, **d_params_odds)
+                df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake)
 
                 df_comp = pd.concat([df_comp, df_pred], axis=0)
 
@@ -498,8 +434,7 @@ class BettingStrategy:
 
         # Determino stake to bet
         d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b']}
-        d_params_odds = {'odd_weight': param_dict['odd_weight'], 'dif_prob_sup_cap': param_dict['lim_sup']}
-        df = self.determine_stake_to_bet(df, **d_params_stake, **d_params_odds)
+        df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
     def select_best_parameters(self, data, verbose: int = 0):
@@ -570,12 +505,10 @@ class BettingStrategy:
             else:
                 logger.warning(f"No hay predicciones con el resultado {pred} (o sea, el modelo no lo predice). Asigno strategy de train.")
                 d_hiper_res[pred] = {
-                    'prob_dp': -1,
+                    'prob_dp': 0,
                     'curva': 'linear',
                     'm': 10,
                     'b': 0,
-                    'odd_weight': 0,
-                    'lim_sup': 0
                     }
                 d_metrics_res[pred] = {}
 
