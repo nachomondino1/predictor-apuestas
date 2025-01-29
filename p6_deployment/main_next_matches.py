@@ -1280,13 +1280,12 @@ if __name__ == "__main__":
     d_run_type = {
         'missing': ['only_extract', 'only_preparation', 'all'],
         'predict': ['try_a_specific_model', 'predict_missing'],
-        'prod': None
     }
 
     id_country = 6
     key, value = 'predict', 'try_a_specific_model'
-    data_unders = False
-    n_days = 2
+    data_unders = True
+    n_days = 1
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1299,7 +1298,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 43, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 40, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1327,11 +1326,6 @@ if __name__ == "__main__":
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
             df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=False, export=True) 
-
-    elif key == 'prod':
-        logger.warning("Get predictions for model in prod")
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True} 
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
