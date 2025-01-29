@@ -27,7 +27,7 @@ def confusion_matrix(y_real, y_pred):
     return df_cm
 
 # Bookies 
-def determine_result_by_bookmaker(df, col_name, classes: list = None):
+def determine_result_by_bookmaker(df, col_name):
     """
     Determina el resultado del partido predicho segun la casa de apuestas. 
 
@@ -38,19 +38,13 @@ def determine_result_by_bookmaker(df, col_name, classes: list = None):
     # Returns
         Dataframe pasado como parametro con nueva columna con el resultado predicho segun la casa de apuestas. (DataFrame)
     """
+    class_home, class_draw, class_away = 1, 0, 2
+
     # Por partido
     for id_match, row in df.iterrows():
 
         # Determino la cuota minima de las 3 posibles
         odds_min = min(row['odds_home'], row['odds_draw'], row['odds_away'])
-
-        # para clasificacion binaria
-        if classes is not None:
-            class_home = 12 if 12 in classes else 1
-            class_draw = 0
-            class_away = 12 if 12 in classes else 2
-        else:
-            class_home, class_draw, class_away = 1, 0, 2
 
         # Determino resultado predicho segun casa de apuestas (el de la cuota minima) y lo guardo
         result_pred_bm = class_home if row['odds_home'] == odds_min else (class_away if row['odds_away'] == odds_min else class_draw)
@@ -71,10 +65,14 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     # Por partido
     for idx, row in df_match_odds.iterrows():
 
+        odds_home = float(row['odds_home'])
+        odds_draw = float(row['odds_draw'])
+        odds_away = float(row['odds_away'])
+
         # Calcular probabilidades a partir de invertir las cuotas
-        prob_home_with_over = 1 / float(row['odds_home'])
-        prob_draw_with_over = 1 / float(row['odds_draw'])
-        prob_away_with_over = 1 / float(row['odds_away'])
+        prob_home_with_over = 1 / odds_home
+        prob_draw_with_over = 1 / odds_draw
+        prob_away_with_over = 1 / odds_away
 
         # Sumo las probabilidades (deberia ser >1 por el margen de ganancia de la casa de apuesta)
         sum_prob_with_over = prob_home_with_over + prob_draw_with_over + prob_away_with_over # Si no habria overround seria 100%
@@ -138,7 +136,7 @@ def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
 
 # ROI
-def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
+def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
 
@@ -152,14 +150,13 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
     """
     # Converito date a datetime y ordeno por fecha
     df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df = df.sort_values(by='date', ascending=False)  # Mas reciente a mas antiguo
+    df = df.sort_values(by='date', ascending=True)  # Mas antiguo a mas reciente
      
     # Definicion de variables
     bank_inicial = 100 # CUIDADO! NO ES sum(df['stake_mod'])
     bank_final = bank_inicial
     n_apuestas = len(df)
     d_rois = {}
-    l_rois_partido = [50, 100, 150, 200, 250, 300, 400, 500]
     cont = 0
 
     # Por partido
@@ -183,19 +180,6 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
         ganancia_sin_bank = ingresos_sin_bank - row['stake_to_bet']
         df.loc[idx, f'{name_extension}G/P_sin_bank'] = ganancia_sin_bank
 
-        # Calculo stake y G/P sin estrategia ?
-        stake_sin_ea = 10 * row['prob_result_to_bet']
-        G_P_sin_ea = stake_sin_ea * (row['odd_to_bet']-1) if row[f'{name_extension}acerte'] == 1 else - stake_sin_ea
-        df.loc[idx, f'{name_extension}stake_sin_ea'] = stake_sin_ea
-        df.loc[idx, f'{name_extension}G_P_sin_ea'] = G_P_sin_ea
-
-        # Guardo ROI en partidos especificados
-        if save_roi:
-            if cont in l_rois_partido:
-                roi_partido = (bank_final - bank_inicial) / bank_inicial * 100
-                d_rois[f'{name_extension}roi_{cont}'] = roi_partido / cont
-                df.loc[idx, f'{name_extension}roi_partido'] = roi_partido / cont
-
         # Raise error si perdi todo el dinero de las apuestas
         if bank_final <= 0:
             logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
@@ -207,6 +191,37 @@ def calculate_roi(df: pd.DataFrame, name_extension='', save_roi: bool = False):
     d_rois[f'{name_extension}roi'] = roi
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
+
+def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, extension: str = None):
+    """
+    Calculo ROI en ultimos partidos
+
+    # Parameters
+        df: Dataframe bank inicial y final ya calculados (DataFrame)
+        l_last_matches: Lista con los ultimos n dias a calcular el ROI. (list) 
+        extension: Extension en el nombre de la metrica.
+
+    # Return
+        roi_values: ROI en ultimos n partidos en l_last_matches. (dict)
+    """
+    # Converito date a datetime y ordeno por fecha
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+    df = df.sort_values(by='date', ascending=True)  # Mas antiguo a mas reciente
+
+    # Calcular ROI para cada cantidad de partidos en l_last_matches
+    roi_values = {}
+    for n_matches in l_last_matches:
+
+        col_name = f'roi_last_{n_matches}_matches' if extension is None else f'roi_last_{n_matches}_matches_{extension}' 
+
+        if len(df) < n_matches:  # Si hay menos partidos de los necesarios, se omite el cálculo
+            roi_values[col_name] = None
+            continue
+        
+        df_filt = df.tail(n_matches)  # Últimos n partidos
+        roi_values[col_name] = df_filt['G/P_sin_bank'].sum()
+
+    return roi_values
 
 def calculate_reality_roi(df: pd.DataFrame):
     """
@@ -447,7 +462,6 @@ def calculate_accuracy_by_result(df_predicciones):
 
 def calculate_bet_metrics(
         df_pred_proba,
-        df_match_odds,
         var_resp: str = 'result',
         var_pred_bm: str = 'bookmaker_result',
         verbose: int = 0,
@@ -456,9 +470,7 @@ def calculate_bet_metrics(
     y_test = df_pred_proba[var_resp].values  # Etiquetas reales
 
     # Calculo metricas de bookie
-    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-    df_match_odds = determine_result_by_bookmaker(df_match_odds, var_pred_bm, classes=set(y_test))  # Determino resultado predicho segun cuota minima (e.g. "Home")
-    y_pred_bm = df_match_odds[var_pred_bm].values
+    y_pred_bm = df_pred_proba[var_pred_bm].values
 
     d_metrics = {
         'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
@@ -468,55 +480,31 @@ def calculate_bet_metrics(
 
     return d_metrics
 
-def read_dfs(
-        df_pred_proba: pd.DataFrame,
-        country: str,
-        retrain: bool = False,
-        verbose: int = 0,
-        ):
-    # Procesar df_match y df_match_odds
-    df_match = load_file_by_condition(country=country, retrain=retrain, file_name="df_match.xlsx")
-    df_match_odds = load_file_by_condition(country=country, retrain=retrain, file_name="df_match_odds.xlsx")
-
-    if verbose >= 2:
-        logger.info(df_match)
-        logger.info(df_match_odds)
-
-    indices_to_use = df_pred_proba.index  # Selecciono los partidos que estan en df_test
-    df_match = df_match[df_match.index.isin(indices_to_use)].reindex(indices_to_use)
-    df_match_odds = df_match_odds[df_match_odds.index.isin(indices_to_use)].reindex(indices_to_use) # ".reindex()" tapa el error de que indices_to_use no está en df_match_odds. Sin embargo, el reindex es necesario pues: Reordeno df_match_odds el orden de X_test (X_test sufrió un shuffle) --> sino lo haces, la precision del bookmaker se calcula mal dado que y_pred tiene un orden ≠ al de y_test
-    if verbose >= 2:
-        print(indices_to_use)
-        print("Shapes: ", df_match.shape, df_match_odds.shape) # Deberia coindicir con el largo de indices_to_use
-        print(df_match.head())
-    return df_match, df_match_odds
-
-def load_file_by_condition(country: str, retrain: bool, file_name: str) -> pd.DataFrame:
-    if retrain:
-        subpath = f"data/{country}/p6_deployment/missing/old_updated" 
-    else:
-        logger.warning("Estas levantando df_match y df_match_odds viejo. Si no es lo deseado, no tendra los indices de df_pred_proba y quedara todo nan en el df_predicciones concatenado. Asegurate de usar retrain = True (en vez de False)")
-        subpath = f'data/{country}/p2_data_understanding'
-
-    return  pd.read_excel(f'{subpath}/{file_name}', index_col=0) # --> missing no lo necesita y el otro si?
-
 def concatenate_dfs( 
         df_pred_proba: pd.DataFrame,
         df_match: pd.DataFrame,
         df_match_odds: pd.DataFrame,
         df_filled: pd.DataFrame = None,
         ):
+    
+    df_match = df_match[df_match.index.isin(df_pred_proba.index)]
+    df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
+    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+    df_match = df_match[l_cols_match]
+
     # Concatenación selectiva
     columns_to_concat = [
-        df_match[['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away']],
+        df_match,
         df_match_odds,
         df_pred_proba,
     ]
 
     if df_filled is not None:
-        l_cols = [col for col in ['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-        columns_to_concat.append(df_filled[l_cols])
-    
+        df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
+        # l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+        # columns_to_concat.append(df_filled[l_cols_fill])
+        columns_to_concat.append(df_filled)
+        
     df_predicciones = pd.concat(columns_to_concat, axis=1)
     return df_predicciones
         
@@ -525,25 +513,27 @@ def calculate_nan_metrics(df_predicciones):
     Calcula las métricas relacionadas con el relleno de NaN en el DataFrame.
     """
     # Cálculo del promedio de columnas rellenadas
-    average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
+    if 'n_col_filled' in df_predicciones.columns:
+        average_col_filled = df_predicciones['n_col_filled'].sum() / len(df_predicciones)
 
     # Filtrar registros con y sin relleno de NaN
-    # if 'player_emergency_fill' in df_predicciones.columns:
-    rows_player_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
-    rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
+    if 'player_emergency_fill' in df_predicciones.columns:
+        rows_player_filled = df_predicciones[df_predicciones['player_emergency_fill'] == 1].index
+        rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
 
-    # G/P por estado de relleno de NaN
-    gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
-    gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
-    gp_total = df_predicciones['G/P_sin_bank'].sum()
+        # G/P por estado de relleno de NaN
+        gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
+        gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
+        gp_total = df_predicciones['G/P_sin_bank'].sum()
 
-    perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
-    perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
+        perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
+        perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
 
-    # else:
-    #     rows_player_filled = []
-    #     gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
-    #     perc_gp_filled, perc_gp_not_filled = 0, 1
+    else:
+        average_col_filled = -1
+        rows_player_filled = []
+        gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
+        perc_gp_filled, perc_gp_not_filled = 0, 1
         
     d = {
         'average_col_filled': average_col_filled,

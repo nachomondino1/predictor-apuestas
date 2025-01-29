@@ -1,24 +1,25 @@
 import sys
 sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
-import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
 import datetime
-from main import Modeling
-from p3_data_preparation import format_data
 from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
 from p6_deployment import main_next_matches
+import os
 
-def initialize_directories(country, iteration_date, predict_missing):
+
+def initialize_directories(country, iteration_date, predict_missing, bet_strategy):
     """
-    Guardar seleccion de modelo vieja en carpeta
+    Guarda la selección de modelo vieja en una carpeta y crea los directorios necesarios.
     """
+
     fecha_hoy = datetime.datetime.now().date()
     
+    # Definir paths principales
     base_path = f"data/{country}/p4_modeling/{iteration_date}"
     base_path_sbm = f"{base_path}/best_model"
-
+    
     d_paths = {
         'base_path': base_path,
         'base_path_sbm': base_path_sbm,
@@ -29,27 +30,34 @@ def initialize_directories(country, iteration_date, predict_missing):
         'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
 
-    if predict_missing:
-        create_and_move_directories(d_paths=d_paths)
+    # Mover toda la carpeta si predict_missing y bet_strategy son True
+    if predict_missing and bet_strategy:
+        if os.path.exists(base_path_sbm):
+            directories.make_directories([d_paths['path_old']])
+            directories.mover_archivo(base_path_sbm, d_paths['path_old'])
+
+    # Mover solo path_assess si predict_missing es True
+    elif predict_missing:
+        directories.make_directories([d_paths['path_old']])
+        directories.mover_archivo(d_paths['path_assess'], d_paths['path_old'])
+
+    # Mover solo path_bet_strategy si bet_strategy es True
+    elif bet_strategy:
+        directories.make_directories([d_paths['path_old']])
+        directories.mover_archivo(d_paths['path_bet_strategy'], d_paths['path_old'])
+
+    # Crear directorios necesarios
+    directories.make_directories([
+        d_paths['path_assess'], 
+        d_paths['path_select'], 
+        d_paths['path_bet_strategy'], 
+        d_paths['path_assess_dep']
+    ])
+
     return d_paths
 
-def create_and_move_directories(d_paths):
-    """
-    Guardar seleccion de modelo vieja en carpeta
-
-    Mejoras: 
-        - Evitar mover old si uso assess_already_extracted?
-    """
-    # Mover anterior seleccion y assess a old..
-    import os
-    if os.path.exists(d_paths['base_path_sbm']):
-        directories.make_directories(l_directorios=[d_paths['path_old']]) # Por si nunca corri el main_select para el pais.
-        directories.mover_archivo(origen=d_paths['base_path_sbm'], destino=d_paths['path_old'])
-
-    # Creo directorios para nuevo assess y seleccion
-    directories.make_directories(l_directorios=[d_paths['path_assess'], d_paths['path_select'], d_paths['path_bet_strategy'], d_paths['path_assess_dep']])
-
 def main(
+        df_ite,
         id_country, 
         country, 
         iteration_date,
@@ -64,45 +72,38 @@ def main(
     Assess model in prod + Seleccion del modelo + Estrategia de apuesta
 
     # Parameters
-        prop_to_max: Porcentaje de la metrica maxima para filtrar modelos. Cuanto mayor es, menos modelos. (float)
+        df_ite: Dataframe con el train y test de los modelos del pais. (DataFrame)
         assess: True para recolectar las predicciones de los modelos en los partidos missing y concatenarlas a las de test. (bool)
-        assess_already_extracted: Si queres evitar la recoleccion y prediccion en partidos missing y usar un test y assess ya actualizado.
-        extract_missing: Para extraer missing y tenerlos actualizados antes de predecir.
-        select_best_model: True para hacer la seleccion del modelo a usar en produccion. (bool)
-        strategy: Estrategia de apuesta para determinar hiperparametros a probar. (str)
 
     # Return
         Modelo a usar en produccion con su estrategia de apuesta optima (teniendo en cuenta test + missing). 
-
-    Mejoras:
-        - Posibilidad de hacer filtrado de modelos antes de determinar el roi weight? --> Eliminaria modelos outlier o chotos y calcularia una correlacion mas precisa?
     """
     # Definicion de variables
-    mo = Modeling(country, iteration_date)
     rows = []
     d_rows = {}
-    l_metrics = ['ROI_sin_ea', 'ROI_con_ea']  ## Determino componentes de metrica combinada y pesos 
-    l_weights = [0.5, 0.5]
+    d_paths = initialize_directories(country, iteration_date, predict_missing, betting_strat)
+    ## Betting strategy
+    bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
+    d_params = bs.define_hiperparameters(strategy=strategy)
+    ## Seleccion de modelo
+    l_metrics = ['ROI_sin_bank_sin_ea', 'roi_last_25_matches_sin_ea', 'roi_last_25_matches_con_ea', 'ROI_sin_bank_con_ea']  ## Determino componentes de metrica combinada y pesos 
+    l_weights = [1 / len(l_metrics) for _ in l_metrics]
 
-    # Creo objeto de clase select_best_model
-    d_paths = initialize_directories(country, iteration_date, predict_missing)
-
-   # Levanto df_iteration
-    df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-
-    # Actualizo missing
+    # (0) Actualizo missing
     if update_missing:
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
         main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
 
     # (1) SELECCION DE MODELOS CANDIDATOS
+    ## Creo instancia de sbm
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])
 
-    # 1.1. Descarte por metrica --> para evitar modelos con alto ROI sin ea pero de ojete.
+    ## Determino metrica mas importante entre test_acc, recall y f1-score
     metrics = asses_model.select_metrics(df_ite, col_corr="roi_por_partido", l_metrics=['test_accuracy', 'recall', 'f1_score'] , n_metrics=1)
+
+    ## Filtro modelos segun metrica mas importante (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
     df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metrics[0], perc_cutoff=1, n_models_max=15)
     logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
-
 
     # (2) ESTRATRAGIA DE APUESTA
     if betting_strat:
@@ -110,41 +111,45 @@ def main(
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
 
-            n_model = row['n_iteration']
-            model_name = row['model_name']
+            n_model, model_name= row['n_iteration'], row['model_name']
             logger.info(f'{n_model} {model_name}')
-
+            
             # Levanto df_predicciones
             if predict_missing:
-                df_pred = assess_models_in_prod.get_model_predictions_with_missing(n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date, path_save=d_paths['path_assess'])
-                df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True)
-
+                df_pred = assess_models_in_prod.get_model_predictions_with_missing(n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
             else: 
                 try:
-                    df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
+                    df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0) # sin ea
+                    logger.info("Levanto df_pred sin ea del assess ya recolectado...")
                 except FileNotFoundError:
-                    df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-                    
-            # Recalculo metricas con test + missing
-            df_pred = df_pred.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-            df_pred, d_metrics = mo.calculate_metrics(df_pred, retrain=True)
+                    df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0) # sin ea
+                    logger.info("Levanto df_pred sin ea de cuando entrene modelos (solo test)...")
+                logger.info(df_pred)
 
-            # Convierto ids de equipos a nombres
-            df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date}/integrate_data/df_teams.xlsx', index_col=0)
-            df_pred = format_data.map_teams(df_pred, df_teams=df_teams)
-
+            # Recalculo metricas   
+            df_pred, d_metric = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)
+            if predict_missing:
+                df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+            
             # Defino estrategia
-            bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-            d_params = bs.define_hiperparameters(strategy=strategy)
-            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
+            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, col_to_max='roi', d_params=d_params) # No usar G/P_sin bank, toma estrategia con m maximo en todos los rdos.. no se por que
 
-            # Guardo metrics
-            roi_sin_ea = df_pred_with_stra['G_P_sin_ea'].sum()
-            roi_con_ea = df['roi'].sum()
-            multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
+            # Calculo metricas para guardar en df_ite_bs
+            ## Calculo ROIs en last matches 
+            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea
+            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], extension='con_ea') # Con ea
+            ## Calculo ROI con y sin ea
+            roi_sin_bank_sin_ea, roi_sin_bank_con_ea = df_pred['G/P_sin_bank'].sum(), df_pred_with_stra['G/P_sin_bank'].sum()
+            roi_con_ea = df_pred_with_stra['G/P'].sum()
+            multiplicador = (roi_sin_bank_con_ea - roi_sin_bank_sin_ea) / abs(roi_sin_bank_sin_ea)
+            
+            # Guardo datos
             new_row = {
-                'n_model': n_model, 'model_name': model_name, **d_metrics,
-                'ROI_sin_ea': roi_sin_ea, 'ROI_con_ea': roi_con_ea, 'x ea': multiplicador
+                'n_model': n_model, 'model_name': model_name, 
+                **d_metric,
+                **roi_values_sin_ea, **roi_values_con_ea, 
+                'ROI_sin_bank_sin_ea': roi_sin_bank_sin_ea, 'ROI_sin_bank_con_ea': roi_sin_bank_con_ea, 'x ea': multiplicador,
+                'ROI_con_ea': roi_con_ea, 
                 }
             rows.append(new_row)
             d_rows[n_model] = [df, df_pred_with_stra]
@@ -168,8 +173,7 @@ def main(
 
     ## Selecciono el modelo que maximiza la metrica combinada
     idx_max = df_ite_bs[metric_col].idxmax()
-    n_model = df_ite_bs.loc[idx_max, 'n_model']
-    model_name = df_ite_bs.loc[idx_max, 'model_name']
+    n_model, model_name = df_ite_bs.loc[idx_max, 'n_model'], df_ite_bs.loc[idx_max, 'model_name']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}")
 
     # Exporto datos
@@ -183,7 +187,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 59, 77]
+    # l_countries = [148]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing
@@ -193,7 +197,7 @@ if __name__ == "__main__":
 
     d_countries = {
         # Train actuales
-        6: ["argentina", '2024-12-05'], 
+        6: ["argentina", '2025-01-28'], 
         48: ["england", '2025-01-22'],
         55: ["france", '2025-01-22'], 
         59: ["germany", '2025-01-23'], 
@@ -206,7 +210,10 @@ if __name__ == "__main__":
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
         
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+
         main(
+            df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
             update_missing=update_missing, predict_missing=predict_missing,
             betting_strat=betting_strat,

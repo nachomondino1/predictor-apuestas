@@ -608,7 +608,7 @@ class DataPreparation:
 
         # (2) Tratamiento de NaN values
         shape_inicial = X.shape
-        X = self.treat_nan_values(X=X, fill_na=fill_na, index_test_set=index_test_set)
+        X, df_filled_columns = self.treat_nan_values(X=X, fill_na=fill_na, index_test_set=index_test_set)
         if self.verbose >= 1:
             print(f"Tras fill_na={fill_na}. Shape X_sin_col_mucho_nan: {shape_inicial} --> {X.shape}")
 
@@ -631,7 +631,7 @@ class DataPreparation:
             joblib.dump((scaler, X.columns), f"{self.base_path}/scaler_model.pkl")       
             df.to_excel(f'{self.base_path}/df_constructed_clean.xlsx', index=True)
 
-        return df, scaler, X.columns
+        return df, scaler, X.columns, df_filled_columns
     
     def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, index_test_set: list = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
         """
@@ -708,7 +708,7 @@ class DataPreparation:
         df_test_filt = df_test.drop(columns=columns_to_drop)
         logger.info(f"{df_test.shape} --> {df_test_filt.shape}")
         ## Reemplazo NaN en TEST por 0
-        df_test_filled = self.emergency_fill_for_test(df_test_filt)
+        df_test_filled, df_filled_columns = self.emergency_fill_for_test(df_test_filt)
 
         # Concateno df_test y df_train_val ya rellenados
         X = pd.concat([df_train_val_filled, df_test_filled], axis=0)
@@ -728,7 +728,7 @@ class DataPreparation:
         if export:
             X.to_excel(f'{self.base_path}/df_selected_nan.xlsx', index=True)
 
-        return X
+        return X, df_filled_columns
         
     def emergency_fill_for_test(self, df, export: bool = True):
         """
@@ -813,7 +813,7 @@ class DataPreparation:
             df_sin_dup.to_excel(f'{self.base_path}/treat_nan/df_treat_nan.xlsx', index=True)
             df_filled_columns.to_excel(f'{self.base_path}/treat_nan/df_filled_columns.xlsx', index=True)
 
-        return df_sin_dup
+        return df_sin_dup, df_filled_columns
         
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, export: bool = True):
         """
@@ -889,18 +889,11 @@ class Modeling:
             path = f'./data/{self.country}/p4_modeling'
             path_dp = f'./data/{self.country}/p3_data_preparation'
 
-            l_directorios = [
-            f'{path_dp}/generate_test_design',
-            f'{path_dp}/modeling',
-            ]
-            
-            for directorio in l_directorios:
-                if not os.path.exists(directorio):
-                    # Si no existe, crear el directorio
-                    os.makedirs(directorio)
-
         self.base_path = path
         self.base_path_dp = path_dp
+
+        # Levanto df_teams (lo hago 1 vez para todas las veces que use el reformateo)
+        self.df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
 
     def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, index_test_set: list = None, export: bool = True):
         """
@@ -1008,7 +1001,7 @@ class Modeling:
 
         return model_best_params, params, train_accuracy, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, retrain: bool = False, export: bool = False):
+    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, df_match: pd.DataFrame, df_match_odds: pd.DataFrame, df_filled: pd.DataFrame = None, prod: bool = False, export: bool = False):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
 
@@ -1026,21 +1019,34 @@ class Modeling:
 
         # Predigo sobre X_test
         df_probabilities, y_pred = self.predict(model, X_test)
-
+            
         # Combinar ambos DataFrames
-        df_pred_proba = pd.DataFrame({
-                self.var_resp: y_test,
+        if not prod:
+            df_pred_proba = pd.DataFrame({
+                    self.var_resp: y_test,
+                    self.var_pred: y_pred,
+                }, index=X_test.index)
+        else:
+            # En producción (excluye y_test)
+            df_pred_proba = pd.DataFrame({
                 self.var_pred: y_pred,
             }, index=X_test.index)
         df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
 
-        # Calculo metricas
-        df_predicciones, d_metrics = self.calculate_metrics(df_pred_proba, retrain=retrain, export=export)
+        # Concateno todos los dfs en uno solo --> Necesario para roi?
+        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
 
+        # Calculo metricas
+        d_metrics = None
+        if not prod:
+            df_predicciones, d_metrics = self.calculate_metrics(df_predicciones, export=export)
+        
+        df_predicciones = self.reformat_pred(df_predicciones)
+        
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
 
-        return df_predicciones, d_metrics
+        return (df_predicciones, d_metrics) if not prod else df_predicciones
     
     def predict(self, model, X_test: pd.DataFrame):
         """
@@ -1086,24 +1092,21 @@ class Modeling:
 
         return df_pred_proba, y_pred   
 
-    def calculate_metrics(self, df_pred_proba, retrain: bool = False, export: bool = False):
-
-        # Defino variables
-        df_match, df_match_odds = asses_model.read_dfs(df_pred_proba, country=self.country, retrain=retrain)
-        df_filled = pd.read_excel(f'{self.base_path_dp}/treat_nan/df_filled_columns.xlsx', index_col=0)
+    def calculate_metrics(self, df_pred_proba, export: bool = False):
+        
+        d_metrics = {}
+        df_pred_proba = asses_model.calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
+        df_pred_proba = asses_model.determine_result_by_bookmaker(df_pred_proba, col_name="bookmaker_result")  # Determino resultado predicho segun cuota minima (e.g. "Home")
 
         # Calculo metricas
-        d_metrics = asses_model.calculate_basic_metrics(df_pred_proba, country=self.country, export=export)
-        d_metrics.update(asses_model.calculate_bet_metrics(df_pred_proba, df_match_odds))
+        d_metrics.update(asses_model.calculate_basic_metrics(df_pred_proba, country=self.country, export=export))
+        d_metrics.update(asses_model.calculate_bet_metrics(df_pred_proba))
         d_metrics.update({'dif_prec_bm': d_metrics['test_accuracy'] -  d_metrics['test_accuracy_bm']})
-
-        # Concateno todos los dfs en uno solo --> Necesario para roi?
-        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
 
         # Calculo ROI
         bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
         d_params = bs.define_hiperparameters(strategy='train')
-        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_predicciones, d_params=d_params)
+        df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_pred_proba, d_params=d_params)
         d_metrics.update(d_roi)
         
         if self.verbose >= 0:
@@ -1117,7 +1120,12 @@ class Modeling:
 
         return df_predicciones, d_metrics
     
-    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos, k, ruta_base_mod_seg, cont_iter, retrain: bool = False, verbose: int = 0):
+    def reformat_pred(self, df):
+        # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
+        df = format_data.map_teams(df,df_teams=self.df_teams)
+        return df
+
+    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, retrain: bool = False, k: int = 5, verbose: int = 0):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -1147,11 +1155,7 @@ class Modeling:
                     model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
 
                     # Evaluo modelo en test
-                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, retrain=retrain)
-
-                    # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
-                    df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
-                    df_predicciones = format_data.map_teams(df_predicciones,df_teams=df_teams)
+                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, df_match, df_match_odds, retrain=retrain)
 
                     # Hiperparametros del modelo y Metricas en testeo y train
                     new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params, 'X_train': X_train.shape,
@@ -1174,7 +1178,7 @@ class Modeling:
             else:
                 logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
                 
-        return df_metrics  # return model, results, df_predicciones, df_metrics
+        return df_metrics
 
 def crear_variables(diccionario):
     return SimpleNamespace(**diccionario)

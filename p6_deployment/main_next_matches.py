@@ -718,90 +718,32 @@ class TrainingDataLoader():
 
         return loaded_model
 
-    def load_modeling_hyperparameters(self):
+    def load_modeling_hyperparameters(self, predict_missing: bool = False):
         """
         Cargo hiperparametros de Modeling()
 
         Mejora: 
          - Levantar parametros por resultado...
         """
-        d = {}
-        l_curvas = ['linear', 'kelly']
+        if predict_missing:
+            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
 
         # Estrategia por resultado
         try:
-            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)  # desde que separé estrategia de apuesta de entrenamiento...
-            print(df_hiper)
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
 
             # Si es por resultado
             if len(df_hiper) == 3:
                 logger.critical("Se levantó la estrategia de apuesta por resultado")
-                return df_hiper
 
-            df_iteration = df_iteration.reset_index()  # Convierte el índice en una columna
-            df_iteration.rename(columns={'n_model': 'n_iteration'}, inplace=True)  # Renombra la columna creada
+            if self.verbose >= 0:
+                logger.info("Hiperparametros cargados:")
+                logger.info(df_hiper)
 
-        # Misma Estrategia para los resultados
         except FileNotFoundError:
-            logger.warning("Falló la obtencion de hiperparametros de estrategia de apuesta")
-            try:
-                logger.warning("No está df_iteration_with_strategy")
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")  # index_col=0 (ya no lo uso?)
+            print("Falló la carga del df_strategy")
 
-            except FileNotFoundError:
-                logger.warning("No está df_iteration_with_strategy ni df_iteration")
-                df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration_test.xlsx")
-
-            row_ite = df_iteration[df_iteration['n_iteration'] == self.n_model]
-
-            if self.verbose >= 2:
-                logger.info(df_iteration)
-                logger.info(row_ite)
-
-            if len(row_ite) > 1:
-                col_model = 'model_name' if 'model_name' in df_iteration.columns else 'model_name_test'
-                row_hiper_bet_strat = row_ite[row_ite[col_model] == self.model_name]
-                logger.warning(len(row_hiper_bet_strat))
-            else:
-                row_hiper_bet_strat = row_ite
-
-            # Verificacion de que se selecciono una sola row
-            if self.verbose >= 0 and len(row_hiper_bet_strat) != 1:
-                logger.error(f"Falló la carga de hiperparametros de la estrategia de apuesta. El modelo a cargar era el {self.n_model}, un {self.model_name}. La fila con los hiperparametros tiene un largo de {len(row_hiper_bet_strat)} (≠ de 1:).")
-                logger.info(df_iteration)
-                raise ValueError
-  
-        try:
-            d['prob_dp'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min_best'))
-        except:
-            d['prob_dp'] = float(self.load_value_from_series(row_hiper_bet_strat, 'thr_prob_min'))
-
-        d['curva'] = self.load_value_from_series(row_hiper_bet_strat, 'curva') # str
-        param1 = self.load_value_from_series(row_hiper_bet_strat, 'param1')  # int?
-        param2 = self.load_value_from_series(row_hiper_bet_strat, 'param2') 
-        d['m'] = param1 if d['curva'] in l_curvas else None
-        d['b'] = param2 if d['curva'] in l_curvas else None
-        d['curva_p1'] = eval(str(param1)) if d['curva'] not in l_curvas else None
-        d['curva_p2'] = eval(str(param2)) if d['curva'] not in l_curvas else None
-        d['odd_weight'] = int(self.load_value_from_series(row_hiper_bet_strat, 'odd_weight'))
-        d['lim_sup'] = float(self.load_value_from_series(row_hiper_bet_strat, 'dif_prob_sup_cap'))
-        d['normalized'] = self.load_value_from_series(row_hiper_bet_strat, 'normalized')
-
-        if self.verbose >= 0:
-            logger.info("Hiperparametros cargados:")
-            for key, value in d.items():
-                logger.info(f'\t {key}: {value}')
-        return d
-
-    def load_value_from_series(self, row, col_name):
-        try:
-            val = row[col_name].values[0]
-        except IndexError:
-            val = row[col_name]
-        
-        if self.verbose >= 2:
-            logger.warning(f'{col_name}: {val}')
-        return val
+        return df_hiper
 
 # Missing data
 class MissingData:
@@ -1058,7 +1000,7 @@ def main(
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export=export) # Creo objeto de clase DataUnderstanding
     dp = DataPreparationNew(id_country=id_country, country=country, iteration_date=iteration_date_dt, export=export) # Creo objeto de clase DataPreparation
-    mo = Modeling(country=country) # Creo objeto de clase DataPreparation
+    mo = Modeling(country=country, date=iteration_date_dt) # Creo objeto de clase DataPreparation
     mis = MissingData(country=country, iteration_date=iteration_date_dt)
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
@@ -1157,17 +1099,20 @@ def main(
         if predict_missing:
             # Levanto partidos missing
             logger.info("Uso los partidos df_match MISSING ya extraidos.")
+
+            # Levanto dfs (tmb utiles en modeling)
             BASE_DIR_ALL_MISSING = f'./data/{country}/p6_deployment/missing/data_understanding/all'
-
             df_match_train = pd.read_excel(f"./data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx", index_col=0)
-            logger.error("agerngfoeinrgoierfg")
-
-            idxs_train = df_match_train.index
             df_match = pd.read_excel(f'{BASE_DIR_ALL_MISSING}/df_match_miss.xlsx', index_col=0)
             df_match_odds = pd.read_excel(f'{BASE_DIR_ALL_MISSING}/df_match_odds_miss.xlsx', index_col=0)
+
+            # Filtro dfs dejandol solo partidos con los que NO entrené 
+            idxs_train = df_match_train.index
             df_match = df_match[~df_match.index.isin(idxs_train)]
             df_match_odds = df_match_odds[~df_match_odds.index.isin(idxs_train)]
-            logger.error(df_match.shape)
+            
+            if verbose >= 1:
+                logger.warning(df_match.shape)
 
         else:
             # Levanto datos de proximos partidos ya extraidos
@@ -1200,10 +1145,12 @@ def main(
             df_int_missing = pd.read_excel(f'./data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)
             
             # Selecciono con los que no entrené
-            df = df_int_missing[~df_int_missing.index.isin(idxs_train)]    
-            logger.info("fgqwefgioargioqjf")
-            logger.critical(df.shape)
-            logger.critical(df)
+            df = df_int_missing[~df_int_missing.index.isin(idxs_train)]
+            
+            if verbose >= 1:
+                logger.info("Levanto df integreated missing sin partidos con los que entrené")
+                logger.critical(df)
+                logger.critical(df.shape)
 
         else:
             # Preparacion de datos hasta integrate
@@ -1291,52 +1238,25 @@ def main(
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
 
-        # Levanto hiperparametros de modeling
-        loaded_model = lo.load_model()
-
-        try:
-            df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition']] 
-        except KeyError:
-            df_match = df_match.loc[:, ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition']] # falla cuando uso predict_missing porque falta 'country' y 'competition'        
-        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds) # Caculo probabilidades segun casa de apuesta
-
-        # Realizo predicciones sobre los nuevos partidos
-        df_probabilities, y_pred = mo.predict(model=loaded_model, X_test=df)
-        df_pred_proba = pd.DataFrame({'predicted_result': y_pred,}, index=df.index)
-
-        # Concateno conjunto de datos # df_fill puede tirar error. Si tira, arreglar.
-        df_predicciones = pd.concat(
-            [df_match, 
-             df_match_odds, 
-             df_pred_proba, 
-             df_probabilities,
-             df_c1['copiado_formaciones'], 
-             df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]
-             ], 
-            axis=1) 
-        df_predicciones = df_predicciones[df_predicciones.index.isin(df.index)] # en ITA queda el partido del COMO-UDINESE pero sin prediccion (pues no lo prepara, no esta en df_integrated_missing) y falla el calculo de metricas...
+        # Predigo con modelo cargado
+        df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
+        df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
+        df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'prob_dp': -1, 'curva': 'linear', 'm': 10, 'b': 0, 'odd_weight':0, 'lim_sup': 0, 'normalized': False} if predict_missing or no_strategy else lo.load_modeling_hyperparameters()
-        df = bs.calculate_dif_proba_in_predicted_result(df_predicciones)
+        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing or no_strategy)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
-            df = bs.apply_strategy(df, param_dict=d_strategy)
+            df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
         else:
             logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
-            df = bs.apply_strategy_by_result(df, df_hiper=d_strategy)
+            df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
-        # Aplico reduccion a stake --> Ver si funciona.. Creo que si.
+        # Aplico reduccion a stake
         df['stake_to_bet'] = df['stake_to_bet'] * porc_m
-        # logger.info(f"m_to_use: {d_strategy['curva_m']} tras aplicar {porc_m}")
-
-        # Ultimos preparativos
-        df_teams = pd.read_excel(f'./data/{country}/p3_data_preparation/{iteration_date_dt}/integrate_data/df_teams.xlsx', index_col=0)
-        df = format_data.map_teams(df, df_teams=df_teams)     # Revierto etiquetas para tener nombres de equipos en vez de ids  # --> Podria usar mapeo 
-        df = df[df['id_competition'].isin(comp_public)]     # Filtro partidos para quedarme solo con los de competencias publicas.
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
@@ -1360,17 +1280,16 @@ if __name__ == "__main__":
     d_run_type = {
         'missing': ['only_extract', 'only_preparation', 'all'],
         'predict': ['try_a_specific_model', 'predict_missing'],
-        'prod': None
     }
 
-    id_country = 148
+    id_country = 6
     key, value = 'predict', 'try_a_specific_model'
-    data_unders = False
-    n_days = 10
+    data_unders = True
+    n_days = 1
 
     # Defino country, iteration date y modelo
     d_countries = {
-        6: ["argentina", '2024-12-05'], 
+        6: ["argentina", '2025-01-28'], 
         48: ["england", '2025-01-22'], 
         55: ["france", '2025-01-22'], 
         59: ["germany", '2025-01-23'], 
@@ -1379,7 +1298,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 281, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 40, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1406,12 +1325,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=True) 
-
-    elif key == 'prod':
-        logger.warning("Get predictions for model in prod")
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True} 
-        df = main(d_run, id_country, n_days_max_next_matches=n_days, export=d_run['export']) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=False, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")

@@ -97,7 +97,6 @@ def comprehensive_search(
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
-    # save_old_train(l_directories=[f"./data/{country}/p2_data_understanding/old_updated", f"./data/{country}/p3_data_preparation", f"./data/{country}/p4_modeling"], base_path_old = f'./data/{country}/old') 
     directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
  
     if data_unders:
@@ -105,8 +104,8 @@ def comprehensive_search(
 
         ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
         # Defino paths de donde levantar los datos
-        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore)
-        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa)
+        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=True)
+        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa, n_seasons_update=1)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
         df_match.to_excel(f'{BASE_DIR_du}/df_match.xlsx', index=True)
@@ -161,9 +160,7 @@ def comprehensive_search(
         n_reg_test = n_reg_test[0]  # Si es una lista, obtenemos el primer elemento
     logger.info(d_params['modeling'].values())
     logger.info(f"N_REG_TEST: {n_reg_test}")
-
-    df_match_old = read_df_match(country=country, iteration_date=date, retrain=retrain)
-    index_test_set = determine_rows_for_test_set(df_match=df_match_old, n_reg_test=n_reg_test)  # Usar n_reg_test.
+    index_test_set = determine_rows_for_test_set(df_match=df_match, n_reg_test=n_reg_test)  # Usar n_reg_test.
 
      # Clean data 3
     for zz, param_values_00 in enumerate(product(*d_params['clean_data_3'].values()), start=1):
@@ -212,7 +209,7 @@ def comprehensive_search(
                     logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
                     print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; fill_na: {fill_na}")            
 
-                df_cons_clean, scaler, columns_used = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, fill_na=fill_na, index_test_set=index_test_set, export=True)
+                df_cons_clean, scaler, columns_used, df_filled_columns = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, fill_na=fill_na, index_test_set=index_test_set, export=True)
                 joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_clean_2}.pkl')
 
                 if verbose >= 2:
@@ -253,8 +250,12 @@ def comprehensive_search(
                             X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
 
                             # Entreno y evaluo modelos
-                            df_metrics = mo.train_and_assess_models(X_val, y_val, X_train, y_train,  X_test, y_test, l_modelos, k, ruta_base_modelos, cont_iter, retrain=retrain)
-
+                            df_metrics = mo.train_and_assess_models(
+                                X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
+                                l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
+                                df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled_columns,
+                                  k=k, retrain=retrain)
+                        
                         if len(df_metrics) > 0:
                             # Guardo datos en dataframe
                             row_data = {
@@ -317,17 +318,6 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def save_old_train(l_directories, base_path_old): # Por ahora lo hago manual porque no funciona como quiero… Arreglar.
-
-    directories.make_directories(l_directorios=[base_path_old])
-
-    import os 
-    for directorio in l_directories:
-        # if not os.path.exists(directorio):
-        #     # Si no existe, crear el directorio
-        #     os.makedirs(directorio)
-        directories.mover_archivo(origen=directorio, destino=base_path_old)
-
 def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = True, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
@@ -361,7 +351,7 @@ def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = True, verbos
 
     return df_match, df_match_player, df_match_odds
 
-def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, verbose: int = 0):
+def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, n_seasons_update: int = 1, verbose: int = 0):
     """
     Obtengo datos de Sofifa a usar en el nuevo entrenamiento.
     """
@@ -374,7 +364,7 @@ def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, verbose: int = 0):
         df_player_sofifa_old, df_player_fifa_sofifa_old = update_sofifa_data.read_last_player_data(country)
 
         # Obtengo ultimas seasons
-        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=1, path_save=f'{BASE_DIR_sofifa}/data_seg')
+        df_player, df_player_fifa = update_sofifa_data.get_player_data(id_country, country, df_comp_country, n_seasons_update=n_seasons_update, path_save=f'{BASE_DIR_sofifa}/data_seg')
 
         # Actualizar sofifa con las ultimas seasons
         df_player_sofifa, df_player_fifa_sofifa = update_sofifa_data.concat_player_data(df_player, df_player_fifa, df_player_sofifa_old, df_player_fifa_sofifa_old, path_save=BASE_DIR_sofifa)
@@ -393,37 +383,6 @@ def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, verbose: int = 0):
         print(df_player_fifa_sofifa)   
 
     return df_player_sofifa, df_player_fifa_sofifa
-
-def read_df_match(country, iteration_date, retrain: bool = True):
-    """
-    Levanto el df_match
-    """
-    # Levanto df_match del pais
-    if retrain:
-        try:
-            # Levanto desde los datos usados para el nuevo train
-            path_new_train = f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}"
-            df_match = pd.read_excel(f'{path_new_train}/df_match.xlsx', index_col=0)
-            # logger.warning(df_match)
-
-        except FileNotFoundError:
-            logger.warning(f"Fallo la carga del archivo df_match. No se encontró el archivo en '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
-
-        except IsADirectoryError:
-            logger.warning(f"Fallo la carga del archivo df_match. No existe el directorio '{path_new_train}'. Por ello recurro a levantarlo desde p6_deployment/missing")
-
-        # Levanto desde deployment/missing
-        path = f'data/{country}/p6_deployment/missing/old_updated/df_match.xlsx' 
-        df_match = pd.read_excel(path, index_col=0)
-
-    else:
-        logger.warning(f"Se esta obteniendo el df_test del df_match viejo (sin missing). En caso de querer extrarlo con missing tambien, usar retrain=True.")
-        df_match = pd.read_excel(f"data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx", index_col=0)  
-
-    if 'Unnamed: 0' in df_match.columns:
-        df_match = df_match.drop(columns=['Unnamed: 0'])
-
-    return df_match
 
 def determine_rows_for_test_set(df_match, n_reg_test: int = 100, verbose : int = 0):
     """
@@ -526,7 +485,7 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], # d_comps['all_comp'] 
             },
             'construct': {
                 'n_last_matches': [[10]],  # Variables historicas en ultimos n partidos
@@ -562,9 +521,9 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 48
+    id_country = 6
     data_unders = False
-    update_sofifa = False
+    update_sofifa = True
     data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}

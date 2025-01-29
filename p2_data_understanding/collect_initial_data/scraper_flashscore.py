@@ -151,6 +151,26 @@ class FlashscoreCrawler(Crawler):
         
         return d_row_match, d_row_match_player, d_row_match_odds
 
+    def extract_new_data(self):
+        """
+        Inicializo funcion para obtener nuevos campos respecto de los datos ya extraidos 
+        """
+        d_row = {}
+        d_field_xpath = {
+            'result_1st_half': './/div[contains(@class, "smv__incidentsHeader")][1]/div[2]', # Con este genero 1st_ht_goals_home y 1st_half_goals_away y result_1st_half (1, 0 o 2) 
+            'result_2nd_half': './/div[contains(@class, "smv__incidentsHeader")][2]/div[2]', # Con esto genero 2nd_ht_goals_home y 2nd_half_goals_away y result_2nd_half (1, 0 o 2)
+            'goals_home_ft': './/div[@class="detailScore__fullTime"]/span[1]',
+            'goals_away_ft': './/div[@class="detailScore__fullTime"]/span[3]',
+            'neutral_location': "//div[contains(@class, 'infoBox__wrapper') and contains(., 'Neutral location.')]"
+            }
+        
+        for field, xpath in d_field_xpath.items():
+            if field == 'neutral_location':
+                # Para neutral_location, buscamos si el elemento existe en lugar de extraer texto
+                value = super().extract_tag(xpath=xpath, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
+                d_row[field] = 1 if value is not None else 0
+        pass
+
     def extract_match_information(self):
         """
         Extrae datos basicos de un match como equipos, fecha, cancha, goals, etc.

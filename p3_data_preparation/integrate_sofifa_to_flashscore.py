@@ -255,6 +255,12 @@ def map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofi
         df_match_league = df_match[df_match['id_competition'] == id_comp]
         print(f"Nº partidos en Flashscore comp {id_comp}: {len(df_match_league)}")
 
+        if id_country == 6:
+            df_match_league = df_match[df_match['id_competition'].isin(d_comps['comp_sin_cups'])]
+
+            if id_comp != 61:
+                continue
+
         ## En Sofifa
         df_player_fifa_sofifa_league = df_player_fifa_sofifa[df_player_fifa_sofifa['id_competition'] == id_comp]
         print(f"Sofifa comp {id_comp}: {len(df_player_fifa_sofifa_league)}")

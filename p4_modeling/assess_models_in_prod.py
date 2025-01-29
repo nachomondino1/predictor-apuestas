@@ -4,14 +4,15 @@ from utils import directories
 from utils.set_up_logging import logger
 import pandas as pd
 from dotenv import load_dotenv
-from p3_data_preparation import format_data
 from p3_data_preparation.construct_data import determine_result
 from p6_deployment import main_next_matches
+from main import Modeling
+from p3_data_preparation import format_data
+from p4_modeling import asses_model
 
-
-def get_model_predictions_with_missing(n_model, model_name, id_country, country, iteration_date, path_save):
+def get_model_predictions_with_missing(n_model, model_name, id_country, country, iteration_date):
     """
-    Actualizo predicciones de modelo con missing.
+    Obtengo df_probabilities test + missing.
     """
     # Levanto df_predicciones de test
     df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
@@ -25,6 +26,9 @@ def get_model_predictions_with_missing(n_model, model_name, id_country, country,
 
     # Concateno df_pred y df_pred missing.
     df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
+
+    # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
+    # df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # No elimino odds y eso para evitar volver a concatenar...
     return df_predicciones
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
@@ -71,6 +75,16 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
     df = determine_result(df) # Intento hacerlo antes con df_match pero rompia.
     # df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
     return df
+
+def determine_metrics(df_predicciones, country, iteration_date):
+    mo = Modeling(country, iteration_date)
+
+    # Recalculo metricas con test + missing
+    df_predicciones, d_metrics = mo.calculate_metrics(df_predicciones)
+
+    # Reformateo teams
+    df_predicciones = format_data.map_teams(df_predicciones, df_teams=mo.df_teams) # Convierto ids de equipos a nombres
+    return df_predicciones, d_metrics
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
