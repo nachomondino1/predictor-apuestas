@@ -192,7 +192,7 @@ def calculate_roi(df: pd.DataFrame, name_extension=''):
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
 
-def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, roi_col: str = 'G/P', extension: str = None):
+def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, extension: str = None):
     """
     Calculo ROI en ultimos partidos
 
@@ -219,8 +219,14 @@ def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, roi_col: 
             continue
         
         df_filt = df.tail(n_matches)  # Últimos n partidos
-        roi_values[col_name] = df_filt[roi_col].sum()
-
+        
+        # Con bank? pues ya tengo el df_pred con ea con mismo bank para cada rdo.
+        bank_inic = df_filt.iloc[0]['bank_inicial'] # Primer valor
+        bank_final = df_filt.iloc[-1]['bank_final'] # Último valor
+        gp = df_filt['G/P'].sum() # Las G/P dependen del bank y stake .... estaria mal usarlo?
+        roi = (bank_final - bank_inic) / bank_inic * 100
+        print(f'bank_inic: {bank_inic} + {gp} = {bank_final} --> ROI: {roi:.1f}%')
+        roi_values[col_name] = roi
     return roi_values
 
 def calculate_reality_roi(df: pd.DataFrame):
