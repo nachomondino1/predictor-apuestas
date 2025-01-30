@@ -446,20 +446,20 @@ class BettingStrategy:
     def select_best_parameters(self, data, col_to_max: str = 'G/P'):
 
         # Convierto diccionario a dataframe para facilitar manejo
-        df = pd.DataFrame.from_dict(data, orient='index')      
-
+        df = pd.DataFrame.from_dict(data, orient='index')
+    
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df[col_to_max].idxmax()
         if self.verbose >= 1:
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
-            row = df.loc[n_comb]  # # Convertir a serie
+            row = df.loc[n_comb]
             print("Row", row)
 
         return n_comb
          
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, col_to_max: str ='G/P', d_params: dict = None, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -495,7 +495,7 @@ class BettingStrategy:
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
                 # Determinar mejor estrategia para el resultado            
-                n_comb = self.select_best_parameters(d_metricas)
+                n_comb = self.select_best_parameters(d_metricas, col_to_max=col_to_max)
 
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]

@@ -86,7 +86,7 @@ def main(
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
     d_params = bs.define_hiperparameters(strategy=strategy)
     ## Seleccion de modelo
-    l_metrics = ['ROI_sin_bank_sin_ea', 'ROI_sin_bank_con_ea', 'roi_last_25_matches_sin_ea', 'roi_last_25_matches_con_ea'] # 'ROI_sin_bank_con_ea'## Determino componentes de metrica combinada y pesos 
+    l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea', 'roi_last_25_matches_con_ea', 'ROI_con_ea']
     l_weights = [1 / len(l_metrics) for _ in l_metrics]
 
     # (0) Actualizo missing
@@ -132,12 +132,12 @@ def main(
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             
             # Defino estrategia
-            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params) # No usar G/P_sin bank, toma estrategia con m maximo en todos los rdos.. no se por que
+            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, col_to_max='G/P', d_params=d_params)
 
             # Calculo metricas para guardar en df_ite_bs
             ## Calculo ROIs en last matches 
-            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea
-            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], extension='con_ea') # Con ea
+            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25], roi_col='G/P', extension='sin_ea')  # Sin ea
+            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25], roi_col='G/P', extension='con_ea') # Con ea # sin bank 
             ## Calculo ROI con y sin ea
             roi_sin_bank_sin_ea, roi_sin_bank_con_ea = df_pred['G/P_sin_bank'].sum(), df_pred_with_stra['G/P_sin_bank'].sum()
             roi_sin_ea, roi_con_ea = df_pred['G/P'].sum(), df_pred_with_stra['G/P'].sum()
@@ -187,7 +187,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [59]
+    # l_countries = [6]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing

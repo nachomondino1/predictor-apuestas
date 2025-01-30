@@ -192,7 +192,7 @@ def calculate_roi(df: pd.DataFrame, name_extension=''):
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
 
-def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, extension: str = None):
+def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, roi_col: str = 'G/P', extension: str = None):
     """
     Calculo ROI en ultimos partidos
 
@@ -219,7 +219,7 @@ def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, extension
             continue
         
         df_filt = df.tail(n_matches)  # Últimos n partidos
-        roi_values[col_name] = df_filt['G/P_sin_bank'].sum()
+        roi_values[col_name] = df_filt[roi_col].sum()
 
     return roi_values
 
