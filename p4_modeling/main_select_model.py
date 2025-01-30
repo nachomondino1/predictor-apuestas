@@ -89,7 +89,8 @@ def main(
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
     d_params = bs.define_hiperparameters(strategy=strategy)
     ## Seleccion de modelo
-    l_metrics = ['ROI_sb_sin_ea', 'ROI_sin_ea', 'ROI_sb_con_ea', 'ROI_con_ea']
+    # l_metrics = ['ROI_sb_sin_ea', 'ROI_sin_ea', 'ROI_sb_con_ea', 'ROI_con_ea']
+    l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea'] # 'roi_last_50_matches_sin_ea', # No usar Estrategia de apuesta para seleccionar modelo para evitar ruido de esta en la seleccion (posible mala seleccion x overfitting en ea)
     l_weights = [1 / len(l_metrics) for _ in l_metrics]
 
     # (0) Actualizo missing
@@ -142,13 +143,11 @@ def main(
             # df_pred_with_stra, d_metric_con_ea = assess_models_in_prod.determine_metrics(df_pred_with_stra, country, iteration_date)            
 
             # Calculo metricas para guardar en df_ite_bs
-            ## Calculo ROIs en last matches 
-            roi_values_sb_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25], roi_col='G/P_sin_bank', extension='sb_sin_ea')  # Sin ea
-            roi_values_sb_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25], roi_col='G/P_sin_bank', extension='sb_con_ea') # Con ea # sin bank 
-            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25], roi_col='G/P', extension='sin_ea')  # Sin ea
-            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25], roi_col='G/P', extension='con_ea') # Con ea # sin bank 
+            # Calculo ROIs en last matches 
+            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea (sin bank el ROI es igual)
+            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], extension='con_ea') # Con ea (sin bank el ROI es igual)
             ## Calculo ROI con y sin ea
-            roi_sin_bank_sin_ea, roi_sin_bank_con_ea = df_pred['G/P_sin_bank'].sum(), df_pred_with_stra['G/P_sin_bank'].sum()
+            # roi_sin_bank_sin_ea, roi_sin_bank_con_ea = df_pred['G/P_sin_bank'].sum(), df_pred_with_stra['G/P_sin_bank'].sum()
             roi_sin_ea, roi_con_ea = df_pred['G/P'].sum(), df_pred_with_stra['G/P'].sum()
             multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
             
@@ -156,9 +155,8 @@ def main(
             new_row = {
                 'n_model': n_model, 'model_name': model_name, 
                 **d_metric,
-                **roi_values_sb_sin_ea, **roi_values_sb_con_ea,
                 **roi_values_sin_ea, **roi_values_con_ea, 
-                'ROI_sb_sin_ea': roi_sin_bank_sin_ea, 'ROI_sb_con_ea': roi_sin_bank_con_ea, 
+                # 'ROI_sb_sin_ea': roi_sin_bank_sin_ea, 'ROI_sb_con_ea': roi_sin_bank_con_ea, 
                 'ROI_sin_ea': roi_sin_ea, 'ROI_con_ea': roi_con_ea, 'x ea': multiplicador,
                 }
             rows.append(new_row)
@@ -197,12 +195,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [6]
+    # l_countries = [6]
     
     # Defino hiperparametros
-    update_missing = True  # Extract missing + Prepare missing
+    update_missing = False  # Extract missing + Prepare missing
     betting_strat = True # Recalcular estrategia de apuesta por modelo 
-    predict_missing = True # Predecir missing x modelo. betting_strategy debe ser True.
+    predict_missing = False # Predecir missing x modelo. betting_strategy debe ser True.
     export = True
 
     d_countries = {
