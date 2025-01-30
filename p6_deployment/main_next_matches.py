@@ -1031,7 +1031,7 @@ def main(
             df_player_sofifa, df_player_fifa_sofifa = mis.read_last_sofifa_data()  # Levanto datos para preparar missing
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, export=False)
-            df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa)
+            df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
 
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
@@ -1156,7 +1156,7 @@ def main(
             # Preparacion de datos hasta integrate
             df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
             df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
-            df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
+            df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=True) # prod=True pues los partidos aun no se jugaron..
             df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
 
         # Tirar error si estoy prediciendo proximos partidos que ya se jugaron y ya fueron recolectados en missing...
@@ -1282,9 +1282,9 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing'],
     }
 
-    id_country = 6
-    key, value = 'predict', 'try_a_specific_model'
-    data_unders = True
+    id_country = 48
+    key, value = 'missing', 'all'
+    data_unders = False
     n_days = 1
 
     # Defino country, iteration date y modelo
