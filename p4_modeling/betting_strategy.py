@@ -48,7 +48,7 @@ class BettingStrategy:
         
         elif strategy == "kelly":
                 dic = {
-                    'prob_dp': [0, 0.45, 0.55, 0.7],  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+                    'prob_dp': [0], # 0.45, 0.55  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
                     'curva': ['kelly'], 
                     'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
                     'b': [0],
@@ -107,7 +107,7 @@ class BettingStrategy:
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
 
             # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
-            if prob_result_to_bet > thr_prob_min or row['predicted_result'] == 0: #             # if row['dif_prob_mod_bm'] >= thr_prob_min:
+            if prob_result_to_bet > thr_prob_min:
 
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
@@ -337,7 +337,7 @@ class BettingStrategy:
             df: El df puede ser de un solo resultado y por ende, definir una estrategia para dicho resultado...
 
         Mejoras:
-            - Estrategia por resultado...
+            - Evitar doble oportunidad para empate. No quiero usar -0.
         """
         # Definicion de variables
         d_predic, d_hiper, d_metricas = {}, {}, {}
@@ -364,14 +364,14 @@ class BettingStrategy:
             # Aplicar estrategia a df_pred
             df_aux = self.apply_strategy(df, param_dict, prod=False)
 
-            # Calculo de metricas (ROI y expected roi)
+            # Calculo de metricas (ROI y roi_pp)
             df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
 
-            # d_metrics.update({
-            #     'G/P': df_pred_with_metrics['G/P'].sum(), # Lo mismo que el ROI
-            #     'G/P_sin_bank': df_pred_with_metrics['G/P_sin_bank'].sum(),
-            #     'test_accuracy': df_pred_with_metrics['acerte'].sum() / len(df_pred_with_metrics)
-            #     })
+            # Agrego algunas metrics
+            d_metrics.update({ # no agregar mas metricas por que me reemplaza las de df_ite
+                'G/P': df_pred_with_metrics['G/P'].sum(), # Es lo mismo que el ROI
+                'G/P_sin_bank': df_pred_with_metrics['G/P_sin_bank'].sum(),
+                })
           
             if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
@@ -443,14 +443,13 @@ class BettingStrategy:
         df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
-    def select_best_parameters(self, data, metric_col):
+    def select_best_parameters(self, data, col_to_max: str = 'G/P'):
 
-        df = pd.DataFrame.from_dict(data, orient='index')
-        if metric_col not in df.columns:
-            raise ValueError(f"La columna '{metric_col}' no existe en el DataFrame.")
+        # Convierto diccionario a dataframe para facilitar manejo
+        df = pd.DataFrame.from_dict(data, orient='index')      
 
         # Encontrar la fila con el valor máximo de 'metric'
-        n_comb = df[metric_col].idxmax()
+        n_comb = df[col_to_max].idxmax()
         if self.verbose >= 1:
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
@@ -460,7 +459,7 @@ class BettingStrategy:
         return n_comb
          
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, col_to_max: str, d_params: dict = None, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -496,7 +495,7 @@ class BettingStrategy:
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
                 # Determinar mejor estrategia para el resultado            
-                n_comb = self.select_best_parameters(d_metricas, metric_col=col_to_max)
+                n_comb = self.select_best_parameters(d_metricas)
 
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
