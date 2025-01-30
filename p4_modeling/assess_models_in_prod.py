@@ -59,7 +59,7 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
     """
     ## Levanto df_match_miss para obtener goals? ??
     df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
-    l_columns_to_copy = ['goals_home', 'goals_away'] #, 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
+    l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
     
     # Ordeno df por date
     df = df.sort_values(by='date', ascending=False)
