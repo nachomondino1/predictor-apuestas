@@ -450,7 +450,7 @@ def format_df_match(df, prod: bool = False):
         'date': {'dtype': 'datetime64[ns]'},
         'referee': {'dtype': str},
         'venue': {'dtype': str},
-        'capacity': {'dtype': int, 'rango': [0, 200000]},
+        'capacity': {}, # {'dtype': int, 'rango': [0, 200000]}, # ValueError: Error al convertir 'capacity' a <class 'int'>: Cannot convert non-finite values (NA or inf) to integer
         'id_team_home': {'dtype': str},
         'id_team_away': {'dtype': str},
         'id_coach_home': {'dtype': str},
@@ -469,7 +469,7 @@ def format_df_match(df, prod: bool = False):
     
     if not prod:
         column_specs.update({
-            'attendance': {'dtype': int, 'rango': [0, 200000]}, # {}
+            'attendance':  {}, # {'dtype': int, 'rango': [0, 200000]}, 
             'goals_home': {'dtype': 'Int64', 'rango': [0, 12]},
             'goals_away': {'dtype': 'Int64', 'rango': [0, 12]},
             'expected_goals_(xg)_home': {'dtype': 'Float64', 'rango': [0, 12]},
