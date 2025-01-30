@@ -156,7 +156,7 @@ def format_percentage_columns(df, base_columns):
             'total_col_away': {'dtype': 'Int64', 'rango': [0, 3500]},
         }
         # Verificacion de formato
-        df = verify_format(df, column_specs=columm_specs, verbose=1)
+        df = verify_format(df, column_specs=columm_specs, verbose=-1)  # verbose=-1 para evitar warnings por no ver formato de todas las col
 
         # Eliminar las columnas originales
         df.drop(columns=[home_col, away_col], inplace=True)
@@ -315,9 +315,10 @@ def verify_format(df, column_specs, verbose: int = 0):
     """
     # Warning si no se esta verificando el formato de una columna
     l_cols_missing = [col for col in df.columns if col not in column_specs.keys()]
-    if len(l_cols_missing) > 0: # No tiro error porque en prod no tengo todas las col (las reformat) y cuando reformateo tampoco.
-        logger.warning(f"No se esta verificando el formato de las siguientes columnas: {l_cols_missing}.")
-        logger.warning("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
+    if verbose >= 0:
+        if len(l_cols_missing) > 0: # No tiro error porque en prod no tengo todas las col (las reformat) y cuando reformateo tampoco.
+            logger.warning(f"No se esta verificando el formato de las siguientes columnas: {l_cols_missing}.")
+            logger.warning("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
 
     for col, specs in column_specs.items():
         # Verificar si la columna existe en el DataFrame

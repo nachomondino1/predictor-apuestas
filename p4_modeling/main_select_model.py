@@ -77,6 +77,9 @@ def main(
 
     # Return
         Modelo a usar en produccion con su estrategia de apuesta optima (teniendo en cuenta test + missing). 
+
+    Posibles mejoras:
+        - Redefinir metricas en caso que convenga. Por ejemplo, si funciona ROIs_last_matches.
     """
     # Definicion de variables
     rows = []
@@ -135,7 +138,7 @@ def main(
             df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, col_to_max='G/P', d_params=d_params)
 
             # Recalculo metricas --> Pues sino los G/P dependen del bank y cada partido tiene un bank ≠ pues defino estrategia por resultado... Necesito un bank segun la fecha y no por rdo..
-            df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra)
+            df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra) # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
             # df_pred_with_stra, d_metric_con_ea = assess_models_in_prod.determine_metrics(df_pred_with_stra, country, iteration_date)            
 
             # Calculo metricas para guardar en df_ite_bs
@@ -194,12 +197,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [148]
+    l_countries = [6]
     
     # Defino hiperparametros
-    update_missing = False  # Extract missing + Prepare missing
+    update_missing = True  # Extract missing + Prepare missing
     betting_strat = True # Recalcular estrategia de apuesta por modelo 
-    predict_missing = False # Predecir missing x modelo. betting_strategy debe ser True.
+    predict_missing = True # Predecir missing x modelo. betting_strategy debe ser True.
     export = True
 
     d_countries = {
