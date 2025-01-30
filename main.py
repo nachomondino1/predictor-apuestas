@@ -297,14 +297,14 @@ class DataPreparation:
     
         return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa
 
-    def verify_format(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
+    def verify_format(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False):
         """
         Verificacion de formato
         """
         logger.info("\nVerifying data format...")
 
         # Flashscore
-        df_match = format_data.format_df_match(df_match)
+        df_match = format_data.format_df_match(df_match, prod=prod)
         # df_match_player = format_data.format_df_match_player(df_match_player)
         df_match_odds = format_data.format_df_match_odds(df_match_odds)
 
@@ -361,16 +361,6 @@ class DataPreparation:
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away', 'fifa_year'] # main_next a veces no tiene coaches.. deeberia copiar antes...
         cols_to_drop_filt = [col for col in cols_to_drop if col in df.columns]
         df = df.drop(cols_to_drop_filt, axis=1)
-
-        # Verificar cantidad de NaN values en variables jugadores
-        l_player_cols  = [col for col in df.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
-        for col in l_player_cols:
-            nan_percentage = df[col].isna().mean() * 100  # Porcentaje de NaN
-            if nan_percentage < 50:  # Si el porcentaje de NaN es menor al 50%
-                if prod: # En prod a veces recoje un solo partido y por ahi justo ni siquiera es de la comp public..
-                    logger.warning(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
-                else:
-                    raise ValueError(f"La columna '{col}' tiene menos del 50% de valores NaN: {nan_percentage:.2f}%. Revisar posible diferencia en formato en columnas usadas al integrar.")
 
         end = time.time()
         print(f"Integracion de datos en {(end - start)/60:.1f} minutos")
