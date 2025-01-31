@@ -1237,7 +1237,8 @@ def main(
     #_____________________________________________________________ MODELING _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
-
+        logger.critical(f"n_model: {n_model} model_name: {model_name} iteration_date: {iteration_date}")
+        
         # Predigo con modelo cargado
         df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
         df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
@@ -1282,8 +1283,8 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing'],
     }
 
-    id_country = 48
-    key, value = 'missing', 'all'
+    id_country = 148
+    key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 1
 
@@ -1298,7 +1299,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 40, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1447, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1325,7 +1326,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=False, export=True) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
