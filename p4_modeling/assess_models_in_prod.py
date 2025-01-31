@@ -4,7 +4,7 @@ from utils import directories
 from utils.set_up_logging import logger
 import pandas as pd
 from dotenv import load_dotenv
-from p3_data_preparation.construct_data import determine_result
+from p3_data_preparation import construct_data
 from p6_deployment import main_next_matches
 from main import Modeling
 from p3_data_preparation import format_data
@@ -22,10 +22,14 @@ def get_model_predictions_with_missing(n_model, model_name, id_country, country,
     df_pred_missing = predict_missing(id_country, n_model, model_name, iteration_date)
 
     #  Agrego columnas result y expected result
-    df_pred_missing = determine_results(df_pred_missing, country)  
+    df_pred_missing = get_goals(df_pred_missing, country)  
 
     # Concateno df_pred y df_pred missing.
     df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
+
+    # Determino result y expected result segun goals
+    df_predicciones = construct_data.determine_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
+    df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
 
     # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
     # df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # No elimino odds y eso para evitar volver a concatenar...
@@ -53,7 +57,7 @@ def predict_missing(id_country, n_model, model_name, iteration_date): # No se si
 
     return df
 
-def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStrategy????
+def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy????
     """
     Agregar columnas result y acerte en df_pred. Determino result y expected result para poder determinar "acerte"
     """
@@ -71,9 +75,6 @@ def determine_results(df, country):  # Ponerlo como funcion dentro de BettingStr
 
             df.loc[idx, column] = df_match_miss.loc[idx, column] 
 
-    ## Determino result y expected result segun goals
-    df = determine_result(df) # Intento hacerlo antes con df_match pero rompia.
-    # df = determine_expected_result(df, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
     return df
 
 def determine_metrics(df_predicciones, country, iteration_date):

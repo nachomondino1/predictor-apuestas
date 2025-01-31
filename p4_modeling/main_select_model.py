@@ -82,16 +82,11 @@ def main(
         - Redefinir metricas en caso que convenga. Por ejemplo, si funciona ROIs_last_matches.
     """
     # Definicion de variables
-    rows = []
-    d_rows = {}
+    rows, d_rows = [], {}
     d_paths = initialize_directories(country, iteration_date, predict_missing, betting_strat)
     ## Betting strategy
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
     d_params = bs.define_hiperparameters(strategy=strategy)
-    ## Seleccion de modelo
-    # l_metrics = ['ROI_sb_sin_ea', 'ROI_sin_ea', 'ROI_sb_con_ea', 'ROI_con_ea']
-    l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea'] # 'roi_last_50_matches_sin_ea', # No usar Estrategia de apuesta para seleccionar modelo para evitar ruido de esta en la seleccion (posible mala seleccion x overfitting en ea)
-    l_weights = [1 / len(l_metrics) for _ in l_metrics]
 
     # (0) Actualizo missing
     if update_missing:
@@ -136,18 +131,14 @@ def main(
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             
             # Defino estrategia
-            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, col_to_max='G/P', d_params=d_params)
+            df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
 
             # Recalculo metricas --> Pues sino los G/P dependen del bank y cada partido tiene un bank ≠ pues defino estrategia por resultado... Necesito un bank segun la fecha y no por rdo..
             df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra) # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
-            # df_pred_with_stra, d_metric_con_ea = assess_models_in_prod.determine_metrics(df_pred_with_stra, country, iteration_date)            
 
             # Calculo metricas para guardar en df_ite_bs
-            # Calculo ROIs en last matches 
             roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea (sin bank el ROI es igual)
             roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], extension='con_ea') # Con ea (sin bank el ROI es igual)
-            ## Calculo ROI con y sin ea
-            # roi_sin_bank_sin_ea, roi_sin_bank_con_ea = df_pred['G/P_sin_bank'].sum(), df_pred_with_stra['G/P_sin_bank'].sum()
             roi_sin_ea, roi_con_ea = df_pred['G/P'].sum(), df_pred_with_stra['G/P'].sum()
             multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
             
@@ -156,7 +147,6 @@ def main(
                 'n_model': n_model, 'model_name': model_name, 
                 **d_metric,
                 **roi_values_sin_ea, **roi_values_con_ea, 
-                # 'ROI_sb_sin_ea': roi_sin_bank_sin_ea, 'ROI_sb_con_ea': roi_sin_bank_con_ea, 
                 'ROI_sin_ea': roi_sin_ea, 'ROI_con_ea': roi_con_ea, 'x ea': multiplicador,
                 }
             rows.append(new_row)
@@ -174,6 +164,9 @@ def main(
         logger.warning(f"Se evito redefinir estrategia de apuesta por modelo. \n{df_ite_bs}")
 
     # (3) SELECCION DEL MODELO (el que maximiza el ROI con ea)
+    ## Seleccion de modelo
+    l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea'] # 'roi_last_50_matches_sin_ea', # No usar Estrategia de apuesta para seleccionar modelo para evitar ruido de esta en la seleccion (posible mala seleccion x overfitting en ea)
+    l_weights = [1 / len(l_metrics) for _ in l_metrics]
     ## Calculo metrica combinada
     metric_col = 'metric'
     df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights)
@@ -195,12 +188,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [6]
+    l_countries = [55, 59, 77, 148]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing
     betting_strat = True # Recalcular estrategia de apuesta por modelo 
-    predict_missing = False # Predecir missing x modelo. betting_strategy debe ser True.
+    predict_missing = True # Predecir missing x modelo. betting_strategy debe ser True.
     export = True
 
     d_countries = {
