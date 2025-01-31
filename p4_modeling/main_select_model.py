@@ -125,29 +125,30 @@ def main(
                     logger.info("Levanto df_pred sin ea de cuando entrene modelos (solo test)...")
                 logger.info(df_pred)
 
-            # Recalculo metricas   
+            # Recalculo metricas sin ea (test + assess)
             df_pred, d_metric = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)
             if predict_missing:
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-            
+            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea (sin bank el ROI es igual)
+            roi_sin_ea = df_pred['G/P'].sum()
+
             # Defino estrategia
             df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
 
-            # Recalculo metricas --> Pues sino los G/P dependen del bank y cada partido tiene un bank ≠ pues defino estrategia por resultado... Necesito un bank segun la fecha y no por rdo..
+            # Recalculo metricas con ea (test + assess)--> Pues sino los G/P dependen del bank y cada partido tiene un bank ≠ pues defino estrategia por resultado... Necesito un bank segun la fecha y no por rdo..
             df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra) # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
 
             # Calculo metricas para guardar en df_ite_bs
-            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea (sin bank el ROI es igual)
             roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], extension='con_ea') # Con ea (sin bank el ROI es igual)
-            roi_sin_ea, roi_con_ea = df_pred['G/P'].sum(), df_pred_with_stra['G/P'].sum()
+            roi_con_ea = df_pred_with_stra['G/P'].sum()
             multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
             
             # Guardo datos
             new_row = {
                 'n_model': n_model, 'model_name': model_name, 
-                **d_metric,
-                **roi_values_sin_ea, **roi_values_con_ea, 
-                'ROI_sin_ea': roi_sin_ea, 'ROI_con_ea': roi_con_ea, 'x ea': multiplicador,
+                **d_metric, **roi_values_sin_ea, 'ROI_sin_ea': roi_sin_ea,          # sin ea
+                **roi_values_con_ea, 'ROI_con_ea': roi_con_ea,                      # con ea
+                'x ea': multiplicador,
                 }
             rows.append(new_row)
             d_rows[n_model] = [df, df_pred_with_stra]
@@ -187,13 +188,13 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [6]
+    l_countries = [48, 55, 59, 77]
+    # l_countries = [148]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing
     betting_strat = True # Recalcular estrategia de apuesta por modelo 
-    predict_missing = False # Predecir missing x modelo. betting_strategy debe ser True.
+    predict_missing = True # Predecir missing x modelo. betting_strategy debe ser True.
     export = True
 
     d_countries = {
