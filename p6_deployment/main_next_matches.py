@@ -740,8 +740,14 @@ class TrainingDataLoader():
                 logger.info("Hiperparametros cargados:")
                 logger.info(df_hiper)
 
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             print("Falló la carga del df_strategy")
+
+            user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
+            if user_input == 'y':
+                return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
+            
+            raise ValueError(e)
 
         return df_hiper
 
@@ -969,7 +975,7 @@ def main(
         n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = 0.35, no_strategy: bool = False, d_model: dict = None,                          # Modeling
+        porc_m: float = 0.35, d_model: dict = None,                          # Modeling
         verbose: int = 1, export: bool = True,
         ):
     """
@@ -1246,7 +1252,7 @@ def main(
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing or no_strategy)
+        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
@@ -1286,7 +1292,7 @@ if __name__ == "__main__":
     id_country = 148
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
-    n_days = 1
+    n_days = 4
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1299,7 +1305,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1447, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1545, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1326,7 +1332,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=True, export=True) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
