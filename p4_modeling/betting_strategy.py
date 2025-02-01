@@ -446,7 +446,7 @@ class BettingStrategy:
         df = pd.DataFrame.from_dict(data, orient='index')
     
         # Calcular metrica combinada para determinar mejor estrategia
-        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[0.75, 0.25])
+        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[0, 1])
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()

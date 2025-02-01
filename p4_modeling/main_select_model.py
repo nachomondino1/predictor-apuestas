@@ -101,7 +101,7 @@ def main(
     metrics = asses_model.select_metrics(df_ite, col_corr="roi_por_partido", l_metrics=['test_accuracy', 'recall', 'f1_score'] , n_metrics=1)
 
     ## Filtro modelos segun metrica mas importante (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metrics[0], perc_cutoff=1, n_models_max=15)
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metrics[0], perc_cutoff=1, n_models_max=30)
     logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
 
     # (2) ESTRATRAGIA DE APUESTA
@@ -129,17 +129,19 @@ def main(
             df_pred, d_metric = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)
             if predict_missing:
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], extension='sin_ea')  # Sin ea (sin bank el ROI es igual)
+            roi_values_sin_ea = asses_model.calculate_last_matches_roi(df_pred, l_last_matches=[25, 50], suffix='expected', extension='sin_ea')  # Sin ea (sin bank el ROI es igual)
             roi_sin_ea = df_pred['G/P'].sum()
+            exp_roi_sin_ea = df_pred['expected_G/P'].sum()
 
             # Defino estrategia
             df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
 
             # Recalculo metricas con ea (test + assess)--> Pues sino los G/P dependen del bank y cada partido tiene un bank ≠ pues defino estrategia por resultado... Necesito un bank segun la fecha y no por rdo..
             df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra) # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
+            # df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra, name_extension='expected') # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
 
             # Calculo metricas para guardar en df_ite_bs
-            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], extension='con_ea') # Con ea (sin bank el ROI es igual)
+            roi_values_con_ea = asses_model.calculate_last_matches_roi(df_pred_with_stra, l_last_matches=[25, 50], suffix='expected', extension='con_ea') # Con ea (sin bank el ROI es igual)
             roi_con_ea = df_pred_with_stra['G/P'].sum()
             multiplicador = (roi_con_ea - roi_sin_ea) / abs(roi_sin_ea)
             
@@ -147,6 +149,7 @@ def main(
             new_row = {
                 'n_model': n_model, 'model_name': model_name, 
                 **d_metric, **roi_values_sin_ea, 'ROI_sin_ea': roi_sin_ea,          # sin ea
+                'exp_roi_sin_ea': exp_roi_sin_ea,
                 **roi_values_con_ea, 'ROI_con_ea': roi_con_ea,                      # con ea
                 'x ea': multiplicador,
                 }
@@ -166,7 +169,7 @@ def main(
 
     # (3) SELECCION DEL MODELO (el que maximiza el ROI con ea)
     ## Seleccion de modelo
-    l_metrics = ['roi_last_25_matches_sin_ea', 'roi_last_50_matches_sin_ea', 'ROI_sin_ea']
+    l_metrics = ['roi_last_25_matches_sin_ea', 'roi_last_50_matches_sin_ea', 'exp_roi_sin_ea']
     l_weights = [1 / len(l_metrics) for _ in l_metrics]
     ## Calculo metrica combinada
     metric_col = 'metric'
@@ -188,8 +191,8 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    l_countries = [48, 55, 59, 77]
-    # l_countries = [148]
+    l_countries = [48, 55, 59, 77, 148]
+    # l_countries = [48]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing
