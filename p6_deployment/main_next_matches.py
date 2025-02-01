@@ -1245,7 +1245,8 @@ def main(
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing or no_strategy)
+        d_strategy = {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
+        # d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing or no_strategy)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
@@ -1256,7 +1257,7 @@ def main(
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
         # Aplico reduccion a stake
-        df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+        # df['stake_to_bet'] = df['stake_to_bet'] * porc_m
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
