@@ -217,7 +217,7 @@ def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, suffix=No
     roi_values = {}
     for n_matches in l_last_matches:
 
-        col_name = f'roi_last_{n_matches}_matches' if extension is None else f'roi_last_{n_matches}_matches_{extension}' 
+        col_name = f'roi_last_{n_matches}_matches_{extension}' if suffix is None else f'{suffix}_roi_last_{n_matches}_matches_{extension}' 
 
         if len(df) < n_matches:  # Si hay menos partidos de los necesarios, se omite el cálculo
             roi_values[col_name] = None
