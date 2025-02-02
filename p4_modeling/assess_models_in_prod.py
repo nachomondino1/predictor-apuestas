@@ -31,8 +31,9 @@ def get_model_predictions_with_missing(n_model, model_name, id_country, country,
     df_predicciones = construct_data.determine_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
     df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
 
-    # Elimino metricas del df_test viejo (dejo el df_pred_proba raso...)
-    # df_predicciones = df_predicciones.loc[:, ['result', 'predicted_result', 'prob_class_1', 'prob_class_0', 'prob_class_2']]  # No elimino odds y eso para evitar volver a concatenar...
+    # Elimino metricas del df_test viejo (no lo dejo raso al df_pred (e.g dejo las odds y eso) para evitar volver a concatenar...)
+    l_cols = ['result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy','acerte', 'expected_acerte', 'stake_to_bet_norm', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank', 'stake_to_bet']
+    df_predicciones.drop(columns=l_cols, inplace=True)
     return df_predicciones
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
