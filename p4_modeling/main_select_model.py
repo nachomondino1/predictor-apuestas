@@ -172,7 +172,8 @@ def main(
 
     # (3) SELECCION DEL MODELO (el que maximiza el ROI con ea)
     ## Seleccion de modelo
-    l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea', 'expected_roi_last_25_matches_sin_ea', 'exp_roi_sin_ea'] # 'roi_last_50_matches_sin_ea'
+    # l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea', 'expected_roi_last_25_matches_sin_ea', 'exp_roi_sin_ea'] # 'roi_last_50_matches_sin_ea'
+    l_metrics = ['roi_last_25_matches_sin_ea', 'ROI_sin_ea', 'exp_roi_sin_ea'] # 'roi_last_50_matches_sin_ea'
     l_weights = [1 / len(l_metrics) for _ in l_metrics]
     ## Calculo metrica combinada
     metric_col = 'metric'
