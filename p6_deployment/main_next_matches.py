@@ -730,7 +730,7 @@ class TrainingDataLoader():
 
         # Estrategia por resultado
         try:
-            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/__df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
 
             # Si es por resultado
             if len(df_hiper) == 3:

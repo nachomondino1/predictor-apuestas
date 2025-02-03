@@ -68,10 +68,10 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 10
+        n_days = 2
         l_countries = [48, 55, 59, 77, 148]
-        # l_countries = [77, 148]
-        porc_m = 0.25
+        # l_countries = [55]
+        porc_m = 0.15
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
         d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
         # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
