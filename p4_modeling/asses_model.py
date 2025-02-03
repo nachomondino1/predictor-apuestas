@@ -192,37 +192,6 @@ def calculate_roi(df: pd.DataFrame, name_extension=''):
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
 
-def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, extension: str = None):
-    """
-    Calculo ROI en ultimos partidos
-
-    # Parameters
-        df: Dataframe bank inicial y final ya calculados (DataFrame)
-        l_last_matches: Lista con los ultimos n dias a calcular el ROI. (list) 
-        extension: Extension en el nombre de la metrica.
-
-    # Return
-        roi_values: ROI en ultimos n partidos en l_last_matches. (dict)
-    """
-    # Converito date a datetime y ordeno por fecha
-    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df = df.sort_values(by='date', ascending=True)  # Mas antiguo a mas reciente
-
-    # Calcular ROI para cada cantidad de partidos en l_last_matches
-    roi_values = {}
-    for n_matches in l_last_matches:
-
-        col_name = f'roi_last_{n_matches}_matches' if extension is None else f'roi_last_{n_matches}_matches_{extension}' 
-
-        if len(df) < n_matches:  # Si hay menos partidos de los necesarios, se omite el cálculo
-            roi_values[col_name] = None
-            continue
-        
-        df_filt = df.tail(n_matches)  # Últimos n partidos
-        roi_values[col_name] = df_filt['G/P_sin_bank'].sum()
-
-    return roi_values
-
 def calculate_reality_roi(df: pd.DataFrame):
     """
     Calcula ROI simulando la forma de apostar de la realidad, de manera de saber que ROI esperar en la realidad.
@@ -489,8 +458,10 @@ def concatenate_dfs(
     
     df_match = df_match[df_match.index.isin(df_pred_proba.index)]
     df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
-    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
     df_match = df_match[l_cols_match]
+
+    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
 
     # Concatenación selectiva
     columns_to_concat = [
@@ -501,9 +472,8 @@ def concatenate_dfs(
 
     if df_filled is not None:
         df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
-        # l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-        # columns_to_concat.append(df_filled[l_cols_fill])
-        columns_to_concat.append(df_filled)
+        l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+        columns_to_concat.append(df_filled[l_cols_fill])
         
     df_predicciones = pd.concat(columns_to_concat, axis=1)
     return df_predicciones

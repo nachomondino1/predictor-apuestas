@@ -726,11 +726,11 @@ class TrainingDataLoader():
          - Levantar parametros por resultado...
         """
         if predict_missing:
-            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
+            return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'normalized': True}
 
         # Estrategia por resultado
         try:
-            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/__df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
 
             # Si es por resultado
             if len(df_hiper) == 3:
@@ -740,10 +740,18 @@ class TrainingDataLoader():
                 logger.info("Hiperparametros cargados:")
                 logger.info(df_hiper)
 
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             print("Falló la carga del df_strategy")
 
+            user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
+            if user_input == 'y':
+                return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
+            
+            raise ValueError(e)
+
+        # return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True} # Temporalmente no uso estrategia de apuesta x rdo
         return df_hiper
+
 
 # Missing data
 class MissingData:
@@ -969,7 +977,7 @@ def main(
         n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = 0.35, no_strategy: bool = False, d_model: dict = None,                          # Modeling
+        porc_m: float = None, d_model: dict = None,                          # Modeling
         verbose: int = 1, export: bool = True,
         ):
     """
@@ -1031,7 +1039,7 @@ def main(
             df_player_sofifa, df_player_fifa_sofifa = mis.read_last_sofifa_data()  # Levanto datos para preparar missing
             df_match_miss, df_match_player_miss, df_player_fifa_sofifa = dp.format_data(df_match_miss, df_match_player_miss, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, export=False)
-            df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa)
+            df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
 
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
@@ -1156,7 +1164,7 @@ def main(
             # Preparacion de datos hasta integrate
             df_match, df_match_odds = dp.format_data_new(df_match, df_match_odds)
             df_match, df_match_player = dp.clean_data_new(df_match, df_match_player)
-            df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
+            df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=True) # prod=True pues los partidos aun no se jugaron..
             df = dp.integrate_data_new(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa)  # si no tengo formaciones, no tiene sentido integrar... Integrar en el fondo es reemplazar nombre de jugadores por su rating, edad, valor_mercado, etc
 
         # Tirar error si estoy prediciendo proximos partidos que ya se jugaron y ya fueron recolectados en missing...
@@ -1237,7 +1245,8 @@ def main(
     #_____________________________________________________________ MODELING _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
-
+        logger.critical(f"n_model: {n_model} model_name: {model_name} iteration_date: {iteration_date}")
+        
         # Predigo con modelo cargado
         df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
         df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
@@ -1245,8 +1254,7 @@ def main(
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
-        # d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing or no_strategy)
+        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
@@ -1257,7 +1265,8 @@ def main(
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
         # Aplico reduccion a stake
-        # df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+        if porc_m is not None: # asi no lo aplico en predict_missing
+            df['stake_to_bet'] = df['stake_to_bet'] * porc_m
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
@@ -1283,10 +1292,10 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing'],
     }
 
-    id_country = 6
+    id_country = 77
     key, value = 'predict', 'try_a_specific_model'
-    data_unders = True
-    n_days = 1
+    data_unders = False
+    n_days = 4
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1299,7 +1308,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 40, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1623, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1326,7 +1335,7 @@ if __name__ == "__main__":
 
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, no_strategy=False, export=True) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
