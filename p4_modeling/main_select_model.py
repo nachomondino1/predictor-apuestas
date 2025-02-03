@@ -207,8 +207,8 @@ def determine_roi(df_pred):
 
 if __name__ == "__main__":
     # Defino parametros
-    l_countries = [55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [6]
     
     # Defino hiperparametros
     update_missing = False  # Extract missing + Prepare missing
