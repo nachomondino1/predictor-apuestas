@@ -726,7 +726,7 @@ class TrainingDataLoader():
          - Levantar parametros por resultado...
         """
         if predict_missing:
-            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
+            return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'normalized': True}
 
         # Estrategia por resultado
         try:
@@ -749,7 +749,9 @@ class TrainingDataLoader():
             
             raise ValueError(e)
 
+        # return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True} # Temporalmente no uso estrategia de apuesta x rdo
         return df_hiper
+
 
 # Missing data
 class MissingData:
@@ -975,7 +977,7 @@ def main(
         n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = 0.35, d_model: dict = None,                          # Modeling
+        porc_m: float = None, d_model: dict = None,                          # Modeling
         verbose: int = 1, export: bool = True,
         ):
     """
@@ -1252,8 +1254,7 @@ def main(
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
-        # d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing)
+        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
@@ -1264,7 +1265,8 @@ def main(
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
         # Aplico reduccion a stake
-        # df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+        if porc_m is not None: # asi no lo aplico en predict_missing
+            df['stake_to_bet'] = df['stake_to_bet'] * porc_m
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
@@ -1290,7 +1292,7 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing'],
     }
 
-    id_country = 148
+    id_country = 77
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 4
@@ -1306,7 +1308,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1545, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1623, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
