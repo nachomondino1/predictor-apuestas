@@ -41,7 +41,7 @@ class BettingStrategy:
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': [0],
-                'curva': ['kelly'],
+                'curva': ['linear'],
                 'm': [10],
                 'b': [0],
             }
@@ -77,8 +77,8 @@ class BettingStrategy:
                
             dic = {
                 'prob_dp': [0],
-                'curva': ['linear'], # 'equal', 'kelly', 'exponential'
-                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110],
+                'curva': ['linear', 'kelly'], # 'equal', 'kelly', 'exponential'
+                'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
                 'b': [0],
             }
 
@@ -446,7 +446,7 @@ class BettingStrategy:
         df = pd.DataFrame.from_dict(data, orient='index')
     
         # Calcular metrica combinada para determinar mejor estrategia
-        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[0, 1])
+        df = calculate_combined_metric(df, l_metrics=['roi'], l_weights=[1])
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
