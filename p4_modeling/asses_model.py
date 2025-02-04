@@ -88,6 +88,25 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     return df_match_odds
 
 # Distribucion de resultados
+def determine_confidence_margin(df):
+    """
+    Calcula el confidence_margin como la diferencia entre la probabilidad más alta 
+    y la segunda más alta. 
+
+    Parameters:
+        df (pd.DataFrame): DataFrame con las columnas de probabilidades.
+
+    Returns:
+        pd.DataFrame: DataFrame con confidence_margin calculado y stake ajustado.
+    """
+    
+    # Obtener las dos probabilidades más altas por fila
+    probs_sorted = np.sort(df[['prob_class_0', 'prob_class_1', 'prob_class_2']], axis=1)
+    
+    # Calcular confidence_margin
+    df['confidence_margin'] = probs_sorted[:, -1] - probs_sorted[:, -2]
+    return df
+
 def determine_distribution(df, var_resp: str = 'result', var_pred: str = 'predicted_result'):
     """
     Determina la cantidad de predicciones por resultado y las compara con la distribucion de resultados reales.
