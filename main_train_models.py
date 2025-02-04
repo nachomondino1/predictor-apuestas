@@ -470,7 +470,7 @@ def define_params_space(id_country, fast: bool = False):
             },
             'clean_data_2': {
                 'n_years_to_select': [2, 3, 5, 10],
-                'fill_na': [None, "0"],  # 'ml'
+                'fill_na': [None, "0", 'ml'], 
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
