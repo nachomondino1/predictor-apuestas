@@ -41,7 +41,7 @@ class BettingStrategy:
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': [0],
-                'curva': ['kelly'],
+                'curva': ['linear'],
                 'm': [10],
                 'b': [0],
             }
