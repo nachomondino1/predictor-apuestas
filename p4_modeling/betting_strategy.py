@@ -459,7 +459,7 @@ class BettingStrategy:
         return n_comb
          
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, d_params, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -477,9 +477,6 @@ class BettingStrategy:
         logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
         d_metrics_res, d_hiper_res = {}, {}
         best_df_pred = pd.DataFrame()
-
-        if d_params is None:
-            d_params = self.define_hiperparameters(strategy='kelly')
 
         # Por resultado
         for pred in [1, 0, 2]:
@@ -504,12 +501,7 @@ class BettingStrategy:
 
             else:
                 logger.warning(f"No hay predicciones con el resultado {pred} (o sea, el modelo no lo predice). Asigno strategy de train.")
-                d_hiper_res[pred] = {
-                    'prob_dp': 0,
-                    'curva': 'linear',
-                    'm': 10,
-                    'b': 0,
-                    }
+                d_hiper_res[pred] = self.define_hiperparameters(strategy="train")
                 d_metrics_res[pred] = {}
 
         # Concateno datos y guardo
