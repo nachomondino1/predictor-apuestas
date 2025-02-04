@@ -540,10 +540,8 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
                 suma = (np.sum(values_home_clean) + np.sum(values_away_clean))
 
                 # Calcular la mediana considerando ambos arreglos
-                all_values_clean = np.concatenate([values_home_clean, values_away_clean])
                 media = suma / total_partidos
-                mediana = np.median(all_values_clean)
-                val_to_copy = mediana
+                val_to_copy = media
 
                 # Si hay al menos un valor que promediar, guardo promedio
                 if total_partidos > 0:

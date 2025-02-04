@@ -10,31 +10,24 @@ from main import Modeling
 from p3_data_preparation import format_data
 from p4_modeling import asses_model
 
-def get_model_predictions_with_missing(n_model, model_name, id_country, country, iteration_date):
+def get_model_predictions_with_missing(df_pred_test, n_model, model_name, id_country, country, iteration_date):
     """
     Obtengo df_probabilities test + missing.
     """
-    # Levanto df_predicciones de test
-    df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-    logger.info(df_pred.shape)
-
     # Predict missing
     df_pred_missing = predict_missing(id_country, n_model, model_name, iteration_date)
 
-    #  Agrego columnas result y expected result
-    df_pred_missing = get_goals(df_pred_missing, country)  
+    # Concateno df_pred_test y df_pred missing.
+    df_predicciones = pd.concat([df_pred_test, df_pred_missing], axis=0)
+    l_cols = ['date', 'id_team_home', 'id_team_away', 'predicted_result', 'prob_class_1', 'prob_class_2', 'prob_class_0', 'odds_home', 'odds_draw', 'odds_away']
+    df_predicciones = df_predicciones.loc[:, l_cols]
 
-    # Concateno df_pred y df_pred missing.
-    df_predicciones = pd.concat([df_pred, df_pred_missing], axis=0)
+    #  Agrego columnas result y expected result
+    df_predicciones = get_goals(df_predicciones, country)  
 
     # Determino result y expected result segun goals
     df_predicciones = construct_data.determine_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
     df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
-
-    # Elimino metricas del df_test viejo (no lo dejo raso al df_pred (e.g dejo las odds y eso) para evitar volver a concatenar...)
-    l_cols = ['result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy','acerte', 'expected_acerte', 'stake_to_bet_norm', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank', 'stake_to_bet']
-    l_cols_filt = [col for col in l_cols if col in df_predicciones.columns]
-    df_predicciones.drop(columns=l_cols_filt, inplace=True)
     return df_predicciones
         
 def predict_missing(id_country, n_model, model_name, iteration_date): # No se si funciona ok el run_missing
@@ -68,6 +61,7 @@ def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy???
     l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
     
     # Ordeno df por date
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
     df = df.sort_values(by='date', ascending=False)
 
     # Asignar valores de df_match_miss a df solo en las columnas y filas correspondientes
