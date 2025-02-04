@@ -497,7 +497,8 @@ class DataPreparation:
 
             ## 2) EN ULTIMOS N PARTIDOS
             for n_matches in n_last_matches:
-                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches) # Hay que ver si funciona tanto sin como con localia.
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True) # Hay que ver si funciona tanto sin como con localia.
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_matches*8)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
             # Por stat (e.g. shots_on_goal)
@@ -834,7 +835,7 @@ class DataPreparation:
         # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
             n_cols = len(df.columns)-1  # -1 por variable respuesta
-            l_important_features, df_normalized = select_data.select_best_features(df, self.var_resp, thr_fs, graf=False)
+            l_important_features, df_normalized = select_data.select_best_features(df=df, var_resp=self.var_resp, thr_fs=thr_fs, graf=False)
             l_col_eliminated = list(df.columns.difference(l_important_features))
             df = df.loc[:, l_important_features + [self.var_resp]]
 

@@ -211,56 +211,57 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
         - Hacerlo por localia usando "segun_localia"
     """
     # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=False) # Fundamental 
-    l_teams = df['id_team_home'].unique()
+    df = df.sort_values(by='date', ascending=True) # Fundamental 
 
-    # Inicializar columnas para evitar errores con columnas inexistentes
-    l_suf = ['n_wins_last', 'n_draws_last', 'n_loss_last']
-    for col in l_suf:
-        for location in ['home', 'away']:
-            df[f'{col}_{n_matches}_matches_{location}'] = np.nan
+    team_matches = {}
+    # Construyo df por equipo
+    for team in pd.concat([df['id_team_home'], df['id_team_away']]).unique():
+        if segun_localia:
+            team_matches[f"{team}_local"] = df[df['id_team_home'] == team]
+            team_matches[f"{team}_visitante"] = df[df['id_team_away'] == team]
+        else:
+            team_matches[team] = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
+        
+    # Por equipo
+    for team_key, df_team in team_matches.items():
 
-    # Por team
-    for team in l_teams:
-    
-        # Seleciono partidos en los que jugo el team
-        df_match_team = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
- 
-        # Por match del team
-        for idx, row in df_match_team.iterrows():
+        team = team_key.split('_')[0] if segun_localia else team_key
 
+        # Por partido
+        for idx, row in df_team.iterrows():
+            match_date = row['date']
             home_or_away = 'home' if row['id_team_home'] == team else 'away'
-            
-            # Obtener el índice posicional del registro actual
-            current_pos = df_match_team.index.get_loc(idx)
 
-            # Seleccionar los 10 registros debajo del actual
-            df_match_team_filt = df_match_team.iloc[current_pos + 1 : current_pos + n_matches + 1]
-            n_games = len(df_match_team_filt)
-            # logger.info(df_match_team_filt)
+            # Filtrar últimos n partidos antes del actual
+            df_last_matches = df_team[df_team['date'] < match_date].tail(n_matches)
+            n_games = len(df_last_matches)
 
-            df_match_team_filt_home = df_match_team_filt[df_match_team_filt['id_team_home'] == team]
-            df_match_team_filt_away = df_match_team_filt[df_match_team_filt['id_team_away'] == team]
+            # Obtener los valores de la variable considerando si fue home o away
+            df_match_team_filt_home = df_last_matches[df_last_matches['id_team_home'] == team]
+            df_match_team_filt_away = df_last_matches[df_last_matches['id_team_away'] == team]
             
             if n_games != (len(df_match_team_filt_home) + len(df_match_team_filt_away)):
-                logger.error(f"Error en filtrado de partidos en la construccion... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_match_team_filt)}")
+                logger.error(f"Error en filtrado de partidos en la construccion... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_last_matches)}")
+                raise ValueError
 
             # Construyo variables
             n_wins = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 1]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 2])
-            n_draws = len(df_match_team_filt[df_match_team_filt['result'] == 0])
+            n_draws = len(df_last_matches[df_last_matches['result'] == 0])
             n_loss = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 1])
 
             if n_games != (n_wins + n_draws + n_loss):
                 logger.error(f"Error en determinacion de resultados en ultimos dias {n_wins} + {n_draws} + {n_loss} != {n_games}")
+                raise ValueError
 
             # Asignar valores al DataFrame original
             if n_games > 0:
                 df.at[idx, f'n_wins_last_{n_matches}_matches_{home_or_away}'] = n_wins
                 df.at[idx, f'n_draws_last_{n_matches}_matches_{home_or_away}'] = n_draws
                 df.at[idx, f'n_loss_last_{n_matches}_matches_{home_or_away}'] = n_loss
-  
+
     # Calculo diferencia entre local y visitate
-    for col in l_suf:
+    l_cols = ['n_wins_last', 'n_draws_last', 'n_loss_last']
+    for col in l_cols:
         dif_col = f'dif_{col}_{n_matches}_matches_by_loc' if segun_localia else f'dif_{col}_{n_matches}_matches'
         col_home, col_away = f'{col}_{n_matches}_matches_home', f'{col}_{n_matches}_matches_away'
         
@@ -528,7 +529,7 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
     Mejoras:
         - Que cada n_last_matches tenga su limite de dias calculado proporcionnalmente... en vez de que sea un hiper...
     """
-    df = df.sort_values(by='date', ascending=True).copy()
+    df = df.sort_values(by='date', ascending=True)
     df.to_excel("/Users/nachomondino/Desktop/asdjgferjg.xlsx")
     team_matches = {}
     n_days = n_matches * 8  # 1 partido cada 8 dias...
