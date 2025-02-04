@@ -1295,13 +1295,13 @@ if __name__ == "__main__":
     directorio = os.getenv('BASE_DIR_LOCAL')
     d_run_type = {
         'missing': ['only_extract', 'only_preparation', 'all'],
-        'predict': ['try_a_specific_model', 'predict_missing'],
+        'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
     id_country = 6
-    key, value = 'predict', 'try_a_specific_model'
-    data_unders = False
-    n_days = 4
+    key, value = 'predict', 'prod'
+    data_unders = True
+    n_days = 2
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1342,6 +1342,9 @@ if __name__ == "__main__":
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
             df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=True) 
+
+        elif value == "prod":
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=0.3, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
