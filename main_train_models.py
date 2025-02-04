@@ -181,15 +181,15 @@ def comprehensive_search(
         for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
             # Asigno valor a cada hiperpametro
-            n_last_matches, n_years_h2h, segun_localia = param_values_2
+            n_last_matches, n_years_h2h, segun_localia, calculate_dif = param_values_2
             if verbose >= 0:
                 logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
-                print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ')
+                print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; calculate_dif:{calculate_dif}')
 
             # Construyo datos
-            path_cons = f"{path_clean}__{n_last_matches}_{n_years_h2h}_{segun_localia}"
+            path_cons = f"{path_clean}__{n_last_matches}_{n_years_h2h}_{segun_localia}_{calculate_dif}"
             path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_cons}.xlsx'
-            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, export=True)
+            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, export=True)
             if export:
                 df_constructed.to_excel(path_construct, index=True)
 
@@ -261,7 +261,7 @@ def comprehensive_search(
                             row_data = {
                                 'n_iteration': cont_iter, 
                                 'comp_to_select': comp_to_select,
-                                'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia,
+                                'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif,
                                 'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                 'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
                                 'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
@@ -461,12 +461,13 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp'] ], 
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
             },
             'construct': {
                 'n_last_matches': [[5], [15], [5, 15]],  # Variables historicas en ultimos n partidos
                 'n_years_h2h': [2],
                 'segun_localia': [False, True],
+                'calculate_dif': [False],
             },
             'clean_data_2': {
                 'n_years_to_select': [2, 3, 5, 10],
@@ -474,12 +475,12 @@ def define_params_space(id_country, fast: bool = False):
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [0.1, 0.35, 0.5], # 0.75
+                'thr_fs': [0.1, 0.2, 0.35, 0.5], 
             },
             'modeling': {
                 'val_size': [0.1],
                 'n_reg_test': [100],
-                'bal_type': [None, 'under'], # None, 
+                'bal_type': ['under'], # None, 
                 'k': [10]
             }
         }
@@ -521,7 +522,6 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [55, 59, 77, 148]
     l_countries = [48]
 
     data_unders = False

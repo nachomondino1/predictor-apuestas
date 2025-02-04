@@ -524,13 +524,13 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
 def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
     """
+    A partir de columnas "diferencia" (e.g. dif goals)
     Obtiene el promedio de las stats en los últimos partidos considerando fecha y cantidad de encuentros.
     
     Mejoras:
         - Que cada n_last_matches tenga su limite de dias calculado proporcionnalmente... en vez de que sea un hiper...
     """
     df = df.sort_values(by='date', ascending=True)
-    df.to_excel("/Users/nachomondino/Desktop/asdjgferjg.xlsx")
     team_matches = {}
     n_days = n_matches * 8  # 1 partido cada 8 dias...
 
@@ -572,6 +572,52 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
 
     return df
 
+def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool): # sin dif previa. Verificar que construye bien.
+    """
+    A partir de columnas "home" y "away" (e.g. goals_home y goals_away)
+    """
+    # Ordeno por fecha ascendente
+    df = df.sort_values(by='date', ascending=True) # True pues uso tail()
+
+    # inicializo diccionarios (para evitar Performance Warning)
+    name_ext = "loc_" if segun_localia else ""
+
+    # Por partido
+    for id_match, row in df.iterrows():
+        
+        # Obtener los últimos partidos antes de la fecha actual
+        match_date = row['date']
+        df_past_matches = df[df['date'] < match_date]
+
+        # Por equipo
+        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
+        for col_team, home_or_away in d_teams.items():
+
+            variable_form = f'{variable}_{home_or_away}'
+            team = row[col_team]
+
+            if segun_localia:
+                # Selecciono ultimos n matches del equipo en esa localia
+                df_team_matches = df_past_matches.loc[df_team_matches[col_team] == team].tail(n_matches)
+                values = df_team_matches[variable_form]
+
+            else:
+                # Selecciono ultimos n matches del equipo
+                df_team_matches = df_past_matches.loc[(df_past_matches["id_team_home"] == team) | (df_past_matches["id_team_away"] == team)].tail(n_matches)
+
+                # Extraer valores de la variable correspondiente
+                values_home = df_team_matches.loc[df_team_matches["id_team_home"] == team, f"{variable}_home"]
+                values_away = df_team_matches.loc[df_team_matches["id_team_away"] == team, f"{variable}_away"]
+                values = pd.concat([values_home, values_away])
+
+            # Convertir a numérico y eliminar NaN
+            values = pd.to_numeric(values, errors="coerce").dropna()
+
+            # Guardar media solo si hay datos
+            if len(values) > 0:
+                df.loc[id_match, f"{name_ext}mean_last_{n_matches}_matches_{variable_form}"] = values.mean()
+
+    return df
 
 ## Player
 def calculate_dif_col_players(df: pd.DataFrame):

@@ -429,7 +429,7 @@ class DataPreparation:
         ]
         return self.stats_to_derive + self.stats_to_construct
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, with_h2h: bool = True, with_historic: bool = True, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_h2h: bool = True, with_historic: bool = True, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -503,34 +503,33 @@ class DataPreparation:
 
             # Por stat (e.g. shots_on_goal)
             logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
-            for var in self.stats_to_construct: 
-                logger.info(f"Estadistica a promediar: {var}")
-                dif_var = f'dif_{var}'
-
-                # Determino la diferencia de la estadistica entre equipo local y visitante de cada partido
-                df[dif_var] = df[f'{var}_home'] - df[f'{var}_away']  # (e.g. dif_goles = goles_home - goles_away)
-                df = df.drop([f'{var}_home', f'{var}_away'], axis=1)  # (e.g. borro goles_home y goles_away)
+            for var in self.stats_to_construct:
+                logger.info(f"Estadística a promediar: {var}")
                 
-                # Por periodo de tiempo en el que calcular promedio
-                for n_matches in n_last_matches:
-                    
-                    # Calculo promedio de stats en ultimos partidos y la diferencia entre local y visitante
-                    # Determine para cada equipo de un partido, el promedio en los ultimos partidos de dicha diferencia de la 
-                    df = construct_data.determine_mean_in_last_matches(df, n_matches=n_matches, variable=dif_var, segun_localia=False)
+                cols_to_drop = []
+                variable = f'dif_{var}' if calculate_dif else var
 
-                    # Determino la diferencia entre promedio del local y del visitante (por ej, diferencia entre prom_dif_goles_home y prom_dif_goles_away)
-                    col1, col2 = f'mean_last_{n_matches}_matches_{dif_var}_home', f'mean_last_{n_matches}_matches_{dif_var}_away'
-                    df[f'dif_mean_last_{n_matches}_matches_{dif_var}'] = df[col1] - df[col2] 
-                    df = df.drop(columns=[col1, col2], axis=1)
+                if calculate_dif:
+                    df[variable] = df[f'{var}_home'] - df[f'{var}_away']
+                    cols_to_drop.extend([variable])
+                cols_to_drop.extend([f'{var}_home', f'{var}_away'])
+
+                for n_matches in n_last_matches:
+                    func = construct_data.determine_mean_in_last_matches if calculate_dif else construct_data.determine_mean_in_last_matches_2
+                    df = func(df, n_matches=n_matches, variable=variable, segun_localia=False)
+
+                    col1, col2 = f'mean_last_{n_matches}_matches_{variable}_home', f'mean_last_{n_matches}_matches_{variable}_away'
+                    df[f'dif_mean_last_{n_matches}_matches_{variable}'] = df[col1] - df[col2]
+                    cols_to_drop.extend([col1, col2])
 
                     if segun_localia:
-                        df = construct_data.determine_mean_in_last_matches(df, n_matches=n_matches, variable=f'dif_{var}', segun_localia=True)
-                        col_h1, col_h2 = f'loc_mean_last_{n_matches}_matches_{dif_var}_home', f'loc_mean_last_{n_matches}_matches_{dif_var}_away'
-                        df[f'loc_dif_mean_last_{n_matches}_matches_{dif_var}'] = df[col_h1] - df[col_h2] 
-                        df = df.drop(columns=[col_h1, col_h2], axis=1)
+                        df = func(df, n_matches=n_matches, variable=variable, segun_localia=True)
+                        col_h1, col_h2 = f'loc_mean_last_{n_matches}_matches_{variable}_home', f'loc_mean_last_{n_matches}_matches_{variable}_away'
+                        df[f'loc_dif_mean_last_{n_matches}_matches_{variable}'] = df[col_h1] - df[col_h2]
+                        cols_to_drop.extend([col_h1, col_h2])
+                
+                df.drop(columns=cols_to_drop, inplace=True)
 
-                df = df.drop([dif_var], axis=1)
-              
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
             # df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
             # df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
@@ -656,6 +655,10 @@ class DataPreparation:
         # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones)
         n_reg_inic = len(df_train_val)
         df_train_val = clean_data.delete_rows_nan(df_train_val, porc_nan_max=porc_nan_max) # no mas del 50% de nan 
+        if len(df_train_val) == 0:
+            logger.error(f"Se eliminó el 100% de las filas de df_train_val por al menos {porc_nan_max}% de nan values.")
+            raise ValueError
+
         if self.verbose >= 0:
             print(f"(1) Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
             logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
