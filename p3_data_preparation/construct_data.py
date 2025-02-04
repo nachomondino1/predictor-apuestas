@@ -578,6 +578,7 @@ def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable:
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=True) # True pues uso tail()
+    n_days = n_matches * 8  # 1 partido cada 8 dias...
 
     # inicializo diccionarios (para evitar Performance Warning)
     name_ext = "loc_" if segun_localia else ""
@@ -589,6 +590,10 @@ def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable:
         match_date = row['date']
         df_past_matches = df[df['date'] < match_date]
 
+        # Filtrar por días límite
+        limit_date = match_date - timedelta(days=n_days)
+        df_past_matches = df_past_matches[df_past_matches['date'] >= limit_date]
+        
         # Por equipo
         d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
         for col_team, home_or_away in d_teams.items():
@@ -598,7 +603,7 @@ def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable:
 
             if segun_localia:
                 # Selecciono ultimos n matches del equipo en esa localia
-                df_team_matches = df_past_matches.loc[df_team_matches[col_team] == team].tail(n_matches)
+                df_team_matches = df_past_matches.loc[df_past_matches[col_team] == team].tail(n_matches)
                 values = df_team_matches[variable_form]
 
             else:
