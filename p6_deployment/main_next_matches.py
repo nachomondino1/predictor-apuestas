@@ -730,7 +730,7 @@ class TrainingDataLoader():
 
         # Estrategia por resultado
         try:
-            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/__df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
+            df_hiper = pd.read_excel(f"{self.BASE_DIR_mod}/best_model/3_bet_strategy/df_strategy_{self.n_model}_{self.model_name}.xlsx", index_col=0)
 
             # Si es por resultado
             if len(df_hiper) == 3:
@@ -1292,7 +1292,7 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing'],
     }
 
-    id_country = 77
+    id_country = 6
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 4
@@ -1308,7 +1308,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1623, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 616, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
