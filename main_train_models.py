@@ -461,13 +461,13 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['all_comp']], 
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], #  d_comps['all_comp']
             },
             'construct': {
                 'n_last_matches': [[5], [15], [5, 15]],  # Variables historicas en ultimos n partidos
                 'n_years_h2h': [2],
-                'segun_localia': [False, True],
-                'calculate_dif': [False],
+                'segun_localia': [True, False],
+                'calculate_dif': [True, False],
             },
             'clean_data_2': {
                 'n_years_to_select': [2, 3, 5, 10],
@@ -475,13 +475,13 @@ def define_params_space(id_country, fast: bool = False):
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [0.1, 0.2, 0.35, 0.5], 
+                'thr_fs': [0.1, 0.2, 0.35],  # 0.5
             },
             'modeling': {
                 'val_size': [0.1],
                 'n_reg_test': [100],
                 'bal_type': ['under'], # None, 
-                'k': [10]
+                'k': [5]
             }
         }
 
@@ -522,7 +522,7 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    # l_countries = [48]
 
     data_unders = False
     update_sofifa = True
