@@ -533,7 +533,8 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
     df = df.sort_values(by='date', ascending=True)
     team_matches = {}
     multplicador = 16 if segun_localia else 8
-    n_days = n_matches * multplicador  # 1 partido cada 8 dias...
+    n_days = n_matches * multplicador  # 1 partido cada multiplicador dias...
+    results = {}
 
     # Construyo df por equipo
     for team in pd.concat([df['id_team_home'], df['id_team_away']]).unique():
@@ -569,7 +570,14 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
             
             # Calcular promedio
             mean_value = s_values.mean() if not s_values.empty else np.nan
-            df.loc[idx, f'{name_ext}mean_last_{n_matches}_matches_{variable}_{home_or_away}'] = mean_value
+
+            results.setdefault(idx, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable}_{home_or_away}"] = mean_value
+            # df.loc[idx, f'{name_ext}mean_last_{n_matches}_matches_{variable}_{home_or_away}'] = mean_value
+            
+    # Convertir a DataFrame y hacer join con el original
+    if results:
+        df_update = pd.DataFrame.from_dict(results, orient="index")
+        df = df.join(df_update)
 
     return df
 
@@ -582,6 +590,7 @@ def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable:
     multplicador = 16 if segun_localia else 8
     n_days = n_matches * multplicador  # 1 partido cada multiplicador dias 
     d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
+    results = {}
 
     # inicializo diccionarios (para evitar Performance Warning)
     name_ext = "loc_" if segun_localia else ""
@@ -618,8 +627,13 @@ def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable:
             values = pd.to_numeric(values, errors="coerce").dropna()
 
             # Guardar media solo si hay datos
-            if len(values) > 0:
-                df.loc[id_match, f"{name_ext}mean_last_{n_matches}_matches_{variable_form}"] = values.mean()
+            if not values.empty:
+                results.setdefault(id_match, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable_form}"] = values.mean()
+    
+    # Convertir el diccionario a un DataFrame y actualizar el original
+    if results:
+        df_update = pd.DataFrame.from_dict(results, orient="index")
+        df = df.join(df_update)  # Mucho más eficiente que usar df.loc en cada iteración
 
     return df
 
