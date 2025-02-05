@@ -357,7 +357,7 @@ class DataPreparationNew(DataPreparation):
         return df
     
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
-                           n_last_matches:list, n_years_h2h: int, segun_localia: bool, columns_used: list, verbose: int = 0):
+                           n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, columns_used: list, verbose: int = 0):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -383,7 +383,7 @@ class DataPreparationNew(DataPreparation):
             self.determine_stats_to_use()
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, with_h2h=False, export=False)
+            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, with_h2h=False, export=False)
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
 
         # Si no hay "ultimos partidos"
@@ -655,6 +655,7 @@ class TrainingDataLoader():
         d['n_last_matches'] = eval(row_hiper['n_last_matches']) 
         d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
         d['segun_localia'] = row_hiper['segun_localia'] # .values[0]
+        d['calculate_dif'] = row_hiper['calculate_dif'] # .values[0]
         ## Clean_data_2
         n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
         d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
@@ -667,7 +668,7 @@ class TrainingDataLoader():
         d['selected_columns'] = selected_columns
 
         self.path_clean = f'{d['comp_to_select']}'
-        self.path_construct = f'{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}'
+        self.path_construct = f'{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['calculate_dif']}'
         self.path_clean_2 = f'{d['n_years_to_select']}_{d['fill_na']}'
 
         if self.verbose >= 0:
@@ -1203,7 +1204,7 @@ def main(
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
         df = dp.construct_data_new(
             df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
-            n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], columns_used=columns_scaled
+            n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], calculate_dif=d_hiper['calculate_dif'],columns_used=columns_scaled
             )
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
         df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
@@ -1284,7 +1285,7 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing'],
     }
 
-    id_country = 55
+    id_country = 48
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 4
@@ -1293,7 +1294,7 @@ if __name__ == "__main__":
     d_countries = {
         6: ["argentina", '2025-01-28'], 
         # 48: ["england", '2025-01-22'], 
-        48: ["england", '2025-02-02'], 
+        48: ["england", '2025-02-05'], 
         55: ["france", '2025-01-22'], 
         59: ["germany", '2025-01-23'], 
         77: ["italy", '2025-01-20'],
@@ -1301,7 +1302,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 81, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 145, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
