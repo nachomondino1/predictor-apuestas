@@ -522,13 +522,9 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
+def determine_mean_last_matches_difference(df, n_matches, variable, segun_localia):
     """
-    A partir de columnas "diferencia" (e.g. dif goals). Con diferencia previa (dif - prom - dif)
-    Obtiene el promedio de las stats en los últimos partidos considerando fecha y cantidad de encuentros.
-    
-    Mejoras:
-        - Que cada n_last_matches tenga su limite de dias calculado proporcionnalmente... en vez de que sea un hiper...
+    Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). Usa diferencia previa antes del promedio.
     """
     df = df.sort_values(by='date', ascending=True)
     team_matches = {}
@@ -581,9 +577,9 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
 
     return df
 
-def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool): 
     """
-    A partir de columnas "home" y "away" (e.g. goals_home y goals_away). Sin diferencia previa (prom - dif)
+    Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). No usa diferencia previa.
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=True) # True pues uso tail()
@@ -725,7 +721,7 @@ if __name__ == "__main__":
 
     # PLAYER 
     # Construyo variables de diferencias para las variables promedio de los players
-    # df = determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
+    # df = determine_mean_last_matches_difference(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
     # df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
     # df = calculate_dif_col_players(df)
 

@@ -453,7 +453,7 @@ class DataPreparation:
 
             # VARIABLES DERIVADAS
             # Expected Result and Expected Points (xPts)
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=1)
+            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
             df = construct_data.determine_points(df, suffix='expected_')
             df = df.drop(['expected_result'], axis=1) # si no lo borras, hay fuga de informacion
 
@@ -515,7 +515,7 @@ class DataPreparation:
                 cols_to_drop.extend([f'{var}_home', f'{var}_away'])
 
                 for n_matches in n_last_matches:
-                    func = construct_data.determine_mean_in_last_matches if calculate_dif else construct_data.determine_mean_in_last_matches_2
+                    func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
                     df = func(df, n_matches=n_matches, variable=variable, segun_localia=False)
 
                     col1, col2 = f'mean_last_{n_matches}_matches_{variable}_home', f'mean_last_{n_matches}_matches_{variable}_away'
@@ -531,7 +531,7 @@ class DataPreparation:
                 df.drop(columns=cols_to_drop, inplace=True)
 
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
-            # df = construct_data.determine_mean_in_last_matches(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
+            # df = construct_data.determine_mean_last_matches_difference(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
             # df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
 
         # VARIABLE DE JUGADORES
