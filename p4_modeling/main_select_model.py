@@ -66,6 +66,7 @@ def main(
         iteration_date,
         assess: bool = True,
         update_missing: bool = True,
+        predict_missing: bool = True,
         betting_strat: bool = True,
         export: bool = True,
         verbose: int = 0
@@ -122,8 +123,11 @@ def main(
             logger.info(df_pred_test.shape)
 
             # Obtengo predicciones missing + concateno test y missing
-            df_pred = assess_models_in_prod.get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
-            df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+            if predict_missing:
+                df_pred = assess_models_in_prod.get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
+                df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+            else:
+                df_pred = df_pred_test.copy()
 
             # Recalculo metricas sin ea (test + assess)
             df_pred, d_metric = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)
@@ -219,10 +223,12 @@ def determine_roi(df_pred):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [6]
+    l_countries = [48]
     
     # Defino hiperparametros
     assess = True
+    update_missing = False
+    predict_missing = False
     betting_strat = True
     export = True
 
@@ -236,7 +242,7 @@ if __name__ == "__main__":
         148: ["spain", '2025-01-20'], 
         167: ["usa", '2024-12-05'],
         # Train nuevos
-        # 48: ["england", '2025-02-02'],
+        48: ["england", '2025-02-05'],
         # 55: ["france", '2025-02-02'], 
         # 59: ["germany", '2025-02-02'], 
         # 77: ["italy", '2025-02-02'],
@@ -253,6 +259,8 @@ if __name__ == "__main__":
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
             assess=assess,
+            update_missing=update_missing,
+            predict_missing=predict_missing,
             betting_strat=betting_strat,
             export=export
             )
