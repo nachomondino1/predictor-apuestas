@@ -88,6 +88,25 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     return df_match_odds
 
 # Distribucion de resultados
+def determine_confidence_margin(df):
+    """
+    Calcula el confidence_margin como la diferencia entre la probabilidad más alta 
+    y la segunda más alta. 
+
+    Parameters:
+        df (pd.DataFrame): DataFrame con las columnas de probabilidades.
+
+    Returns:
+        pd.DataFrame: DataFrame con confidence_margin calculado y stake ajustado.
+    """
+    
+    # Obtener las dos probabilidades más altas por fila
+    probs_sorted = np.sort(df[['prob_class_0', 'prob_class_1', 'prob_class_2']], axis=1)
+    
+    # Calcular confidence_margin
+    df['confidence_margin'] = probs_sorted[:, -1] - probs_sorted[:, -2]
+    return df
+
 def determine_distribution(df, var_resp: str = 'result', var_pred: str = 'predicted_result'):
     """
     Determina la cantidad de predicciones por resultado y las compara con la distribucion de resultados reales.
@@ -191,48 +210,6 @@ def calculate_roi(df: pd.DataFrame, name_extension=''):
     d_rois[f'{name_extension}roi'] = roi
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
     return df, d_rois
-
-def calculate_last_matches_roi(df: pd.DataFrame, l_last_matches: list, suffix=None, extension: str = None):
-    """
-    Calculo ROI en ultimos partidos
-
-    # Parameters
-        df: Dataframe bank inicial y final ya calculados (DataFrame)
-        l_last_matches: Lista con los ultimos n dias a calcular el ROI. (list) 
-        extension: Extension en el nombre de la metrica.
-
-    # Return
-        roi_values: ROI en ultimos n partidos en l_last_matches. (dict)
-    """
-    # Converito date a datetime y ordeno por fecha
-    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df = df.sort_values(by='date', ascending=True)  # Mas antiguo a mas reciente
-
-    # Col names
-    col_bank_inic = 'bank_inicial' if suffix is None else f'{suffix}_bank_inicial'
-    col_bank_fin = 'bank_final' if suffix is None else f'{suffix}_bank_final'
-    col_gp = 'G/P' if suffix is None else f'{suffix}_G/P'
-
-    # Calcular ROI para cada cantidad de partidos en l_last_matches
-    roi_values = {}
-    for n_matches in l_last_matches:
-
-        col_name = f'roi_last_{n_matches}_matches_{extension}' if suffix is None else f'{suffix}_roi_last_{n_matches}_matches_{extension}' 
-
-        if len(df) < n_matches:  # Si hay menos partidos de los necesarios, se omite el cálculo
-            roi_values[col_name] = None
-            continue
-        
-        df_filt = df.tail(n_matches)  # Últimos n partidos
-        
-        # Con bank? pues ya tengo el df_pred con ea con mismo bank para cada rdo.
-        bank_inic = df_filt.iloc[0][col_bank_inic] # Primer valor
-        bank_final = df_filt.iloc[-1][col_bank_fin] # Último valor
-        gp = df_filt[col_gp].sum() # Las G/P dependen del bank y stake .... estaria mal usarlo?
-        roi = (bank_final - bank_inic) / bank_inic * 100
-        print(f'bank_inic: {bank_inic} + {gp} = {bank_final} --> ROI: {roi:.1f}%')
-        roi_values[col_name] = roi
-    return roi_values
 
 def calculate_reality_roi(df: pd.DataFrame):
     """
@@ -500,8 +477,10 @@ def concatenate_dfs(
     
     df_match = df_match[df_match.index.isin(df_pred_proba.index)]
     df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
-    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
     df_match = df_match[l_cols_match]
+
+    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
 
     # Concatenación selectiva
     columns_to_concat = [
@@ -512,9 +491,8 @@ def concatenate_dfs(
 
     if df_filled is not None:
         df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
-        # l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-        # columns_to_concat.append(df_filled[l_cols_fill])
-        columns_to_concat.append(df_filled)
+        l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+        columns_to_concat.append(df_filled[l_cols_fill])
         
     df_predicciones = pd.concat(columns_to_concat, axis=1)
     return df_predicciones

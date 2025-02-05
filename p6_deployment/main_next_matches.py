@@ -724,7 +724,7 @@ class TrainingDataLoader():
          - Levantar parametros por resultado...
         """
         if predict_missing:
-            return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
+            return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'normalized': True}
 
         # Estrategia por resultado
         try:
@@ -747,7 +747,9 @@ class TrainingDataLoader():
             
             raise ValueError(e)
 
+        # return {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True} # Temporalmente no uso estrategia de apuesta x rdo
         return df_hiper
+
 
 # Missing data
 class MissingData:
@@ -973,7 +975,7 @@ def main(
         n_seasons_missing : int = 1, extract_missing: bool = True, prepare_missing: bool = True,        # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = 0.35, d_model: dict = None,                          # Modeling
+        porc_m: float = None, d_model: dict = None,                          # Modeling
         verbose: int = 1, export: bool = True,
         ):
     """
@@ -1247,8 +1249,7 @@ def main(
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
-        d_strategy = {'prob_dp': 0, 'curva': 'kelly', 'm': 10, 'b': 0, 'normalized': True}
-        # d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing)
+        d_strategy = lo.load_modeling_hyperparameters(predict_missing=predict_missing)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if  isinstance(d_strategy, dict):
@@ -1259,7 +1260,14 @@ def main(
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
         # Aplico reduccion a stake
-        # df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+        if porc_m is not None: # asi no lo aplico en predict_missing
+            df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+
+            # Determino confidence margin
+            df = asses_model.determine_confidence_margin(df)
+
+            # Reducir stake si confidence_margin < threshold
+            df.loc[df['confidence_margin'] < 0.04, 'stake_to_bet'] *= 0.5  # Reducir el stake a la mitad
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
@@ -1282,13 +1290,13 @@ if __name__ == "__main__":
     directorio = os.getenv('BASE_DIR_LOCAL')
     d_run_type = {
         'missing': ['only_extract', 'only_preparation', 'all'],
-        'predict': ['try_a_specific_model', 'predict_missing'],
+        'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 48
-    key, value = 'predict', 'try_a_specific_model'
-    data_unders = False
-    n_days = 4
+    id_country = 6
+    key, value = 'predict', 'prod'
+    data_unders = True
+    n_days = 2
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1302,7 +1310,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 145, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 616, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1330,6 +1338,9 @@ if __name__ == "__main__":
         elif value == "try_a_specific_model":
             logger.warning("Get predictions of specific model")
             df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=True) 
+
+        elif value == "prod":
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=0.3, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")

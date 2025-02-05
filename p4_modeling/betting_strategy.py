@@ -77,8 +77,8 @@ class BettingStrategy:
                
             dic = {
                 'prob_dp': [0],
-                'curva': ['linear'], # 'equal', 'kelly', 'exponential'
-                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110],
+                'curva': ['linear', 'kelly'], # 'equal', 'kelly', 'exponential'
+                'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
                 'b': [0],
             }
 
@@ -446,7 +446,7 @@ class BettingStrategy:
         df = pd.DataFrame.from_dict(data, orient='index')
     
         # Calcular metrica combinada para determinar mejor estrategia
-        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[0, 1])
+        df = calculate_combined_metric(df, l_metrics=['roi'], l_weights=[1])
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
@@ -459,7 +459,7 @@ class BettingStrategy:
         return n_comb
          
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, d_params: dict = None, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, d_params, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -477,9 +477,6 @@ class BettingStrategy:
         logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
         d_metrics_res, d_hiper_res = {}, {}
         best_df_pred = pd.DataFrame()
-
-        if d_params is None:
-            d_params = self.define_hiperparameters(strategy='kelly')
 
         # Por resultado
         for pred in [1, 0, 2]:
@@ -504,12 +501,7 @@ class BettingStrategy:
 
             else:
                 logger.warning(f"No hay predicciones con el resultado {pred} (o sea, el modelo no lo predice). Asigno strategy de train.")
-                d_hiper_res[pred] = {
-                    'prob_dp': 0,
-                    'curva': 'linear',
-                    'm': 10,
-                    'b': 0,
-                    }
+                d_hiper_res[pred] = self.define_hiperparameters(strategy="train")
                 d_metrics_res[pred] = {}
 
         # Concateno datos y guardo
