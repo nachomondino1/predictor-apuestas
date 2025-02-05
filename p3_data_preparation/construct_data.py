@@ -524,7 +524,7 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
 def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
     """
-    A partir de columnas "diferencia" (e.g. dif goals)
+    A partir de columnas "diferencia" (e.g. dif goals). Con diferencia previa (dif - prom - dif)
     Obtiene el promedio de las stats en los últimos partidos considerando fecha y cantidad de encuentros.
     
     Mejoras:
@@ -532,7 +532,8 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
     """
     df = df.sort_values(by='date', ascending=True)
     team_matches = {}
-    n_days = n_matches * 8  # 1 partido cada 8 dias...
+    multplicador = 16 if segun_localia else 8
+    n_days = n_matches * multplicador  # 1 partido cada 8 dias...
 
     # Construyo df por equipo
     for team in pd.concat([df['id_team_home'], df['id_team_away']]).unique():
@@ -572,13 +573,15 @@ def determine_mean_in_last_matches(df, n_matches, variable, segun_localia):
 
     return df
 
-def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool): # sin dif previa. Verificar que construye bien.
+def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool): 
     """
-    A partir de columnas "home" y "away" (e.g. goals_home y goals_away)
+    A partir de columnas "home" y "away" (e.g. goals_home y goals_away). Sin diferencia previa (prom - dif)
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=True) # True pues uso tail()
-    n_days = n_matches * 8  # 1 partido cada 8 dias...
+    multplicador = 16 if segun_localia else 8
+    n_days = n_matches * multplicador  # 1 partido cada multiplicador dias 
+    d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
 
     # inicializo diccionarios (para evitar Performance Warning)
     name_ext = "loc_" if segun_localia else ""
@@ -588,14 +591,10 @@ def determine_mean_in_last_matches_2(df: pd.DataFrame, n_matches: int, variable:
         
         # Obtener los últimos partidos antes de la fecha actual
         match_date = row['date']
-        df_past_matches = df[df['date'] < match_date]
-
-        # Filtrar por días límite
         limit_date = match_date - timedelta(days=n_days)
-        df_past_matches = df_past_matches[df_past_matches['date'] >= limit_date]
+        df_past_matches = df[(df['date'] < match_date) & (df['date'] >= limit_date)]
         
         # Por equipo
-        d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
         for col_team, home_or_away in d_teams.items():
 
             variable_form = f'{variable}_{home_or_away}'
