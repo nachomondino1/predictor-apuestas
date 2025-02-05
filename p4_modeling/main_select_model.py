@@ -129,9 +129,9 @@ def main(
             else:
                 df_pred = df_pred_test.copy()
 
+
             # Recalculo metricas sin ea (test + assess)
             df_pred, d_metric = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)
-
             df_pred_last_25 = df_pred.tail(25)
             df_pred_last_50 = df_pred.tail(50)
             

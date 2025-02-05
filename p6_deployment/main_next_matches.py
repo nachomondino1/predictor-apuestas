@@ -357,8 +357,7 @@ class DataPreparationNew(DataPreparation):
         return df
     
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
-                           n_last_matches:list, n_days: list, n_years_h2h: int, 
-                           segun_localia: bool, columns_used: list, dif_con_against: bool = True, verbose: int = 0):
+                           n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, columns_used: list, verbose: int = 0):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -366,7 +365,7 @@ class DataPreparationNew(DataPreparation):
             df_next_matches: Dataframe con proximos partidos ya integrado. (DataFrame)
             df_old_matches: Dataframe con partidos ya jugados e integrado. (DataFrame)
             df_last_old_matches: Dataframe con los ultimos partidos ya jugados (DataFrame)
-            n_days: Número de últimos partidos a considerar para el cálculo de variables. (int)
+            n_last_matches: Número de últimos partidos a considerar para el cálculo de variables. (int)
             n_years_h2h: Numero de años para construir historial entre equipos. (int)
             segun_localia: Construir variables por localia o no. (bool)
         
@@ -384,14 +383,14 @@ class DataPreparationNew(DataPreparation):
             self.determine_stats_to_use()
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, l_days=n_days, n_years_h2h=n_years_h2h, segun_localia=segun_localia, with_h2h=False, dif_con_against=dif_con_against, export=False)
+            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, with_h2h=False, export=False)
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
 
         # Si no hay "ultimos partidos"
         else:
             # evito construir variables historicas
             logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")
-            df_next_matches = self.construct_data(df_next_matches, n_days, n_years_h2h, segun_localia=segun_localia, with_historic=False, verbose=verbose, export=False)
+            df_next_matches = self.construct_data(df_next_matches, n_last_matches, n_years_h2h, segun_localia=segun_localia, with_historic=False, verbose=verbose, export=False)
 
             # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
             for columna in columns_used: 
@@ -654,10 +653,9 @@ class TrainingDataLoader():
         # Guardo hiperparametros en diccionario
         ## Construct_data
         d['n_last_matches'] = eval(row_hiper['n_last_matches']) 
-        d['n_dias_ult_part'] = eval(row_hiper['n_dias_ult_part']) # eval(row_hiper['n_dias_ult_part'].values[0])
         d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
         d['segun_localia'] = row_hiper['segun_localia'] # .values[0]
-        d['dif_con_against'] = row_hiper['dif_con_against'] # .values[0]
+        d['calculate_dif'] = row_hiper['calculate_dif'] # .values[0]
         ## Clean_data_2
         n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
         d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
@@ -665,12 +663,12 @@ class TrainingDataLoader():
         if pd.isna(row_hiper['fill_na']):  # Verifica si es NaN o None
             d['fill_na'] = row_hiper['fill_na'] = None
         else:
-            d['fill_na'] = row_hiper['fill_na'] # .values[0]
+            d['fill_na'] = row_hiper['fill_na']
         ## Select_data
         d['selected_columns'] = selected_columns
 
         self.path_clean = f'{d['comp_to_select']}'
-        self.path_construct = f'{d['n_last_matches']}_{d['n_dias_ult_part']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['dif_con_against']}'
+        self.path_construct = f'{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['calculate_dif']}'
         self.path_clean_2 = f'{d['n_years_to_select']}_{d['fill_na']}'
 
         if self.verbose >= 0:
@@ -682,7 +680,7 @@ class TrainingDataLoader():
     def load_df_etiquetas(self):
 
         logger.info("Levento etiquetas con el que entrené")
-        subpath = f'{self.path_clean}_{self.path_construct}'
+        subpath = f'{self.path_clean}__{self.path_construct}'
         path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{subpath}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
@@ -695,7 +693,7 @@ class TrainingDataLoader():
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        subpath = f'{self.path_clean}_{self.path_construct}_{self.path_clean_2}'
+        subpath = f'{self.path_clean}__{self.path_construct}__{self.path_clean_2}'
         path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{subpath}.pkl'
 
         scaler, columns_scaled = joblib.load(path_scaler)
@@ -1199,9 +1197,8 @@ def main(
         df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
         ## Para construct_data
         logger.info("Seleccion de ultimos partidos para construccion de variables...")
-        n_days_max = max(d_hiper['n_dias_ult_part'])
-        n_days_period = n_days_max * 2 if d_hiper['segun_localia'] == True else n_days_max
-        df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_period) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
+        n_days_max = max(d_hiper['n_last_matches']) * 8
+        df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_max) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
         df_last_old_matches_h2h = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=d_hiper['n_years_h2h']*365 + 100) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
 
         # Sigo con la preparacion de datos desde fill_data
@@ -1209,9 +1206,7 @@ def main(
         df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
         df = dp.construct_data_new(
             df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
-            n_last_matches=d_hiper['n_last_matches'], n_days=d_hiper['n_dias_ult_part'], n_years_h2h=d_hiper['n_years_h2h'], 
-            segun_localia=d_hiper['segun_localia'], dif_con_against=d_hiper['dif_con_against'], 
-            columns_used=columns_scaled
+            n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], calculate_dif=d_hiper['calculate_dif'],columns_used=columns_scaled
             )
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
         df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
@@ -1306,7 +1301,8 @@ if __name__ == "__main__":
     # Defino country, iteration date y modelo
     d_countries = {
         6: ["argentina", '2025-01-28'], 
-        48: ["england", '2025-01-22'], 
+        # 48: ["england", '2025-01-22'], 
+        48: ["england", '2025-02-05'], 
         55: ["france", '2025-01-22'], 
         59: ["germany", '2025-01-23'], 
         77: ["italy", '2025-01-20'],
