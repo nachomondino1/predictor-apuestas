@@ -197,7 +197,7 @@ def main(
 
         # 4.2. Defino estrategia
         bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-        d_params = bs.define_hiperparameters(strategy='all') # Defino hiperparametros de estrategia de apuesta a probar
+        d_params = bs.define_hiperparameters(strategy='kelly')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
         df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
 
         # 4.3. Recalculo metricas con ea (test + assess)
@@ -225,11 +225,12 @@ def determine_roi(df_pred):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [55, 77]
 
     # Defino hiperparametros
     assess = True
     update_missing = False if assess else False
-    predict_missing = True if assess else False
+    predict_missing = False if assess else False
     betting_strat = True
     export = True
 
@@ -245,7 +246,7 @@ if __name__ == "__main__":
         # Train nuevos
         48: ["england", '2025-02-05'],
         55: ["france", '2025-02-05'], 
-        59: ["germany", '2025-02-05'], 
+        59: ["germany", '2025-02-05'],
         77: ["italy", '2025-02-05'],
         148: ["spain", '2025-02-05'], 
         }
