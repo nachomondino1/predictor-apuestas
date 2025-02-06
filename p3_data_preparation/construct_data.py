@@ -12,11 +12,20 @@ from p3_data_preparation.clean_data import replace_nan_with_zero
 ## Variable respuesta y otras
 def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     """
-    Se determina el 'result' a partir de los goles que hizo cada team
-    :param df: Dataframe. Unidad de analisis: match. Columnas: entre ellas goals_home y goals_away
-    :return: Dataframe pasado por parametro con nueva columna, 'result', que detalla el resultado del match.
+    Determina el 'result' a partir de los goles que hizo cada equipo.
+    
+    :param df: DataFrame con columna 'goals_home' y 'goals_away'.
+    :param var_resp: Nombre de la nueva columna de resultado.
+    :return: DataFrame con la nueva columna 'result'.
     """
-    # Condiciones para determine el ganador
+    # Reemplazar NaN en goles con un valor neutral (-1)
+    df['goals_home'] = df['goals_home'].fillna(-1)
+    df['goals_away'] = df['goals_away'].fillna(-1)
+
+    df['goals_home'] = df['goals_home'].astype(int)
+    df['goals_away'] = df['goals_away'].astype(int)
+
+    # Condiciones para determinar el resultado
     condiciones = [
         df['goals_home'] > df['goals_away'],
         df['goals_home'] < df['goals_away'],
@@ -25,8 +34,9 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     # Valores correspondientes a las condiciones
     valores = [1, 2]
 
-    # Usar numpy.select para aplicar las condiciones
-    df[var_resp] = pd.Series(np.select(condiciones, valores, default=0), index=df.index)
+    # Aplicar np.select() sin necesidad de convertir condiciones a booleanas
+    df[var_resp] = np.select(condiciones, valores, default=0)
+
     return df
 
 def compare_distributions(

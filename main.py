@@ -429,7 +429,7 @@ class DataPreparation:
         ]
         return self.stats_to_derive + self.stats_to_construct
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_h2h: bool = True, with_historic: bool = True, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -492,7 +492,7 @@ class DataPreparation:
 
             # VARIABLES HISTORICAS
             ## 1) EN PARTIDOS EN ULTIMOS N DAYS
-            if with_h2h:
+            if not prod:
                 df = construct_data.h2h_by_date(df, n_years=n_years_h2h) # no mas por localia por alto nan.
 
             ## 2) EN ULTIMOS N PARTIDOS
@@ -1092,7 +1092,7 @@ class Modeling:
     def calculate_metrics(self, df_pred_proba, export: bool = False):
         
         d_metrics = {}
-        df_pred_proba = construct_data.determine_expected_result(df_pred_proba, goals_to_xg_ratio=0.42, verbose=1)  # Durante la prep la elimino x fuga de info.
+        df_pred_proba = construct_data.determine_expected_result(df_pred_proba, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
         df_pred_proba = asses_model.calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
         df_pred_proba = asses_model.determine_result_by_bookmaker(df_pred_proba, col_name="bookmaker_result")  # Determino resultado predicho segun cuota minima (e.g. "Home")
 

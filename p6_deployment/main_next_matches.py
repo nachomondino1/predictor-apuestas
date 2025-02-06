@@ -383,14 +383,14 @@ class DataPreparationNew(DataPreparation):
             self.determine_stats_to_use()
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, with_h2h=False, export=False)
+            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, prod=True, export=False)
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
 
         # Si no hay "ultimos partidos"
         else:
             # evito construir variables historicas
             logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")
-            df_next_matches = self.construct_data(df_next_matches, n_last_matches, n_years_h2h, segun_localia=segun_localia, with_historic=False, verbose=verbose, export=False)
+            df_next_matches = self.construct_data(df_next_matches, n_last_matches, n_years_h2h, segun_localia=segun_localia, with_historic=False, prod=True, verbose=verbose, export=False)
 
             # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
             for columna in columns_used: 
@@ -629,7 +629,7 @@ class TrainingDataLoader():
         if self.n_model is not None:
             
             df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")
-            
+   
             # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
             try:
                 row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
@@ -1022,6 +1022,7 @@ def main(
             df_match_miss, df_match_player_miss, df_match_odds_miss = du.collect_missing_data(df_match, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
 
             if export and len(df_match_miss) > 0:
+                # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
                 mis.concat_with_missing_already_extracted(df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
                 mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
 
@@ -1041,11 +1042,11 @@ def main(
 
             df_integrated_missing = dp.integrate_data(df_match_miss, df_match_player_miss, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
-            # Si no existen columnas player, raise error
-            l_player_cols = [col for col in df_integrated_missing.columns if ('player_start' in col) or ('player_sub' in col)] 
-            if len(l_player_cols) == 0:
-                logger.error("No existen las columnas de jugadores en df_integrated_missing. Falló la integración de Sofifa a Flashscore. Revisar posible diferencia de formato de columnas usadas al integrar.")
-                raise ValueError
+            # Si no existen columnas player, raise error --> Pueden ser partidos de la segunda o eso y no haber jugadores...
+            # l_player_cols = [col for col in df_integrated_missing.columns if ('player_start' in col) or ('player_sub' in col)] 
+            # if len(l_player_cols) == 0:
+            #     logger.error("No existen las columnas de jugadores en df_integrated_missing. Falló la integración de Sofifa a Flashscore. Revisar posible diferencia de formato de columnas usadas al integrar.")
+            #     raise ValueError
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_integrated = mis.read_last_integrate_data()
@@ -1057,7 +1058,7 @@ def main(
             df_integrated_missing_all = mis.read_last_integrate_missing_data()
             df_integrated_missing_all = pd.concat([df_integrated_missing_all, df_integrated_missing], axis=0)
             
-            if export:
+            if export:                
                 df_integrated_missing.to_excel(f'{mis.BASE_DIR_MISSING_DP}/df_integrated_missing.xlsx', index=True)
                 df_integrated_updated.to_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index=True)
                 df_integrated_missing_all.to_excel(f'{mis.BASE_DIR_MISSING_ALL_dp}/df_integrated_missing.xlsx', index=True)
@@ -1293,24 +1294,24 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 6
-    key, value = 'predict', 'prod'
-    data_unders = True
+    id_country = 77
+    key, value = 'predict', 'try_a_specific_model'
+    data_unders = False
     n_days = 2
 
     # Defino country, iteration date y modelo
     d_countries = {
         6: ["argentina", '2025-01-28'], 
-        # 48: ["england", '2025-01-22'], 
         48: ["england", '2025-02-05'], 
         55: ["france", '2025-01-22'], 
         59: ["germany", '2025-01-23'], 
-        77: ["italy", '2025-01-20'],
+        # 77: ["italy", '2025-01-20'],
+        77: ["italy", '2025-02-05'],
         148: ["spain", '2025-01-20'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 616, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1015, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
