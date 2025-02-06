@@ -464,13 +464,13 @@ def define_params_space(id_country, fast: bool = False):
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], #  d_comps['all_comp']
             },
             'construct': {
-                'n_last_matches': [[5], [15], [5, 15]],  # Variables historicas en ultimos n partidos
+                'n_last_matches': [[5], [5, 15]],  # [15], # Variables historicas en ultimos n partidos
                 'n_years_h2h': [2],
                 'segun_localia': [True, False],
                 'calculate_dif': [True, False],
             },
             'clean_data_2': {
-                'n_years_to_select': [2, 3, 5, 10],
+                'n_years_to_select': [2, 3, 5], # 10
                 'fill_na': [None, "0", 'ml'], 
             },
             'select': {
@@ -522,7 +522,7 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [59]
 
     data_unders = False
     update_sofifa = True
@@ -543,7 +543,9 @@ if __name__ == "__main__":
         d_params, l_modelos = define_params_space(id_country, fast=True)
         
         # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-        df_iteration_comp = comprehensive_search(country=country, date=date, 
-                                                data_unders=data_unders, update_sofifa=update_sofifa, 
-                                                data_prep_int=data_prep_int, 
-                                                d_params=d_params, l_modelos=l_modelos)
+        df_iteration_comp = comprehensive_search(
+            country=country, date=date, 
+            data_unders=data_unders, update_sofifa=update_sofifa, 
+            data_prep_int=data_prep_int, 
+            d_params=d_params, l_modelos=l_modelos
+            )
