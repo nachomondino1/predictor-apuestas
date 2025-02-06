@@ -339,7 +339,7 @@ class FeatureSelection():
         df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
         return df_normalized
 
-def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = 'percentil', graf: bool = False):
+def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = None, graf: bool = False):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -368,23 +368,19 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
     df_normalized = fs.sum_and_normalize_importances(df_importance)
 
     # Determino columnas mas importantes
-    if thr_type == 'percentil':
+    if thr_type is None:
+        # Numero fijo
+        l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()  
+    elif thr_type == 'percentil':
         # Basadas en percentil
         percentile_value = df_normalized['suma_de_imp_norm'].quantile(thr_fs)
         logger.info(f"El valor del percentil {thr_fs * 100}% es {percentile_value}")  # Loggear el valor del percentil
         l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= percentile_value].index.tolist()
-    else:
-        # Numero fijo
-        l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= df_normalized['suma_de_imp_norm'].max() * thr_fs].index.tolist()  
 
     # Imprimir importancias por pantalla
-    df_normalized_sorted = df_normalized.sort_values(by='suma_de_imp_norm', ascending=False)
-    pos = 0
-    for idx, row in df_normalized_sorted.iterrows():
-        pos += 1
-        logger.info(f"Nº{pos}: Variable {idx} con importancia: {row['suma_de_imp_norm']}")
-        if pos == 10:
-            break
+    df_top_10 = df_normalized.sort_values(by='suma_de_imp_norm', ascending=False).head(10)    # Ordenar y seleccionar las 10 variables más importantes
+    for pos, (idx, suma_de_imp_norm) in enumerate(zip(df_top_10.index, df_top_10['suma_de_imp_norm']), start=1):
+        logger.info(f"Nº{pos}: Variable {idx} con importancia: {suma_de_imp_norm}")
 
     # Grafico importancias teniendo en cuenta todos los modelos
     if graf:

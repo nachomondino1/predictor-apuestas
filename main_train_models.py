@@ -181,15 +181,15 @@ def comprehensive_search(
         for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
             # Asigno valor a cada hiperpametro
-            n_last_matches, n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2  # n_dias_ult_part, n_years_h2h, segun_localia, dif_con_against = param_values_2[0], param_values_2[1], param_values_2[2], param_values_2[3]
+            n_last_matches, n_years_h2h, segun_localia, calculate_dif = param_values_2
             if verbose >= 0:
                 logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
-                print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; dif_con_against: {dif_con_against}')
+                print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; calculate_dif:{calculate_dif}')
 
             # Construyo datos
-            path_cons = f"{path_clean}_{n_last_matches}_{n_dias_ult_part}_{n_years_h2h}_{segun_localia}_{dif_con_against}"
+            path_cons = f"{path_clean}__{n_last_matches}_{n_years_h2h}_{segun_localia}_{calculate_dif}"
             path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_cons}.xlsx'
-            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches,l_days=n_dias_ult_part, n_years_h2h=n_years_h2h, segun_localia=segun_localia, dif_con_against=dif_con_against, export=True)
+            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, export=True)
             if export:
                 df_constructed.to_excel(path_construct, index=True)
 
@@ -203,7 +203,7 @@ def comprehensive_search(
             for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
 
                 n_years_to_select, fill_na = param_values_00[0], param_values_00[1]
-                path_clean_2 = f'{path_cons}_{n_years_to_select}_{fill_na}'
+                path_clean_2 = f'{path_cons}__{n_years_to_select}_{fill_na}'
                 path_clean_data = f'{BASE_DIR_dp}/clean_data_2/df_clean_data_2_{path_clean_2}.xlsx'
                 if verbose >= 0:
                     logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
@@ -220,7 +220,7 @@ def comprehensive_search(
 
                     # Asigno valor a cada hiperpametro
                     thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                    path_sel = f'{path_clean_2}_{thr_corr}_{thr_fs}'
+                    path_sel = f'{path_clean_2}__{thr_corr}_{thr_fs}'
                     if verbose >= 0:
                         logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
                         print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
@@ -243,7 +243,7 @@ def comprehensive_search(
                         if verbose >= 0:
                             cont_iter += 1
                             logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                            print(f'\n - Hiper construct --> n_dias_ult_part: {n_dias_ult_part} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
+                            print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                             logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
                             # Generar el diseño de la prueba
@@ -254,14 +254,14 @@ def comprehensive_search(
                                 X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
                                 l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
                                 df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled_columns,
-                                  k=k, retrain=retrain)
+                                  k=k)
                         
                         if len(df_metrics) > 0:
                             # Guardo datos en dataframe
                             row_data = {
                                 'n_iteration': cont_iter, 
                                 'comp_to_select': comp_to_select,
-                                'n_last_matches': n_last_matches, 'n_dias_ult_part': n_dias_ult_part, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'dif_con_against': dif_con_against,
+                                'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif,
                                 'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                 'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
                                 'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
@@ -456,56 +456,56 @@ def define_params_space(id_country, fast: bool = False):
     # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
 
     # 1728 iteraciones
-    d_params = {
-        'construct': {
-            'n_dias_ult_part': [[60], [30, 180]], # [30, 180] 
-            'n_years_h2h': [2],
-            'segun_localia': [True, False],
-            'dif_con_against': [False, True] 
-        },
-        'clean_data_2': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']],
-            'n_years_to_select': [2, 3, 5, 10], 
-            'fill_na': [None, "0", 'ml'],
-        },
-        'select': {
-            'thr_corr': [0.7, 0.85, None],
-            'thr_fs': [None, 0.25, 0.5, 0.75],
-        },
-        'modeling': {
-            'val_size': [0.10],
-            'n_reg_test': [100], 
-            'bal_type': [None, 'under'], # None
-            'k': [5] 
-        }
-    }
-
     if fast:
         l_modelos = [LogisticRegression()]
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], # d_comps['all_comp'] 
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], #  d_comps['all_comp']
             },
             'construct': {
-                'n_last_matches': [[10]],  # Variables historicas en ultimos n partidos
-                'n_dias_ult_part': [[30, 180]], # Variables historicas en partidos de ultimos n_days
+                'n_last_matches': [[5], [5, 15]],  # [15], # Variables historicas en ultimos n partidos
+                'n_years_h2h': [2],
+                'segun_localia': [True, False],
+                'calculate_dif': [True, False],
+            },
+            'clean_data_2': {
+                'n_years_to_select': [2, 3, 5], # 10
+                'fill_na': [None, "0", 'ml'], 
+            },
+            'select': {
+                'thr_corr': [0.7, 0.85, None],
+                'thr_fs': [0.1, 0.2, 0.35],  # 0.5
+            },
+            'modeling': {
+                'val_size': [0.1],
+                'n_reg_test': [100],
+                'bal_type': ['under'], # None, 
+                'k': [5]
+            }
+        }
+
+    else:
+        d_params = {
+            'construct': {
+                'n_dias_ult_part': [[60], [30, 180]], # [30, 180] 
                 'n_years_h2h': [2],
                 'segun_localia': [True, False],
                 'dif_con_against': [False, True] 
             },
             'clean_data_2': {
-                'n_years_to_select': [2, 3, 5, 10],
-                'fill_na': [None, "0", 'ml'], 
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']],
+                'n_years_to_select': [2, 3, 5, 10], 
+                'fill_na': [None, "0", 'ml'],
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
                 'thr_fs': [None, 0.25, 0.5, 0.75],
             },
             'modeling': {
-                'val_size': [0.1],
-                'n_reg_test': [100],
-                'bal_type': ['under'], # None, 
+                'val_size': [0.10],
+                'n_reg_test': [100], 
+                'bal_type': [None, 'under'], # None
                 'k': [5] 
             }
         }
@@ -521,24 +521,31 @@ def define_params_space(id_country, fast: bool = False):
 if __name__ == "__main__":
         
     # Parametros de ejecucion
-    id_country = 6
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [59]
+
     data_unders = False
     update_sofifa = True
     data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-    country = d_countries[id_country]
 
-    # Determino date 
-    date = datetime.datetime.now().date() # datetime.datetime.now().date() 
-    logger.info(f"Country: {country} Date: {date}")
-    
-    # Preparao datos, entreno modelos y evaluo en df_test
-    # Defino hiperparametros a probar
-    d_params, l_modelos = define_params_space(id_country, fast=True)
-    
-    # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-    df_iteration_comp = comprehensive_search(country=country, date=date, 
-                                             data_unders=data_unders, update_sofifa=update_sofifa, 
-                                             data_prep_int=data_prep_int, 
-                                             d_params=d_params, l_modelos=l_modelos)
+    for id_country in l_countries:
+
+        country = d_countries[id_country]
+
+        # Determino date 
+        date = datetime.datetime.now().date() # datetime.datetime.now().date() 
+        logger.info(f"Country: {country} Date: {date}")
+        
+        # Preparao datos, entreno modelos y evaluo en df_test
+        # Defino hiperparametros a probar
+        d_params, l_modelos = define_params_space(id_country, fast=True)
+        
+        # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
+        df_iteration_comp = comprehensive_search(
+            country=country, date=date, 
+            data_unders=data_unders, update_sofifa=update_sofifa, 
+            data_prep_int=data_prep_int, 
+            d_params=d_params, l_modelos=l_modelos
+            )

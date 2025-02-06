@@ -62,7 +62,7 @@ def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy???
     
     # Ordeno df por date
     df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df = df.sort_values(by='date', ascending=False)
+    df = df.sort_values(by='date', ascending=True)
 
     # Asignar valores de df_match_miss a df solo en las columnas y filas correspondientes
     for idx, row in df.iterrows():
