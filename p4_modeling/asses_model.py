@@ -299,7 +299,7 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def calculate_combined_metric(df, l_metrics: list, l_weights: list, name_extension: str = ''):
+def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
     """
     Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
     Normaliza las columnas en 'l_metrics' antes del cálculo y agrega el resultado como una nueva columna.
@@ -320,7 +320,7 @@ def calculate_combined_metric(df, l_metrics: list, l_weights: list, name_extensi
         return sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
     
     # Aplicar la función fila por fila
-    df[f'metric{name_extension}'] = df.apply(calculate_row_metric, axis=1)
+    df[metric_name] = df.apply(calculate_row_metric, axis=1)
     return df
 
 def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
@@ -419,12 +419,11 @@ def calculate_basic_metrics(
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
     }
 
-    if verbose >= 0:
+    if verbose >= 1:
         # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
         df_conf_mat = confusion_matrix(y_test, y_pred)
         if export:
-            base_path = f'./data/{country}/p4_modeling'
-            df_conf_mat.to_excel(f'{base_path}/modeling/df_conf_matrix.xlsx')
+            df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
     return d_metrics
 
