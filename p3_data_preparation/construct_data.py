@@ -578,7 +578,6 @@ def determine_mean_last_matches_difference(df, n_matches, variable, segun_locali
             mean_value = s_values.mean() if not s_values.empty else np.nan
 
             results.setdefault(idx, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable}_{home_or_away}"] = mean_value
-            # df.loc[idx, f'{name_ext}mean_last_{n_matches}_matches_{variable}_{home_or_away}'] = mean_value
             
     # Convertir a DataFrame y hacer join con el original
     if results:

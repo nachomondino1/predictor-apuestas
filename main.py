@@ -525,8 +525,11 @@ class DataPreparation:
                     if segun_localia:
                         df = func(df, n_matches=n_matches, variable=variable, segun_localia=True)
                         col_h1, col_h2 = f'loc_mean_last_{n_matches}_matches_{variable}_home', f'loc_mean_last_{n_matches}_matches_{variable}_away'
-                        df[f'loc_dif_mean_last_{n_matches}_matches_{variable}'] = df[col_h1] - df[col_h2]
-                        cols_to_drop.extend([col_h1, col_h2])
+                        try:
+                            df[f'loc_dif_mean_last_{n_matches}_matches_{variable}'] = df[col_h1] - df[col_h2]
+                            cols_to_drop.extend([col_h1, col_h2])
+                        except KeyError:
+                            pass
                 
                 df.drop(columns=cols_to_drop, inplace=True)
 
@@ -1092,12 +1095,40 @@ class Modeling:
     def calculate_metrics(self, df_pred_proba, export: bool = False):
         
         d_metrics = {}
+
+        # Ordeno por fecha de mas antiguo a mas reciente
+        df_pred_proba = df_pred_proba.sort_values(by='date', ascending=True)
+
+        # Determino expected result + probas de bookies
         df_pred_proba = construct_data.determine_expected_result(df_pred_proba, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
         df_pred_proba = asses_model.calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
         df_pred_proba = asses_model.determine_result_by_bookmaker(df_pred_proba, col_name="bookmaker_result")  # Determino resultado predicho segun cuota minima (e.g. "Home")
 
-        # Calculo metricas
+        # Calculo prec / recall / f1-score
+        ## Todo el test
         d_metrics.update(asses_model.calculate_basic_metrics(df_pred_proba, country=self.country, export=export))
+
+        ## Last 25 matches
+        df_pred_last_25 = df_pred_proba.tail(25)
+        d_metrics_last_25 = asses_model.calculate_basic_metrics(df_pred_last_25, self.country)
+
+        ## Last 50 matches
+        df_pred_last_50 = df_pred_proba.tail(50)
+        d_metrics_last_50 = asses_model.calculate_basic_metrics(df_pred_last_50, self.country)
+
+        d_last = {
+            # Last 25 matches
+            'test_acc_last_25': d_metrics_last_25['test_accuracy'],
+            'recall_last_25': d_metrics_last_25['recall'],
+            'f1_score_last_25': d_metrics_last_25['f1_score'],
+            # Last 50 matches
+            'test_acc_last_50': d_metrics_last_50['test_accuracy'],
+            'recall_last_50': d_metrics_last_50['recall'],
+            'f1_score_last_50': d_metrics_last_50['f1_score'],
+        }
+        d_metrics.update(d_last)
+        
+        # Bet metrics
         d_metrics.update(asses_model.calculate_bet_metrics(df_pred_proba))
         d_metrics.update({'dif_prec_bm': d_metrics['test_accuracy'] -  d_metrics['test_accuracy_bm']})
 
@@ -1106,6 +1137,17 @@ class Modeling:
         d_params = bs.define_hiperparameters(strategy='train')
         df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_pred_proba, d_params=d_params)
         d_metrics.update(d_roi)
+
+        ## En last matches
+        df_pred_last_25 = df_predicciones.tail(25)
+        df_pred_last_50 = df_predicciones.tail(50)
+        roi_sin_ea_last_25 = asses_model.determine_roi(df_pred_last_25)
+        roi_sin_ea_last_50 = asses_model.determine_roi(df_pred_last_50)
+        d_last_2 = {
+            'roi_sin_ea_last_25': roi_sin_ea_last_25,
+            'roi_sin_ea_last_50': roi_sin_ea_last_50,
+        }
+        d_metrics.update(d_last_2)
         
         if self.verbose >= 0:
             print(d_metrics)
