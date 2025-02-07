@@ -32,9 +32,9 @@ def collect_predictions(d_run: dict, d_countries: dict, l_countries:list, n_days
                 # Concatenar df_countries....
                 df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
 
-                # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo)
-                df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-                df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+                # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo) --> no sirve pues 'id_match' es el indice en vez de una columna.
+                # df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
+                # df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
 
             else:
                 logger.warning(f"No se generaron predicciones para el país {id_country}.")
@@ -69,12 +69,12 @@ if __name__ == "__main__":
     if env == 'dev':
         # Definir condiciones del análisis
         n_days = 15
-        l_countries = [48, 55, 59, 77, 148]
-        # l_countries = [48]
+        # l_countries = [48, 55, 59, 77, 148]
+        l_countries = [48]
         porc_m = 0.35
         # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}  # Solo missing
-        # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
-        d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        # d_run = {'run_missing': True, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
         d_countries = {  # Estaria bueno que no este harcodeado. Qeu sea de df_best_models...
             48: ["england", '2025-02-05'],
