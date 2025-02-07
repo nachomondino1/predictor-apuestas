@@ -7,8 +7,8 @@ import warnings
 # Grid y Bayes
 from sklearn.model_selection import PredefinedSplit, GridSearchCV
 from sklearn.metrics import make_scorer, accuracy_score, f1_score, log_loss
-from skopt import BayesSearchCV
-from skopt.space import Real, Integer, Categorical
+# from skopt import BayesSearchCV
+# from skopt.space import Real, Integer, Categorical
 
 def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, 
                                 scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
