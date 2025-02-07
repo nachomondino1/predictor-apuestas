@@ -32,9 +32,9 @@ def collect_predictions(d_run: dict, d_countries: dict, l_countries:list, n_days
                 # Concatenar df_countries....
                 df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
 
-                # Exporto por seguridad (x si falla un pais, no haberlo corrido la action al re pedo) --> no sirve pues 'id_match' es el indice en vez de una columna.
-                # df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-                # df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+                # Exporto por seguridad
+                df_predicciones.to_excel(f'data/predicciones_seg.xlsx', index=True)
+                df_historial_predicciones.to_excel(f'data/historial_predicciones_seg.xlsx', index=True)
 
             else:
                 logger.warning(f"No se generaron predicciones para el país {id_country}.")
