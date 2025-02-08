@@ -18,13 +18,6 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
-    # Reemplazar NaN en goles con un valor neutral (-1)
-    df['goals_home'] = df['goals_home'].fillna(-1)
-    df['goals_away'] = df['goals_away'].fillna(-1)
-
-    df['goals_home'] = df['goals_home'].astype(int)
-    df['goals_away'] = df['goals_away'].astype(int)
-
     # Condiciones para determinar el resultado
     condiciones = [
         df['goals_home'] > df['goals_away'],
