@@ -256,15 +256,16 @@ class FlashscoreCrawler(Crawler):
             SEC_WAIT = self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
 
             # Si existe dicha formation
-            tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True)
+            tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div/span[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True) # tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True)
+
             if self.verbose >= 1:
                 print(formation, SEC_WAIT)
 
             if tag_lineup:
 
                 # Extraigo listado de jugadores
-                l_tags_player_home = super().extract_tags(tag_inicial=tag_lineup, xpath='.//following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
-                l_tags_player_away = super().extract_tags(tag_inicial=tag_lineup, xpath='.//following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+                l_tags_player_home = super().extract_tags(tag_inicial=tag_lineup, xpath='./parent::div/following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+                l_tags_player_away = super().extract_tags(tag_inicial=tag_lineup, xpath='./parent::div/following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
 
                 if l_tags_player_home:
                     # Obtengo urls de jugadores
@@ -298,14 +299,14 @@ class FlashscoreCrawler(Crawler):
         """        
         d_row = {}
 
-        seccion_entrenadores = super().extract_tag(xpath='.//div[@class="lf__lineUp"]/div[@class="section"]/div[text()="Coaches"]', sec_wait=self.SEC_WAIT_MIN)
+        seccion_entrenadores = super().extract_tag(xpath='.//div[@class="lf__lineUp"]/div[@class="section"]/div/span[text()="Coaches"]', sec_wait=self.SEC_WAIT_MIN)
 
         # Si existe la seccion de entrenadores
         if seccion_entrenadores:
 
             # Extraigo entrenadores
-            coach_home_tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN)
-            coach_away__tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN)
+            coach_home_tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./parent::div/following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN)
+            coach_away__tag = super().extract_tag(tag_inicial= seccion_entrenadores, xpath='./parent::div/following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN)
 
             if coach_home_tag:
                 # Obtengo url de coach home
