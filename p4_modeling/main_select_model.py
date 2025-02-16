@@ -82,9 +82,7 @@ def main(
 
 
     ## (0) Determino metricas para seleccionar modelos candidatos (1) y modelos en prod (3)
-    # l_metrics = ['recall', 'recall_last_50', 'recall_last_25']  # Segun el exp, es lo que conviene. Me gustaria que no cambie tanto el modelo
-    # l_metrics = ['roi_sin_ea_last_50', 'roi_sin_ea_last_25']  # Antes usaba ROI...
-    l_metrics = ['roi_sin_ea_last_50', 'recall_last_50', 'roi_sin_ea_last_25', 'recall_last_25']  # Combinacion. 
+    l_metrics = ['ex_roi_sin_ea_last_50', 'recall_last_50', 'ex_roi_sin_ea_last_25', 'recall_last_25']  # Combinacion ROI + recall.
     l_weights = [1, 1, 1, 1]
 
 
@@ -92,10 +90,8 @@ def main(
     sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])  # Creo instancia de sbm
 
     # 1.0. Temporalmente, filtro l_metrics hasta que  tenga 'recall_last_50' y 'recall_last_25' en df_test (por ende en df_ite) --> El proximo train ya deberia tenerlo
-    l_metrics_filt = ['roi', 'recall']   # Roi sin ea...
-    l_weights_filt = [1, 1]
-    # l_metrics_filt = [metric for metric in l_metrics if metric in df_ite.columns]   
-    # l_weights_filt = [1 / len(l_metrics_filt) for _ in l_metrics_filt]
+    l_metrics_filt = ['expected_roi', 'recall']   # [metric for metric in l_metrics if metric in df_ite.columns]   
+    l_weights_filt = [1, 1] # [1 / len(l_metrics_filt) for _ in l_metrics_filt]
     logger.warning(l_metrics_filt)
 
     # 1.1. Calculo metrica combinada
@@ -103,7 +99,7 @@ def main(
     df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights_filt, metric_name=metric)
 
     ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, n_models_max=30)
+    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, n_models_max=25)
     logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
 
 
@@ -208,12 +204,11 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [55, 59, 77, 148]
     # l_countries = [48]
 
     # Defino hiperparametros
     assess = True
-    update_missing = False if assess else False
+    update_missing = True if assess else False
     predict_missing = True if assess else False
     betting_strat = True
     export = True
