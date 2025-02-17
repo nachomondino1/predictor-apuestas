@@ -54,6 +54,7 @@ def main(
         id_country, 
         country, 
         iteration_date,
+        select_candidates: bool = True,
         assess: bool = True,
         update_missing: bool = True,
         predict_missing: bool = True,
@@ -82,25 +83,24 @@ def main(
 
 
     ## (0) Determino metricas para seleccionar modelos candidatos (1) y modelos en prod (3)
-    l_metrics = ['ex_roi_sin_ea_last_50', 'recall_last_50', 'ex_roi_sin_ea_last_25', 'recall_last_25']  # Combinacion ROI + recall.
-    l_weights = [1, 1, 1, 1]
-
+    l_metrics = ['roi_sin_ea_last_50', 'recall_last_50']
+    l_weights = [0.5, 0.5]
 
     # (1) SELECCION DE MODELOS CANDIDATOS
-    sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])  # Creo instancia de sbm
+    if select_candidates:
+        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])  # Creo instancia de sbm
 
-    # 1.0. Temporalmente, filtro l_metrics hasta que  tenga 'recall_last_50' y 'recall_last_25' en df_test (por ende en df_ite) --> El proximo train ya deberia tenerlo
-    l_metrics_filt = ['expected_roi', 'recall']   # [metric for metric in l_metrics if metric in df_ite.columns]   
-    l_weights_filt = [1, 1] # [1 / len(l_metrics_filt) for _ in l_metrics_filt]
-    logger.warning(l_metrics_filt)
+        # 1.1. Calculo metrica combinada
+        metric = 'metric_cand'
+        l_metrics_filt = ['roi', 'recall'] # Hasta que tenga last matches en df_iteration al entrenar
+        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights, metric_name=metric)
 
-    # 1.1. Calculo metrica combinada
-    metric = 'metric_cand'
-    df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights_filt, metric_name=metric)
-
-    ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-    df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, n_models_max=25)
-    logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
+        ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
+        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.25, n_models_max=100) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
+    
+    else:
+        df_ite_filt = pd.read_excel(f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx')
 
 
     # (2) Assses + Recalculo de metricas
@@ -154,7 +154,6 @@ def main(
         n_model_name = 'n_model'
 
     else:
-        # df_ite_bs = pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
         df_ite_bs = df_ite_filt.copy()
         n_model_name = 'n_iteration'
         logger.info(df_ite_bs)
@@ -204,12 +203,14 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [59]
+    # l_countries = [77, 148]
 
     # Defino hiperparametros
+    select_candidates = True
     assess = True
-    update_missing = True if assess else False
-    predict_missing = True if assess else False
+    update_missing = False if assess else False
+    predict_missing = False if assess else False
     betting_strat = True
     export = True
 
@@ -233,6 +234,7 @@ if __name__ == "__main__":
         main(
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
+            select_candidates=select_candidates,
             assess=assess,
             update_missing=update_missing,
             predict_missing=predict_missing,
