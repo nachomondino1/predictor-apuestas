@@ -50,7 +50,7 @@ class BettingStrategy:
                 dic = {
                     'prob_dp': [0], # 0.45, 0.55  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
                     'curva': ['kelly'], 
-                    'm': [5, 10, 15], # 10, 25, 45],
+                    'm': [5, 10, 20, 40, 80, 160, 200], 
                     'b': [0],
                 }
         elif strategy == "linear":
