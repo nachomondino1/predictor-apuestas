@@ -132,7 +132,7 @@ def main(
 
             # Recalculo metricas sin ea (test + assess)
             df_pred, d_metric = assess_models_in_prod.determine_metrics(df_pred, country, iteration_date)  # Con esto se supone que ya calculo metrics en last matches y por ende no haria falta el codigo que sigue.
-            roi_sin_ea = asses_model.determine_roi(df_pred)
+            roi_sin_ea = asses_model.determine_roi(df_pred) # Es sin multiplicar por 100 (y no es por partido). No es kelly, es linear.
 
             # Guardo datos
             new_row = {
@@ -154,9 +154,11 @@ def main(
         n_model_name = 'n_model'
 
     else:
-        df_ite_bs = df_ite_filt.copy()
-        n_model_name = 'n_iteration'
-        logger.info(df_ite_bs)
+        # df_ite_bs = df_ite_filt.copy()
+        # n_model_name = 'n_iteration'
+        df_ite_bs = pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
+        n_model_name = 'n_model'
+        metric = 'metric_assess'
 
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
@@ -203,12 +205,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
+    # l_countries = [59]
     # l_countries = [77, 148]
 
     # Defino hiperparametros
-    select_candidates = True
-    assess = True
+    select_candidates = False
+    assess = False
     update_missing = False if assess else False
     predict_missing = False if assess else False
     betting_strat = True
