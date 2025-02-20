@@ -83,8 +83,8 @@ def main(
 
 
     ## (0) Determino metricas para seleccionar modelos candidatos (1) y modelos en prod (3)
-    l_metrics = ['roi_sin_ea_last_50', 'recall_last_50']
-    l_weights = [0.5, 0.5]
+    l_metrics = ['roi_sin_ea', 'recall', 'roi_sin_ea_last_50', 'recall_last_50']
+    l_weights = [0.25, 0.25, 0.25, 0.25]
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
@@ -92,11 +92,11 @@ def main(
 
         # 1.1. Calculo metrica combinada
         metric = 'metric_cand'
-        l_metrics_filt = ['roi', 'recall'] # Hasta que tenga last matches en df_iteration al entrenar
-        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights, metric_name=metric)
+        l_metrics_filt, l_weights_filt = ['roi', 'recall'], [0.5, 0.5] # Hasta que tenga last matches en df_iteration al entrenar
+        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights_filt, metric_name=metric)
 
         ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.25, n_models_max=100) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.75, n_models_max=30) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
     
     else:
@@ -205,8 +205,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [59]
-    # l_countries = [77, 148]
+    # l_countries = [148]
 
     # Defino hiperparametros
     select_candidates = False
