@@ -1015,7 +1015,7 @@ def main(
         
         # Levanto datos viejos + los ultimos missing extraidos
         df_match, df_match_player, df_match_odds = mis.read_last_flashscore_data()
-
+                
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         if extract_missing:
             # Extraigo missing (si hay)
@@ -1028,6 +1028,9 @@ def main(
 
         else:
             df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
+        
+            # Temporalmente... cuando queres old_updated de nuevo.
+            # mis.concat_old_with_missing(df_match, df_match_player, df_match_odds, df_match_miss, df_match_player_miss, df_match_odds_miss) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
 
         logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
 
@@ -1268,7 +1271,8 @@ def main(
             df = asses_model.determine_confidence_margin(df)
 
             # Reducir stake si confidence_margin < threshold
-            df.loc[df['confidence_margin'] < 0.04, 'stake_to_bet'] *= 0.5  # Reducir el stake a la mitad
+            # df.loc[df['confidence_margin'] < 0.04, 'stake_to_bet'] *= 0.2  # Reducir el stake a la mitad
+            df.loc[(df['confidence_margin'] < 0.04) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.2
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
@@ -1297,21 +1301,20 @@ if __name__ == "__main__":
     id_country = 77
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
-    n_days = 2
+    n_days = 5
 
     # Defino country, iteration date y modelo
     d_countries = {
-        6: ["argentina", '2025-01-28'], 
+        6: ["argentina", '2025-02-06'], 
         48: ["england", '2025-02-05'], 
-        55: ["france", '2025-01-22'], 
-        59: ["germany", '2025-01-23'], 
-        # 77: ["italy", '2025-01-20'],
+        55: ["france", '2025-02-05'], 
+        59: ["germany", '2025-02-05'], 
         77: ["italy", '2025-02-05'],
-        148: ["spain", '2025-01-20'], 
+        148: ["spain", '2025-02-05'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1015, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1016, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
