@@ -733,6 +733,9 @@ class TrainingDataLoader():
             # Si es por resultado
             if len(df_hiper) == 3:
                 logger.critical("Se levantó la estrategia de apuesta por resultado")
+            else:
+                logger.warning("Se levanta una estrategia comun a todos los resultados")
+                return {'prob_dp': df_hiper['prob_dp'].values[0], 'curva': df_hiper['curva'].values[0], 'm': df_hiper['m'].values[0], 'b': df_hiper['b'].values[0], 'normalized': True}
 
             if self.verbose >= 0:
                 logger.info("Hiperparametros cargados:")
