@@ -1092,7 +1092,7 @@ class Modeling:
 
         return df_pred_proba, y_pred   
 
-    def calculate_metrics(self, df_pred_proba, export: bool = False):
+    def calculate_metrics(self, df_pred_proba, export: bool = False, strategy: str = 'train'):
         
         d_metrics = {}
 
@@ -1134,22 +1134,22 @@ class Modeling:
 
         # Calculo ROI
         bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
-        d_params = bs.define_hiperparameters(strategy='train')
+        d_params = bs.define_hiperparameters(strategy=strategy)
         df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_pred_proba, d_params=d_params)
         d_metrics.update(d_roi)
 
         ## En last matches
         df_pred_last_25 = df_predicciones.tail(25)
         df_pred_last_50 = df_predicciones.tail(50)
-        ex_roi_sin_ea_last_25 = asses_model.determine_roi(df_pred_last_25, expected=True)
-        ex_roi_sin_ea_last_50 = asses_model.determine_roi(df_pred_last_50, expected=True)
-        roi_sin_ea_last_25 = asses_model.determine_roi(df_pred_last_25)
-        roi_sin_ea_last_50 = asses_model.determine_roi(df_pred_last_50)
+        ex_roi_last_25 = asses_model.determine_roi(df_pred_last_25, expected=True)
+        ex_roi_last_50 = asses_model.determine_roi(df_pred_last_50, expected=True)
+        roi_last_25 = asses_model.determine_roi(df_pred_last_25)
+        roi_last_50 = asses_model.determine_roi(df_pred_last_50)
         d_last_2 = {
-            'roi_sin_ea_last_25': roi_sin_ea_last_25,
-            'roi_sin_ea_last_50': roi_sin_ea_last_50,
-            'ex_roi_sin_ea_last_25': ex_roi_sin_ea_last_25,
-            'ex_roi_sin_ea_last_50': ex_roi_sin_ea_last_50
+            'roi_last_25': roi_last_25,
+            'roi_last_50': roi_last_50,
+            'ex_roi_last_25': ex_roi_last_25,
+            'ex_roi_last_50': ex_roi_last_50
         }
         d_metrics.update(d_last_2)
         

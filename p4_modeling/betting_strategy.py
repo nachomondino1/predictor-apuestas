@@ -50,7 +50,7 @@ class BettingStrategy:
                 dic = {
                     'prob_dp': [0], # 0.45, 0.55  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
                     'curva': ['kelly'], 
-                    'm': [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],  # 'm': [5, 10, 20, 40, 60, 90, 135, 200], 
+                    'm': [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200], # no tocar.
                     'b': [0],
                 }
         elif strategy == "linear":
@@ -521,41 +521,38 @@ class BettingStrategy:
         # Exportar el DataFrame final a un archivo Excel
         return df_final, best_df_pred
 
-    def define_model_betting_strategy_general(self, df_pred, d_params: dict = None):
+    def define_model_betting_strategy(self, df_pred, d_params, verbose: int = 0):
         """
-        Determina la estrategia de apuesta optima para un modelo. Todos los resultados con la misma estrategia
+        Determina la estrategia de apuesta óptima para un modelo aplicando la misma estrategia a todos los resultados.
+
+        # Parameters:
+            df_pred: DataFrame con las predicciones.
+            d_params: Diccionario de parámetros para calcular el ROI.
+            verbose: Nivel de detalle de logs.
+
+        # Return
+            df_final: DataFrame con los mejores parámetros y métricas.
+            best_df_pred: DataFrame con las predicciones y resultados usando la mejor estrategia.
         """
-        # Lista para almacenar los resultados
-        logger.info("Definiendo la estrategia de apuesta optima para el modelo...")
-        results = []
+        logger.info("Definiendo la estrategia de apuesta óptima para el modelo...")
 
-        # Defino hiperparametros a probar
-        if d_params is None:
-            d_params = self.define_hiperparameters(strategy='general')
-
-        # Determino ROI por combinacion de hiper de apuesta
+        # Calculo ROI para todas las predicciones juntas
         d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, d_params=d_params)
+
+        # Selecciono la mejor combinación
         n_comb = self.select_best_parameters(d_metricas)
 
-        d_hiper = d_hiper[n_comb]
+        # Guardo resultados
         best_df_pred = d_predic[n_comb]
-        best_d_rois = d_metricas[n_comb]
+        df_final = pd.DataFrame({**d_hiper[n_comb], **d_metricas[n_comb]}, index=[0])
 
-        # Concateno datos y guardo
-        ## Combinar los dos diccionarios
-        d_ct = {**d_hiper, **best_d_rois}  
+        # Calculo %_G/P si es posible
+        if 'roi' in df_final.columns:
+            df_final['%_G/P'] = df_final['roi'] / df_final['roi'].sum() * 100
 
-        ## Añadir el resultado al DataFrame final
-        results.append(d_ct)
+        if verbose >= 1:
+            logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
 
-        ## Convertir la lista de resultados en un DataFrame
-        df_final = pd.DataFrame(results)
-        # df_final.set_index('n_model', inplace=True)
-
-        if self.verbose >= 1:
-            logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
-
-        # Exportar el DataFrame final a un archivo Excel
         return df_final, best_df_pred
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
