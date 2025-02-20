@@ -1141,11 +1141,15 @@ class Modeling:
         ## En last matches
         df_pred_last_25 = df_predicciones.tail(25)
         df_pred_last_50 = df_predicciones.tail(50)
+        ex_roi_sin_ea_last_25 = asses_model.determine_roi(df_pred_last_25, expected=True)
+        ex_roi_sin_ea_last_50 = asses_model.determine_roi(df_pred_last_50, expected=True)
         roi_sin_ea_last_25 = asses_model.determine_roi(df_pred_last_25)
         roi_sin_ea_last_50 = asses_model.determine_roi(df_pred_last_50)
         d_last_2 = {
             'roi_sin_ea_last_25': roi_sin_ea_last_25,
             'roi_sin_ea_last_50': roi_sin_ea_last_50,
+            'ex_roi_sin_ea_last_25': ex_roi_sin_ea_last_25,
+            'ex_roi_sin_ea_last_50': ex_roi_sin_ea_last_50
         }
         d_metrics.update(d_last_2)
         

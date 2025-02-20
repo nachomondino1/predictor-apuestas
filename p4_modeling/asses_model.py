@@ -498,9 +498,15 @@ def concatenate_dfs(
     df_predicciones = pd.concat(columns_to_concat, axis=1)
     return df_predicciones
 
-def determine_roi(df_pred):
-    bank_inicial = df_pred['bank_inicial'].iloc[0]  # Primer valor de bank_inicial
-    bank_final = df_pred['bank_inicial'].iloc[-1]  # Último valor de bank_inicial
+def determine_roi(df_pred, expected: bool = False):
+
+    if expected:
+        col_inic, col_fin = 'expected_bank_inicial', 'expected_bank_final'
+    else:
+        col_inic, col_fin = 'bank_inicial', 'bank_final'
+
+    bank_inicial = df_pred[col_inic].iloc[0]  # Primer valor de bank_inicial
+    bank_final = df_pred[col_fin].iloc[-1]  # Último valor de bank_inicial
     return (bank_final - bank_inicial) / bank_inicial
      
 def calculate_nan_metrics(df_predicciones):
