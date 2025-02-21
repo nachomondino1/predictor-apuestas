@@ -81,7 +81,7 @@ def main(
     rows = []
     d_paths = initialize_directories(country, iteration_date, predict_missing, betting_strat)
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-    d_params = bs.define_hiperparameters(strategy='kelly')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
 
     ## (0) Determino metricas para seleccionar modelos candidatos (1) y modelos en prod (3)
     l_metrics = ['roi_con_ea', 'roi_con_ea_last_50', 'ex_roi_con_ea', 'ex_roi_con_ea_last_50']
@@ -93,11 +93,11 @@ def main(
 
         # 1.1. Calculo metrica combinada
         metric = 'metric_cand'
-        l_metrics_filt, l_weights_filt = ['roi', 'expected_roi'], [0.5, 0.5] # ['roi', 'recall'], # Hasta que tenga last matches en df_iteration al entrenar
+        l_metrics_filt, l_weights_filt = ['roi', 'expected_roi'], [0.5, 0.5]  # Hasta que tenga last matches en df_iteration al entrenar
         df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights_filt, metric_name=metric)
 
         ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.75, n_models_max=30) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.5, n_models_max=30) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
     
     else:
@@ -130,11 +130,11 @@ def main(
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             else:
                 df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
-                if 'Unnamed: 0' in df_pred.columns:
-                    df_pred = df_pred.drop(columns=['Unnamed: 0'])
+                df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
 
             # Defino estrategia optima
             df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
+            # df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
 
             # Recalculo metricas (test + assess)
             ## sin ea 
@@ -233,12 +233,13 @@ if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
     # l_countries = [48]
+    l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
-    select_candidates = False
+    select_candidates = True
     assess = True
     update_missing = False if assess else False
-    predict_missing = False if assess else False
+    predict_missing = True if assess else False
     betting_strat = True
     export = True
 
