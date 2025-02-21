@@ -38,6 +38,9 @@ class BettingStrategy:
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
+        list_dp = [0] # [0.45, 0.55, 0.65] # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_m = [5, 10, 20, 30, 40, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.
+
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': [0],
@@ -48,37 +51,26 @@ class BettingStrategy:
         
         elif strategy == "kelly":
                 dic = {
-                    'prob_dp': [0], # 0.45, 0.55  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+                    'prob_dp': list_dp,
                     'curva': ['kelly'], 
-                    'm': [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200], # no tocar.
+                    'm': list_m,
                     'b': [0],
                 }
+
         elif strategy == "linear":
             dic = {
-                'prob_dp': [0],  # tengo varios valores porque cambia mucho si el modelo es under o no.
+                'prob_dp': list_dp, 
                 'curva': ['linear'], # ['linear',  'kelly'],  #'linear', 
-                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [
-                    0, 
-                    -0.1, -0.2, 
-                    0.1, 
-                    ], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
-            }
-
-        elif strategy == "linear_no_odds":
-            dic = {
-                'prob_dp': [0], #  -0.5, -0.35, -0.25
-                'curva': ['linear'],
-                'm': [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250],
-                'b': [0],
+                'm': list_m,
+                'b': [0], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
             }
 
         elif strategy == "all":
                
             dic = {
-                'prob_dp': [0],
+                'prob_dp': list_dp,
                 'curva': ['linear', 'kelly'], # 'equal', 'kelly', 'exponential'
-                'm': [10, 25, 45, 70, 100, 135, 175, 200], # sumar +5 a la diferencia fija
+                'm': list_m,
                 'b': [0],
             }
 
@@ -546,9 +538,9 @@ class BettingStrategy:
         best_df_pred = d_predic[n_comb]
         df_final = pd.DataFrame({**d_hiper[n_comb], **d_metricas[n_comb]}, index=[0])
 
-        # Calculo %_G/P si es posible
-        if 'roi' in df_final.columns:
-            df_final['%_G/P'] = df_final['roi'] / df_final['roi'].sum() * 100
+        # # Calculo %_G/P si es posible
+        # if 'roi' in df_final.columns:
+        #     df_final['%_G/P'] = df_final['roi'] / df_final['roi'].sum() * 100
 
         if verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
