@@ -35,12 +35,14 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy):
+    def define_hiperparameters(self, strategy, by_result: bool = False):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
-        list_dp = [0] # [0.45, 0.55, 0.65] # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.
+        list_dp = [0] # [0, 0.45, 0.55, 0.65] if by_result else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_m_gral = [10, 30, 60, 90, 200] # no tocar.
+        list_m_spec = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.
+        list_m = list_m_gral if by_result else list_m_spec
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -61,7 +63,7 @@ class BettingStrategy:
         elif strategy == "linear":
             dic = {
                 'prob_dp': list_dp, 
-                'curva': ['linear'], # ['linear',  'kelly'],  #'linear', 
+                'curva': ['linear'],
                 'm': list_m,
                 'b': [0], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
             }
@@ -100,7 +102,7 @@ class BettingStrategy:
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
 
             # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
-            if prob_result_to_bet > thr_prob_min:
+            if (prob_result_to_bet > thr_prob_min): # nunca hagas esto: and (row['predicted_result'] != 0):
 
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']

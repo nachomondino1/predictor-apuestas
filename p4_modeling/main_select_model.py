@@ -81,7 +81,6 @@ def main(
     rows = []
     d_paths = initialize_directories(country, iteration_date, predict_missing, betting_strat)
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-    d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
 
     ## (0) Determino metricas para seleccionar modelos candidatos (1) y modelos en prod (3)
     expected_weight = df_ite['roi'].corr(df_ite['expected_roi'])
@@ -134,9 +133,15 @@ def main(
                 df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
                 df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
 
-            # Defino estrategia optima
+            # Defino estrategia 
+            d_params = bs.define_hiperparameters(strategy='linear', by_result=False)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
+            
+            # Mismo m por rdp pero ≠ dp
+            # m_sel = df_strat_1['m'].values[0]
+            # d_params['m'] = [m_sel]
             # df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
+            # logger.info(f"M seleccionado: {m_sel}. \n Parametros a probar: {d_params}")
 
             # Recalculo metricas (test + assess)
             ## sin ea 
@@ -174,7 +179,7 @@ def main(
             # Exporto datos
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
             df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-            df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
+            df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx', index=True)
             df_strat.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
 
         ## 3.1. Calculo metrica combinada
@@ -195,36 +200,6 @@ def main(
     n_model, model_name = df_ite_bs.loc[idx_max, n_model_name], df_ite_bs.loc[idx_max, 'model_name']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}")
 
-    ''' A futuro, podrias aplicar x resultado una vez seleccionado el modelo.
-    # (4) ESTRATRAGIA DE APUESTA
-    if betting_strat:
-
-        # 4.1. Levanto df_pred del modelo seleccionado
-        try:
-            logger.warning("Levanto df_pred test + missing ya recolectado...")
-            df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0) # sin ea
-        except:
-            logger.warning("Levanto df_pred sin ea de cuando entrene modelos (solo test)...")
-            df_pred = pd.read_excel(f"{d_paths['base_path']}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0) # sin ea. Ya tiene metricas
-        logger.critical(df_pred.shape)  
-
-        # 4.2. Defino estrategia
-        bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-        d_params = bs.define_hiperparameters(strategy='kelly')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-        df, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
-
-        # 4.3. Recalculo metricas con ea (test + assess)
-        df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra) # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
-        # df_pred_with_stra, d_metric_con_ea = asses_model.calculate_roi(df_pred_with_stra, name_extension='expected') # d_metric_con_ea = ROI_con_ea (y tmb tiene ROI_con_ea_pp)
-        logger.info(d_metric_con_ea)
-
-        # Exporto datos (x seg)
-        df.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
-        df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx')
-    
-    else:
-        logger.warning(f"Se evito redefinir estrategia de apuesta por modelo. \n{df_ite_bs}")
-    '''
     # Exporto datos
     if export:
         df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
@@ -233,7 +208,8 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 148]
+    l_countries = [55, 59, 77, 148]
+    l_countries = [6]
 
     # Defino hiperparametros
     select_candidates = True

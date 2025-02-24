@@ -1134,7 +1134,7 @@ class Modeling:
 
         # Calculo ROI
         bs = betting_strategy.BettingStrategy()  # Al no pasarle iteration_date no inicializa directories de betting strategy
-        d_params = bs.define_hiperparameters(strategy=strategy)
+        d_params = bs.define_hiperparameters(strategy=strategy, by_result=False)
         df_predicciones, _, d_roi = bs.calculate_roi_in_combinations(df_pred_proba, d_params=d_params)
         d_metrics.update(d_roi)
 
