@@ -84,8 +84,11 @@ def main(
     d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
 
     ## (0) Determino metricas para seleccionar modelos candidatos (1) y modelos en prod (3)
-    l_metrics = ['roi_con_ea', 'roi_con_ea_last_50', 'ex_roi_con_ea', 'ex_roi_con_ea_last_50']
-    l_weights = [0.25, 0.25, 0.25, 0.25]
+    expected_weight = df_ite['roi'].corr(df_ite['expected_roi'])
+    roi_weight = 1 - expected_weight
+    l_metrics = ['roi_con_ea', 'roi_con_ea_last_50', 'ex_roi_con_ea', 'ex_roi_con_ea_last_50'] # 50 y/o 25?
+    l_weights = [roi_weight/2, roi_weight/2, expected_weight/2, expected_weight/2]
+    logger.info(f'ROI weight: {roi_weight} Expected Weight: {expected_weight}')
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
@@ -93,16 +96,15 @@ def main(
 
         # 1.1. Calculo metrica combinada
         metric = 'metric_cand'
-        l_metrics_filt, l_weights_filt = ['roi', 'expected_roi'], [0.5, 0.5]  # Hasta que tenga last matches en df_iteration al entrenar
+        l_metrics_filt, l_weights_filt = ['roi', 'expected_roi'], [roi_weight, expected_weight]  # Hasta que tenga last matches en df_iteration al entrenar
         df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_filt, l_weights=l_weights_filt, metric_name=metric)
 
         ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.5, n_models_max=30) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.35, n_models_max=30) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
     
     else:
         df_ite_filt = pd.read_excel(f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx')
-
 
     # (2) Assses + Recalculo de metricas
     # Por modelo
@@ -187,7 +189,6 @@ def main(
         n_model_name = 'n_model'
         metric = 'metric_assess'
 
-
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
@@ -232,13 +233,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
-    l_countries = [55, 59, 77, 148]
+    l_countries = [55, 59, 148]
 
     # Defino hiperparametros
     select_candidates = True
     assess = True
-    update_missing = False if assess else False
+    update_missing = True if assess else False
     predict_missing = True if assess else False
     betting_strat = True
     export = True

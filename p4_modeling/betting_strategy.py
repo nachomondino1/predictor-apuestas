@@ -34,12 +34,13 @@ class BettingStrategy:
                 self.BASE_PATH = self.d_paths['base_path']
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
+    # HIPER SPACE
     def define_hiperparameters(self, strategy):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
         list_dp = [0] # [0.45, 0.55, 0.65] # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [5, 10, 20, 30, 40, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.
+        list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -320,7 +321,7 @@ class BettingStrategy:
                     logger.warning(f"Disminución de stakes por copiado de emergencia de variables START y/o SUB en partido. Se afectaron los stakes de {len(rows_player_filled)} de {len(df)} registros.")
         return df
 
-    ## Determinar la mejor estrategia
+    # DETERMINE BETTING STRATEGY
     def calculate_roi_in_combinations(self, df, d_params):
         """
         Determinar un ROI para cada combinacion de hiperparametros de la estrategia de apuesta. 
@@ -378,41 +379,6 @@ class BettingStrategy:
 
         return d_predic, d_hiper, d_metricas
 
-    def apply_strategy_by_result(self, df, df_hiper):
-        """
-        Es para usar en produccion.
-
-        df_hiper: Parametros a probar por result
-        """
-        df_comp = pd.DataFrame()
-        print(df.shape)
-
-        # Por resultado
-        for pred in [1, 0, 2]:
-            print(f"Resultado: {pred}")
-
-            df_pred = df[df['predicted_result'] == pred] 
-            print(df_pred.shape)
-
-            # Si no hay registros falla...
-            if len(df_pred) > 0:
-                row_pred = df_hiper.loc[pred]
-                prob, curva, m, b = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b']
-        
-                # Determino result to bet
-                df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
-
-                # Determino stake to bet
-                d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
-                df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake)
-
-                df_comp = pd.concat([df_comp, df_pred], axis=0)
-
-            else:
-                logger.warning(f"No hay partidos para el resultado {pred}, por lo que, no se aplica la estrategia a dicho resultado.")
-
-        return df_comp
-
     def apply_strategy(self, df, param_dict, prod: bool = True):
         
         if len(df) == 0:
@@ -449,7 +415,7 @@ class BettingStrategy:
             print("Row", row)
 
         return n_comb
-         
+
     # Main
     def define_model_betting_strategy_by_result(self, df_pred, d_params, verbose: int = 0):
         """
@@ -547,6 +513,42 @@ class BettingStrategy:
 
         return df_final, best_df_pred
 
+    # Prod
+    def apply_strategy_by_result(self, df, df_hiper):
+        """
+        Es para usar en produccion.
+
+        df_hiper: Parametros a probar por result
+        """
+        df_comp = pd.DataFrame()
+        print(df.shape)
+
+        # Por resultado
+        for pred in [1, 0, 2]:
+            print(f"Resultado: {pred}")
+
+            df_pred = df[df['predicted_result'] == pred] 
+            print(df_pred.shape)
+
+            # Si no hay registros falla...
+            if len(df_pred) > 0:
+                row_pred = df_hiper.loc[pred]
+                prob, curva, m, b = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b']
+        
+                # Determino result to bet
+                df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
+
+                # Determino stake to bet
+                d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
+                df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake)
+
+                df_comp = pd.concat([df_comp, df_pred], axis=0)
+
+            else:
+                logger.warning(f"No hay partidos para el resultado {pred}, por lo que, no se aplica la estrategia a dicho resultado.")
+
+        return df_comp
+    
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
