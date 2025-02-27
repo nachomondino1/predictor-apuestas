@@ -204,7 +204,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55]
+    l_countries = [59]
 
     # Defino hiperparametros
     select_candidates = False
@@ -233,7 +233,8 @@ if __name__ == "__main__":
             'expected_roi': 0.29
         },
         59: {
-            
+            '%_gp_home': 0.53,
+            'expected_roi': 0.47
         },
         77: {
             '%_gp_away': 0.28,
