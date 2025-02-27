@@ -35,14 +35,12 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, by_result: bool = False):
+    def define_hiperparameters(self, strategy):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
-        list_dp = [0] # [0, 0.45, 0.55, 0.65] if by_result else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m_gral = [10, 30, 60, 90, 200] # no tocar.
-        list_m_spec = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.
-        list_m = list_m_gral if by_result else list_m_spec
+        list_dp = [0, 0.45, 0.55, 0.65]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_m = [10, 20, 40, 80, 160, 200]  # list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.   
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -407,7 +405,7 @@ class BettingStrategy:
   
         # Calcular metrica combinada para determinar mejor estrategia
         df = calculate_combined_metric(df, l_metrics=['roi'], l_weights=[1])
-        # df = calculate_combined_metric(df, l_metrics=['expected_roi'], l_weights=[1])
+        # df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[0.75, 0.25])
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()

@@ -302,7 +302,7 @@ def calculate_reality_roi(df: pd.DataFrame):
     return df, d_rois
 
 
-def calculate_metrics(df_pred_proba, export: bool = False):
+def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, export: bool = False):
         
     d_metrics = {}
 
@@ -327,10 +327,11 @@ def calculate_metrics(df_pred_proba, export: bool = False):
     d_metrics.update({'roi': roi, 'expected_roi': ex_roi})
 
     # Otras métricas
-    d_metrics.update(determine_distribution(df_pred_proba))
-    # d_metrics.update(calculate_nan_metrics(df_pred_proba))
-    d_metrics.update(calculate_gp_by_result(df_pred_proba))
-    d_metrics.update(calculate_accuracy_by_result(df_pred_proba))
+    if advanced_metrics:
+        d_metrics.update(determine_distribution(df_pred_proba))
+        d_metrics.update(calculate_nan_metrics(df_pred_proba))
+        d_metrics.update(calculate_gp_by_result(df_pred_proba))
+        d_metrics.update(calculate_accuracy_by_result(df_pred_proba))
 
     print(d_metrics)
 

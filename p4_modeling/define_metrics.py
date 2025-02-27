@@ -40,11 +40,8 @@ def main(id_country, country, iteration_date, n_max_candidates: int = 30):
         )
     df_ite_assess.to_excel(f'/Users/nachomondino/Desktop/df_ite_assess.xlsx', index=False)
     
-    n_matches = (df_ite_assess['n_loc'].sum() + df_ite_assess['n_emp'].sum() + df_ite_assess['n_vis'].sum()) / len(df_ite_assess)
-    n_matches_assess = int(n_matches - 100)
-    roi_assess = f'roi_last_{n_matches_assess}'
-    ex_roi_assess = f'ex_roi_last_{n_matches_assess}'
     # 3: calcular ROIs en partidos assess --> ya lo calculo en df_ite_assess
+    roi_assess, ex_roi_assess = 'roi_sin_ea_last_50', 'ex_roi_sin_ea_last_50'
 
     # 4: Concatenar df_ite_test con ROIs en assess
     df_ite_assess = df_ite_assess.rename(columns={'n_model': 'n_iteration'})
@@ -74,8 +71,8 @@ def main(id_country, country, iteration_date, n_max_candidates: int = 30):
 
 if __name__ == "__main__":
     # Defino parametros
-    id_country = 59
-
+    l_countries = [55, 59, 77, 148]
+    
     d_countries = {
         # Train nuevos
         6: ["argentina", '2025-02-06'], 
@@ -85,10 +82,13 @@ if __name__ == "__main__":
         77: ["italy", '2025-02-05'],
         148: ["spain", '2025-02-05'], 
         }
-    country = d_countries[id_country][0]
-    iteration_date = d_countries[id_country][1]
+    
+    for id_country in l_countries:
 
-    main(id_country, country, iteration_date)
+        country = d_countries[id_country][0]
+        iteration_date = d_countries[id_country][1]
+
+        main(id_country, country, iteration_date)
 
 
 

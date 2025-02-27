@@ -60,7 +60,6 @@ def main(
         update_missing: bool = True,
         predict_missing: bool = True,
         select_model: bool = True,
-        d_metrics: list = None,
         export: bool = True,
         verbose: int = 0
         ):
@@ -82,17 +81,15 @@ def main(
     rows = []
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-    d_metrics_cand = {
-        'roi': 0.5,
-        'expected_roi': 0.5
-    }
-    l_metrics_cand, l_weights_cand = d_metrics_cand.keys(), d_metrics_cand.values()
+    l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
+    l_weights = [1/len(l_metrics) for _ in l_metrics]
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])  # Creo instancia de sbm
-
+        
         # 1.1. Calculo metrica combinada
+        l_metrics_cand, l_weights_cand = ['roi', 'f1_score'], [0.5, 0.5] # Temporal pues no tengo n last matches en test...
         metric = 'metric_cand' 
         df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric)
 
@@ -130,37 +127,38 @@ def main(
             else:
                 df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
                 df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
-
+            
             # Defino predicciones sin estrategia 
-            d_params = bs.define_hiperparameters(strategy='train', by_result=False)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            d_params = bs.define_hiperparameters(strategy='train')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
             df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
 
             # Defino predicciones con estrategia 
-            d_params = bs.define_hiperparameters(strategy='linear', by_result=False)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-            df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
+            d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            # df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
+            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
+            df_pred_with_stra, _ = asses_model.calculate_roi(df_pred_with_stra) # para tener mismo bank across all results.
             df_strat.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
             df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx', index=True)
 
             # Recalculo metricas (test + assess)
             ## sin ea 
-            d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met)
+            d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, advanced_metrics=True)
+            for num_matches in [50, 25]:
+                d_metrics_last = asses_model.calculate_metrics_for_last_matches(df_pred_met, num_matches=num_matches)
+                d_metric_sin_ea.update(d_metrics_last)
             ## con ea
             d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra) 
 
-            n_matches_assess = len(df_pred_met) - 100
-            for num_matches in [50, 25, n_matches_assess]:
-                # d_metrics_last = asses_model.calculate_metrics_for_last_matches(df_pred_met, num_matches=num_matches)
-                d_metrics_last_2 = asses_model.calculate_metrics_for_last_matches(df_pred_with_stra, num_matches=num_matches)
-                # d_metric_sin_ea.update(d_metrics_last)
-                d_metric_con_ea.update(d_metrics_last_2)
+            ## Renombro metricas para que no se sobreescriban
+            d_metric_sin_ea_renamed = {f"{k}_sin_ea": v for k, v in d_metric_sin_ea.items()}
+            d_metric_con_ea_renamed = {f"{k}_con_ea": v for k, v in d_metric_con_ea.items()}
 
             # Guardo datos
             new_row = {
                 'n_model': n_model, 'model_name': model_name, 
-                **d_metric_sin_ea,
-                **d_metric_con_ea
-                # Multiplicador
+                **d_metric_sin_ea_renamed,
+                **d_metric_con_ea_renamed
                 }
             rows.append(new_row)
             df_ite_bs = pd.DataFrame(data=rows)
@@ -169,11 +167,9 @@ def main(
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
 
         ## 3.1. Calculo metrica combinada
-        if select_model:
-            l_metrics, l_weights = d_metrics.keys(), d_metrics.values()
-            metric = 'metric_assess'
-            df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
-            n_model_name = 'n_model'
+        metric = 'metric_assess'
+        df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+        n_model_name = 'n_model'
 
     else:
         # Usar test viejo
@@ -204,7 +200,8 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
+    # l_countries = [55, 59, 77, 148]
+    l_countries = [148]
 
     # Defino hiperparametros
     select_candidates = False
@@ -222,34 +219,10 @@ if __name__ == "__main__":
         77: ["italy", '2025-02-05'],
         148: ["spain", '2025-02-05'], 
         }
-    
-    d_country_metric = {
-        48: {
-            '%_gp_away': 0.63,
-            'expected_roi': 0.37
-        }, 
-        55: {
-            '%_gp_away': 0.71,
-            'expected_roi': 0.29
-        },
-        59: {
-            '%_gp_home': 0.53,
-            'expected_roi': 0.47
-        },
-        77: {
-            '%_gp_away': 0.28,
-            'expected_roi': 0.72
-        },
-        148: {
-            '%_gp_draw': 0.4,
-            'expected_roi': 0.6
-        }
-    }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        d_metric = d_country_metric[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
@@ -261,7 +234,6 @@ if __name__ == "__main__":
             assess=assess,
             update_missing=update_missing,
             predict_missing=predict_missing,
-            d_metrics=d_metric,
             export=export
             )
         
