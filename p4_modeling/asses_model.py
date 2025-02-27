@@ -301,6 +301,56 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
+
+def calculate_metrics(df_pred_proba, export: bool = False):
+        
+    d_metrics = {}
+
+    # Ordeno por fecha de mas antiguo a mas reciente
+    df_pred_proba = df_pred_proba.sort_values(by='date', ascending=True)
+
+    # Determino expected result + probas de bookies
+    df_pred_proba = construct_data.determine_expected_result(df_pred_proba, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
+    df_pred_proba = calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
+    df_pred_proba = determine_result_by_bookmaker(df_pred_proba, col_name="bookmaker_result")  # Determino resultado predicho segun cuota minima (e.g. "Home")
+
+    # Basic metrics
+    d_metrics.update(calculate_basic_metrics(df_pred_proba, export=export))
+
+    # Bet metrics
+    d_metrics.update(calculate_bet_metrics(df_pred_proba))
+    d_metrics.update({'dif_prec_bm': d_metrics['test_accuracy'] - d_metrics['test_accuracy_bm']})
+
+    # ROI
+    roi = determine_roi(df_pred_proba)
+    ex_roi = determine_roi(df_pred_proba, expected=True)
+    d_metrics.update({'roi': roi, 'expected_roi': ex_roi})
+
+    # Otras métricas
+    d_metrics.update(determine_distribution(df_pred_proba))
+    # d_metrics.update(calculate_nan_metrics(df_pred_proba))
+    d_metrics.update(calculate_gp_by_result(df_pred_proba))
+    d_metrics.update(calculate_accuracy_by_result(df_pred_proba))
+
+    print(d_metrics)
+
+    return d_metrics
+
+def calculate_metrics_for_last_matches(df_pred_proba, num_matches: int):
+    """Calcula métricas de precisión y ROI para los últimos `num_matches` partidos."""
+    df_last_matches = df_pred_proba.tail(num_matches)
+
+    # Obtener métricas de los últimos `num_matches` partidos
+    d_metrics_last = calculate_metrics(df_last_matches)
+
+    return {
+        f'test_acc_last_{num_matches}': d_metrics_last['test_accuracy'],
+        f'recall_last_{num_matches}': d_metrics_last['recall'],
+        f'f1_score_last_{num_matches}': d_metrics_last['f1_score'],
+        f'roi_last_{num_matches}': d_metrics_last['roi'],
+        f'ex_roi_last_{num_matches}': d_metrics_last['expected_roi']
+    }
+    
 def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
     """
     Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
@@ -403,11 +453,12 @@ def define_weights(df: pd.DataFrame, col_corr: str, l_metrics:list):
 # Simplificar + Moduralizar
 def calculate_basic_metrics( 
         df_pred_proba,
-        country: str,
         var_resp: str = 'result',
         var_pred: str = 'predicted_result',
         verbose: int = 0,
-        export: bool = False):
+        export: bool = False,
+        country: str = None
+        ):
     """
     Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
     """
@@ -505,10 +556,14 @@ def determine_roi(df_pred, expected: bool = False):
     else:
         col_inic, col_fin = 'bank_inicial', 'bank_final'
 
-    bank_inicial = df_pred[col_inic].iloc[0]  # Primer valor de bank_inicial
-    bank_final = df_pred[col_fin].iloc[-1]  # Último valor de bank_inicial
+    # Promedio de los primeros 3 valores (o menos si hay menos de 3 registros)
+    bank_inicial = df_pred[col_inic].iloc[:3].mean()
+
+    # Promedio de los últimos 3 valores (o menos si hay menos de 3 registros)
+    bank_final = df_pred[col_fin].iloc[-3:].mean()
+
     return (bank_final - bank_inicial) / bank_inicial
-     
+
 def calculate_nan_metrics(df_predicciones):
     """
     Calcula las métricas relacionadas con el relleno de NaN en el DataFrame.

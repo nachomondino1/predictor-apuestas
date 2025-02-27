@@ -401,20 +401,19 @@ class BettingStrategy:
         return df
 
     def select_best_parameters(self, data):
-
+        
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
-    
+  
         # Calcular metrica combinada para determinar mejor estrategia
         df = calculate_combined_metric(df, l_metrics=['roi'], l_weights=[1])
+        # df = calculate_combined_metric(df, l_metrics=['expected_roi'], l_weights=[1])
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
         if self.verbose >= 1:
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
-            row = df.loc[n_comb]
-            print("Row", row)
 
         return n_comb
 
@@ -451,9 +450,9 @@ class BettingStrategy:
                 # Calculo roi por cada set de hiper de apuesta
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
-                # Determinar mejor estrategia para el resultado            
+                # Determinar mejor estrategia para el resultado      
                 n_comb = self.select_best_parameters(d_metricas)
-
+         
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
                 d_metrics_res[pred] = d_metricas[n_comb]
@@ -505,10 +504,6 @@ class BettingStrategy:
         # Guardo resultados
         best_df_pred = d_predic[n_comb]
         df_final = pd.DataFrame({**d_hiper[n_comb], **d_metricas[n_comb]}, index=[0])
-
-        # # Calculo %_G/P si es posible
-        # if 'roi' in df_final.columns:
-        #     df_final['%_G/P'] = df_final['roi'] / df_final['roi'].sum() * 100
 
         if verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
