@@ -229,7 +229,7 @@ def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = F
             m_sel = df_strat_1['m'].values[0]
 
             # Defino dp por resultado usando el m ya definido
-            d_params_dp = {'prob_dp': [0, 0.45, 0.55, 0.65, 0.75, 0.85], 'curva': ['linear'], 'm': [m_sel], 'b': [0]}
+            d_params_dp = {'prob_dp': [0, 0.45, 0.6, 0.75], 'curva': ['linear'], 'm': [m_sel], 'b': [0]}
             df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_dp)  # antes no lo hacia por rdo.
        
         # para tener mismo bank across all results.
