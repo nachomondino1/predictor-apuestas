@@ -130,17 +130,15 @@ def main(
             
             # Defino predicciones sin estrategia 
             d_params = bs.define_hiperparameters(strategy='train')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-            df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
-            df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+            df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
+            if predict_missing:
+                df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
 
-            # Defino predicciones con estrategia 
-            d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-            # df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
-            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)  # antes no lo hacia por rdo.
-            df_pred_with_stra, _ = asses_model.calculate_roi(df_pred_with_stra) # para tener mismo bank across all results.
+            # Defino predicciones con estrategia (lo hago aqui solo para tener los rdos de todos los modelos con su ea)
+            df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=True, vary_m=False)
             df_strat.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
             df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx', index=True)
-
+          
             # Recalculo metricas (test + assess)
             ## sin ea 
             d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, advanced_metrics=True)
@@ -197,11 +195,56 @@ def main(
 
     return df_ite_bs
 
+def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = False, vary_m: bool = False):
+    """
+    Aplico ≠ estrategias de apuesta.
+
+    # Parameters:
+        df_pred: Dataframe con predicciones a las cuales aplicar estrategia.
+        bs: Instancia de clase BettingStrategy()
+        mode: Tipo de estrategia a usar. 
+            'equal' para usar mismo m en todos los rdos. 
+            'per_res' para usar un m y dp ≠ por res. 
+            'dp_per_res' para usar mismo m pero dp ≠ por rdo.
+    """
+    d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+        
+    # estrategia x rdo + dp
+    if per_res:
+
+        # Completo
+        if vary_m and vary_dp:
+            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
+
+        # Solo vario el m
+        elif vary_m:
+            d_params['prob_dp'] = [0]
+            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
+
+        # Solo vario el dp
+        elif vary_dp:
+            # Defino m comun a todos los rdos
+            d_params_m = {'prob_dp': [0], 'curva': ['linear'], 'm': [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200], 'b': [0]}
+            df_strat_1, df_pred_with_stra_1 = bs.define_model_betting_strategy(df_pred, d_params=d_params_m)
+            m_sel = df_strat_1['m'].values[0]
+
+            # Defino dp por resultado usando el m ya definido
+            d_params_dp = {'prob_dp': [0, 0.45, 0.55, 0.65, 0.75, 0.85], 'curva': ['linear'], 'm': [m_sel], 'b': [0]}
+            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_dp)  # antes no lo hacia por rdo.
+       
+        # para tener mismo bank across all results.
+        df_pred_with_stra, _ = asses_model.calculate_roi(df_pred_with_stra) 
+        
+    ## Mismo m todos los rdos
+    else:
+        df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)
+
+    return df_strat, df_pred_with_stra
+
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [55, 59, 77, 148]
-    l_countries = [148]
+    # l_countries = [148]
 
     # Defino hiperparametros
     select_candidates = False
