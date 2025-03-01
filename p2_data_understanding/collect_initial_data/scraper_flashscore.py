@@ -256,7 +256,7 @@ class FlashscoreCrawler(Crawler):
             SEC_WAIT = self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
 
             # Si existe dicha formation
-            tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div/span[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True) # tag_lineup = super().extract_tag(xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div[text()="{formation}"]', sec_wait=SEC_WAIT, print_fail=True)
+            tag_lineup = super().extract_tag(xpath=f'.//div[contains(@class, "lf__lineUp")]//*[contains(text(), "{formation}")]', sec_wait=SEC_WAIT, print_fail=True) # Mas robusto que xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div/span[text()="{formation}"]'
 
             if self.verbose >= 1:
                 print(formation, SEC_WAIT)
