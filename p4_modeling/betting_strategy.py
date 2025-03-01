@@ -39,8 +39,8 @@ class BettingStrategy:
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
-        list_dp = [0, 0.45, 0.55, 0.65]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [10, 20, 40, 80, 160, 200]  # list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.   
+        list_dp = [0, 0.45, 0.6, 0.75]  # [0, 0.45, 0.5, 0.55, 0.6, 0.65, 0.75, 0.85, 0.9]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.          # list_m = [10, 20, 40, 80, 160, 200] 
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -98,29 +98,41 @@ class BettingStrategy:
         for id_match, row in df.iterrows():
 
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
+            odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
+            kelly_criterion = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1) 
+            # thr_kelly = thr_prob_min - 0.33
 
-            # Si el modelo esta MAS seguro del resultado predicho que la casa de apuestas
-            if (prob_result_to_bet > thr_prob_min): # nunca hagas esto: and (row['predicted_result'] != 0):
-
-                # Apuesto al resultado predicho
-                result_to_bet = row['predicted_result']
-                odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
-                strategy = f"dif_prob_mod_bm > {thr_prob_min}"
-
-            # Si el modelo esta MENOS seguro del resultado predicho que la casa de apuestas
-            else:
+            # Si el modelo esta POCO seguro del resultado predicho
+            if (prob_result_to_bet < thr_prob_min):
+                
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"dif_prob_mod_bm < {thr_prob_min}"
 
+            # Si la cuota es baja, tal que, la relacion beneficio - riesgo no conviene
+            # elif (kelly_criterion < thr_kelly) and (thr_prob_min != 0):  # ojo que no se implemente cuando strategy es train...
+                     
+            #     # Apuesto doble oportunidad sin el resultado predicho
+            #     result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
+            #     prob_result_to_bet = 1 - prob_result_to_bet
+            #     odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
+            #     strategy = f"kelly_crit < 0"
+
+            # Si nuestro modelo esta seguro del rdo
+            else:
+                # Apuesto al resultado predicho
+                result_to_bet = row['predicted_result']
+                strategy = f"dif_prob_mod_bm > {thr_prob_min}"
+
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
-            
+            df.loc[id_match, 'kelly_criterion'] = kelly_criterion
+
         return df
 
     def calculate_odd_double_chance(self, row, result_to_bet):

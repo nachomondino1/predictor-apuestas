@@ -18,6 +18,10 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
+    # Temporal (falla en prod pues rellena rdos con 0-0 en el update_results)
+    df[['goals_home', 'goals_away']] = df[['goals_home', 'goals_away']].fillna(0)
+    # df = df.dropna(subset=['goals_home', 'goals_away'])
+
     # Condiciones para determinar el resultado (convertidas explícitamente a booleanas) (no rellenar goals con 0 antes porque falla en prod)
     condiciones = [
         (df['goals_home'] > df['goals_away']).astype(bool),

@@ -81,7 +81,8 @@ def main(
     rows = []
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
-    l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
+    # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
+    l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'roi_last_25_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
     l_weights = [1/len(l_metrics) for _ in l_metrics]
 
     # (1) SELECCION DE MODELOS CANDIDATOS
@@ -117,6 +118,10 @@ def main(
             logger.info(f'{n_model} {model_name}')
             
             # Obtengo predicciones missing + concateno test y missing
+            df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+
+            # ERROR EN ASSESS...
+            '''
             if predict_missing:
                 # Levanto df_pred_test
                 df_pred_test = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
@@ -127,7 +132,7 @@ def main(
             else:
                 df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
                 df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
-            
+            '''
             # Defino predicciones sin estrategia 
             d_params = bs.define_hiperparameters(strategy='train')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
@@ -135,7 +140,7 @@ def main(
                 df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
 
             # Defino predicciones con estrategia (lo hago aqui solo para tener los rdos de todos los modelos con su ea)
-            df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=True, vary_m=False)
+            df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=True, vary_m=True)
             df_strat.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
             df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx', index=True)
           
@@ -147,6 +152,9 @@ def main(
                 d_metric_sin_ea.update(d_metrics_last)
             ## con ea
             d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra) 
+            for num_matches in [50, 25]:
+                d_metrics_last = asses_model.calculate_metrics_for_last_matches(df_pred_with_stra, num_matches=num_matches)
+                d_metric_con_ea.update(d_metrics_last)
 
             ## Renombro metricas para que no se sobreescriban
             d_metric_sin_ea_renamed = {f"{k}_sin_ea": v for k, v in d_metric_sin_ea.items()}
@@ -229,9 +237,9 @@ def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = F
             m_sel = df_strat_1['m'].values[0]
 
             # Defino dp por resultado usando el m ya definido
-            d_params_dp = {'prob_dp': [0, 0.45, 0.6, 0.75], 'curva': ['linear'], 'm': [m_sel], 'b': [0]}
+            d_params_dp = {'prob_dp': [0, 0.45, 0.6, 0.75, 0.9], 'curva': ['linear'], 'm': [m_sel], 'b': [0]}
             df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_dp)  # antes no lo hacia por rdo.
-       
+        
         # para tener mismo bank across all results.
         df_pred_with_stra, _ = asses_model.calculate_roi(df_pred_with_stra) 
         
@@ -244,10 +252,11 @@ def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = F
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [148]
+    # l_countries = [59, 77, 148]
+    l_countries = [6]
 
     # Defino hiperparametros
-    select_candidates = False
+    select_candidates = True
     assess = True
     update_missing = False if assess else False
     predict_missing = False if assess else False
