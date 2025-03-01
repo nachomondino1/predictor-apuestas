@@ -101,7 +101,7 @@ class Crawler:
             return driver
         
         except Exception as e:
-            logger.error(f"Failed to inicialize the ChromeDriver with the latest version.")   # logger.error(f"Failed to inicialize the ChromeDriver with the latest version: {e}")
+            logger.error(f"Failed to inicialize the ChromeDriver with the latest version. Probablemente tengas una actualizacion de software pendiente en tu compu. Una vez actualizada, deberia funcionar.")
 
             try:
                 # 2) Inicializar ChromeDriver con la versión de Google Chorme en mi compu
