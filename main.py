@@ -14,7 +14,7 @@ from p3_data_preparation import format_data, select_data, clean_data, construct_
 from sklearn.preprocessing import StandardScaler
 import joblib
 ## Modeling
-from p4_modeling import generate_test_design, build_model, asses_model
+from p4_modeling import generate_test_design, build_model, asses_model, betting_strategy
 ### Generate test design
 from random import randint
 from sklearn.model_selection import train_test_split
@@ -443,6 +443,7 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("Constructing data...")
+        segun_localia_options = [False, True] if segun_localia == 'both' else [segun_localia] # Determinar las opciones de segun_localia según el valor recibido
 
         # Si quiero construir variables historicas
         if with_historic:
@@ -511,26 +512,23 @@ class DataPreparation:
 
                 if calculate_dif:
                     df[variable] = df[f'{var}_home'] - df[f'{var}_away']
-                    cols_to_drop.extend([variable])
+                    cols_to_drop.append(variable)
                 cols_to_drop.extend([f'{var}_home', f'{var}_away'])
 
                 for n_matches in n_last_matches:
-                    func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
-                    df = func(df, n_matches=n_matches, variable=variable, segun_localia=False)
+                    for loc in segun_localia_options:  # Iterar sobre las opciones de localía
+                        func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
+                        df = func(df, n_matches=n_matches, variable=variable, segun_localia=loc)
 
-                    col1, col2 = f'mean_last_{n_matches}_matches_{variable}_home', f'mean_last_{n_matches}_matches_{variable}_away'
-                    df[f'dif_mean_last_{n_matches}_matches_{variable}'] = df[col1] - df[col2]
-                    cols_to_drop.extend([col1, col2])
-
-                    if segun_localia:
-                        df = func(df, n_matches=n_matches, variable=variable, segun_localia=True)
-                        col_h1, col_h2 = f'loc_mean_last_{n_matches}_matches_{variable}_home', f'loc_mean_last_{n_matches}_matches_{variable}_away'
+                        prefix = 'loc_' if loc else ''
+                        col1, col2 = f'{prefix}mean_last_{n_matches}_matches_{variable}_home', f'{prefix}mean_last_{n_matches}_matches_{variable}_away'
+                        
                         try:
-                            df[f'loc_dif_mean_last_{n_matches}_matches_{variable}'] = df[col_h1] - df[col_h2]
-                            cols_to_drop.extend([col_h1, col_h2])
+                            df[f'{prefix}dif_mean_last_{n_matches}_matches_{variable}'] = df[col1] - df[col2]
+                            cols_to_drop.extend([col1, col2])
                         except KeyError:
                             pass
-                
+
                 df.drop(columns=cols_to_drop, inplace=True)
 
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
@@ -1036,10 +1034,16 @@ class Modeling:
         # Concateno todos los dfs en uno solo --> Necesario para roi?
         df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
 
-        # Calculo metricas
         d_metrics = None
         if not prod:
-            df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, export=export)
+
+            # Aplico estrategia "sin ea" para tener bank, stakes y rois 
+            bs = betting_strategy.BettingStrategy(self.country, self.date)
+            param_dict = bs.define_hiperparameters(strategy='train')
+            df_pred_with_metrics, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+        
+            # Calculo metricas
+            d_metrics = asses_model.calculate_metrics(df_pred_with_metrics, export=export)
         
         df_predicciones = self.reformat_pred(df_predicciones)
         

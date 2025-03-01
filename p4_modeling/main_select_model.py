@@ -130,7 +130,8 @@ def main(
             
             # Defino predicciones sin estrategia 
             d_params = bs.define_hiperparameters(strategy='train')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-            df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
+            df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params) # Ver si funca.
+            # df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
             if predict_missing:
                 df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
 
