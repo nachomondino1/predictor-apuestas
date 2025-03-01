@@ -18,10 +18,7 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
-    df['goals_home'] = df['goals_home'].fillna(0).astype(int)
-    df['goals_away'] = df['goals_away'].fillna(0).astype(int)
-    
-    # Condiciones para determinar el resultado (convertidas explícitamente a booleanas)
+    # Condiciones para determinar el resultado (convertidas explícitamente a booleanas) (no rellenar goals con 0 antes porque falla en prod)
     condiciones = [
         (df['goals_home'] > df['goals_away']).astype(bool),
         (df['goals_home'] < df['goals_away']).astype(bool),
@@ -168,7 +165,7 @@ def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.42,
 
     return df
 
-def determine_number_matches_last_days(df: pd.DataFrame, n_days):
+def determine_number_matches_last_days(df: pd.DataFrame, n_days): # Ver si funciona
     """
     Determinar numero de partidos jugados en los ultimos dias. 
     
@@ -176,40 +173,49 @@ def determine_number_matches_last_days(df: pd.DataFrame, n_days):
         - Hacerlo por localia usando "segun_localia"
     """
     # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=False)
+    df = df.sort_values(by='date', ascending=False).copy()  # Hacer copia para evitar modificaciones sobre el original
     l_teams = df['id_team_home'].unique()
 
-    # Inicializar columnas para evitar errores con columnas inexistentes
-    for col in ['n_matches_last']:
-        for location in ['home', 'away']:
-            df[f'{col}_{n_days}_days_{location}'] = np.nan
+    # Diccionario para acumular valores antes de asignarlos
+    results_dict = {
+        f'n_matches_last_{n_days}_days_home': [],
+        f'n_matches_last_{n_days}_days_away': []
+    }
 
     # Por team
     for team in l_teams:
-    
-        # Obtengo los matchs que jugó el team --> Deberia tomarlo distinto segun "segun_localia" True o False...            
+        # Filtrar los partidos del equipo
         df_match_team = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
 
         # Por match del team
         for idx, row in df_match_team.iterrows():
-
             home_or_away = 'home' if row['id_team_home'] == team else 'away'
             limit_date = row['date'] - timedelta(days=n_days)
 
-            # Selecciono los ultimos matchs del team
-            df_match_team_filt = df_match_team.loc[(df_match_team['date'] >= limit_date) & (df_match_team['date'] < row['date'])]
+            # Selecciono los últimos partidos del equipo dentro del rango de días
+            df_match_team_filt = df_match_team.loc[
+                (df_match_team['date'] >= limit_date) & (df_match_team['date'] < row['date'])
+            ]
             n_games = len(df_match_team_filt)
 
-            # Asignar valores al DataFrame original
-            if n_games > 0:
-                df.at[idx, f'n_matches_last_{n_days}_days_{home_or_away}'] = n_games
-  
-    # Calculo diferencia entre local y visitate
-    df[f'dif_n_matches_last_{n_days}_days'] = df[f'n_matches_last_{n_days}_days_home'] - df[f'n_matches_last_{n_days}_days_away']  
+            # Acumular valores en el diccionario
+            results_dict[f'n_matches_last_{n_days}_days_{home_or_away}'].append((idx, n_games))
+
+    # Convertir listas en Series y asignarlas de una vez
+    for col, values in results_dict.items():
+        df[col] = pd.Series(dict(values))  # Crea la columna usando un diccionario de índices
+
+    # Calculo diferencia entre local y visitante
+    df[f'dif_n_matches_last_{n_days}_days'] = (
+        df[f'n_matches_last_{n_days}_days_home'] - df[f'n_matches_last_{n_days}_days_away']
+    )
+
+    # Elimino columnas temporales
     df = df.drop(columns=[f'n_matches_last_{n_days}_days_home', f'n_matches_last_{n_days}_days_away'])
+
     return df
 
-def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_localia: bool = False):
+def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_localia: bool = False): # Ver si funciona
     """
     Determinar numero de triunfos, empates y derrotas en los ultimos n partidos por equipo.
     
@@ -217,7 +223,7 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
         - Hacerlo por localia usando "segun_localia"
     """
     # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=True) # Fundamental 
+    df = df.sort_values(by='date', ascending=True).copy()  # Hacer copia para evitar fragmentación
 
     team_matches = {}
     # Construyo df por equipo
@@ -228,9 +234,18 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
         else:
             team_matches[team] = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
         
+    # Diccionarios para acumular valores y evitar asignaciones repetitivas con `.at[]`
+    results_dict = {
+        f'n_wins_last_{n_matches}_matches_home': [],
+        f'n_draws_last_{n_matches}_matches_home': [],
+        f'n_loss_last_{n_matches}_matches_home': [],
+        f'n_wins_last_{n_matches}_matches_away': [],
+        f'n_draws_last_{n_matches}_matches_away': [],
+        f'n_loss_last_{n_matches}_matches_away': []
+    }
+
     # Por equipo
     for team_key, df_team in team_matches.items():
-
         team = team_key.split('_')[0] if segun_localia else team_key
 
         # Por partido
@@ -245,9 +260,9 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
             # Obtener los valores de la variable considerando si fue home o away
             df_match_team_filt_home = df_last_matches[df_last_matches['id_team_home'] == team]
             df_match_team_filt_away = df_last_matches[df_last_matches['id_team_away'] == team]
-            
+
             if n_games != (len(df_match_team_filt_home) + len(df_match_team_filt_away)):
-                logger.error(f"Error en filtrado de partidos en la construccion... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_last_matches)}")
+                logger.error(f"Error en filtrado de partidos en la construcción... {len(df_match_team_filt_home)} + {len(df_match_team_filt_away)} != {len(df_last_matches)}")
                 raise ValueError
 
             # Construyo variables
@@ -256,24 +271,27 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
             n_loss = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 1])
 
             if n_games != (n_wins + n_draws + n_loss):
-                logger.error(f"Error en determinacion de resultados en ultimos dias {n_wins} + {n_draws} + {n_loss} != {n_games}")
+                logger.error(f"Error en determinación de resultados en últimos días {n_wins} + {n_draws} + {n_loss} != {n_games}")
                 raise ValueError
 
-            # Asignar valores al DataFrame original
-            if n_games > 0:
-                df.at[idx, f'n_wins_last_{n_matches}_matches_{home_or_away}'] = n_wins
-                df.at[idx, f'n_draws_last_{n_matches}_matches_{home_or_away}'] = n_draws
-                df.at[idx, f'n_loss_last_{n_matches}_matches_{home_or_away}'] = n_loss
+            # Acumular valores en listas
+            results_dict[f'n_wins_last_{n_matches}_matches_{home_or_away}'].append((idx, n_wins))
+            results_dict[f'n_draws_last_{n_matches}_matches_{home_or_away}'].append((idx, n_draws))
+            results_dict[f'n_loss_last_{n_matches}_matches_{home_or_away}'].append((idx, n_loss))
 
-    # Calculo diferencia entre local y visitate
+    # Convertir listas en Series y asignarlas de una vez para evitar fragmentación
+    for col, values in results_dict.items():
+        df[col] = pd.Series(dict(values))  # Crea la columna usando un diccionario de índices
+
+    # Calculo diferencia entre local y visitante
     l_cols = ['n_wins_last', 'n_draws_last', 'n_loss_last']
     for col in l_cols:
         dif_col = f'dif_{col}_{n_matches}_matches_by_loc' if segun_localia else f'dif_{col}_{n_matches}_matches'
         col_home, col_away = f'{col}_{n_matches}_matches_home', f'{col}_{n_matches}_matches_away'
         
-        df[dif_col] = df[col_home] - df[col_away]  
+        df[dif_col] = df[col_home] - df[col_away]
         df = df.drop(columns=[col_home, col_away])
-    
+
     return df
 
 ## Rendimiento del equipo
