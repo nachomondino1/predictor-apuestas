@@ -6,7 +6,8 @@ import p4_modeling.main_select_model as msm
 
 def main(id_country, country, iteration_date, n_max_candidates: int = 30):
     """
-    Automatizo el experimento para definir metricas segun correlacion con ROI prod y Ex ROI prod
+    Automatizo el experimento para definir metricas segun correlacion con ROI prod y Ex ROI prod.
+    Es un experimento retroactivo. Tengo el ROI de cada modelos en los partidos futuros y veo como seleccionar a los modelos que mejor les fue.
     """
     # 1: Levanto df_ite_test (test)
     df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
