@@ -1142,6 +1142,10 @@ def main(
     logger.info("\n" + "+"*120 + "\n" + "DATA PREPARATION".center(120) + "\n" + "+"*120 + "\n")
     if d_run['data_prep']:
 
+        # En caso que no haya proximos partidos para predecir, no los preparo.
+        if len(df_match) == 0:
+            return pd.DataFrame()
+
         # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
         n_model, model_name = read_data_of_best_model(id_country, d_model)
         if verbose >= 0:
@@ -1301,10 +1305,10 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 77
+    id_country = 6
     key, value = 'predict', 'try_a_specific_model'
-    data_unders = False
-    n_days = 5
+    data_unders = True
+    n_days = 7
 
     # Defino country, iteration date y modelo
     d_countries = {
@@ -1317,7 +1321,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1016, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 478, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
