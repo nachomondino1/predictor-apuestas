@@ -73,16 +73,6 @@ def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy???
 
     return df
 
-def determine_metrics(df_predicciones, country, iteration_date, strategy: str = 'train'):
-    mo = Modeling(country, iteration_date)
-
-    # Recalculo metricas con test + missing
-    df_predicciones, d_metrics = mo.calculate_metrics(df_predicciones, strategy=strategy)
-
-    # Reformateo teams
-    df_predicciones = format_data.map_teams(df_predicciones, df_teams=mo.df_teams) # Convierto ids de equipos a nombres
-    return df_predicciones, d_metrics
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     
