@@ -18,10 +18,7 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
-    df['goals_home'] = df['goals_home'].fillna(0).astype(int)
-    df['goals_away'] = df['goals_away'].fillna(0).astype(int)
-    
-    # Condiciones para determinar el resultado (convertidas explícitamente a booleanas)
+    # Condiciones para determinar el resultado (convertidas explícitamente a booleanas) (no rellenar goals con 0 antes porque falla en prod)
     condiciones = [
         (df['goals_home'] > df['goals_away']).astype(bool),
         (df['goals_home'] < df['goals_away']).astype(bool),
