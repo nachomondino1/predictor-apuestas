@@ -1,10 +1,12 @@
 import sys
 sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
+import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
 import datetime
-from p4_modeling import select_model_for_prod, betting_strategy, assess_models_in_prod, asses_model
+from p3_data_preparation import construct_data
+from p4_modeling import betting_strategy, asses_model
 from p6_deployment import main_next_matches
 import os
 
@@ -56,6 +58,7 @@ def main(
         iteration_date,
         select_candidates: bool = True,
         n_max_candidates: int = 30,
+        recalculate_metrics: bool = True,
         assess: bool = True,
         update_missing: bool = True,
         predict_missing: bool = True,
@@ -80,6 +83,7 @@ def main(
     # Definicion de variables
     rows = []
     d_paths = initialize_directories(country, iteration_date, predict_missing)
+    path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
     bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
     # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
     l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'roi_last_25_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
@@ -87,7 +91,6 @@ def main(
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
-        sbm = select_model_for_prod.SelectBestModel(id_country=id_country, path_save=d_paths['path_select'])  # Creo instancia de sbm
         
         # 1.1. Calculo metrica combinada
         l_metrics_cand, l_weights_cand = ['roi', 'f1_score'], [0.5, 0.5] # Temporal pues no tengo n last matches en test...
@@ -95,49 +98,46 @@ def main(
         df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric)
 
         ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-        df_ite_filt = sbm.filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        df_ite_filt = filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
-    
+        df_ite_filt.to_excel(path_cand, index=False)
+
     else:
-        df_ite_filt = pd.read_excel(f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx')
+        df_ite_filt = pd.read_excel(path_cand)
 
     # (2) Assses + Recalculo de metricas
-    # Por modelo
-    if assess:
+    if recalculate_metrics:
 
-        # 2.1. Actualizo missing
-        if update_missing:
-            d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
-
-        # 2.2. Predicciones test + missing
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
-
             n_model, model_name= row['n_iteration'], row['model_name']
             logger.info(f'{n_model} {model_name}')
             
-            # Obtengo predicciones missing + concateno test y missing
+            # Levanto df_pred solo con test
             df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
+            logger.info(df_pred_test.shape)
 
-            # ERROR EN ASSESS...
-            '''
-            if predict_missing:
-                # Levanto df_pred_test
-                df_pred_test = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-                logger.info(df_pred_test.shape)
+            # (Opcional) Concateno assess a test  --> # ERROR EN ASSESS...
+            if assess: 
 
-                df_pred = assess_models_in_prod.get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
-                df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-            else:
-                df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
-                df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
-            '''
+                # 2.1. Actualizo missing
+                if update_missing:
+                    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
+                    main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+
+                # 2.2. Predict missing
+                if predict_missing:
+                    df_pred_test = df_pred.copy()
+                    df_pred = get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
+                    df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+                else:
+                    df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
+                    df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
+ 
             # Defino predicciones sin estrategia 
             d_params = bs.define_hiperparameters(strategy='train')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
-            if predict_missing:
-                df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+            df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
 
             # Defino predicciones con estrategia (lo hago aqui solo para tener los rdos de todos los modelos con su ea)
             df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=True, vary_m=True)
@@ -203,6 +203,112 @@ def main(
 
     return df_ite_bs
 
+# Select candidates
+def filter_models_by_metric(df, metric_col, prop_to_max: float = 0, perc_cutoff: float = 100, n_models_max: int = 100, verbose: int = 0):
+    """
+    Selecciona los mejores modelos (sin tener en cuenta la estrategia de apuesta aun).
+
+    # Parameters
+    df: Un DataFrame que contiene información sobre los modelos, incluyendo las columnas roi_por_partido y expected_roi_por_partido.
+    cutoff: Proporción de los mejores registros a seleccionar (por defecto, 0.02 o el 2% superior).
+    method: Metodo para filtrar. 
+        'percentile' o 'prop_to_max'
+    verbose: Nivel de detalle en los mensajes de salida.
+        0 (por defecto): Salida básica.
+        Valores mayores producen más detalles.
+
+    # Return 
+    La función devuelve un DataFrame (df_filt) que contiene solo los registros seleccionados con los valores más altos en la métrica combinada.
+    """
+    logger.info("Paso 1: Descartando modelos segun metrica en df_test")
+    df = df.sort_values(by=metric_col, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
+
+    # Determino metrica de corte
+    ## segun roi proporcional al max
+    max_metric = df[metric_col].max()
+    metric_cut_prop = max_metric * prop_to_max
+
+    ## segun percentil 
+    metric_cut_perc = np.percentile(df[metric_col], (100-perc_cutoff)) # Seleccionar el 20% de los registros con los valores más altos de 'metric'
+    
+    ## segun cantidad maxima de modelos
+    if len(df) >= n_models_max:
+        metric_cut_fixed = df.iloc[n_models_max-1][metric_col]
+    else:
+        metric_cut_fixed = 0
+
+    # Determino el minimo
+    metric_cut = max(metric_cut_prop, metric_cut_perc, metric_cut_fixed)
+    logger.info(f"\nMetricas de corte: \n(1) {metric_cut_prop} \n(2) {metric_cut_perc} \n (3) {metric_cut_fixed} \n => {metric_cut} ")
+
+    # Filtro modelos segun roi to cut
+    df_filt = df[df[metric_col] >= metric_cut]
+
+    if verbose >= 1:
+        logger.warning(f"Descarte por {metric_col.upper()}: {len(df)} --> {len(df_filt)}")
+        error_empty_dataframe(df_filt)
+
+    return df_filt
+
+def error_empty_dataframe(df):
+    if len(df) == 0:
+        logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
+        raise ValueError
+        
+# Assess
+def get_model_predictions_with_missing(df_pred_test, n_model, model_name, id_country, country, iteration_date):
+    """
+    Obtengo df_probabilities test + missing.
+    """
+    # 1. Predict missing
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
+    d_model = {'n_model': n_model, 'model_name': model_name} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+
+    # Usar mnm.py con predict_missing=True y data_unders=False.
+    df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, predict_missing=True, export=False, verbose=0) 
+
+    if not isinstance(df_pred_missing, pd.DataFrame):
+        raise ValueError("No se generó un dataframe.")
+
+    elif len(df_pred_missing) == 0:
+        logger.warning("No hay predicciones de partidos missing...")
+        raise ValueError
+    
+    # 2. Concateno df_pred_test y df_pred missing.
+    df_predicciones = pd.concat([df_pred_test, df_pred_missing], axis=0)
+    l_cols = ['date', 'id_team_home', 'id_team_away', 'predicted_result', 'prob_class_1', 'prob_class_2', 'prob_class_0', 'odds_home', 'odds_draw', 'odds_away']
+    df_predicciones = df_predicciones.loc[:, l_cols]
+
+    #  Agrego columnas result y expected result
+    df_predicciones = get_goals(df_predicciones, country)  
+
+    # Determino result y expected result segun goals
+    df_predicciones = construct_data.determine_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
+    df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+    return df_predicciones
+
+def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy????
+    """
+    Agregar columnas result y acerte en df_pred. Determino result y expected result para poder determinar "acerte"
+    """
+    ## Levanto df_match_miss para obtener goals? ??
+    df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
+    l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
+    
+    # Ordeno df por date
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+    df = df.sort_values(by='date', ascending=True)
+
+    # Asignar valores de df_match_miss a df solo en las columnas y filas correspondientes
+    for idx, row in df.iterrows():
+
+        for column in l_columns_to_copy:
+
+            df.loc[idx, column] = df_match_miss.loc[idx, column] 
+
+    return df
+
+# Betting Strategy
 def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = False, vary_m: bool = False):
     """
     Aplico ≠ estrategias de apuesta.
@@ -257,7 +363,8 @@ if __name__ == "__main__":
 
     # Defino hiperparametros
     select_candidates = True
-    assess = True
+    recalculate_metrics = True
+    assess = False if recalculate_metrics else False
     update_missing = False if assess else False
     predict_missing = False if assess else False
     export = True
@@ -283,6 +390,7 @@ if __name__ == "__main__":
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
             select_candidates=select_candidates,
+            recalculate_metrics=recalculate_metrics,
             assess=assess,
             update_missing=update_missing,
             predict_missing=predict_missing,
