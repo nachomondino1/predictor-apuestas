@@ -58,7 +58,7 @@ def main(
         iteration_date,
         select_candidates: bool = True,
         n_max_candidates: int = 30,
-        recalculate_metrics: bool = True,
+        bet_strat: bool = True,
         assess: bool = True,
         update_missing: bool = True,
         predict_missing: bool = True,
@@ -81,26 +81,20 @@ def main(
         - A partir de nuevos train (donde ya calculo metrics en last matches), usar mismas metricas entre seleccion de candidatos y seleccion de modelo. Por el momento no puedo porque no estoy calculando metricas en ultimos partidos en df_test.
     """
     # Definicion de paths
+    rows = []
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
-
-    # Definicion de variables
-    rows = []
-    # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
-    l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'roi_last_25_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
-    l_weights = [1/len(l_metrics) for _ in l_metrics]
-    
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
         # 1.1. Calculo metrica combinada
-        l_metrics_cand, l_weights_cand = ['roi', 'f1_score'], [0.5, 0.5] # Temporal pues no tengo n last matches en test...
-        metric = 'metric_cand' 
-        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric)
+        l_metrics_cand, l_weights_cand = ['roi', 'expected_roi', 'f1_score'], [0.33, 0.33, 0.33] # Temporal pues no tengo n last matches en test...
+        metric_cand = 'metric_cand' 
+        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric_cand)
 
         ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-        df_ite_filt = filter_models_by_metric(df_ite, metric_col=metric, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        df_ite_filt = filter_models_by_metric(df_ite, metric_col=metric_cand, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
         df_ite_filt.to_excel(path_cand, index=False)
 
@@ -108,7 +102,7 @@ def main(
         df_ite_filt = pd.read_excel(path_cand)
 
     # (2) BETTING STRATEGY + CALCULO DE METRICAS
-    if recalculate_metrics:
+    if bet_strat:
         bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
 
         # Por modelo
@@ -126,10 +120,10 @@ def main(
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
             df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
-            d_metric_sin_ea = calculate_all_metrics(df_pred_with_stra, suffix="sin_ea", advanced_metrics=True)
+            d_metric_sin_ea = calculate_all_metrics(df_pred_met, suffix="sin_ea", advanced_metrics=True)
 
             # 📌 Aplicar estrategia "con ea"
-            df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=True, vary_m=True)
+            df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=False, vary_m=True)
             d_metric_con_ea = calculate_all_metrics(df_pred_with_stra, suffix="con_ea")
 
             # Guardo datos
@@ -143,26 +137,26 @@ def main(
             df_pred_with_stra.to_excel(f"{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx", index=True)
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
 
-        ## 3.1. Calculo metrica combinada
-        metric, n_model_name = 'metric_assess', 'n_model'
-        df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
-
     else:
         # Usar test viejo
         df_ite_bs = df_ite_filt.copy() # pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
-        n_model_name = 'n_iteration' # 'n_model'
-        # metric = 'metric_assess'
+        # n_model_name = 'n_iteration' # 'n_model'
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
-    if select_model:
-        df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
-        idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
-        n_model, model_name = df_ite_bs.loc[idx_max, n_model_name], df_ite_bs.loc[idx_max, 'model_name']
-        logger.critical(f"Modelo seleccionado: {n_model} {model_name}")
-    
-    else:
-        logger.warning("Se evitó seleccionar un modelo")
+    ## 3.0 Defino metricas
+    l_metrics = ['roi_sin_ea', 'expected_roi_sin_ea', 'f1_score_sin_ea']     # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
+    # l_metrics = ['roi_con_ea', 'f1_score_sin_ea']     # l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea']
+    l_weights = [1/len(l_metrics) for _ in l_metrics]
 
+    ## 3.1. Calculo metrica combinada
+    metric = 'metric_assess'
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+
+    ## 3.2. Ordeno por metrica combinada
+    df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
+    idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
+    logger.critical(f"Modelo seleccionado: {df_ite_bs.loc[idx_max, 'n_model']} {df_ite_bs.loc[idx_max, 'model_name']}")
+    
     # Exporto datos
     if export:
         df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
@@ -356,13 +350,13 @@ def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = F
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [59, 77, 148]
-    l_countries = [6]
+    l_countries = [55, 59, 77, 148]
+    l_countries = [48]
 
     # Defino hiperparametros
     select_candidates = True
-    recalculate_metrics = True
-    assess = False if recalculate_metrics else False
+    bet_strat = True
+    assess = False if bet_strat else False
     update_missing = False if assess else False
     predict_missing = False if assess else False
     export = True
@@ -371,6 +365,7 @@ if __name__ == "__main__":
         # Train nuevos
         6: ["argentina", '2025-02-06'], 
         48: ["england", '2025-02-05'],
+        # 48: ["england", '2025-03-01'],
         55: ["france", '2025-02-05'], 
         59: ["germany", '2025-02-05'],
         77: ["italy", '2025-02-05'],
@@ -388,7 +383,7 @@ if __name__ == "__main__":
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
             select_candidates=select_candidates,
-            recalculate_metrics=recalculate_metrics,
+            bet_strat=bet_strat,
             assess=assess,
             update_missing=update_missing,
             predict_missing=predict_missing,
