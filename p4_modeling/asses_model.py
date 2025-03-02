@@ -62,7 +62,7 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     # Returns
         Dataframe pasado como parametro con cuatro nuevas columnas: la probabilidad de cada resultado (Home, Draw y Away) segun la casa de apuestas y el overround. (DataFrame)
     """
-    df_match_odds = df_match_odds.dropna(subset=['odds_home'])
+    df_match_odds = df_match_odds.dropna(subset=['odds_home', 'odds_draw', 'odds_away'])
 
     # Por partido
     for idx, row in df_match_odds.iterrows():

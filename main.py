@@ -1040,6 +1040,8 @@ class Modeling:
         d_metrics = None
         if not prod:
             df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, export=export)
+
+            # Agregar calculo de metricas en last matches...
         
         df_predicciones = self.reformat_pred(df_predicciones)
         

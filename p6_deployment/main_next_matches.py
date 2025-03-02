@@ -957,9 +957,13 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
     # Returns:
         df: Dataframe solo con registros en el periodo de tiempo especificado. (DataFrame)
     """
+    # Asegurar que 'date' es datetime
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')  # Convierte y fuerza NaT si hay errores
+    df.to_excel('/Users/nachomondino/Desktop/prueba.xlsx')
+
     # Determino fecha inical 
     limit_date = initial_date - datetime.timedelta(days=n_days) 
-    # print(f"Seleccion de ultimos partidos jugados: {limit_date} -- {n_days} days --> {initial_date}")
+    print(f"Seleccion de ultimos partidos jugados: {limit_date} -- {n_days} days --> {initial_date}")
 
     # Filtro segun fechas inicial y final
     df_filt = df[(df['date'] >= limit_date) & (df['date'] <= initial_date)]
@@ -1187,6 +1191,7 @@ def main(
                 logger.info(df_integrated_updated.shape)
                 df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
                 logger.info(df_integrated_updated.shape)
+
             else:
                 user_input = str(input("Escribe 'y' para eliminar indices duplicados y seguir la prediccion: "))
 
@@ -1307,7 +1312,7 @@ if __name__ == "__main__":
 
     id_country = 6
     key, value = 'predict', 'try_a_specific_model'
-    data_unders = True
+    data_unders = False
     n_days = 7
 
     # Defino country, iteration date y modelo
@@ -1321,7 +1326,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 478, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1137, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
