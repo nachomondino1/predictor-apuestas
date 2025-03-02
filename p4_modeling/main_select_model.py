@@ -80,14 +80,16 @@ def main(
     Posibles mejoras:
         - A partir de nuevos train (donde ya calculo metrics en last matches), usar mismas metricas entre seleccion de candidatos y seleccion de modelo. Por el momento no puedo porque no estoy calculando metricas en ultimos partidos en df_test.
     """
-    # Definicion de variables
-    rows = []
+    # Definicion de paths
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
-    bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
+
+    # Definicion de variables
+    rows = []
     # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
     l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'roi_last_25_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
     l_weights = [1/len(l_metrics) for _ in l_metrics]
+    
 
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
@@ -105,86 +107,50 @@ def main(
     else:
         df_ite_filt = pd.read_excel(path_cand)
 
-    # (2) Assses + Recalculo de metricas
+    # (2) BETTING STRATEGY + CALCULO DE METRICAS
     if recalculate_metrics:
+        bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
 
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
             n_model, model_name= row['n_iteration'], row['model_name']
             logger.info(f'{n_model} {model_name}')
             
-            # Levanto df_pred solo con test
-            df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-            logger.info(df_pred_test.shape)
+            # Levanto predicciones del modelo (test o test + assess)
+            path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+            if assess:
+                df_pred = update_test_with_assess(path_test, n_model, model_name, id_country, country, iteration_date, d_paths)
+            else:
+                df_pred = pd.read_excel(path_test, index_col=0)
 
-            # (Opcional) Concateno assess a test  --> # ERROR EN ASSESS...
-            if assess: 
-
-                # 2.1. Actualizo missing
-                if update_missing:
-                    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-                    main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
-
-                # 2.2. Predict missing
-                if predict_missing:
-                    df_pred_test = df_pred.copy()
-                    df_pred = get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
-                    df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-                else:
-                    df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx') # sin ea pero con metricas
-                    df_pred = df_pred.loc[:, ~df_pred.columns.str.startswith('Unnamed')]
- 
-            # Defino predicciones sin estrategia 
-            d_params = bs.define_hiperparameters(strategy='train')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            # 📌 Aplicar estrategia "sin_ea"
+            d_params = bs.define_hiperparameters(strategy='train')  
             df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
-            df_pred_met.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+            d_metric_sin_ea = calculate_all_metrics(df_pred_with_stra, suffix="sin_ea", advanced_metrics=True)
 
-            # Defino predicciones con estrategia (lo hago aqui solo para tener los rdos de todos los modelos con su ea)
+            # 📌 Aplicar estrategia "con ea"
             df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=True, vary_m=True)
-            df_strat.to_excel(f'{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx', index=True)
-            df_pred_with_stra.to_excel(f'{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx', index=True)
-          
-            # Recalculo metricas (test + assess)
-            ## sin ea 
-            d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, advanced_metrics=True)
-            for num_matches in [50, 25]:
-                d_metrics_last = asses_model.calculate_metrics_for_last_matches(df_pred_met, num_matches=num_matches)
-                d_metric_sin_ea.update(d_metrics_last)
-            ## con ea
-            d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra) 
-            for num_matches in [50, 25]:
-                d_metrics_last = asses_model.calculate_metrics_for_last_matches(df_pred_with_stra, num_matches=num_matches)
-                d_metric_con_ea.update(d_metrics_last)
-
-            ## Renombro metricas para que no se sobreescriban
-            d_metric_sin_ea_renamed = {f"{k}_sin_ea": v for k, v in d_metric_sin_ea.items()}
-            d_metric_con_ea_renamed = {f"{k}_con_ea": v for k, v in d_metric_con_ea.items()}
+            d_metric_con_ea = calculate_all_metrics(df_pred_with_stra, suffix="con_ea")
 
             # Guardo datos
-            new_row = {
-                'n_model': n_model, 'model_name': model_name, 
-                **d_metric_sin_ea_renamed,
-                **d_metric_con_ea_renamed
-                }
+            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_con_ea}
             rows.append(new_row)
             df_ite_bs = pd.DataFrame(data=rows)
 
             # Exporto datos
+            df_pred_met.to_excel(f"{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx", index=True)
+            df_strat.to_excel(f"{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+            df_pred_with_stra.to_excel(f"{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx", index=True)
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
 
         ## 3.1. Calculo metrica combinada
-        metric = 'metric_assess'
+        metric, n_model_name = 'metric_assess', 'n_model'
         df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
-        n_model_name = 'n_model'
 
     else:
         # Usar test viejo
-        df_ite_bs = df_ite_filt.copy()
-        n_model_name = 'n_iteration'
-
-        # Usar test + assess viejo
-        # df_ite_bs = pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
-        # n_model_name = 'n_model'
+        df_ite_bs = df_ite_filt.copy() # pd.read_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx')
+        n_model_name = 'n_iteration' # 'n_model'
         # metric = 'metric_assess'
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
@@ -254,8 +220,24 @@ def error_empty_dataframe(df):
     if len(df) == 0:
         logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
         raise ValueError
-        
+
 # Assess
+def update_test_with_assess(path_test, n_model, model_name, id_country, country, iteration_date, d_paths):
+
+    logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
+
+    # 2.1. Actualizo missing
+    if update_missing:
+        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
+        main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+
+    # 2.2. Predict missing
+    df_pred_test = pd.read_excel(path_test, index_col=0)
+    df_pred = get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
+    df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+    
+    return df_pred
+
 def get_model_predictions_with_missing(df_pred_test, n_model, model_name, id_country, country, iteration_date):
     """
     Obtengo df_probabilities test + missing.
@@ -309,6 +291,22 @@ def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy???
     return df
 
 # Betting Strategy
+def calculate_all_metrics(df, suffix, advanced_metrics=False):
+    """
+    Calcula métricas generales y para los últimos 50 y 25 partidos, agregando un sufijo a las claves.
+
+    :param df: DataFrame con las predicciones.
+    :param suffix: Sufijo para renombrar las métricas (ejemplo: "sin_ea" o "con_ea").
+    :param advanced_metrics: Si True, calcula métricas avanzadas.
+    :return: Diccionario con las métricas calculadas.
+    """
+    d_metrics = asses_model.calculate_metrics(df, advanced_metrics=advanced_metrics)
+
+    for num_matches in [50, 25]:
+        d_metrics.update(asses_model.calculate_metrics_for_last_matches(df, num_matches=num_matches))
+
+    return {f"{k}_{suffix}": v for k, v in d_metrics.items()}
+
 def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = False, vary_m: bool = False):
     """
     Aplico ≠ estrategias de apuesta.
