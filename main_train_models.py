@@ -464,7 +464,7 @@ def define_params_space(id_country, fast: bool = False):
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], #  d_comps['all_comp']
             },
             'construct': {
-                'n_last_matches': [[5], [10], [15], [20], [25], [50]],  # [15], # Variables historicas en ultimos n partidos
+                'n_last_matches': [[5], [3, 6], [3, 12]],  # [15], # Variables historicas en ultimos n partidos
                 'n_years_h2h': [2],
                 'segun_localia': [True, False, 'both'],
                 'calculate_dif': [True, False],
@@ -475,12 +475,12 @@ def define_params_space(id_country, fast: bool = False):
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [0.1, 0.2, 0.35],  # 0.5
+                'thr_fs': [0.1, 0.2, 0.3],  # 0.5
             },
             'modeling': {
                 'val_size': [0.1],
                 'n_reg_test': [100],
-                'bal_type': ['under'], # None, 
+                'bal_type': [None, 'under'], # None, 
                 'k': [5]
             }
         }
@@ -522,11 +522,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [59, 77, 148]
+    # l_countries = [48]
 
-    data_unders = False
-    update_sofifa = False if data_unders else False
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_unders = True
+    update_sofifa = True if data_unders else False
+    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 

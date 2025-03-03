@@ -891,7 +891,7 @@ class Modeling:
         self.base_path_dp = path_dp
 
         # Levanto df_teams (lo hago 1 vez para todas las veces que use el reformateo)
-        self.df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
+        # self.df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
 
     def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, index_test_set: list = None, export: bool = True):
         """
@@ -1045,7 +1045,7 @@ class Modeling:
             # Calculo metricas
             d_metrics = asses_model.calculate_metrics(df_pred_with_metrics, export=export)
         
-        df_predicciones = self.reformat_pred(df_predicciones)
+        df_predicciones = self.reformat_pred(df_pred_with_metrics)
         
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1098,7 +1098,8 @@ class Modeling:
     
     def reformat_pred(self, df):
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
-        df = format_data.map_teams(df,df_teams=self.df_teams)
+        df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
+        df = format_data.map_teams(df,df_teams=df_teams)
         return df
 
     def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, df_filled: pd.DataFrame, k: int = 5, verbose: int = 0):
