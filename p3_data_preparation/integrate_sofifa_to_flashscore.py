@@ -204,8 +204,8 @@ def match_dataframes_by_str_column(df1, df2, column_to_match1, column_to_match2,
     if n_pos_matchs > 0:
         logger.info(f"De los {n_pos_matchs} strings en df1, hizo match para {n_matchs}, es decir para el {n_matchs/n_pos_matchs*100:.2f}% de ellos.")
     else:
-        logger.error("Warning! No se cuenta con las formaciones de ningun partido de df_match, por ende, df_match_player no tiene que integrar a df_match.")
-
+        logger.error("Warning! No se cuenta con las formaciones de ningun partido de df_match, por ende, df_match_player no tiene que integrar a df_match. Si es un Fifa del 7 al 15, no te preocupes porque eliminaste los registros hasta 2015 de df_match")
+        
     return df_map
 
 def calculate_coincidence(str1, str2):
