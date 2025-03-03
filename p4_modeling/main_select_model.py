@@ -7,6 +7,7 @@ from utils import directories
 import datetime
 from p3_data_preparation import construct_data
 from p4_modeling import betting_strategy, asses_model
+from p4_modeling.utils_select_model.assess import predict_missing_data
 from p6_deployment import main_next_matches
 import os
 
@@ -104,73 +105,22 @@ def error_empty_dataframe(df):
         raise ValueError
 
 # Assess
-def update_test_with_assess(path_test, n_model, model_name, id_country, country, iteration_date, d_paths):
-
-    logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
-
-    # 2.1. Actualizo missing
-    if update_missing:
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-        main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
-
-    # 2.2. Predict missing
-    df_pred_test = pd.read_excel(path_test, index_col=0)
-    df_pred = get_model_predictions_with_missing(df_pred_test=df_pred_test, n_model=n_model, model_name=model_name, id_country=id_country, country=country, iteration_date=iteration_date) # sin ea
-    df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
+def concat_test_and_missing(df_pred_test, df_pred_missing, verbose: int = 0):
     
-    return df_pred
-
-def get_model_predictions_with_missing(df_pred_test, n_model, model_name, id_country, country, iteration_date):
-    """
-    Obtengo df_probabilities test + missing.
-    """
-    # 1. Predict missing
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True}  # No puedo correr data_unders = False si los proximos partidos ya estan en missing.
-    d_model = {'n_model': n_model, 'model_name': model_name} # XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
-
-    # Usar mnm.py con predict_missing=True y data_unders=False.
-    df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, predict_missing=True, export=False, verbose=0) 
-
-    if not isinstance(df_pred_missing, pd.DataFrame):
-        raise ValueError("No se generó un dataframe.")
-
-    elif len(df_pred_missing) == 0:
-        logger.warning("No hay predicciones de partidos missing...")
-        raise ValueError
-    
-    # 2. Concateno df_pred_test y df_pred missing.
+    # Concat test + missing
     df_predicciones = pd.concat([df_pred_test, df_pred_missing], axis=0)
-    l_cols = ['date', 'id_team_home', 'id_team_away', 'predicted_result', 'prob_class_1', 'prob_class_2', 'prob_class_0', 'odds_home', 'odds_draw', 'odds_away']
-    df_predicciones = df_predicciones.loc[:, l_cols]
 
-    #  Agrego columnas result y expected result
-    df_predicciones = get_goals(df_predicciones, country)  
+    # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
+    columns_to_exclude = [
+        'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
+        'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank'
+        'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank'
+    ]
+    df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
 
-    # Determino result y expected result segun goals
-    df_predicciones = construct_data.determine_result(df_predicciones) # Intento hacerlo antes con df_match pero rompia.
-    df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+    if verbose > 1:
+        df_predicciones.to_excel('/Users/nachomondino/Desktop/df_pred_concat.xlsx')
     return df_predicciones
-
-def get_goals(df, country):  # Ponerlo como funcion dentro de BettingStrategy????
-    """
-    Agregar columnas result y acerte en df_pred. Determino result y expected result para poder determinar "acerte"
-    """
-    ## Levanto df_match_miss para obtener goals? ??
-    df_match_miss = pd.read_excel(f"data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx", index_col=0)
-    l_columns_to_copy = ['goals_home', 'goals_away', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']   # Columnas a copiar
-    
-    # Ordeno df por date
-    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-    df = df.sort_values(by='date', ascending=True)
-
-    # Asignar valores de df_match_miss a df solo en las columnas y filas correspondientes
-    for idx, row in df.iterrows():
-
-        for column in l_columns_to_copy:
-
-            df.loc[idx, column] = df_match_miss.loc[idx, column] 
-
-    return df
 
 # Betting Strategy
 def calculate_all_metrics(df, suffix, advanced_metrics=False):
@@ -242,7 +192,7 @@ def main(
         country, 
         iteration_date,
         select_candidates: bool = True,
-        n_max_candidates: int = 30,
+        n_max_candidates: int = 10,
         bet_strat: bool = True,
         assess: bool = True,
         update_missing: bool = True,
@@ -274,7 +224,7 @@ def main(
     if select_candidates:
         
         # 1.1. Calculo metrica combinada
-        l_metrics_cand, l_weights_cand = ['roi', 'expected_roi', 'f1_score'], [0.33, 0.33, 0.33] # Temporal pues no tengo n last matches en test...
+        l_metrics_cand, l_weights_cand = ['roi', 'f1_score'], [0.5, 0.5] # Temporal pues no tengo n last matches en test...
         metric_cand = 'metric_cand' 
         df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric_cand)
 
@@ -290,6 +240,11 @@ def main(
     if bet_strat:
         bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
 
+        # Actualizo missing (1 sola vez para todos los modelos)
+        if assess and update_missing:
+            d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
+            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
             n_model, model_name= row['n_iteration'], row['model_name']
@@ -297,10 +252,24 @@ def main(
             
             # Levanto predicciones del modelo (test o test + assess)
             path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+            df_pred_test = pd.read_excel(path_test, index_col=0)
+
             if assess:
-                df_pred = update_test_with_assess(path_test, n_model, model_name, id_country, country, iteration_date, d_paths)
+                logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
+
+                # 1. Predict missing
+                df_pred_missing = predict_missing_data(n_model, model_name, id_country, country, iteration_date)
+
+                # 2. Concat test + missing
+                df_pred = concat_test_and_missing(df_pred_test, df_pred_missing)
+
+                # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
+                df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
+                df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+
+                df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             else:
-                df_pred = pd.read_excel(path_test, index_col=0)
+                df_pred = df_pred_test.copy()
 
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
@@ -329,7 +298,7 @@ def main(
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
     ## 3.0 Defino metricas
-    l_metrics = ['roi_sin_ea', 'expected_roi_sin_ea', 'f1_score_sin_ea']     # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
+    l_metrics = ['roi_sin_ea', 'f1_score_sin_ea']  # 'expected_roi_sin_ea',  # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
     # l_metrics = ['roi_con_ea', 'f1_score_sin_ea']     # l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea']
     l_weights = [1/len(l_metrics) for _ in l_metrics]
 
@@ -351,8 +320,8 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [55, 148]
+    # l_countries = [77]
 
     # Defino hiperparametros
     select_candidates = True
