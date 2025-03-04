@@ -254,8 +254,19 @@ def main(
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
     ## 3.0 Defino metricas
-    l_metrics = ['roi_sin_ea', 'f1_score_sin_ea']  #  'expected_roi_sin_ea'
-    l_weights = [1/len(l_metrics) for _ in l_metrics]
+    l_metrics = ['f1_score_sin_ea', 'roi_sin_ea', 'expected_roi_sin_ea', 'roi_con_ea']
+    d_weights = {
+        48: [0.4, 0.39, 0.08, 0.12],
+        55: [0.38, 0.36, 0.16, 0.1],
+        59: [0.22, 0.28, 0.34, 0.16],
+        77: [0.36, 0.24, 0.39, 0],
+        148: [0.28, 0.46, 0, 0.26]
+    }
+    l_weights = d_weights[id_country]
+    if sum(l_weights) < 0.99 and sum(l_weights) > 1.01:
+        print(l_weights, sum(l_weights))
+        raise ValueError
+    # l_weights = [1/len(l_metrics) for _ in l_metrics]
 
     ## 3.1. Calculo metrica combinada
     metric = 'metric_assess'
@@ -275,7 +286,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [148]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 50

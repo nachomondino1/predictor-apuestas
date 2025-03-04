@@ -370,7 +370,7 @@ class BettingStrategy:
             d_metrics.update(d_metrics_2)
 
             # Calcular metrica a maximizar
-            metric = 0 * d_metrics['roi'] + 1 * d_metrics_2['expected_roi']
+            metric = 0.5 * d_metrics['roi'] + 0.5 * d_metrics_2['expected_roi']
             d_metrics.update({'metric': metric})
 
             if self.verbose >= 1:
