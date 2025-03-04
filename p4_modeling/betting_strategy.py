@@ -35,11 +35,11 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy):
+    def define_hiperparameters(self, strategy, vary_dp: bool = False):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
-        list_dp = [0, 0.45, 0.6, 0.75]  # [0, 0.45, 0.5, 0.55, 0.6, 0.65, 0.75, 0.85, 0.9]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.          # list_m = [10, 20, 40, 80, 160, 200] 
 
         if strategy == "train": # "Sin estrategia"
@@ -99,8 +99,6 @@ class BettingStrategy:
 
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
             odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
-            kelly_criterion = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1) 
-            # thr_kelly = thr_prob_min - 0.33
 
             # Si el modelo esta POCO seguro del resultado predicho
             if (prob_result_to_bet < thr_prob_min):
@@ -110,15 +108,6 @@ class BettingStrategy:
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"dif_prob_mod_bm < {thr_prob_min}"
-
-            # Si la cuota es baja, tal que, la relacion beneficio - riesgo no conviene
-            # elif (kelly_criterion < thr_kelly) and (thr_prob_min != 0):  # ojo que no se implemente cuando strategy es train...
-                     
-            #     # Apuesto doble oportunidad sin el resultado predicho
-            #     result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
-            #     prob_result_to_bet = 1 - prob_result_to_bet
-            #     odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
-            #     strategy = f"kelly_crit < 0"
 
             # Si nuestro modelo esta seguro del rdo
             else:
@@ -131,7 +120,6 @@ class BettingStrategy:
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
-            df.loc[id_match, 'kelly_criterion'] = kelly_criterion
 
         return df
 
@@ -255,12 +243,13 @@ class BettingStrategy:
         # STRATEGY: KELLY
         elif type_relation == 'kelly':
 
-            df['stake_to_bet'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) * 100 / (df['odd_to_bet'] - 1) 
+            # Calculo kelly criterion
+            df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
 
-            # Normalizo stake  # si o si sino el stake es negativo.
-            p_min, p_max = 0, m
-            df = self.normalize_stake(df, p_min, p_max, m) 
-            
+            # Normalizo stake (si o si sino el stake es negativo)
+            # df = self.normalize_stake(df, p_min=-1, p_max=1, m=m) 
+            df = self.transform_sigmoid(df, m=m) 
+
         # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
@@ -287,9 +276,6 @@ class BettingStrategy:
         # Disminuyo stake por rellenado de emergencia
         df = self.stake_reduction_emergency_fill(df, porc_emergency=porc_emergency)
 
-        # Disminuyo stake por doble oportunidad?
-        # df.loc[df["result_to_bet"].isin([-1, -2]), "stake_to_bet"] *= 0.5
-
         # Limito stake a entre 0 y 100 
         df = self.cap_stake(df)
         return df
@@ -301,20 +287,25 @@ class BettingStrategy:
         df.loc[:, 'stake_to_bet'] = df['stake_to_bet'].apply(func)         # df['stake_to_bet'] = df['stake_to_bet'].apply(func)
         return df
     
-    def normalize_stake(self, df, p_min, p_max, m):
-
-        # Capa de funcion sigmoide (creo que sirve nada mas para Kelly. Para linear seria muy parecico a la variacion exponencial puesto que buscas agrandar las diferencias entre probas de 0.33 y 1)
-        df = df.rename(columns={'stake_to_bet': 'stake_to_bet_raw'})
+    def normalize_stake(self, df, p_min, p_max):
+        """
+        Capa de funcion sigmoide (creo que sirve nada mas para Kelly. 
+        Para linear seria muy parecico a la variacion exponencial puesto que buscas agrandar las diferencias entre probas de 0.33 y 1)
+        """
+        if p_min >= p_max:
+            raise ValueError("p_min debe ser menor que p_max para una normalización correcta.")
 
         # Normalización: Escalar los valores de kelly_raw entre 0 y 1
-        df['stake_to_bet_norm'] = (df['stake_to_bet_raw'] - p_min) / (p_max - p_min)
+        df['stake_to_bet_norm'] = (df['kelly_criterion'] - p_min) / (p_max - p_min)
 
-        # Usar la función sigmoide para reducir la variabilidad y escalar entre 0 y 30
-        num = m if m > 0 else 1
-        df['stake_to_bet'] = num / (1 + np.exp(-df['stake_to_bet_norm']))
-        df = df.drop(['stake_to_bet_raw'], axis=1)
         return df
         
+    def transform_sigmoid(self, df, m):
+        # Usar la función sigmoide para reducir la variabilidad y escalar entre p_min y p_max
+        num = m if m > 0 else 1
+        df['stake_to_bet'] = num / (1 + np.exp(-df['kelly_criterion']))
+        return df
+
     def stake_reduction_emergency_fill(self, df, porc_emergency: float = 0.5):
 
         # Si existen la columna 'emergency_fill' (pues para X_test no existe. Es solo para stakes en produccion). --> Ver si falla cuando hago main_best_model.py (ni deberia entrar)
@@ -370,13 +361,17 @@ class BettingStrategy:
             df_aux = self.apply_strategy(df, param_dict, prod=False)
 
             # Calculo de metricas (ROI y roi_pp)
-            df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
-            df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
+            df_pred_with_metrics_roi, d_metrics = calculate_roi(df_aux)
+            df_pred_with_metrics__ex, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
             
             # # Concateno datos de ROI y Expected ROI
-            missing_columns = [col for col in df_pred_with_metrics_2.columns if col not in df_pred_with_metrics.columns]
-            df_pred_with_metrics = pd.concat([df_pred_with_metrics, df_pred_with_metrics_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+            missing_columns = [col for col in df_pred_with_metrics__ex.columns if col not in df_pred_with_metrics_roi.columns]
+            df_pred_with_metrics = pd.concat([df_pred_with_metrics_roi, df_pred_with_metrics__ex[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
             d_metrics.update(d_metrics_2)
+
+            # Calcular metrica a maximizar
+            metric = 0 * d_metrics['roi'] + 1 * d_metrics_2['expected_roi']
+            d_metrics.update({'metric': metric})
 
             if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
@@ -414,12 +409,7 @@ class BettingStrategy:
         
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
-  
-        # Calcular metrica combinada para determinar mejor estrategia
-        # df = calculate_combined_metric(df, l_metrics=['roi'], l_weights=[1])
-        # df = calculate_combined_metric(df, l_metrics=['expected_roi'], l_weights=[1])
-        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[0.5, 0.5])
-
+        
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
         if self.verbose >= 1:
@@ -479,6 +469,12 @@ class BettingStrategy:
         df_hiper = pd.DataFrame.from_dict(d_hiper_res, orient='index')
         df_final = pd.concat([df_hiper, df_metrics], axis=1)
 
+        # Para tener mismo bank across all results.
+        df_pred_with_stra_roi, _ = calculate_roi(best_df_pred) 
+        df_pred_with_stra_ex, _ = calculate_roi(best_df_pred, name_extension='expected_') 
+        missing_columns = [col for col in df_pred_with_stra_ex.columns if col not in df_pred_with_stra_roi.columns]
+        best_df_pred = pd.concat([df_pred_with_stra_roi, df_pred_with_stra_ex[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+
         # Calculo G/P por resultado (para comparar con G/P sin estrategia)
         gp_total = sum(df_final['roi'])
         df_final.loc[1, '%_G/P'] = df_final.loc[1, 'roi'] / gp_total * 100
@@ -504,17 +500,22 @@ class BettingStrategy:
             df_final: DataFrame con los mejores parámetros y métricas.
             best_df_pred: DataFrame con las predicciones y resultados usando la mejor estrategia.
         """
-        logger.info("Definiendo la estrategia de apuesta óptima para el modelo...")
+        if verbose >= 1:
+            logger.info("Definiendo la estrategia de apuesta óptima para el modelo...")
 
         # Calculo ROI para todas las predicciones juntas
         d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_pred, d_params=d_params)
 
-        # Selecciono la mejor combinación
-        n_comb = self.select_best_parameters(d_metricas)
+        if not isinstance(d_predic, pd.DataFrame):
+            # Selecciono la mejor combinación
+            n_comb = self.select_best_parameters(d_metricas)
 
-        # Guardo resultados
-        best_df_pred = d_predic[n_comb]
-        df_final = pd.DataFrame({**d_hiper[n_comb], **d_metricas[n_comb]}, index=[0])
+            # Guardo resultados
+            best_df_pred = d_predic[n_comb]
+            df_final = pd.DataFrame({**d_hiper[n_comb], **d_metricas[n_comb]}, index=[0])
+        else:
+            best_df_pred = d_predic
+            df_final = pd.DataFrame([{**d_hiper, **d_metricas}])
 
         if verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
