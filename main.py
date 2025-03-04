@@ -1040,12 +1040,12 @@ class Modeling:
             # Aplico estrategia "sin ea" para tener bank, stakes y rois 
             bs = betting_strategy.BettingStrategy(self.country, self.date)
             param_dict = bs.define_hiperparameters(strategy='train')
-            df_pred_with_metrics, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+            df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
         
             # Calculo metricas
-            d_metrics = asses_model.calculate_metrics(df_pred_with_metrics, export=export)
+            d_metrics = asses_model.calculate_metrics(df_predicciones, export=export)
         
-        df_predicciones = self.reformat_pred(df_pred_with_metrics)
+        df_predicciones = self.reformat_pred(df_predicciones)
         
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
@@ -1109,7 +1109,7 @@ class Modeling:
         """
         # Defino variables
         df_metrics = pd.DataFrame()
-        rows_to_features_min, min_row_test = 5, 30
+        rows_to_features_min = 5
         rows_test = len(X_test)
         rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
         
@@ -1118,7 +1118,7 @@ class Modeling:
             logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
 
         # Si hay suficientes datos
-        if (rows_test >= min_row_test) and (rows_to_features >= rows_to_features_min):
+        if rows_to_features >= rows_to_features_min:
 
             # Por modelo
             for modelo in l_modelos:
@@ -1150,11 +1150,8 @@ class Modeling:
                     logger.warning(f"Se evitó entrenar este modelo mediante {e}")
         
         else:
-            if rows_to_features >= rows_to_features_min:
-                logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas en X_test. {rows_test} menor a {min_row_test}. Probablemente los 'ultimos partidos' tienen mucho NaN y se estan eliminando en clean_data_2 (en la eliminacion de filas por mucho NaN) o treat_nan_values (si el fill_na=None no podes hacer nada..., en este caso el fill_na es {fill_na})")
-            else:
-                logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
-                
+            logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
+
         return df_metrics
 
 def crear_variables(diccionario):
