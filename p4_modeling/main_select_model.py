@@ -104,12 +104,8 @@ def error_empty_dataframe(df):
         logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
         raise ValueError
 
-# Assess
-def concat_test_and_missing(df_pred_test, df_pred_missing, verbose: int = 0):
-    
-    # Concat test + missing
-    df_predicciones = pd.concat([df_pred_test, df_pred_missing], axis=0)
-
+# Betting Strategy
+def drop_old_metrics(df_predicciones):
     # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
     columns_to_exclude = [
         'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
@@ -117,12 +113,8 @@ def concat_test_and_missing(df_pred_test, df_pred_missing, verbose: int = 0):
         'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank'
     ]
     df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
-
-    if verbose > 1:
-        df_predicciones.to_excel('/Users/nachomondino/Desktop/df_pred_concat.xlsx')
     return df_predicciones
 
-# Betting Strategy
 def calculate_all_metrics(df, suffix, advanced_metrics=False):
     """
     Calcula métricas generales y para los últimos 50 y 25 partidos, agregando un sufijo a las claves.
@@ -134,56 +126,11 @@ def calculate_all_metrics(df, suffix, advanced_metrics=False):
     """
     d_metrics = asses_model.calculate_metrics(df, advanced_metrics=advanced_metrics)
 
-    for num_matches in [50, 25]:
+    l_matches = [num for num in (50, 25) if len(df) > num]
+    for num_matches in l_matches:
         d_metrics.update(asses_model.calculate_metrics_for_last_matches(df, num_matches=num_matches))
 
     return {f"{k}_{suffix}": v for k, v in d_metrics.items()}
-
-def apply_betting_strategy(df_pred, bs, per_res: bool = False, vary_dp: bool = False, vary_m: bool = False):
-    """
-    Aplico ≠ estrategias de apuesta.
-
-    # Parameters:
-        df_pred: Dataframe con predicciones a las cuales aplicar estrategia.
-        bs: Instancia de clase BettingStrategy()
-        mode: Tipo de estrategia a usar. 
-            'equal' para usar mismo m en todos los rdos. 
-            'per_res' para usar un m y dp ≠ por res. 
-            'dp_per_res' para usar mismo m pero dp ≠ por rdo.
-    """
-    d_params = bs.define_hiperparameters(strategy='linear')  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-        
-    # estrategia x rdo + dp
-    if per_res:
-
-        # Completo
-        if vary_m and vary_dp:
-            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
-
-        # Solo vario el m
-        elif vary_m:
-            d_params['prob_dp'] = [0]
-            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params)
-
-        # Solo vario el dp
-        elif vary_dp:
-            # Defino m comun a todos los rdos
-            d_params_m = {'prob_dp': [0], 'curva': ['linear'], 'm': [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200], 'b': [0]}
-            df_strat_1, df_pred_with_stra_1 = bs.define_model_betting_strategy(df_pred, d_params=d_params_m)
-            m_sel = df_strat_1['m'].values[0]
-
-            # Defino dp por resultado usando el m ya definido
-            d_params_dp = {'prob_dp': [0, 0.45, 0.6, 0.75, 0.9], 'curva': ['linear'], 'm': [m_sel], 'b': [0]}
-            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred, d_params=d_params_dp)  # antes no lo hacia por rdo.
-        
-        # para tener mismo bank across all results.
-        df_pred_with_stra, _ = asses_model.calculate_roi(df_pred_with_stra) 
-        
-    ## Mismo m todos los rdos
-    else:
-        df_strat, df_pred_with_stra = bs.define_model_betting_strategy(df_pred, d_params=d_params)
-
-    return df_strat, df_pred_with_stra
 
 # Main
 def main(
@@ -192,12 +139,11 @@ def main(
         country, 
         iteration_date,
         select_candidates: bool = True,
-        n_max_candidates: int = 10,
+        n_max_candidates: int = None,
         bet_strat: bool = True,
         assess: bool = True,
         update_missing: bool = True,
         predict_missing: bool = True,
-        select_model: bool = True,
         export: bool = True,
         verbose: int = 0
         ):
@@ -261,7 +207,7 @@ def main(
                 df_pred_missing = predict_missing_data(n_model, model_name, id_country, country, iteration_date)
 
                 # 2. Concat test + missing
-                df_pred = concat_test_and_missing(df_pred_test, df_pred_missing)
+                df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
 
                 # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
                 df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
@@ -270,6 +216,9 @@ def main(
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             else:
                 df_pred = df_pred_test.copy()
+            
+            # Dropeo old metrics (sino calcula mal las nuevas)
+            df_pred = drop_old_metrics(df_pred)
 
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
@@ -277,9 +226,16 @@ def main(
             d_metric_sin_ea = calculate_all_metrics(df_pred_met, suffix="sin_ea", advanced_metrics=True)
 
             # 📌 Aplicar estrategia "con ea"
-            df_strat, df_pred_with_stra = apply_betting_strategy(df_pred, bs, per_res=True, vary_dp=False, vary_m=True)
+            per_res, vary_dp = False, False
+            d_params = bs.define_hiperparameters(strategy='linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            if per_res:
+                func = bs.define_model_betting_strategy_by_result
+            else:
+                func = bs.define_model_betting_strategy
+            
+            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params)
             d_metric_con_ea = calculate_all_metrics(df_pred_with_stra, suffix="con_ea")
-
+            
             # Guardo datos
             new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_con_ea}
             rows.append(new_row)
@@ -298,8 +254,7 @@ def main(
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
     ## 3.0 Defino metricas
-    l_metrics = ['roi_sin_ea', 'f1_score_sin_ea']  # 'expected_roi_sin_ea',  # l_metrics = ['roi_sin_ea', 'roi_last_50_sin_ea', 'roi_last_25_sin_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea', 'f1_score_last_25_sin_ea']
-    # l_metrics = ['roi_con_ea', 'f1_score_sin_ea']     # l_metrics = ['roi_con_ea', 'roi_last_50_con_ea', 'f1_score_sin_ea', 'f1_score_last_50_sin_ea']
+    l_metrics = ['roi_sin_ea', 'f1_score_sin_ea']  #  'expected_roi_sin_ea'
     l_weights = [1/len(l_metrics) for _ in l_metrics]
 
     ## 3.1. Calculo metrica combinada
@@ -320,26 +275,30 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 148]
-    # l_countries = [77]
+    # l_countries = [48]
 
     # Defino hiperparametros
-    select_candidates = True
+    select_candidates, n_max_candidates = True, 50
     bet_strat = True
-    assess = True if bet_strat else False
+    assess = False if bet_strat else False
     update_missing = False if assess else False
-    predict_missing = True if assess else False
+    predict_missing = False if assess else False
     export = True
 
     d_countries = {
-        # Train nuevos
-        6: ["argentina", '2025-02-06'], 
+        # train viejos
         48: ["england", '2025-02-05'],
-        # 48: ["england", '2025-03-01'],
         55: ["france", '2025-02-05'], 
         59: ["germany", '2025-02-05'],
         77: ["italy", '2025-02-05'],
         148: ["spain", '2025-02-05'], 
+        # Train nuevos
+        # 6: ["argentina", '2025-02-06'], 
+        48: ["england", '2025-03-03'],
+        55: ["france", '2025-03-03'], 
+        59: ["germany", '2025-03-04'],
+        77: ["italy", '2025-03-04'],
+        148: ["spain", '2025-03-04'], 
         }
 
     for id_country in l_countries:
@@ -353,6 +312,7 @@ if __name__ == "__main__":
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
             select_candidates=select_candidates,
+            n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,
             assess=assess,
             update_missing=update_missing,
