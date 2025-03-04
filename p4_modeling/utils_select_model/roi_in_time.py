@@ -30,7 +30,7 @@ def main(df_ite, country, iteration_date, assess):
             continue
 
         # Calculo el ROI por fila
-        # df_pred = df_pred.head(50)
+        # df_pred = df_pred.head(25)
         df_pred['roi'] = (df_pred['bank_final'] - 100) / 100  # 100 es el bank inicial
 
         # Crear columna de número de apuesta (1, 2, 3, ...)
@@ -38,6 +38,7 @@ def main(df_ite, country, iteration_date, assess):
 
         # Graficar evolución del ROI en el mismo gráfico
         plt.plot(df_pred['bet_number'], df_pred['roi'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
+        # plt.plot(df_pred['bet_number'], df_pred['recall'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
 
         # Guardar datos combinados
         all_bet_numbers.extend(df_pred['bet_number'])
@@ -93,20 +94,23 @@ def roi_in_time_one_model(n_model, model_name):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55]
+    l_countries = [48]
 
     assess = True
 
     d_countries = {
         # Train nuevos
         6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-02-05'],
-        # 48: ["england", '2025-03-01'],
-        55: ["france", '2025-02-05'], 
+        # 48: ["england", '2025-02-05'],
+        48: ["england", '2025-03-03'],
+        # 55: ["france", '2025-02-05'], 
+        55: ["france", '2025-03-03'], 
         59: ["germany", '2025-02-05'],
         77: ["italy", '2025-02-05'],
         148: ["spain", '2025-02-05'], 
         }
+
+    n_models = 10
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -114,8 +118,9 @@ if __name__ == "__main__":
 
         # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         # df_ite = df_ite.sort_values(by='roi', ascending=False)
-        # df_ite.head(5)
+
         df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/1_filter_models/df_filt_by_metric_cand.xlsx')
+        df_ite = df_ite.head(n_models)
         print(df_ite)
 
         main(

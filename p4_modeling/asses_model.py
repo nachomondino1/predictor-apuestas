@@ -301,7 +301,7 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, export: bool = False):
+def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, verbose: int = 0, export: bool = False):
         
     d_metrics = {}
 
@@ -332,7 +332,8 @@ def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, export: boo
         d_metrics.update(calculate_gp_by_result(df_pred_proba))
         d_metrics.update(calculate_accuracy_by_result(df_pred_proba))
 
-    print(d_metrics)
+    if verbose > 1:
+        print(d_metrics)
 
     return d_metrics
 
@@ -557,10 +558,10 @@ def determine_roi(df_pred, expected: bool = False):
         col_inic, col_fin = 'bank_inicial', 'bank_final'
 
     # Tomar el primer valor de la columna
-    bank_inicial = df_pred[col_inic].iloc[0] # df_pred[col_inic].iloc[:3].mean()
+    bank_inicial = df_pred[col_inic].iloc[0]
 
     # Tomar el último valor de la columna
-    bank_final = df_pred[col_fin].iloc[-1] # df_pred[col_fin].iloc[-3:].mean()
+    bank_final = df_pred[col_fin].iloc[-1]
 
     return (bank_final - bank_inicial) / bank_inicial
 

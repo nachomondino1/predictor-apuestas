@@ -1039,7 +1039,7 @@ class Modeling:
         # Calculo metricas
         d_metrics = None
         if not prod:
-            df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, export=export)
+            df_predicciones, d_metrics = asses_model.calculate_metrics(df_predicciones, advanced_metrics=True, export=export)
 
             # Agregar calculo de metricas en last matches...
         
