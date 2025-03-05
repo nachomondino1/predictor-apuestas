@@ -1295,7 +1295,7 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'prod'],
     }
 
-    id_country = 148
+    id_country = 59
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 7
@@ -1303,15 +1303,15 @@ if __name__ == "__main__":
     # Defino country, iteration date y modelo
     d_countries = {
         6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-02-05'], 
-        55: ["france", '2025-02-05'], 
-        59: ["germany", '2025-02-05'], 
-        77: ["italy", '2025-02-05'],
-        148: ["spain", '2025-02-05'], 
+        48: ["england", '2025-03-03'], 
+        55: ["france", '2025-03-03'], 
+        59: ["germany", '2025-03-04'], 
+        77: ["italy", '2025-03-04'],
+        148: ["spain", '2025-03-04'], 
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 770, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 4964, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         

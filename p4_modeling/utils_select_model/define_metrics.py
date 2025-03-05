@@ -38,12 +38,12 @@ def main(df_ite, country, iteration_date, n_matches_test: int = 50, n_matches_pr
 
         # Aplico estrategia
         d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
-        d_params_con_ea = bs.define_hiperparameters(strategy='kelly', vary_dp=False)
+        d_params_con_ea = bs.define_hiperparameters(strategy='linear', vary_dp=False)
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Aplicar estrategia a first_matches ("test") sin ea 
         df_strat, df_pred_fm_met_sin_ea = bs.define_model_betting_strategy(df_first_matches, d_params=d_params_sin_ea)
-        d_metrics_test_sin_ea = msm.calculate_all_metrics(df_pred_fm_met_sin_ea, suffix='sin_ea')
+        d_metrics_test_sin_ea = msm.calculate_all_metrics(df_pred_fm_met_sin_ea, suffix='sin_ea', advanced_metrics=True)
     
         # 📌 Aplicar estrategia a first_matches ("test") con ea --> con ea pues selecciono con metricas con ea
         df_strat, df_pred_fm_met = bs.define_model_betting_strategy(df_first_matches, d_params=d_params_con_ea) # no por res porque 25 part es muy poco...
@@ -97,6 +97,7 @@ def main(df_ite, country, iteration_date, n_matches_test: int = 50, n_matches_pr
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48, 55, 59, 77]
 
     d_countries = {
         # train viejos
