@@ -490,15 +490,35 @@ def calculate_accuracy_by_result(df_predicciones):
     df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
     df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
 
-    prec_home = int(df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
-    prec_draw = int(df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
-    prec_away = int(df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
+    acerte_home =  int(df_pred_home['acerte'].sum())
+    acerte_draw = int(df_pred_draw['acerte'].sum())
+    acerte_away = int(df_pred_away['acerte'].sum())
+    prec_home = acerte_home / len(df_pred_home) * 100 if len(df_pred_home) > 0 else 0
+    prec_draw =  acerte_draw / len(df_pred_draw) * 100 if len(df_pred_draw) > 0 else 0
+    prec_away =  acerte_away / len(df_pred_away) * 100 if len(df_pred_away) > 0 else 0
 
     d = {
         'acc_home': prec_home,
         'acc_draw': prec_draw,
-        'acc_away': prec_away
+        'acc_away': prec_away,
+        'acerte_home': acerte_home,
+        'acerte_draw': acerte_draw,
+        'acerte_away': acerte_away,
     }
+
+    if 'expected_result' in df_predicciones.columns:
+        df_pred_home_ex = df_predicciones[df_predicciones['expected_result'] == 1]
+        df_pred_draw_ex = df_predicciones[df_predicciones['expected_result'] == 0]
+        df_pred_away_ex = df_predicciones[df_predicciones['expected_result'] == 2]
+
+        ex_acerte_home =  int(df_pred_home_ex['expected_acerte'].sum())
+        ex_acerte_draw = int(df_pred_draw_ex['expected_acerte'].sum())
+        ex_acerte_away = int(df_pred_away_ex['expected_acerte'].sum())
+        d.update({
+            'ex_acerte_home': ex_acerte_home,
+            'ex_acerte_draw': ex_acerte_draw,
+            'ex_acerte_away': ex_acerte_away
+        })
     return d
 
 def calculate_bet_metrics(
