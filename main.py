@@ -1044,7 +1044,7 @@ class Modeling:
         
             # Calculo metricas
             d_metrics = asses_model.calculate_metrics(df_predicciones, export=export)
-        
+            
         df_predicciones = self.reformat_pred(df_predicciones)
         
         if export:

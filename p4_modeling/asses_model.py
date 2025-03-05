@@ -62,7 +62,7 @@ def calculate_result_probabilities_by_bookmaker(df_match_odds):
     # Returns
         Dataframe pasado como parametro con cuatro nuevas columnas: la probabilidad de cada resultado (Home, Draw y Away) segun la casa de apuestas y el overround. (DataFrame)
     """
-    df_match_odds = df_match_odds.dropna(subset=['odds_home'])
+    df_match_odds = df_match_odds.dropna(subset=['odds_home', 'odds_draw', 'odds_away'])
 
     # Por partido
     for idx, row in df_match_odds.iterrows():
@@ -301,8 +301,7 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-
-def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, export: bool = False):
+def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, verbose: int = 0, export: bool = False):
         
     d_metrics = {}
 
@@ -333,7 +332,8 @@ def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, export: boo
         d_metrics.update(calculate_gp_by_result(df_pred_proba))
         d_metrics.update(calculate_accuracy_by_result(df_pred_proba))
 
-    print(d_metrics)
+    if verbose > 1:
+        print(d_metrics)
 
     return d_metrics
 
@@ -490,15 +490,35 @@ def calculate_accuracy_by_result(df_predicciones):
     df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
     df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
 
-    prec_home = int(df_pred_home['acerte'].sum() / len(df_pred_home) * 100) if len(df_pred_home) > 0 else 0
-    prec_draw = int(df_pred_draw['acerte'].sum() / len(df_pred_draw) * 100) if len(df_pred_draw) > 0 else 0
-    prec_away = int(df_pred_away['acerte'].sum() / len(df_pred_away) * 100) if len(df_pred_away) > 0 else 0
+    acerte_home =  int(df_pred_home['acerte'].sum())
+    acerte_draw = int(df_pred_draw['acerte'].sum())
+    acerte_away = int(df_pred_away['acerte'].sum())
+    prec_home = acerte_home / len(df_pred_home) * 100 if len(df_pred_home) > 0 else 0
+    prec_draw =  acerte_draw / len(df_pred_draw) * 100 if len(df_pred_draw) > 0 else 0
+    prec_away =  acerte_away / len(df_pred_away) * 100 if len(df_pred_away) > 0 else 0
 
     d = {
         'acc_home': prec_home,
         'acc_draw': prec_draw,
-        'acc_away': prec_away
+        'acc_away': prec_away,
+        'acerte_home': acerte_home,
+        'acerte_draw': acerte_draw,
+        'acerte_away': acerte_away,
     }
+
+    if 'expected_result' in df_predicciones.columns:
+        df_pred_home_ex = df_predicciones[df_predicciones['expected_result'] == 1]
+        df_pred_draw_ex = df_predicciones[df_predicciones['expected_result'] == 0]
+        df_pred_away_ex = df_predicciones[df_predicciones['expected_result'] == 2]
+
+        ex_acerte_home =  int(df_pred_home_ex['expected_acerte'].sum())
+        ex_acerte_draw = int(df_pred_draw_ex['expected_acerte'].sum())
+        ex_acerte_away = int(df_pred_away_ex['expected_acerte'].sum())
+        d.update({
+            'ex_acerte_home': ex_acerte_home,
+            'ex_acerte_draw': ex_acerte_draw,
+            'ex_acerte_away': ex_acerte_away
+        })
     return d
 
 def calculate_bet_metrics(
@@ -557,11 +577,11 @@ def determine_roi(df_pred, expected: bool = False):
     else:
         col_inic, col_fin = 'bank_inicial', 'bank_final'
 
-    # Promedio de los primeros 3 valores (o menos si hay menos de 3 registros)
-    bank_inicial = df_pred[col_inic].iloc[:3].mean()
+    # Tomar el primer valor de la columna
+    bank_inicial = df_pred[col_inic].iloc[0]
 
-    # Promedio de los últimos 3 valores (o menos si hay menos de 3 registros)
-    bank_final = df_pred[col_fin].iloc[-3:].mean()
+    # Tomar el último valor de la columna
+    bank_final = df_pred[col_fin].iloc[-1]
 
     return (bank_final - bank_inicial) / bank_inicial
 
