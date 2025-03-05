@@ -35,12 +35,12 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, vary_dp: bool = False):
+    def define_hiperparameters(self, strategy, vary_dp: bool = False, spec_m: bool = True):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # no tocar.          # list_m = [10, 20, 40, 80, 160, 200] 
+        list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if spec_m else [10, 20, 40, 60, 80, 100, 200]
 
         if strategy == "train": # "Sin estrategia"
             dic = {
