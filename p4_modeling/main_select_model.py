@@ -138,6 +138,8 @@ def main(
         id_country, 
         country, 
         iteration_date,
+        l_metrics= list,
+        l_weights=list,
         select_candidates: bool = True,
         n_max_candidates: int = None,
         bet_strat: bool = True,
@@ -170,7 +172,8 @@ def main(
     if select_candidates:
         
         # 1.1. Calculo metrica combinada
-        l_metrics_cand, l_weights_cand = ['roi', 'f1_score'], [0.5, 0.5] # Temporal pues no tengo n last matches en test...
+        l_metrics_cand = ['f1_score', 'roi']
+        l_weights_cand = [1/len(l_metrics_cand) for _ in l_metrics_cand] 
         metric_cand = 'metric_cand' 
         df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric_cand)
 
@@ -253,21 +256,6 @@ def main(
         # n_model_name = 'n_iteration' # 'n_model'
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
-    ## 3.0 Defino metricas
-    l_metrics = ['f1_score_sin_ea', 'roi_sin_ea', 'expected_roi_sin_ea', 'roi_con_ea']
-    d_weights = {
-        48: [0.4, 0.39, 0.08, 0.12],
-        55: [0.38, 0.36, 0.16, 0.1],
-        59: [0.22, 0.28, 0.34, 0.16],
-        77: [0.36, 0.24, 0.39, 0],
-        148: [0.28, 0.46, 0, 0.26]
-    }
-    l_weights = d_weights[id_country]
-    if sum(l_weights) < 0.99 and sum(l_weights) > 1.01:
-        print(l_weights, sum(l_weights))
-        raise ValueError
-    # l_weights = [1/len(l_metrics) for _ in l_metrics]
-
     ## 3.1. Calculo metrica combinada
     metric = 'metric_assess'
     df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
@@ -286,10 +274,10 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [55]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 50
+    select_candidates, n_max_candidates = True, 100
     bet_strat = True
     assess = False if bet_strat else False
     update_missing = False if assess else False
@@ -298,11 +286,11 @@ if __name__ == "__main__":
 
     d_countries = {
         # train viejos
-        48: ["england", '2025-02-05'],
-        55: ["france", '2025-02-05'], 
-        59: ["germany", '2025-02-05'],
-        77: ["italy", '2025-02-05'],
-        148: ["spain", '2025-02-05'], 
+        # 48: ["england", '2025-02-05'],
+        # 55: ["france", '2025-02-05'], 
+        # 59: ["germany", '2025-02-05'],
+        # 77: ["italy", '2025-02-05'],
+        # 148: ["spain", '2025-02-05'], 
         # Train nuevos
         # 6: ["argentina", '2025-02-06'], 
         48: ["england", '2025-03-03'],
@@ -312,9 +300,23 @@ if __name__ == "__main__":
         148: ["spain", '2025-03-04'], 
         }
 
+    # Defino metricas (y sus pesos) para seleccionar el modelo
+    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'roi_sin_ea']
+    d_weights = {
+        48: [0.31, 0.4, 0.3],
+        55: [0.35, 0.33, 0.32],
+        59: [0.44, 0, 0.56],
+        77: [0.37, 0.38, 0.25],
+        148: [0.27, 0.29, 0.44]
+    }
+    
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
+        l_weights = d_weights[id_country]
+        print(l_weights, sum(l_weights))
+        if sum(l_weights) < 0.99 and sum(l_weights) > 1.01:
+            raise ValueError
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
@@ -322,6 +324,7 @@ if __name__ == "__main__":
         main(
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
+            l_metrics=l_metrics, l_weights=l_weights,
             select_candidates=select_candidates,
             n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,
