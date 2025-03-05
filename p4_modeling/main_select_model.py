@@ -219,7 +219,7 @@ def main(
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             else:
                 df_pred = df_pred_test.copy()
-            
+
             # Dropeo old metrics (sino calcula mal las nuevas)
             df_pred = drop_old_metrics(df_pred)
 

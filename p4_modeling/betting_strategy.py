@@ -3,6 +3,7 @@ sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
+from p3_data_preparation.construct_data import determine_expected_result
 from p4_modeling.asses_model import calculate_combined_metric, calculate_roi
 from utils import directories
 from itertools import product
@@ -44,11 +45,17 @@ class BettingStrategy:
 
         if strategy == "train": # "Sin estrategia"
             dic = {
-                'prob_dp': [0],
-                'curva': ['linear'],
-                'm': [10],
-                'b': [0],
+                'prob_dp': 0,
+                'curva': 'linear',
+                'm': 10,
+                'b': 0
             }
+            # dic = {
+            #     'prob_dp': [0],
+            #     'curva': ['linear'],
+            #     'm': [10],
+            #     'b': [0]
+            # }
         
         elif strategy == "kelly":
                 dic = {
@@ -385,6 +392,25 @@ class BettingStrategy:
             d_predic, d_hiper, d_metricas = df_pred_with_metrics, param_dict, d_metrics
 
         return d_predic, d_hiper, d_metricas
+
+    def calculate_roi_in_combination(self, df, param_dict):
+
+        if 'expected result' not in df.columns:
+            df = determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
+
+        # Aplicar estrategia a df_pred
+        df_aux = self.apply_strategy(df, param_dict, prod=False)
+
+        # Calculo de metricas (ROI y roi_pp)
+        df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
+        df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
+        
+        # # Concateno datos de ROI y Expected ROI
+        missing_columns = [col for col in df_pred_with_metrics_2.columns if col not in df_pred_with_metrics.columns]
+        df_pred_with_metrics = pd.concat([df_pred_with_metrics, df_pred_with_metrics_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+        d_metrics.update(d_metrics_2)
+        return df_pred_with_metrics, d_metrics
+
 
     def apply_strategy(self, df, param_dict, prod: bool = True):
         

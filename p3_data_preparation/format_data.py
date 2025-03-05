@@ -551,9 +551,9 @@ def format_df_match_odds(df):
     logger.info("Formatting df_match_odds de Flashscore...")
 
     column_specs = {
-        'odds_home': {'dtype': 'Float64', 'rango': [1, 50]},
-        'odds_draw': {'dtype': 'Float64', 'rango': [1, 50]},
-        'odds_away': {'dtype': 'Float64', 'rango': [1, 50]},
+        'odds_home': {'dtype': 'Float64', 'rango': [1, 100]},
+        'odds_draw': {'dtype': 'Float64', 'rango': [1, 100]},
+        'odds_away': {'dtype': 'Float64', 'rango': [1, 100]},
         }
     
     return verify_format(df, column_specs)
