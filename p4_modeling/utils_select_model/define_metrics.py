@@ -38,11 +38,11 @@ def main(df_ite, country, iteration_date, n_matches_test: int = 50, n_matches_pr
 
         # Aplico estrategia
         d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
-        d_params_con_ea = bs.define_hiperparameters(strategy='linear', vary_dp=False)
+        d_params_con_ea = bs.define_hiperparameters(strategy='kelly', vary_dp=False)
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Aplicar estrategia a first_matches ("test") sin ea 
-        df_strat, df_pred_fm_met_sin_ea = bs.define_model_betting_strategy(df_first_matches, d_params=d_params_sin_ea)
+        df_pred_fm_met_sin_ea, _ = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
         d_metrics_test_sin_ea = msm.calculate_all_metrics(df_pred_fm_met_sin_ea, suffix='sin_ea', advanced_metrics=True)
     
         # 📌 Aplicar estrategia a first_matches ("test") con ea --> con ea pues selecciono con metricas con ea
@@ -50,7 +50,7 @@ def main(df_ite, country, iteration_date, n_matches_test: int = 50, n_matches_pr
         d_metrics_test_con_ea = msm.calculate_all_metrics(df_pred_fm_met, suffix='con_ea')
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) --> con o sin ea? Sin ea Por que con ea no? con ea creo que no tiene sentido porque no usa la ea del test sino que elige una nueva...
-        df_strat, df_pred_lm_met_sin_ea = bs.define_model_betting_strategy(df_last_matches, d_params=d_params_sin_ea)
+        df_pred_lm_met_sin_ea, _ = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
         d_metrics_prod_sin_ea = msm.calculate_all_metrics(df_pred_lm_met_sin_ea, suffix='prod_sin_ea')
 
         # Guardo métricas del modelo en un solo diccionario
@@ -97,7 +97,7 @@ def main(df_ite, country, iteration_date, n_matches_test: int = 50, n_matches_pr
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 59, 77]
+    l_countries = [148]
 
     d_countries = {
         # train viejos

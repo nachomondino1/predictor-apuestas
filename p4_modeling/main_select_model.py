@@ -168,6 +168,10 @@ def main(
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
 
+    ex_weight = df_ite['roi'].corr(df_ite['expected_roi'])
+    roi_weight = 1 - ex_weight if ex_weight > 0 else 1
+    logger.info(f"Correlacion ROI y Expected ROI: {ex_weight:.2f}. --> ROI weight: {roi_weight:.2f} y Ex ROI weight: {ex_weight:.2f}")
+
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
@@ -225,22 +229,24 @@ def main(
 
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
-            df_pred_met, _, __ = bs.calculate_roi_in_combinations(df_pred, d_params=d_params)
+            df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params)
             d_metric_sin_ea = calculate_all_metrics(df_pred_met, suffix="sin_ea", advanced_metrics=True)
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = False, False
-            d_params = bs.define_hiperparameters(strategy='linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            d_params = bs.define_hiperparameters(strategy='kelly_linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
                 func = bs.define_model_betting_strategy
             
-            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params)
+            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight)
             d_metric_con_ea = calculate_all_metrics(df_pred_with_stra, suffix="con_ea")
-            
+            mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi_sin_ea'])  / abs(d_metric_sin_ea['roi_sin_ea'])
+            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea['expected_roi_sin_ea']) / abs(d_metric_sin_ea['expected_roi_sin_ea'])
+
             # Guardo datos
-            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_con_ea}
+            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_con_ea, 'x_roi': mult, 'x ex_roi': mult_ex}
             rows.append(new_row)
             df_ite_bs = pd.DataFrame(data=rows)
 
@@ -274,7 +280,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55]
+    # l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 100
