@@ -283,7 +283,7 @@ if __name__ == "__main__":
     # l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 250
+    select_candidates, n_max_candidates = True, 100
     bet_strat = True
     assess = False if bet_strat else False
     update_missing = False if assess else False
@@ -307,8 +307,8 @@ if __name__ == "__main__":
         }
 
     # Defino metricas (y sus pesos) para seleccionar el modelo
-    l_metrics = ['acerte_draw_sin_ea', 'gp_home_sin_ea', 'expected_roi_sin_ea'] # ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'roi_sin_ea']
-    l_weights = [0.37, 0.36, 0.27]
+    l_metrics = ['acerte_draw_sin_ea', 'expected_roi_sin_ea', 'ex_acerte_home_sin_ea', 'ex_acerte_draw_sin_ea', 'ex_acerte_away_sin_ea'] # 'gp_home_sin_ea',
+    l_weights = [0.25, 0.18, 0.15, 0.21, 0.2]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
