@@ -234,7 +234,7 @@ def main(
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = False, False
-            d_params = bs.define_hiperparameters(strategy='kelly_linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            d_params = bs.define_hiperparameters(strategy='kelly_linear', big_space_m=False, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
@@ -283,7 +283,7 @@ if __name__ == "__main__":
     # l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 100
+    select_candidates, n_max_candidates = True, 250
     bet_strat = True
     assess = False if bet_strat else False
     update_missing = False if assess else False
@@ -307,22 +307,12 @@ if __name__ == "__main__":
         }
 
     # Defino metricas (y sus pesos) para seleccionar el modelo
-    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'roi_sin_ea']
-    d_weights = {
-        48: [0.31, 0.4, 0.3],
-        55: [0.35, 0.33, 0.32],
-        59: [0.44, 0, 0.56],
-        77: [0.37, 0.38, 0.25],
-        148: [0.27, 0.29, 0.44]
-    }
-    
+    l_metrics = ['acerte_draw_sin_ea', 'gp_home_sin_ea', 'expected_roi_sin_ea'] # ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'roi_sin_ea']
+    l_weights = [0.37, 0.36, 0.27]
+
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_weights = d_weights[id_country]
-        print(l_weights, sum(l_weights))
-        if sum(l_weights) < 0.99 and sum(l_weights) > 1.01:
-            raise ValueError
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)

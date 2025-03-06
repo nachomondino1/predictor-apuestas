@@ -97,7 +97,7 @@ def main(df_ite, country, iteration_date, n_matches_test: int = 50, n_matches_pr
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    # l_countries = [148]
 
     d_countries = {
         # train viejos
@@ -121,7 +121,33 @@ if __name__ == "__main__":
         iteration_date = d_countries[id_country][1]
 
         # 1: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        print(df_ite)
+        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        # print(df_ite)
 
-        main(df_ite, country, iteration_date)
+        # main(df_ite, country, iteration_date)
+
+        import numpy as np
+        from p3_data_preparation.select_data import delete_correlated_columns
+        df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
+
+
+        # Determino columnas a eliminar
+        cols_not_float = [col for col in df_ite.columns if (df_ite[col].dtype != np.float64)]
+        l_strings_to_avoid = [ "con_ea", "_prod", 'last_', 'filled_', '_r_sin_ea', '%_gp_', '_bm_', 'acc_', 'dif_']
+        cols_substring = [col for col in df_ite.columns if any(substring in col for substring in l_strings_to_avoid)]
+        cols_to_avoid = list(set(cols_not_float + cols_substring))
+
+        # Evito eliminar ciertas columnas
+        cols_to_keep = ["acerte_home_sin_ea", 'acerte_draw_sin_ea', 'acerte_away_sin_ea', 'roi_prod_sin_ea', 'ex_acerte_home_sin_ea', 'ex_acerte_draw_sin_ea', 'ex_acerte_away_sin_ea']   
+        cols_to_avoid = [col for col in cols_to_avoid if col not in cols_to_keep]
+
+        # Filtro columns (solo float y solo las que quiero)
+        df_ite.drop(columns=cols_to_avoid, inplace=True)
+        print(df_ite.shape)
+
+        # Determino correlacion
+        l_cols_to_elim, df = delete_correlated_columns(df_ite, var_resp='roi_prod_sin_ea', verbose=2)
+        # df_corr_y.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_y.xlsx')
+        df.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_metrics.xlsx')
+        cols_selected = [col for col in df.columns if col not in l_cols_to_elim]
+        print(cols_selected)
