@@ -36,12 +36,12 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, vary_dp: bool = False, spec_m: bool = True):
+    def define_hiperparameters(self, strategy, vary_dp: bool = False):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if spec_m else [10, 20, 40, 60, 80, 100, 200]
+        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # [10, 20, 40, 60, 80, 100, 200]
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -50,12 +50,6 @@ class BettingStrategy:
                 'm': 10,
                 'b': 0
             }
-            # dic = {
-            #     'prob_dp': [0],
-            #     'curva': ['linear'],
-            #     'm': [10],
-            #     'b': [0]
-            # }
         
         elif strategy == "kelly":
                 dic = {
@@ -371,14 +365,10 @@ class BettingStrategy:
             df_pred_with_metrics_roi, d_metrics = calculate_roi(df_aux)
             df_pred_with_metrics__ex, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
             
-            # # Concateno datos de ROI y Expected ROI
+            # # Concateno datos de ROI y Expected ROI (no calculo metric aqui para poder normalizar dsp)
             missing_columns = [col for col in df_pred_with_metrics__ex.columns if col not in df_pred_with_metrics_roi.columns]
             df_pred_with_metrics = pd.concat([df_pred_with_metrics_roi, df_pred_with_metrics__ex[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
             d_metrics.update(d_metrics_2)
-
-            # Calcular metrica a maximizar
-            metric = 0.5 * d_metrics['roi'] + 0.5 * d_metrics_2['expected_roi']
-            d_metrics.update({'metric': metric})
 
             if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
@@ -411,7 +401,6 @@ class BettingStrategy:
         d_metrics.update(d_metrics_2)
         return df_pred_with_metrics, d_metrics
 
-
     def apply_strategy(self, df, param_dict, prod: bool = True):
         
         if len(df) == 0:
@@ -431,11 +420,15 @@ class BettingStrategy:
         df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
-    def select_best_parameters(self, data):
+    def select_best_parameters(self, data, roi_weight: int = 0.3):
         
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
         
+        # Calcular metrica a maximizar (lo hago aqui para poder normalizar)
+        ex_weight = 1 - roi_weight
+        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[roi_weight, ex_weight])
+
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
         if self.verbose >= 1:
@@ -513,7 +506,7 @@ class BettingStrategy:
         # Exportar el DataFrame final a un archivo Excel
         return df_final, best_df_pred
 
-    def define_model_betting_strategy(self, df_pred, d_params, verbose: int = 0):
+    def define_model_betting_strategy(self, df_pred, d_params, roi_weight: int, verbose: int = 0):
         """
         Determina la estrategia de apuesta óptima para un modelo aplicando la misma estrategia a todos los resultados.
 
@@ -534,7 +527,7 @@ class BettingStrategy:
 
         if not isinstance(d_predic, pd.DataFrame):
             # Selecciono la mejor combinación
-            n_comb = self.select_best_parameters(d_metricas)
+            n_comb = self.select_best_parameters(d_metricas, roi_weight)
 
             # Guardo resultados
             best_df_pred = d_predic[n_comb]
