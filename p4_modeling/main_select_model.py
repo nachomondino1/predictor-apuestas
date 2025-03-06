@@ -234,7 +234,7 @@ def main(
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = False, False
-            d_params = bs.define_hiperparameters(strategy='linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            d_params = bs.define_hiperparameters(strategy='kelly_linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
@@ -280,8 +280,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
-    # 48 = 0.48 ; 55= 0.51, 59 = -0.11 ; 77 = 0.25 148 = 0.36
+    # l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 100

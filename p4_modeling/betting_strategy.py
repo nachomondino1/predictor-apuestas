@@ -42,7 +42,7 @@ class BettingStrategy:
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] # [10, 20, 40, 60, 80, 100, 200]
-
+        
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': 0,
@@ -50,32 +50,14 @@ class BettingStrategy:
                 'm': 10,
                 'b': 0
             }
-        
-        elif strategy == "kelly":
-                dic = {
-                    'prob_dp': list_dp,
-                    'curva': ['kelly'], 
-                    'm': list_m,
-                    'b': [0],
-                }
-
-        elif strategy == "linear":
-            dic = {
-                'prob_dp': list_dp, 
-                'curva': ['linear'],
-                'm': list_m,
-                'b': [0], # Ojo que ya es el doble del m (pues no esta afectado por prob_result_to_bet en cambio el m si)
-            }
-
-        elif strategy == "all":
-               
+        else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': ['linear', 'kelly'], # 'equal', 'kelly', 'exponential'
+                'curva': [strategy], 
                 'm': list_m,
                 'b': [0],
             }
-
+    
         if self.verbose >= 1:
             logger.info(f"Hiperparametros estrategia de apuesta: {dic}")
     
@@ -247,15 +229,31 @@ class BettingStrategy:
             # Calculo kelly criterion
             df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
 
-            # Normalizo stake (si o si sino el stake es negativo)
-            # df = self.normalize_stake(df, p_min=-1, p_max=1, m=m) 
-            df = self.transform_sigmoid(df, m=m) 
+            # Usar la función sigmoide para reducir la variabilidad y escalar entre p_min y p_max
+            num = m if m > 0 else 1
+            df['stake_to_bet'] = num / (1 + np.exp(-df['kelly_criterion']))
 
         # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
 
             df['stake_to_bet'] = df['prob_result_to_bet'] * m + b 
             
+        # STRATEGY: LINEAR + kelly
+        elif type_relation == 'kelly_linear':
+
+            # Calculo kelly criterion
+            df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
+
+            # Calcular m_ajustado para asegurar continuidad en kelly_criterion = 0
+            m_ajustado = 2 * (df['prob_result_to_bet'] * m + b)
+            k = 1.5 # es una constante que controla la sensibilidad para disminuir stake con kelly negativo. Cuanto mayor de 1 es, mas decrecerá el stake
+                      
+            df['stake_to_bet'] = np.where(
+                df['kelly_criterion'] > 0, 
+                df['prob_result_to_bet'] * m + b, # aplicar linear si kelly_crit > 0 para no inflar 
+                m_ajustado / (1 + np.exp(-k * df['kelly_criterion'])) # aplicar kelly si kelly_crit < 0 para reducir 
+            )
+
         # STRATEGY: POLY
         elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
             pass
@@ -299,12 +297,6 @@ class BettingStrategy:
         # Normalización: Escalar los valores de kelly_raw entre 0 y 1
         df['stake_to_bet_norm'] = (df['kelly_criterion'] - p_min) / (p_max - p_min)
 
-        return df
-        
-    def transform_sigmoid(self, df, m):
-        # Usar la función sigmoide para reducir la variabilidad y escalar entre p_min y p_max
-        num = m if m > 0 else 1
-        df['stake_to_bet'] = num / (1 + np.exp(-df['kelly_criterion']))
         return df
 
     def stake_reduction_emergency_fill(self, df, porc_emergency: float = 0.5):
