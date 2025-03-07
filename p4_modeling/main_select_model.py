@@ -11,7 +11,6 @@ from p4_modeling.utils_select_model.assess import predict_missing_data
 from p6_deployment import main_next_matches
 import os
 
-
 def initialize_directories(country, iteration_date, assess):
     """
     Guarda la selección de modelo vieja en una carpeta y crea los directorios necesarios.
@@ -282,14 +281,8 @@ if __name__ == "__main__":
     export = True
 
     d_countries = {
-        # train viejos
-        # 48: ["england", '2025-02-05'],
-        # 55: ["france", '2025-02-05'], 
-        # 59: ["germany", '2025-02-05'],
-        # 77: ["italy", '2025-02-05'],
-        # 148: ["spain", '2025-02-05'], 
         # Train nuevos
-        # 6: ["argentina", '2025-02-06'], 
+        6: ["argentina", '2025-02-06'], 
         48: ["england", '2025-03-03'],
         55: ["france", '2025-03-03'], 
         59: ["germany", '2025-03-04'],
@@ -300,8 +293,6 @@ if __name__ == "__main__":
     # Defino pesos
     l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea']
     l_weights = [0.48, 0.46, 0.07]
-    # l_metrics = ['acerte_draw_sin_ea', 'expected_roi_sin_ea', 'expected_acerte_home_sin_ea', 'expected_acerte_draw_sin_ea', 'expected_acerte_away_sin_ea'] 
-    # l_weights = [0.25, 0.18, 0.15, 0.21, 0.2]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]

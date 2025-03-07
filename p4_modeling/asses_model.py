@@ -314,8 +314,7 @@ def prepare_to_calc_metrics(df_pred_proba, var_pred_bm: str = 'bookmaker_result'
     df_pred_proba = calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
     df_pred_proba = determine_result_by_bookmaker(df_pred_proba, col_name=var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
 
-    df_pred_proba = df_pred_proba.dropna(subset=['result', 'expected_result']) # en SPA no se por que falla sino
-
+    df_pred_proba['expected_result'] = df_pred_proba['expected_result'].fillna(-100) # en SPA no se por que falla sino
     return df_pred_proba
 
 def calculate_metrics(df_pred_proba, var_pred: str = 'predicted_result', var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result', advanced_metrics: bool = False, verbose: int = 0):
