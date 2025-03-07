@@ -337,121 +337,6 @@ def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, verbose: in
 
     return d_metrics
 
-def calculate_metrics_for_last_matches(df_pred_proba, num_matches: int):
-    """Calcula métricas de precisión y ROI para los últimos `num_matches` partidos."""
-    df_last_matches = df_pred_proba.tail(num_matches)
-
-    # Obtener métricas de los últimos `num_matches` partidos
-    d_metrics_last = calculate_metrics(df_last_matches)
-
-    return {
-        f'test_acc_last_{num_matches}': d_metrics_last['test_accuracy'],
-        f'recall_last_{num_matches}': d_metrics_last['recall'],
-        f'f1_score_last_{num_matches}': d_metrics_last['f1_score'],
-        f'roi_last_{num_matches}': d_metrics_last['roi'],
-        f'ex_roi_last_{num_matches}': d_metrics_last['expected_roi']
-    }
-    
-def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
-    """
-    Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
-    Normaliza las columnas en 'l_metrics' antes del cálculo y agrega el resultado como una nueva columna.
-    """
-    # Validar que el número de métricas y pesos coincida
-    if len(l_metrics) != len(l_weights):
-        raise ValueError("El número de métricas debe coincidir con el número de pesos.")
-    
-    norm_metrics = []
-    
-    # Normalizar cada columna en l_metrics
-    for metric in l_metrics:
-        df = normalize_column(df, col=metric)
-        norm_metrics.append(metric + '_norm')
-    
-    # Definir función para calcular la métrica por fila
-    def calculate_row_metric(row):
-        return sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
-    
-    # Aplicar la función fila por fila
-    df[metric_name] = df.apply(calculate_row_metric, axis=1)
-    return df
-
-def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
-    
-    # Determino puntos minimo y maximo de la columna
-    p_min = df[col].min()
-    p_max = df[col].max()
-    if verbose >= 2:
-        logger.info(f"Punto minimo: {p_min}. Punto maximo: {p_max}")
-
-    # Normalizo columna
-    df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
-    return df
-
-def select_metrics(df, col_corr: str, l_metrics: list, n_metrics=None, threshold=None):
-    """
-    Selecciona métricas basándose en correlación con ROI. Usa n_metrics o threshold, pero no ambos.
-
-    Args:
-        df (pd.DataFrame): DataFrame con los datos.
-        l_metrics (list): Lista de métricas (columnas) a evaluar.
-        n_metrics (int, optional): Número de métricas a seleccionar. Exclusivo con threshold.
-        threshold (float, optional): Umbral de correlación (positivo o negativo). Exclusivo con n_metrics.
-
-    Returns:
-        list: Lista de métricas seleccionadas.
-    """
-    correlations = {}
-
-    # Calcular correlación para cada métrica
-    for metric in l_metrics:
-        correlation = df[col_corr].corr(df[metric])
-        print(f"La correlación entre {col_corr} y {metric} es de {correlation*100:.0f}%.")
-        correlations[metric] = correlation
-
-    # Validar que no se usen ambos parámetros a la vez
-    if n_metrics is not None and threshold is not None:
-        raise ValueError("No se puede usar 'n_metrics' y 'threshold' al mismo tiempo. Especifique solo uno.")
-
-    # Selección basada en threshold
-    if threshold is not None:
-        filtered_metrics = [metric for metric, corr in correlations.items() if abs(corr) >= threshold]
-        print(f"Métricas que cumplen el umbral ({threshold}): {filtered_metrics}")
-        return filtered_metrics
-
-    # Selección basada en n_metrics
-    elif n_metrics is not None:
-        sorted_metrics = sorted(correlations, key=correlations.get, reverse=True)
-        selected_metrics = sorted_metrics[:n_metrics]
-        print(f"Métricas seleccionadas (top {n_metrics}): {selected_metrics}")
-        return selected_metrics
-
-    # Si no se especifica n_metrics ni threshold
-    else:
-        raise ValueError("Debe especificar 'n_metrics' o 'threshold'.")
-    
-def define_weights(df: pd.DataFrame, col_corr: str, l_metrics:list):
-    """
-    Defino pesos de variables segun correlacion con ROI
-    """
-    weights = []
-
-    # Por metrica
-    for metric in l_metrics:
-
-        # Calculo correlacion con ROI
-        correlacion = df[col_corr].corr(df[metric])
-        logger.info(f"La correlacion entre {col_corr} y {metric} es de {correlacion*100:.0f}%.")
-
-        weights.append(correlacion)
-    
-    total_weight = sum(weights)
-    weights_1 = [weight / total_weight for weight in weights]
-
-    logger.critical(weights_1)
-    return weights_1
-
-# Simplificar + Moduralizar
 def calculate_basic_metrics( 
         df_pred_proba,
         var_resp: str = 'result',
@@ -669,7 +554,122 @@ def calculate_perc_gp(gp, gp_total):
         return gp / gp_total
     else:
         return 0
+
+# Metrica para seleccionar modelos
+def calculate_metrics_for_last_matches(df_pred_proba, num_matches: int):
+    """Calcula métricas de precisión y ROI para los últimos `num_matches` partidos."""
+    df_last_matches = df_pred_proba.tail(num_matches)
+
+    # Obtener métricas de los últimos `num_matches` partidos
+    d_metrics_last = calculate_metrics(df_last_matches)
+
+    return {
+        f'test_acc_last_{num_matches}': d_metrics_last['test_accuracy'],
+        f'recall_last_{num_matches}': d_metrics_last['recall'],
+        f'f1_score_last_{num_matches}': d_metrics_last['f1_score'],
+        f'roi_last_{num_matches}': d_metrics_last['roi'],
+        f'ex_roi_last_{num_matches}': d_metrics_last['expected_roi']
+    }
+
+def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
+    """
+    Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
+    Normaliza las columnas en 'l_metrics' antes del cálculo y agrega el resultado como una nueva columna.
+    """
+    # Validar que el número de métricas y pesos coincida
+    if len(l_metrics) != len(l_weights):
+        raise ValueError("El número de métricas debe coincidir con el número de pesos.")
     
+    norm_metrics = []
+    
+    # Normalizar cada columna en l_metrics
+    for metric in l_metrics:
+        df = normalize_column(df, col=metric)
+        norm_metrics.append(metric + '_norm')
+    
+    # Definir función para calcular la métrica por fila
+    def calculate_row_metric(row):
+        return sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
+    
+    # Aplicar la función fila por fila
+    df[metric_name] = df.apply(calculate_row_metric, axis=1)
+    return df
+
+def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
+    
+    # Determino puntos minimo y maximo de la columna
+    p_min = df[col].min()
+    p_max = df[col].max()
+    if verbose >= 2:
+        logger.info(f"Punto minimo: {p_min}. Punto maximo: {p_max}")
+
+    # Normalizo columna
+    df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
+    return df
+
+def select_metrics(df, col_corr: str, l_metrics: list, n_metrics=None, threshold=None):
+    """
+    Selecciona métricas basándose en correlación con ROI. Usa n_metrics o threshold, pero no ambos.
+
+    Args:
+        df (pd.DataFrame): DataFrame con los datos.
+        l_metrics (list): Lista de métricas (columnas) a evaluar.
+        n_metrics (int, optional): Número de métricas a seleccionar. Exclusivo con threshold.
+        threshold (float, optional): Umbral de correlación (positivo o negativo). Exclusivo con n_metrics.
+
+    Returns:
+        list: Lista de métricas seleccionadas.
+    """
+    correlations = {}
+
+    # Calcular correlación para cada métrica
+    for metric in l_metrics:
+        correlation = df[col_corr].corr(df[metric])
+        print(f"La correlación entre {col_corr} y {metric} es de {correlation*100:.0f}%.")
+        correlations[metric] = correlation
+
+    # Validar que no se usen ambos parámetros a la vez
+    if n_metrics is not None and threshold is not None:
+        raise ValueError("No se puede usar 'n_metrics' y 'threshold' al mismo tiempo. Especifique solo uno.")
+
+    # Selección basada en threshold
+    if threshold is not None:
+        filtered_metrics = [metric for metric, corr in correlations.items() if abs(corr) >= threshold]
+        print(f"Métricas que cumplen el umbral ({threshold}): {filtered_metrics}")
+        return filtered_metrics
+
+    # Selección basada en n_metrics
+    elif n_metrics is not None:
+        sorted_metrics = sorted(correlations, key=correlations.get, reverse=True)
+        selected_metrics = sorted_metrics[:n_metrics]
+        print(f"Métricas seleccionadas (top {n_metrics}): {selected_metrics}")
+        return selected_metrics
+
+    # Si no se especifica n_metrics ni threshold
+    else:
+        raise ValueError("Debe especificar 'n_metrics' o 'threshold'.")
+    
+def define_weights(df: pd.DataFrame, col_corr: str, l_metrics:list):
+    """
+    Defino pesos de variables segun correlacion con ROI
+    """
+    weights = []
+
+    # Por metrica
+    for metric in l_metrics:
+
+        # Calculo correlacion con ROI
+        correlacion = df[col_corr].corr(df[metric])
+        logger.info(f"La correlacion entre {col_corr} y {metric} es de {correlacion*100:.0f}%.")
+
+        weights.append(correlacion)
+    
+    total_weight = sum(weights)
+    weights_1 = [weight / total_weight for weight in weights]
+
+    logger.critical(weights_1)
+    return weights_1
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     pass
