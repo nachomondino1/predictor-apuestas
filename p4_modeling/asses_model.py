@@ -156,6 +156,9 @@ def count_results(df, col):
 def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
 
+def rename_dict_keys(d, prefix=None, suffix=None):
+    return {f"{prefix or ''}{k}{'_' + suffix if suffix else ''}": v for k, v in d.items()}
+
 # ROI
 def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
@@ -301,9 +304,7 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, verbose: int = 0, export: bool = False):
-        
-    d_metrics = {}
+def prepare_to_calc_metrics(df_pred_proba, var_pred_bm: str = 'bookmaker_result'):
 
     # Ordeno por fecha de mas antiguo a mas reciente
     df_pred_proba = df_pred_proba.sort_values(by='date', ascending=True)
@@ -311,46 +312,22 @@ def calculate_metrics(df_pred_proba, advanced_metrics: bool = False, verbose: in
     # Determino expected result + probas de bookies
     df_pred_proba = construct_data.determine_expected_result(df_pred_proba, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
     df_pred_proba = calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
-    df_pred_proba = determine_result_by_bookmaker(df_pred_proba, col_name="bookmaker_result")  # Determino resultado predicho segun cuota minima (e.g. "Home")
+    df_pred_proba = determine_result_by_bookmaker(df_pred_proba, col_name=var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
 
-    # Basic metrics
-    d_metrics.update(calculate_basic_metrics(df_pred_proba, export=export))
+    df_pred_proba = df_pred_proba.dropna(subset=['result', 'expected_result']) # en SPA no se por que falla sino
 
-    # Bet metrics
-    d_metrics.update(calculate_bet_metrics(df_pred_proba))
-    d_metrics.update({'dif_prec_bm': d_metrics['test_accuracy'] - d_metrics['test_accuracy_bm']})
+    return df_pred_proba
 
-    # ROI
-    roi = determine_roi(df_pred_proba)
-    ex_roi = determine_roi(df_pred_proba, expected=True)
-    d_metrics.update({'roi': roi, 'expected_roi': ex_roi})
+def calculate_metrics(df_pred_proba, var_pred: str = 'predicted_result', var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result', advanced_metrics: bool = False, verbose: int = 0):
+        
+    # Preparacion previa a calc de metricas
+    df_pred_proba = prepare_to_calc_metrics(df_pred_proba)
 
-    # Otras métricas
-    if advanced_metrics:
-        d_metrics.update(determine_distribution(df_pred_proba))
-        d_metrics.update(calculate_nan_metrics(df_pred_proba))
-        d_metrics.update(calculate_gp_by_result(df_pred_proba))
-        d_metrics.update(calculate_accuracy_by_result(df_pred_proba))
+    # Defino los array para calc metrics
+    y_test = df_pred_proba[var_resp].values         # Etiquetas reales
+    y_pred = df_pred_proba[var_pred].values         # Predicciones del modelo
+    y_pred_bm = df_pred_proba[var_pred_bm].values   # Predicciones del BET
 
-    if verbose > 1:
-        print(d_metrics)
-
-    return d_metrics
-
-def calculate_basic_metrics( 
-        df_pred_proba,
-        var_resp: str = 'result',
-        var_pred: str = 'predicted_result',
-        verbose: int = 0,
-        export: bool = False,
-        country: str = None
-        ):
-    """
-    Calculo metricas como precision y ROI de las predicciones del modelo entrenado.
-    """
-    y_test = df_pred_proba[var_resp].values  # Etiquetas reales
-    y_pred = df_pred_proba[var_pred].values  # Predicciones del modelo
-    
     # Calculo métricas básicas
     d_metrics = {
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
@@ -358,70 +335,31 @@ def calculate_basic_metrics(
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
     }
 
+    # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
     if verbose >= 1:
-        # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
         df_conf_mat = confusion_matrix(y_test, y_pred)
-        if export:
-            df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
-
-    return d_metrics
-
-def calculate_accuracy_by_result(df_predicciones):
-    """
-    Calcula la precisión (accuracy) por tipo de resultado.
-    """
-    # Dividir DataFrame por tipo de resultado
-    df_pred_home = df_predicciones[df_predicciones['predicted_result'] == 1]
-    df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == 0]
-    df_pred_away = df_predicciones[df_predicciones['predicted_result'] == 2]
-
-    acerte_home =  int(df_pred_home['acerte'].sum())
-    acerte_draw = int(df_pred_draw['acerte'].sum())
-    acerte_away = int(df_pred_away['acerte'].sum())
-    prec_home = acerte_home / len(df_pred_home) * 100 if len(df_pred_home) > 0 else 0
-    prec_draw =  acerte_draw / len(df_pred_draw) * 100 if len(df_pred_draw) > 0 else 0
-    prec_away =  acerte_away / len(df_pred_away) * 100 if len(df_pred_away) > 0 else 0
-
-    d = {
-        'acc_home': prec_home,
-        'acc_draw': prec_draw,
-        'acc_away': prec_away,
-        'acerte_home': acerte_home,
-        'acerte_draw': acerte_draw,
-        'acerte_away': acerte_away,
-    }
-
-    if 'expected_result' in df_predicciones.columns:
-        df_pred_home_ex = df_predicciones[df_predicciones['expected_result'] == 1]
-        df_pred_draw_ex = df_predicciones[df_predicciones['expected_result'] == 0]
-        df_pred_away_ex = df_predicciones[df_predicciones['expected_result'] == 2]
-
-        ex_acerte_home =  int(df_pred_home_ex['expected_acerte'].sum())
-        ex_acerte_draw = int(df_pred_draw_ex['expected_acerte'].sum())
-        ex_acerte_away = int(df_pred_away_ex['expected_acerte'].sum())
-        d.update({
-            'ex_acerte_home': ex_acerte_home,
-            'ex_acerte_draw': ex_acerte_draw,
-            'ex_acerte_away': ex_acerte_away
-        })
-    return d
-
-def calculate_bet_metrics(
-        df_pred_proba,
-        var_resp: str = 'result',
-        var_pred_bm: str = 'bookmaker_result',
-        verbose: int = 0,
-        ):
-
-    y_test = df_pred_proba[var_resp].values  # Etiquetas reales
+        # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
     # Calculo metricas de bookie
-    y_pred_bm = df_pred_proba[var_pred_bm].values
+    test_accuracy_bm = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
+    d_metrics.update({
+        'test_accuracy_bm': test_accuracy_bm,
+        'dif_prec_bm': d_metrics['test_accuracy'] - test_accuracy_bm
+        }
+    )
 
-    d_metrics = {
-        'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex()
-    }
-    if verbose >=1:
+    # ROI
+    roi = determine_roi(df_pred_proba, var_resp=var_resp) # hago el rename con expected por fuera de la funcion...
+    d_metrics.update({'roi': roi})
+
+    # Otras métricas
+    if advanced_metrics:
+        d_metrics.update(determine_distribution(df_pred_proba, var_resp=var_resp))
+        # d_metrics.update(calculate_nan_metrics(df_pred_proba))
+        d_metrics.update(calculate_gp_by_result(df_pred_proba, var_resp=var_resp))
+        d_metrics.update(calculate_accuracy_by_result(df_pred_proba, var_resp=var_resp))
+
+    if verbose > 1:
         print(d_metrics)
 
     return d_metrics
@@ -455,12 +393,14 @@ def concatenate_dfs(
     df_predicciones = pd.concat(columns_to_concat, axis=1)
     return df_predicciones
 
-def determine_roi(df_pred, expected: bool = False):
+def determine_roi(df_pred, var_resp):
 
-    if expected:
+    if var_resp == 'result':
+        col_inic, col_fin = 'bank_inicial', 'bank_final'
+    elif var_resp == 'expected_result':
         col_inic, col_fin = 'expected_bank_inicial', 'expected_bank_final'
     else:
-        col_inic, col_fin = 'bank_inicial', 'bank_final'
+        logger.error("No se puede determinar el roi porque no se encontró la variable predicha.")
 
     # Tomar el primer valor de la columna
     bank_inicial = df_pred[col_inic].iloc[0]
@@ -507,27 +447,56 @@ def calculate_nan_metrics(df_predicciones):
     }
     return d
 
-def calculate_gp_by_result(df_predicciones, classes = None):
+def calculate_accuracy_by_result(df_predicciones, var_resp):
+    """
+    Calcula la precisión (accuracy) por tipo de resultado.
+    """
+    if var_resp == 'result':
+        col_acerte = 'acerte'
+    elif var_resp == 'expected_result':
+        col_acerte = 'expected_acerte'
+
+    # Dividir DataFrame por tipo de resultado
+    df_pred_home = df_predicciones[df_predicciones[var_resp] == 1]
+    df_pred_draw = df_predicciones[df_predicciones[var_resp] == 0]
+    df_pred_away = df_predicciones[df_predicciones[var_resp] == 2]
+
+    acerte_home =  int(df_pred_home[col_acerte].sum())
+    acerte_draw = int(df_pred_draw[col_acerte].sum())
+    acerte_away = int(df_pred_away[col_acerte].sum())
+
+    prec_home = acerte_home / len(df_pred_home) * 100 if len(df_pred_home) > 0 else 0
+    prec_draw =  acerte_draw / len(df_pred_draw) * 100 if len(df_pred_draw) > 0 else 0
+    prec_away =  acerte_away / len(df_pred_away) * 100 if len(df_pred_away) > 0 else 0
+
+    d = {
+        'acc_home': prec_home,
+        'acc_draw': prec_draw,
+        'acc_away': prec_away,
+        'acerte_home': acerte_home,
+        'acerte_draw': acerte_draw,
+        'acerte_away': acerte_away,
+    }
+    return d
+
+def calculate_gp_by_result(df_predicciones, var_resp):
     """
     Calcula el G/P por resultado (local, empate, visitante).
     """
-    # para clasificacion binaria
-    if classes is not None:
-        class_home = 12 if 12 in classes else 1
-        class_draw = 0
-        class_away = 12 if 12 in classes else 2
-    else:
-        class_home, class_draw, class_away = 1, 0, 2
+    if var_resp == 'result':
+        col_gp = 'G/P_sin_bank'
+    elif var_resp == 'expected_result':
+        col_gp = 'expected_G/P_sin_bank'
 
     # Dividir DataFrame por tipo de resultado
-    df_pred_home = df_predicciones[df_predicciones['predicted_result'] == class_home]
-    df_pred_draw = df_predicciones[df_predicciones['predicted_result'] == class_draw]
-    df_pred_away = df_predicciones[df_predicciones['predicted_result'] == class_away]
+    df_pred_home = df_predicciones[df_predicciones[var_resp] == 1]
+    df_pred_draw = df_predicciones[df_predicciones[var_resp] == 0]
+    df_pred_away = df_predicciones[df_predicciones[var_resp] == 2]
     
     # Calcular G/P por resultado
-    gp_home = df_pred_home['G/P_sin_bank'].sum()
-    gp_draw = df_pred_draw['G/P_sin_bank'].sum()
-    gp_away = df_pred_away['G/P_sin_bank'].sum()
+    gp_home = df_pred_home[col_gp].sum()
+    gp_draw = df_pred_draw[col_gp].sum()
+    gp_away = df_pred_away[col_gp].sum()
     gp_total = gp_home + gp_draw + gp_away
 
     perc_gp_home = calculate_perc_gp(gp_home, gp_total)
@@ -557,19 +526,16 @@ def calculate_perc_gp(gp, gp_total):
 
 # Metrica para seleccionar modelos
 def calculate_metrics_for_last_matches(df_pred_proba, num_matches: int):
-    """Calcula métricas de precisión y ROI para los últimos `num_matches` partidos."""
+    """
+    Calcula métricas de precisión y ROI para los últimos `num_matches` partidos.
+    """
     df_last_matches = df_pred_proba.tail(num_matches)
 
     # Obtener métricas de los últimos `num_matches` partidos
-    d_metrics_last = calculate_metrics(df_last_matches)
+    d_metrics_last = calculate_metrics(df_last_matches, advanced_metrics=False)
 
-    return {
-        f'test_acc_last_{num_matches}': d_metrics_last['test_accuracy'],
-        f'recall_last_{num_matches}': d_metrics_last['recall'],
-        f'f1_score_last_{num_matches}': d_metrics_last['f1_score'],
-        f'roi_last_{num_matches}': d_metrics_last['roi'],
-        f'ex_roi_last_{num_matches}': d_metrics_last['expected_roi']
-    }
+    d_metrics_last = rename_dict_keys(d_metrics_last, suffix=f'last_{num_matches}')
+    return d_metrics_last
 
 def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
     """

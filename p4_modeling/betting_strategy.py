@@ -377,9 +377,6 @@ class BettingStrategy:
 
     def calculate_roi_in_combination(self, df, param_dict):
 
-        if 'expected result' not in df.columns:
-            df = determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
-
         # Aplicar estrategia a df_pred
         df_aux = self.apply_strategy(df, param_dict, prod=False)
 

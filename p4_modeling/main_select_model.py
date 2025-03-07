@@ -115,31 +115,14 @@ def drop_old_metrics(df_predicciones):
     df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
     return df_predicciones
 
-def calculate_all_metrics(df, suffix, advanced_metrics=False):
-    """
-    Calcula métricas generales y para los últimos 50 y 25 partidos, agregando un sufijo a las claves.
-
-    :param df: DataFrame con las predicciones.
-    :param suffix: Sufijo para renombrar las métricas (ejemplo: "sin_ea" o "con_ea").
-    :param advanced_metrics: Si True, calcula métricas avanzadas.
-    :return: Diccionario con las métricas calculadas.
-    """
-    d_metrics = asses_model.calculate_metrics(df, advanced_metrics=advanced_metrics)
-
-    l_matches = [num for num in (50, 25) if len(df) > num]
-    for num_matches in l_matches:
-        d_metrics.update(asses_model.calculate_metrics_for_last_matches(df, num_matches=num_matches))
-
-    return {f"{k}_{suffix}": v for k, v in d_metrics.items()}
-
 # Main
 def main(
         df_ite,
         id_country, 
         country, 
         iteration_date,
-        l_metrics= list,
-        l_weights=list,
+        l_metrics: list, 
+        l_weights: list, 
         select_candidates: bool = True,
         n_max_candidates: int = None,
         bet_strat: bool = True,
@@ -168,6 +151,7 @@ def main(
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
 
+    # Determino correlacion entre ROI y Expected ROI
     ex_weight = df_ite['roi'].corr(df_ite['expected_roi'])
     roi_weight = 1 - ex_weight if ex_weight > 0 else 1
     logger.info(f"Correlacion ROI y Expected ROI: {ex_weight:.2f}. --> ROI weight: {roi_weight:.2f} y Ex ROI weight: {ex_weight:.2f}")
@@ -230,7 +214,8 @@ def main(
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
             df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params)
-            d_metric_sin_ea = calculate_all_metrics(df_pred_met, suffix="sin_ea", advanced_metrics=True)
+            d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result', advanced_metrics=True)
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', advanced_metrics=True)
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = False, False
@@ -239,14 +224,21 @@ def main(
                 func = bs.define_model_betting_strategy_by_result
             else:
                 func = bs.define_model_betting_strategy
-            
             df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight)
-            d_metric_con_ea = calculate_all_metrics(df_pred_with_stra, suffix="con_ea")
+            ## Solo calculo el roi que es lo unico que cambia..  --> d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra, var_pred='predicted_result', advanced_metrics=False)
+            roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='result')
+            ex_roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='expected_result') 
+            d_metric_con_ea = ({'roi_con_ea': roi_con_ea, 'expected_roi_con_ea': ex_roi_con_ea})
+
+            # Renombro metricas para evitar sobreescribirlas
+            d_metric_sin_ea = asses_model.rename_dict_keys(d_metric_sin_ea, suffix="sin_ea")
+            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_', suffix="sin_ea")
+
             mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi_sin_ea'])  / abs(d_metric_sin_ea['roi_sin_ea'])
-            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea['expected_roi_sin_ea']) / abs(d_metric_sin_ea['expected_roi_sin_ea'])
+            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea_ex['expected_roi_sin_ea']) / abs(d_metric_sin_ea_ex['expected_roi_sin_ea'])
 
             # Guardo datos
-            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_con_ea, 'x_roi': mult, 'x ex_roi': mult_ex}
+            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_sin_ea_ex, **d_metric_con_ea, 'x_roi': mult, 'x ex_roi': mult_ex}
             rows.append(new_row)
             df_ite_bs = pd.DataFrame(data=rows)
 
@@ -280,7 +272,6 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 100
@@ -305,10 +296,12 @@ if __name__ == "__main__":
         77: ["italy", '2025-03-04'],
         148: ["spain", '2025-03-04'], 
         }
-
-    # Defino metricas (y sus pesos) para seleccionar el modelo
-    l_metrics = ['acerte_draw_sin_ea', 'expected_roi_sin_ea', 'ex_acerte_home_sin_ea', 'ex_acerte_draw_sin_ea', 'ex_acerte_away_sin_ea'] # 'gp_home_sin_ea',
-    l_weights = [0.25, 0.18, 0.15, 0.21, 0.2]
+    
+    # Defino pesos
+    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea']
+    l_weights = [0.48, 0.46, 0.07]
+    # l_metrics = ['acerte_draw_sin_ea', 'expected_roi_sin_ea', 'expected_acerte_home_sin_ea', 'expected_acerte_draw_sin_ea', 'expected_acerte_away_sin_ea'] 
+    # l_weights = [0.25, 0.18, 0.15, 0.21, 0.2]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -320,7 +313,7 @@ if __name__ == "__main__":
         main(
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
-            l_metrics=l_metrics, l_weights=l_weights,
+            l_metrics=l_metrics, l_weights=l_weights, 
             select_candidates=select_candidates,
             n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,
