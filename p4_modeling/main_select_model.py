@@ -217,7 +217,7 @@ def main(
             d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', advanced_metrics=True)
 
             # 📌 Aplicar estrategia "con ea"
-            per_res, vary_dp = False, False
+            per_res, vary_dp = True, False
             d_params = bs.define_hiperparameters(strategy='kelly_linear', big_space_m=False, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
@@ -271,6 +271,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    # l_countries = [48]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 100
@@ -291,8 +292,8 @@ if __name__ == "__main__":
         }
     
     # Defino pesos
-    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea']
-    l_weights = [0.48, 0.46, 0.07]
+    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea', 'roi_con_ea']
+    l_weights = [0.48, 0.46, 0.07, 0.5]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]

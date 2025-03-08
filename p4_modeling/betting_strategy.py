@@ -427,7 +427,7 @@ class BettingStrategy:
         return n_comb
 
     # Main
-    def define_model_betting_strategy_by_result(self, df_pred, d_params, verbose: int = 0):
+    def define_model_betting_strategy_by_result(self, df_pred, d_params, roi_weight: int, verbose: int = 0):
         """
         Determina la estrategia de apuesta optima para un modelo.
 
@@ -449,6 +449,14 @@ class BettingStrategy:
         # Por resultado
         for pred in [1, 0, 2]:
 
+            # Fuerzo a usar stakes mas altos en 0 y bajos en 1.
+            if pred == 1:
+                d_params['m'] = [5, 10]
+            elif pred == 0:
+                d_params['m'] = [80, 100, 120]
+            elif pred == 2:
+                d_params['m'] = [10, 50, 100, 150]
+
             # Filtro predicciones por result
             df_result = df_pred[df_pred['predicted_result'] == pred] 
             if verbose >= 0:
@@ -460,7 +468,7 @@ class BettingStrategy:
                 d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
                 # Determinar mejor estrategia para el resultado      
-                n_comb = self.select_best_parameters(d_metricas)
+                n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
          
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
