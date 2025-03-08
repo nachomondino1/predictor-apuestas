@@ -292,8 +292,8 @@ if __name__ == "__main__":
         }
     
     # Defino pesos
-    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea', 'roi_con_ea']
-    l_weights = [0.48, 0.46, 0.07, 0.5]
+    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea']
+    l_weights = [0.48, 0.46, 0.07]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
