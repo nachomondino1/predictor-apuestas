@@ -7,7 +7,6 @@ from utils import directories
 import datetime
 from p3_data_preparation import construct_data
 from p4_modeling import betting_strategy, asses_model
-from p4_modeling.utils_select_model.assess import predict_missing_data
 from p6_deployment import main_next_matches
 import os
 
@@ -194,7 +193,8 @@ def main(
                 logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
 
                 # 1. Predict missing
-                df_pred_missing = predict_missing_data(n_model, model_name, id_country, country, iteration_date)
+                d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
+                df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, export=False) 
 
                 # 2. Concat test + missing
                 df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
