@@ -514,7 +514,7 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
 
         # Por partido nuevo
         for id_match, row in df_to_fill.iterrows():
-
+                
             # Si el valor es nan en el partido
             if pd.isna(row[variable]):
 
@@ -523,7 +523,7 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
                 # Busco promedio en ultimos partidos
                 df_matches_home_team = df[df['id_team_home'] == team]
                 df_matches_away_team = df[df['id_team_away'] == team]
-                if verbose >=1:
+                if verbose >= 1:
                     print("\n DF_MATCH_TEAM_HOME \n", df_matches_home_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_home']].head(5))
                     print("\n DF_MATCH_TEAM_AWAY \n", df_matches_away_team.loc[:, ['date', 'id_team_home', 'id_team_away', f'{col_sin_suffix}_away']].head(5))
 
