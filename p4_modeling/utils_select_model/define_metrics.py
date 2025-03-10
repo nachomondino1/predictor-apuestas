@@ -123,18 +123,17 @@ def eliminate_corr_metrics(df_ite):
     print(df_ite.shape)
     
     # Determino correlacion
-    l_cols_to_elim, df, df_corr_y = delete_correlated_columns(df_ite, var_resp='roi_prod_sin_ea', verbose=0)
+    l_cols_to_elim, df = delete_correlated_columns(df_ite, var_resp='roi_prod_sin_ea', verbose=0)
     cols_selected = [col for col in df_ite.columns if col not in l_cols_to_elim]
     cols_selected.remove('roi_prod_sin_ea')
     
-    df_corr_y.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_y.xlsx')
+    # df_corr_y.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_y.xlsx')
     df.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_metrics.xlsx')
     return cols_selected
 
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
 
     d_countries = {
         # train viejos
@@ -152,7 +151,7 @@ if __name__ == "__main__":
         # 148: ["spain", '2025-03-04'], 
         }
     
-    calc_corr = False
+    calc_corr = True
 
     for id_country in l_countries:
 

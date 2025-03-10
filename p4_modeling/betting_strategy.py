@@ -377,6 +377,9 @@ class BettingStrategy:
 
     def calculate_roi_in_combination(self, df, param_dict):
 
+        if 'expected_result' not in df.columns:
+            df = determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
+
         # Aplicar estrategia a df_pred
         df_aux = self.apply_strategy(df, param_dict, prod=False)
 
@@ -451,7 +454,7 @@ class BettingStrategy:
 
             # Fuerzo a usar stakes mas altos en 0 y bajos en 1.
             if pred == 1:
-                d_params['m'] = [5, 10]
+                d_params['m'] = [5, 10, 30]
             elif pred == 0:
                 d_params['m'] = [80, 100, 120]
             elif pred == 2:

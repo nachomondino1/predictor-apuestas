@@ -150,7 +150,7 @@ def main(
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
 
-    # Determino correlacion entre ROI y Expected ROI
+    # Determino correlacion entre ROI y Expected ROI --> no creo que este bien. Creo que conviene usar roi_weight de 1 y listo. No es representativo la corr sino la diferencia absoluta entre roi y ex_roi (posiblemente porcentual)
     ex_weight = df_ite['roi'].corr(df_ite['expected_roi'])
     roi_weight = 1 - ex_weight if ex_weight > 0 else 1
     logger.info(f"Correlacion ROI y Expected ROI: {ex_weight:.2f}. --> ROI weight: {roi_weight:.2f} y Ex ROI weight: {ex_weight:.2f}")
@@ -230,11 +230,11 @@ def main(
             d_metric_con_ea = ({'roi_con_ea': roi_con_ea, 'expected_roi_con_ea': ex_roi_con_ea})
 
             # Renombro metricas para evitar sobreescribirlas
-            d_metric_sin_ea = asses_model.rename_dict_keys(d_metric_sin_ea, suffix="sin_ea")
-            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_', suffix="sin_ea")
+            d_metric_sin_ea = asses_model.rename_dict_keys(d_metric_sin_ea) #  suffix="sin_ea"
+            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_') #suffix="sin_ea"
 
-            mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi_sin_ea'])  / abs(d_metric_sin_ea['roi_sin_ea'])
-            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea_ex['expected_roi_sin_ea']) / abs(d_metric_sin_ea_ex['expected_roi_sin_ea'])
+            mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi'])  / abs(d_metric_sin_ea['roi'])
+            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea_ex['expected_roi']) / abs(d_metric_sin_ea_ex['expected_roi'])
 
             # Guardo datos
             new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_sin_ea_ex, **d_metric_con_ea, 'x_roi': mult, 'x ex_roi': mult_ex}
@@ -271,12 +271,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 100
     bet_strat = True
-    assess = False if bet_strat else False
+    assess = False if bet_strat else False   # Tarda banda. Ver de volver a poner predict_missing en mnm. 
     update_missing = False if assess else False
     predict_missing = False if assess else False
     export = True
@@ -292,13 +292,24 @@ if __name__ == "__main__":
         }
     
     # Defino pesos
-    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea']
-    l_weights = [0.48, 0.46, 0.07]
+    # l_metrics = ['acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea', 'n_emp_sin_ea'] # total f1 socre lo uso para candidatos y no me interesa tanto ahora (busco max el 0)
+    # l_weights = [0.5, 0.5, 0.25]
+
+    # l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea'] # 'n_emp_sin_ea'? para favorecer mas empates predichos? --> no creo que es mejor tener un test mas robusto...
+    # l_weights = [0.48, 0.46, 0.07]
+
+    d_metrics = {
+        48: {'gp_draw': 0.393902, 'expected_gp_draw': 0.3127, 'f1_score': 0.2933},
+        55: {'f1_score_home': 0.2767, 'f1_score': 0.255, 'acerte_draw':  0.24004, 'expected_f1_score': 0.2279},
+        59: {'expected_gp_away': 0.4171, 'gp_home': 0.2919, 'gp_away': 0.2908},
+        77: {'expected_f1_score': 0.52601, 'acerte_draw': 0.4739},
+        148: {'roi': 0.4364, 'f1_score_draw': 0.3201, 'gp_away': 0.24337}
+    }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-
+        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
 
