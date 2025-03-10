@@ -332,6 +332,10 @@ def calculate_metrics(df_pred_proba, var_pred: str = 'predicted_result', var_res
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
+        'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
+        'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
+        'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100
+
     }
 
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
