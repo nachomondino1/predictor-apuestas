@@ -18,17 +18,11 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
-    # Condiciones para determinar el resultado (convertidas explícitamente a booleanas) (no rellenar goals con 0 antes porque falla en prod)
-    condiciones = [
-        (df['goals_home'] > df['goals_away']).astype(bool),
-        (df['goals_home'] < df['goals_away']).astype(bool),
-    ]
+    df = df.copy()  # Evitar modificar el original
 
-    # Valores correspondientes a las condiciones
-    valores = [1, 2]
-
-    # Aplicar np.select() con condiciones corregidas
-    df[var_resp] = np.select(condiciones, valores, default=0)
+    df[var_resp] = df.apply(lambda row: 1 if row['goals_home'] > row['goals_away'] 
+                            else 2 if row['goals_home'] < row['goals_away'] 
+                            else 0, axis=1)
 
     return df
 
