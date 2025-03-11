@@ -41,7 +41,7 @@ class BettingStrategy:
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [10, 20, 40, 60, 80, 100, 200]
+        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [10, 20, 40, 60, 80, 100, 120] # no uso 200 por si acertó todo en ese rdo.
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -452,14 +452,6 @@ class BettingStrategy:
         # Por resultado
         for pred in [1, 0, 2]:
 
-            # Fuerzo a usar stakes mas altos en 0 y bajos en 1.
-            # if pred == 1:
-            #     d_params['m'] = [5, 10, 30]
-            # elif pred == 0:
-            #     d_params['m'] = [80, 100, 120]
-            # elif pred == 2:
-            #     d_params['m'] = [10, 50, 100, 150]
-
             # Filtro predicciones por result
             df_result = df_pred[df_pred['predicted_result'] == pred] 
             if verbose >= 0:
@@ -491,8 +483,10 @@ class BettingStrategy:
         # Para tener mismo bank across all results.
         df_pred_with_stra_roi, _ = calculate_roi(best_df_pred) 
         df_pred_with_stra_ex, _ = calculate_roi(best_df_pred, name_extension='expected_') 
-        missing_columns = [col for col in df_pred_with_stra_ex.columns if col not in df_pred_with_stra_roi.columns]
-        best_df_pred = pd.concat([df_pred_with_stra_roi, df_pred_with_stra_ex[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+        # Seleccionar solo las columnas que contienen "expected_"
+        expected_cols = [col for col in df_pred_with_stra_ex.columns if "expected_" in col] #  missing_columns = [col for col in df_pred_with_stra_ex.columns if col not in df_pred_with_stra_roi.columns]
+        df_pred_with_stra_roi.drop(columns=expected_cols, inplace=True)
+        best_df_pred = pd.concat([df_pred_with_stra_roi, df_pred_with_stra_ex[expected_cols]], axis=1)
 
         # Calculo G/P por resultado (para comparar con G/P sin estrategia)
         gp_total = sum(df_final['roi'])
