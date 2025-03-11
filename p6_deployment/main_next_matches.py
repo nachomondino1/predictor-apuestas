@@ -709,7 +709,7 @@ class MissingData:
 
             warning_msg = f"No se pudo levantar el df_integrated con old + missing. Esto es correcto solo si nunca se ha extraido / integrado missing. Desea levantar el df_integrated con el que se entrenó? (y/n)"
             user_input = input(warning_msg).strip().lower() 
-            if user_input != "y":
+            if user_input == "y":
                 df_integrated = pd.read_excel(f'{self.BASE_DIR_dp}/df_integrated.xlsx', index_col=0)  # Tiene missing hasta el dia en el que entrené (por no desde ese dia en adelante)
                 logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
             else: 
@@ -732,7 +732,7 @@ class MissingData:
 
             warning_msg = f"No se pudo levantar df_match, df_match_player y df_match_odds missing. Esto es correcto solo si nunca se ha extraido missing. Desea inicializar crear los dataframes? (y/n)"
             user_input = input(warning_msg).strip().lower() 
-            if user_input != "y":
+            if user_input == "y":
                 df_match_miss, df_match_player_miss, df_match_odds_miss = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             else: 
                 raise SystemExit("⛔ Predicción cancelada por el usuario.")            
@@ -849,7 +849,7 @@ def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
 
     return n_model, model_name
 
-def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
+def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, holgura: int = 0.5):
     """
     Filtrar registros de dataframe por fecha segun columna 'date'.
 
@@ -874,7 +874,6 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int):
     logger.info(f"Seleccion de ultimos partidos: {len(df)} --> {len(df_filt)}")
 
     # Cálculo del mínimo de partidos necesarios
-    holgura = 0.7
     min_last_matches = (n_days / 7) * 10 * holgura # 1 fecha cada 7 dias y 10 partidos por fecha. Algo asi seria el minimo.
 
     # Verificar si hay suficientes partidos para rellenar
