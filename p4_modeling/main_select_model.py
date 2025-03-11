@@ -178,11 +178,11 @@ def main(
         # Actualizo missing (1 sola vez para todos los modelos)
         if assess and update_missing:
             d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, export=d_run['export']) 
 
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
-            n_model, model_name= row['n_iteration'], row['model_name']
+            n_model, model_name = row['n_iteration'], row['model_name']
             logger.info(f'{n_model} {model_name}')
             
             # Levanto predicciones del modelo (test o test + assess)
@@ -194,7 +194,8 @@ def main(
 
                 # 1. Predict missing
                 d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
-                df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, export=False) 
+                d_model = {'n_model': n_model, 'model_name': model_name}
+                df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
 
                 # 2. Concat test + missing
                 df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
@@ -218,7 +219,7 @@ def main(
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = True, False
-            d_params = bs.define_hiperparameters(strategy='kelly_linear', big_space_m=False, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            d_params = bs.define_hiperparameters(strategy='linear', big_space_m=False, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
@@ -271,14 +272,14 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 77, 148]
+    l_countries = [48]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 100
+    select_candidates, n_max_candidates = True, 20
     bet_strat = True
-    assess = False if bet_strat else False   # Tarda banda. Ver de volver a poner predict_missing en mnm. 
+    assess = True if bet_strat else False   # Tarda banda. Ver de volver a poner predict_missing en mnm. 
     update_missing = False if assess else False
-    predict_missing = False if assess else False
+    predict_missing = True if assess else False
     export = True
 
     d_countries = {
@@ -291,13 +292,7 @@ if __name__ == "__main__":
         148: ["spain", '2025-03-04'], 
         }
     
-    # Defino pesos
-    # l_metrics = ['acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea', 'n_emp_sin_ea'] # total f1 socre lo uso para candidatos y no me interesa tanto ahora (busco max el 0)
-    # l_weights = [0.5, 0.5, 0.25]
-
-    # l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'expected_acerte_draw_sin_ea'] # 'n_emp_sin_ea'? para favorecer mas empates predichos? --> no creo que es mejor tener un test mas robusto...
-    # l_weights = [0.48, 0.46, 0.07]
-
+    # Defino metricas y pesos
     d_metrics = {
         48: {'gp_draw': 0.393902, 'expected_gp_draw': 0.3127, 'f1_score': 0.2933},
         55: {'f1_score_home': 0.2767, 'f1_score': 0.255, 'acerte_draw':  0.24004, 'expected_f1_score': 0.2279},

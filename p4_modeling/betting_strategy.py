@@ -453,12 +453,12 @@ class BettingStrategy:
         for pred in [1, 0, 2]:
 
             # Fuerzo a usar stakes mas altos en 0 y bajos en 1.
-            if pred == 1:
-                d_params['m'] = [5, 10, 30]
-            elif pred == 0:
-                d_params['m'] = [80, 100, 120]
-            elif pred == 2:
-                d_params['m'] = [10, 50, 100, 150]
+            # if pred == 1:
+            #     d_params['m'] = [5, 10, 30]
+            # elif pred == 0:
+            #     d_params['m'] = [80, 100, 120]
+            # elif pred == 2:
+            #     d_params['m'] = [10, 50, 100, 150]
 
             # Filtro predicciones por result
             df_result = df_pred[df_pred['predicted_result'] == pred] 
