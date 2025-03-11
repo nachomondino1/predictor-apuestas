@@ -1001,8 +1001,8 @@ def main(
             du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
         
         # SOFIFA
-        df_player_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date}/df_player_sofifa.xlsx", index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date}/df_player_fifa_sofifa.xlsx")
+        df_player_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_sofifa.xlsx", index_col=0)
+        df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_fifa_sofifa.xlsx")
 
         if verbose >= 1:
             print("\n DF MATCH \n", df_match.head(2))
