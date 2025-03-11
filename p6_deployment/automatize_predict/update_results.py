@@ -59,6 +59,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
 
         # Agrego columnas 'goals_home' y 'goals_away' a predicciones.xlsx
         df_pred_with_goals = pd.concat([df, df_results], axis=1)
+        df_pred_with_goals = df_pred_with_goals.dropna(subset=['goals_home', 'goals_away'])  # Eliminar filas con NaN en goles
 
         # Determino ganador y si acerté
         df_pred_with_result = determine_result(df_pred_with_goals, var_resp='result')
