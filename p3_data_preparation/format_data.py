@@ -38,6 +38,10 @@ def convert_value_to_int(df):
         if value_str == "€0":
             return None
 
+        # Si value_str ya es un número, simplemente devuelve el número
+        if isinstance(value_str, (int, float)):
+            return value_str
+
         # Si se tiene el dato del valor de mercado
         else:
             for elem in d.keys():
@@ -46,10 +50,11 @@ def convert_value_to_int(df):
                     return value_int
             return None
     
-    # Reemplazo strings por numbers
+    # Reemplazo strings por números
     df['value'] = df['value'].apply(convertir_value).astype(float)
     df['wage'] = df['wage'].apply(convertir_value).astype(float)
     return df
+
 
 def convert_goals_to_int(df):
     """

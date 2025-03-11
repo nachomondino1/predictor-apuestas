@@ -19,6 +19,7 @@ def determine_last_matches(df: pd.DataFrame, n_days: float = 1):
     fecha_limite = fecha_hoy - datetime.timedelta(days=n_days)
     print(f"Fechas a filtrar: {fecha_limite} --> {fecha_hoy}")
 
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
     df_filt = df[(df['date'] > fecha_limite) & (df['date'] <= fecha_hoy)]
     print(df_filt.shape)
     return df_filt
@@ -47,9 +48,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         if len(df_results_competition) > 0:
 
             # Elimino partidos con goals_home y goals_away None (A PRUEBA, NO SE SI FUNCIONA)
-            # Elimino partidos con goals_home "-" puesto que son partidos suspendidos
-            df_results_competition = drop_suspended_matches(df_results_competition)
-            # df_results_competition = df_results_competition.dropna(subset=["goals_home"])
+            df_results_competition = drop_suspended_matches(df_results_competition) # df_results_competition.dropna(subset=["goals_home"])
 
             # Guardo results de competencia
             df_results = pd.concat([df_results, df_results_competition], axis=0)
@@ -98,7 +97,7 @@ if __name__ == "__main__":
     
     # Parametros de ejecución
     if env == 'dev':
-        n_days = 5
+        n_days = 2
     
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
@@ -111,6 +110,7 @@ if __name__ == "__main__":
 
     # Selecciono los partidos de los ultimos <n_days>
     df_last_matches = determine_last_matches(df_historial_predicciones, n_days)
+    logger.info(df_last_matches)
 
     # Agrego columnas 'goals_home', 'goals_away', 'result' y 'acerte'
     collect_results(df_last_matches, df_countries, df_comp_public)

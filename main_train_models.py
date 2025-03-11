@@ -99,12 +99,12 @@ def comprehensive_search(
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
  
+    ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
     if data_unders:
         directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa])
 
-        ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
         # Defino paths de donde levantar los datos
-        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=True)
+        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=False)
         df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa, n_seasons_update=1)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
@@ -121,9 +121,9 @@ def comprehensive_search(
         df_player_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index_col=0)
         df_player_fifa_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index_col=0)
 
+    ####################################################################### DATA PREPARATION (hasta integrate) #######################################################################
     if data_prep_int:
 
-        ####################################################################### DATA PREPARATION (hasta integrate) #######################################################################
         # Format data
         df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, reformat=True, export=True)
         
@@ -151,9 +151,7 @@ def comprehensive_search(
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
     
-    
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
-
     # Determino registros a usar en test_set
     n_reg_test = d_params['modeling'].pop('n_reg_test', None)     # Obtener el valor de 'n_reg_test' y eliminarlo del diccionario
     if n_reg_test is not None:
@@ -464,7 +462,7 @@ def define_params_space(id_country, fast: bool = False):
                 'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], #  d_comps['all_comp']
             },
             'construct': {
-                'n_last_matches': [[5], [3, 12]],  # [15], # Variables historicas en ultimos n partidos
+                'n_last_matches': [[5], [5, 15]],  # [15], # Variables historicas en ultimos n partidos
                 'n_years_h2h': [2],
                 'segun_localia': [True, False, 'both'],
                 'calculate_dif': [True, False],
@@ -479,8 +477,8 @@ def define_params_space(id_country, fast: bool = False):
             },
             'modeling': {
                 'val_size': [0.1],
-                'n_reg_test': [25],
-                'bal_type': [None, 'under'], # None, 
+                'n_reg_test': [50], # 25 es muy poco para selec el modelo
+                'bal_type': ['under'], # None, 
                 'k': [5]
             }
         }
@@ -522,11 +520,10 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 77, 148]
-    # l_countries = [48]
+    l_countries = [77, 48]
 
     data_unders = True
-    update_sofifa = True if data_unders else False
+    update_sofifa = False if data_unders else False
     data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}

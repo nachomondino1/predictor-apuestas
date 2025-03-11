@@ -438,6 +438,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                         if len(row_map) > 0:
                             if verbose >= 1:
                                 logger.critical("Hay mapeo!")
+                                logger.info(row_map)
 
                             # Busco id_team_sofifa
                             id_player_sofifa = str(row_map['id_player_so'].values[0])
@@ -445,17 +446,16 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                             # Busco el id y la fecha en df_player (Sofifa)
                             df_player_filt = df_player_fifa_sofifa[(df_player_fifa_sofifa['id_player'].astype(str) == str(id_player_sofifa))]
                             df_player_fifa_actual = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
-                            # df_player_filt = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa))]
                             
                             # Si no encontro jugador en el actual fifa, busco en el anterior (Solucion cuando aun no salio el nuevo fifa)
                             if (len(df_player_filt) > 0) and len(df_player_fifa_actual) == 0:
                                 # logger.warning("Tuve que usar fifa anterior")
                                 df_player_fifa_ant = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa_ant))]
-                                df_player_filt = df_player_fifa_ant
+                                df_player_filt = df_player_fifa_ant.copy()
                                 if len(df_player_fifa_ant) > 0:
                                     n_fif_ant += 1
                             else:
-                                df_player_filt = df_player_fifa_actual
+                                df_player_filt = df_player_fifa_actual.copy()
                                 n_fif_act += 1
 
                             if verbose >= 2:
@@ -476,7 +476,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 l_market_value.append(df_player_filt.value.values[0])
                                 l_potential.append(df_player_filt.potential.values[0])
                                 l_int_reputation.append(df_player_filt.int_reputation.values[0])
-                                if verbose >=2:
+                                if verbose >=1:
                                     print(f"\t\t DATOS DEL JUGADOR: Age: {df_player_filt.age.values[0]}; Height: {height}; Rating: {df_player_filt.overall_rating.values[0]}; Market value: {df_player_filt.value.values[0]}; Potencial: {df_player_filt.potential.values[0]}; Int rep: {df_player_filt.int_reputation.values[0]}")       
 
                 # Guardo promedios de age, height, overall_rating y market value

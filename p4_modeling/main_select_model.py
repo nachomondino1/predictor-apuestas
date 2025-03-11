@@ -7,10 +7,8 @@ from utils import directories
 import datetime
 from p3_data_preparation import construct_data
 from p4_modeling import betting_strategy, asses_model
-from p4_modeling.utils_select_model.assess import predict_missing_data
 from p6_deployment import main_next_matches
 import os
-
 
 def initialize_directories(country, iteration_date, assess):
     """
@@ -115,31 +113,14 @@ def drop_old_metrics(df_predicciones):
     df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
     return df_predicciones
 
-def calculate_all_metrics(df, suffix, advanced_metrics=False):
-    """
-    Calcula métricas generales y para los últimos 50 y 25 partidos, agregando un sufijo a las claves.
-
-    :param df: DataFrame con las predicciones.
-    :param suffix: Sufijo para renombrar las métricas (ejemplo: "sin_ea" o "con_ea").
-    :param advanced_metrics: Si True, calcula métricas avanzadas.
-    :return: Diccionario con las métricas calculadas.
-    """
-    d_metrics = asses_model.calculate_metrics(df, advanced_metrics=advanced_metrics)
-
-    l_matches = [num for num in (50, 25) if len(df) > num]
-    for num_matches in l_matches:
-        d_metrics.update(asses_model.calculate_metrics_for_last_matches(df, num_matches=num_matches))
-
-    return {f"{k}_{suffix}": v for k, v in d_metrics.items()}
-
 # Main
 def main(
         df_ite,
         id_country, 
         country, 
         iteration_date,
-        l_metrics= list,
-        l_weights=list,
+        l_metrics: list, 
+        l_weights: list, 
         select_candidates: bool = True,
         n_max_candidates: int = None,
         bet_strat: bool = True,
@@ -168,10 +149,6 @@ def main(
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
 
-    ex_weight = df_ite['roi'].corr(df_ite['expected_roi'])
-    roi_weight = 1 - ex_weight if ex_weight > 0 else 1
-    logger.info(f"Correlacion ROI y Expected ROI: {ex_weight:.2f}. --> ROI weight: {roi_weight:.2f} y Ex ROI weight: {ex_weight:.2f}")
-
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
@@ -196,11 +173,11 @@ def main(
         # Actualizo missing (1 sola vez para todos los modelos)
         if assess and update_missing:
             d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, extract_missing=True, prepare_missing=True, export=d_run['export']) 
+            main_next_matches.main(d_run, id_country, iteration_date=iteration_date, export=d_run['export']) 
 
         # Por modelo
         for idx, row in df_ite_filt.iterrows():
-            n_model, model_name= row['n_iteration'], row['model_name']
+            n_model, model_name = row['n_iteration'], row['model_name']
             logger.info(f'{n_model} {model_name}')
             
             # Levanto predicciones del modelo (test o test + assess)
@@ -211,7 +188,9 @@ def main(
                 logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
 
                 # 1. Predict missing
-                df_pred_missing = predict_missing_data(n_model, model_name, id_country, country, iteration_date)
+                d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
+                d_model = {'n_model': n_model, 'model_name': model_name}
+                df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
 
                 # 2. Concat test + missing
                 df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
@@ -230,23 +209,31 @@ def main(
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
             df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params)
-            d_metric_sin_ea = calculate_all_metrics(df_pred_met, suffix="sin_ea", advanced_metrics=True)
+            d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result', advanced_metrics=True)
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', advanced_metrics=True)
 
             # 📌 Aplicar estrategia "con ea"
-            per_res, vary_dp = False, False
-            d_params = bs.define_hiperparameters(strategy='kelly_linear', vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            per_res, vary_dp = True, False
+            d_params = bs.define_hiperparameters(strategy='linear', big_space_m=False, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
                 func = bs.define_model_betting_strategy
-            
-            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight)
-            d_metric_con_ea = calculate_all_metrics(df_pred_with_stra, suffix="con_ea")
-            mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi_sin_ea'])  / abs(d_metric_sin_ea['roi_sin_ea'])
-            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea['expected_roi_sin_ea']) / abs(d_metric_sin_ea['expected_roi_sin_ea'])
+            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1)
+            ## Solo calculo el roi que es lo unico que cambia..  --> d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra, var_pred='predicted_result', advanced_metrics=False)
+            roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='result')
+            ex_roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='expected_result') 
+            d_metric_con_ea = ({'roi_con_ea': roi_con_ea, 'expected_roi_con_ea': ex_roi_con_ea})
+
+            # Renombro metricas para evitar sobreescribirlas
+            d_metric_sin_ea = asses_model.rename_dict_keys(d_metric_sin_ea) #  suffix="sin_ea"
+            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_') #suffix="sin_ea"
+
+            mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi'])  / abs(d_metric_sin_ea['roi'])
+            mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea_ex['expected_roi']) / abs(d_metric_sin_ea_ex['expected_roi'])
 
             # Guardo datos
-            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_con_ea, 'x_roi': mult, 'x ex_roi': mult_ex}
+            new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_sin_ea_ex, **d_metric_con_ea, 'x_roi': mult, 'x ex_roi': mult_ex}
             rows.append(new_row)
             df_ite_bs = pd.DataFrame(data=rows)
 
@@ -280,57 +267,47 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [55, 59, 77, 148]
+    l_countries = [59, 77, 148]
+
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 100
+    select_candidates, n_max_candidates = True, 20
     bet_strat = True
-    assess = False if bet_strat else False
+    assess = True if bet_strat else False   # Tarda banda. Ver de volver a poner predict_missing en mnm. 
     update_missing = False if assess else False
-    predict_missing = False if assess else False
+    predict_missing = True if assess else False
     export = True
 
     d_countries = {
-        # train viejos
-        # 48: ["england", '2025-02-05'],
-        # 55: ["france", '2025-02-05'], 
-        # 59: ["germany", '2025-02-05'],
-        # 77: ["italy", '2025-02-05'],
-        # 148: ["spain", '2025-02-05'], 
         # Train nuevos
-        # 6: ["argentina", '2025-02-06'], 
+        6: ["argentina", '2025-02-06'], 
         48: ["england", '2025-03-03'],
         55: ["france", '2025-03-03'], 
         59: ["germany", '2025-03-04'],
         77: ["italy", '2025-03-04'],
         148: ["spain", '2025-03-04'], 
         }
-
-    # Defino metricas (y sus pesos) para seleccionar el modelo
-    l_metrics = ['f1_score_sin_ea', 'acerte_draw_sin_ea', 'roi_sin_ea']
-    d_weights = {
-        48: [0.31, 0.4, 0.3],
-        55: [0.35, 0.33, 0.32],
-        59: [0.44, 0, 0.56],
-        77: [0.37, 0.38, 0.25],
-        148: [0.27, 0.29, 0.44]
-    }
     
+    # Defino metricas y pesos
+    d_metrics = {
+        48: {'gp_draw': 0.393902, 'expected_gp_draw': 0.3127, 'f1_score': 0.2933},
+        55: {'f1_score_home': 0.2767, 'f1_score': 0.255, 'acerte_draw':  0.24004, 'expected_f1_score': 0.2279},
+        59: {'expected_gp_away': 0.4171, 'gp_home': 0.2919, 'gp_away': 0.2908},
+        77: {'expected_f1_score': 0.52601, 'acerte_draw': 0.4739},
+        148: {'roi': 0.4364, 'f1_score_draw': 0.3201, 'gp_away': 0.24337}
+    }
+
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_weights = d_weights[id_country]
-        print(l_weights, sum(l_weights))
-        if sum(l_weights) < 0.99 and sum(l_weights) > 1.01:
-            raise ValueError
-
+        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
 
         main(
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
-            l_metrics=l_metrics, l_weights=l_weights,
+            l_metrics=l_metrics, l_weights=l_weights, 
             select_candidates=select_candidates,
             n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,

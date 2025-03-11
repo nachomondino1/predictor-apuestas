@@ -149,13 +149,8 @@ class DataPreparation:
         self.var_resp = var_resp
         self.verbose = verbose
 
-        # Tiene que estar aca por prod?
-        if self.date is not None:
-            path = f'./data/{self.country}/p3_data_preparation/{self.date}'
-        else:
-            path = f'./data/{self.country}/p3_data_preparation'
-        self.base_path = path
-        
+        self.base_path = f'./data/{self.country}/p3_data_preparation/{self.date}'
+        # path = f'./data/{self.country}/p3_data_preparation'        
         self.make_directories()
 
     def make_directories(self):
@@ -174,7 +169,7 @@ class DataPreparation:
         ]  
         directories.make_directories(l_directorios=l_directorios)
 
-    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = True, export: bool = True):
+    def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = True, prod: bool = False, export: bool = True):
         """
         Arreglo el data data_type de algunas variables.
 
@@ -194,11 +189,12 @@ class DataPreparation:
         ## Ball posession
         df_match = format_data.convert_ball_possession_to_int(df_match)
         ## Goals
-        df_match = format_data.convert_goals_to_int(df_match)
+        if not prod:
+            df_match = format_data.convert_goals_to_int(df_match)
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
         ## Todas las columnas
         df_match = format_data.convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
-        # df_match_odds = convert_columns_to_float(df_match_odds)  # Formateo estadisticas a float (no se por que son object)
+        df_match_odds = format_data.convert_columns_to_float(df_match_odds)  # Formateo estadisticas a float (no se por que son object)
 
         if reformat: # Solo para missing
             # Formateo nuevas columnas...
@@ -236,7 +232,7 @@ class DataPreparation:
             df_match_player.to_excel(f'{self.base_path}/format_data/df_match_player_formated.xlsx', index=True)
             df_player_fifa_sofifa.to_excel(f'{self.base_path}/format_data/df_player_fifa_sofifa_formated.xlsx', index=True)
 
-        return df_match, df_match_player, df_player_fifa_sofifa
+        return df_match, df_match_player, df_match_odds, df_player_fifa_sofifa
 
     def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
         """
@@ -344,7 +340,6 @@ class DataPreparation:
         # Segun si es train o produccion (en el 1ero hago el mapeo, en el 2do uso el mapeo ya hecho)
         if prod:
             logger.critical("Integración para produccion")
-
             df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
             logger.info(f"No vuelvo a mapear sino que levanto df_map del pais (para producción) \n {df_map_players_fs_so.head(3)}")
 
@@ -356,6 +351,7 @@ class DataPreparation:
 
         # Integro datos de jugadores a df_match usando el mapeo
         df, df_aux = integrate_sofifa_to_flashscore.integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
+        # df_aux.to_excel(f'/Users/nachomondino/Desktop/n_players_integrated_missing.xlsx', index=True)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away', 'fifa_year'] # main_next a veces no tiene coaches.. deeberia copiar antes...
@@ -1043,8 +1039,11 @@ class Modeling:
             df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
         
             # Calculo metricas
-            d_metrics = asses_model.calculate_metrics(df_predicciones, export=export)
-            
+            d_metrics = asses_model.calculate_metrics(df_predicciones, advanced_metrics=True)
+            d_metrics_2 = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
+            d_metrics_2_renamed = asses_model.rename_dict_keys(d_metrics_2, prefix='expected_')
+            d_metrics.update(d_metrics_2_renamed)
+
         df_predicciones = self.reformat_pred(df_predicciones)
         
         if export:
