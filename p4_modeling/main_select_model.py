@@ -149,11 +149,6 @@ def main(
     d_paths = initialize_directories(country, iteration_date, predict_missing)
     path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
 
-    # Determino correlacion entre ROI y Expected ROI --> no creo que este bien. Creo que conviene usar roi_weight de 1 y listo. No es representativo la corr sino la diferencia absoluta entre roi y ex_roi (posiblemente porcentual)
-    ex_weight = df_ite['roi'].corr(df_ite['expected_roi'])
-    roi_weight = 1 - ex_weight if ex_weight > 0 else 1
-    logger.info(f"Correlacion ROI y Expected ROI: {ex_weight:.2f}. --> ROI weight: {roi_weight:.2f} y Ex ROI weight: {ex_weight:.2f}")
-
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
@@ -224,7 +219,7 @@ def main(
                 func = bs.define_model_betting_strategy_by_result
             else:
                 func = bs.define_model_betting_strategy
-            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight)
+            df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1)
             ## Solo calculo el roi que es lo unico que cambia..  --> d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra, var_pred='predicted_result', advanced_metrics=False)
             roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='result')
             ex_roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='expected_result') 
@@ -272,7 +267,8 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [59, 77, 148]
+
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 20
