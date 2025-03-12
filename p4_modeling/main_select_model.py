@@ -124,7 +124,6 @@ def main(
         select_candidates: bool = True,
         n_max_candidates: int = None,
         bet_strat: bool = True,
-        assess: bool = True,
         update_missing: bool = True,
         predict_missing: bool = True,
         export: bool = True,
@@ -171,7 +170,7 @@ def main(
         bs = betting_strategy.BettingStrategy(country, iteration_date, d_paths=d_paths, verbose=0)
 
         # Actualizo missing (1 sola vez para todos los modelos)
-        if assess and update_missing:
+        if update_missing:
             d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
             main_next_matches.main(d_run, id_country, iteration_date=iteration_date, export=d_run['export']) 
 
@@ -184,7 +183,7 @@ def main(
             path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
             df_pred_test = pd.read_excel(path_test, index_col=0)
 
-            if assess:
+            if predict_missing:
                 logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
 
                 # 1. Predict missing
@@ -201,7 +200,8 @@ def main(
 
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
             else:
-                df_pred = df_pred_test.copy()
+                df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
+                # df_pred = df_pred_test.copy()
 
             # Dropeo old metrics (sino calcula mal las nuevas)
             df_pred = drop_old_metrics(df_pred)
@@ -238,7 +238,7 @@ def main(
             df_ite_bs = pd.DataFrame(data=rows)
 
             # Exporto datos
-            df_pred_met.to_excel(f"{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx", index=True)
+            df_pred_met.to_excel(f"{d_paths['path_assess']}/{n_model}__{model_name}_predicciones_met.xlsx", index=True)
             df_strat.to_excel(f"{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
             df_pred_with_stra.to_excel(f"{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx", index=True)
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
@@ -267,15 +267,13 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59, 77, 148]
-
+    # l_countries = [55, 59, 77, 148]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 20
+    select_candidates, n_max_candidates = True, 50
     bet_strat = True
-    assess = True if bet_strat else False   # Tarda banda. Ver de volver a poner predict_missing en mnm. 
-    update_missing = False if assess else False
-    predict_missing = True if assess else False
+    update_missing = False
+    predict_missing = False
     export = True
 
     d_countries = {
@@ -289,18 +287,19 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
-    d_metrics = {
-        48: {'gp_draw': 0.393902, 'expected_gp_draw': 0.3127, 'f1_score': 0.2933},
-        55: {'f1_score_home': 0.2767, 'f1_score': 0.255, 'acerte_draw':  0.24004, 'expected_f1_score': 0.2279},
-        59: {'expected_gp_away': 0.4171, 'gp_home': 0.2919, 'gp_away': 0.2908},
-        77: {'expected_f1_score': 0.52601, 'acerte_draw': 0.4739},
-        148: {'roi': 0.4364, 'f1_score_draw': 0.3201, 'gp_away': 0.24337}
+    d_weights = {
+        48: [0.45, 0.55],
+        55: [0.54, 0.46],
+        59: [1, 0],
+        77: [0.5, 0.5],
+        148: [0.44, 0.56]
     }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        l_metrics, l_weights = ['f1_score', 'f1_score_draw'], d_weights[id_country]
+
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
 
@@ -311,7 +310,6 @@ if __name__ == "__main__":
             select_candidates=select_candidates,
             n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,
-            assess=assess,
             update_missing=update_missing,
             predict_missing=predict_missing,
             export=export

@@ -17,35 +17,34 @@ def main(df_ite, country, iteration_date, assess):
 
     # Iterar sobre los modelos
     for idx, row in df_ite.iterrows():
-        n_model, model_name = row['n_iteration'], row['model_name']
+        n_model, model_name = row['n_model'], row['model_name'] # n_iteration
         logger.info(f'{n_model} {model_name}')
         
         # Levanto predicciones del modelo (test o test + assess)
-        try:
-            if assess:
-                df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{n_model}__{model_name}_predicciones.xlsx", index_col=0)
-            else:
-                df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
-        except FileNotFoundError:
-            continue
+        if assess:
+            df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{n_model}__{model_name}_predicciones_met.xlsx", index_col=0)
+        else:
+            # df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
+            pass
+        print(df_pred.shape)
 
         # Calculo el ROI por fila
         # df_pred = df_pred.head(25)
-        df_pred['roi'] = (df_pred['bank_final'] - 100) / 100  # 100 es el bank inicial
+        df_pred['roi_'] = (df_pred['bank_final'] - 100) / 100  # 100 es el bank inicial
 
         # Crear columna de número de apuesta (1, 2, 3, ...)
         df_pred['bet_number'] = range(1, len(df_pred) + 1)
 
         # Graficar evolución del ROI en el mismo gráfico
-        plt.plot(df_pred['bet_number'], df_pred['roi'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
+        plt.plot(df_pred['bet_number'], df_pred['roi_'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
         # plt.plot(df_pred['bet_number'], df_pred['recall'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
 
         # Guardar datos combinados
         all_bet_numbers.extend(df_pred['bet_number'])
-        all_rois.extend(df_pred['roi'])
+        all_rois.extend(df_pred['roi_'])
 
     # Calcular una única línea de tendencia para todos los modelos
-    z = np.polyfit(all_bet_numbers, all_rois, 3)  # Ajuste lineal (grado 1)
+    z = np.polyfit(all_bet_numbers, all_rois, 2)  # Ajuste lineal (grado 1)
     p = np.poly1d(z)  # Crear la función polinómica
     plt.plot(sorted(all_bet_numbers), p(sorted(all_bet_numbers)), color='black', linestyle='--', label='Tendencia General')
 
@@ -92,25 +91,23 @@ def roi_in_time_one_model(n_model, model_name):
     plt.show()
     
 if __name__ == "__main__":
-    # Defino parametros
+    # Defino parametroçs
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    # l_countries = [48]
 
     assess = True
 
     d_countries = {
         # Train nuevos
         6: ["argentina", '2025-02-06'], 
-        # 48: ["england", '2025-02-05'],
         48: ["england", '2025-03-03'],
-        # 55: ["france", '2025-02-05'], 
         55: ["france", '2025-03-03'], 
-        59: ["germany", '2025-02-05'],
-        77: ["italy", '2025-02-05'],
-        148: ["spain", '2025-02-05'], 
+        59: ["germany", '2025-03-04'],
+        77: ["italy", '2025-03-04'],
+        148: ["spain", '2025-03-04'], 
         }
 
-    n_models = 10
+    n_models = 5
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -119,7 +116,8 @@ if __name__ == "__main__":
         # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         # df_ite = df_ite.sort_values(by='roi', ascending=False)
 
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/1_filter_models/df_filt_by_metric_cand.xlsx')
+        # df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/1_filter_models/df_filt_by_metric_cand.xlsx')
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx')
         df_ite = df_ite.head(n_models)
         print(df_ite)
 
