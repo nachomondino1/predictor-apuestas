@@ -645,7 +645,7 @@ class TrainingDataLoader():
                 logger.critical("Se levantó la estrategia de apuesta por resultado")
             else:
                 logger.warning("Se levanta una estrategia comun a todos los resultados")
-                return {'prob_dp': df_hiper['prob_dp'].values[0], 'curva': df_hiper['curva'].values[0], 'm': df_hiper['m'].values[0], 'b': df_hiper['b'].values[0], 'normalized': True}
+                return {'prob_dp': df_hiper['prob_dp'].values[0], 'curva': df_hiper['curva'].values[0], 'm': df_hiper['m'].values[0], 'b': df_hiper['b'].values[0]}
 
             if self.verbose >= 0:
                 logger.info("Hiperparametros cargados:")
@@ -1190,6 +1190,7 @@ def main(
         else:  
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
+            d_strategy['curva'] = 'kelly_linear' # solo en prod pero no en ea para no afectar el m seleccionado
 
         df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
         df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
@@ -1236,7 +1237,7 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 48
+    id_country = 148
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 0.5
@@ -1252,7 +1253,7 @@ if __name__ == "__main__":
         167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 5193, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 2232, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         

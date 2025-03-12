@@ -219,15 +219,15 @@ class BettingStrategy:
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
 
+        # Calculo kelly criterion
+        df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
+
         # STRATEGY: EQUAL
         if type_relation == "equal":  
             df['stake_to_bet'] = 1
 
         # STRATEGY: KELLY
         elif type_relation == 'kelly':
-
-            # Calculo kelly criterion
-            df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
 
             # Usar la función sigmoide para reducir la variabilidad y escalar entre p_min y p_max
             num = m if m > 0 else 1
@@ -240,9 +240,6 @@ class BettingStrategy:
             
         # STRATEGY: LINEAR + kelly
         elif type_relation == 'kelly_linear':
-
-            # Calculo kelly criterion
-            df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
 
             # Calcular m_ajustado para asegurar continuidad en kelly_criterion = 0
             m_ajustado = 2 * (df['prob_result_to_bet'] * m + b)
