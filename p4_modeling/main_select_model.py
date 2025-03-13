@@ -97,6 +97,31 @@ def filter_models_by_metric(df, metric_col, prop_to_max: float = 0, perc_cutoff:
 
     return df_filt
 
+def filter_models_by_distribution(df, verbose: int = 0):
+    """
+    Selecciono solo los modelos con una distribución de predicted_result similar 
+    a la distribución de resultados en la realidad.
+    """
+    logger.info("Paso 2: Descartando modelos según distribución en df_test")
+
+    # Hago la diferencia absoluta
+    df['abs_dif'] = abs(df['%_dif'])
+
+    # Determino diferencia maxima tolerada
+    thr_fixed = 0.3
+    thr_perc = df['abs_dif'].quantile(0.5)
+    thr = min(thr_fixed, thr_perc)
+    print(f"Diferencia maxima tolerada: {thr_fixed} {thr_perc} --> {thr}")
+
+    # Quiero eliminar modelos solo si el %_dif es mayor a cierto threshold y no es porque el empate tiene de menos y se lo da a otro resultado?
+    df_filtered = df[df['abs_dif'] < thr]
+
+    if verbose >= 0:
+        logger.warning(f'Descarte por distribucion: {len(df)} --> {len(df_filtered)}' )
+        # logger.info(f"Se eliminaron {len(l_idx_to_remove)} modelos por distribucion muy distinta a la de results.")
+
+    return df_filtered
+
 def error_empty_dataframe(df):
     if len(df) == 0:
         logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
@@ -126,6 +151,7 @@ def main(
         bet_strat: bool = True,
         update_missing: bool = True,
         predict_missing: bool = True,
+        use_assess_saved: bool = True,
         export: bool = True,
         verbose: int = 0
         ):
@@ -151,13 +177,15 @@ def main(
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
-        # 1.1. Calculo metrica combinada
-        l_metrics_cand = ['f1_score', 'roi']
-        l_weights_cand = [1/len(l_metrics_cand) for _ in l_metrics_cand] 
-        metric_cand = 'metric_cand' 
-        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric_cand)
+        ## 1.1. Filtro modelos por distribucion
+        df_ite = filter_models_by_distribution(df_ite)
+        df_ite.to_excel(f'{d_paths['path_select']}/1_df_filt_by_distrib.xlsx', index=False)
 
-        ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
+        # 1.2. Calculo metrica combinada
+        metric_cand = 'metric_test' # es sin assess
+        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric_cand)
+
+        ## 1.3. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
         df_ite_filt = filter_models_by_metric(df_ite, metric_col=metric_cand, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
         df_ite_filt.to_excel(path_cand, index=False)
@@ -199,9 +227,12 @@ def main(
                 df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
 
                 df_pred.to_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-            else:
+            
+            elif use_assess_saved:
                 df_pred = pd.read_excel(f'{d_paths['path_assess']}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
-                # df_pred = df_pred_test.copy()
+            
+            else:
+                df_pred = df_pred_test.copy()
 
             # Dropeo old metrics (sino calcula mal las nuevas)
             df_pred = drop_old_metrics(df_pred)
@@ -209,8 +240,13 @@ def main(
             # 📌 Aplicar estrategia "sin_ea"
             d_params = bs.define_hiperparameters(strategy='train')  
             df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params)
+            
+            ## Calculo metricas
             d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result', advanced_metrics=True)
             d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', advanced_metrics=True)
+            
+            ## Renombro metricas para evitar sobreescribirlas
+            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_') #suffix="sin_ea"
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = True, False
@@ -220,15 +256,10 @@ def main(
             else:
                 func = bs.define_model_betting_strategy
             df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1)
-            ## Solo calculo el roi que es lo unico que cambia..  --> d_metric_con_ea = asses_model.calculate_metrics(df_pred_with_stra, var_pred='predicted_result', advanced_metrics=False)
+            ## Calculo metricas  ## Solo calculo el roi que es lo unico que cambia.. o que me interesa medir
             roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='result')
             ex_roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='expected_result') 
             d_metric_con_ea = ({'roi_con_ea': roi_con_ea, 'expected_roi_con_ea': ex_roi_con_ea})
-
-            # Renombro metricas para evitar sobreescribirlas
-            d_metric_sin_ea = asses_model.rename_dict_keys(d_metric_sin_ea) #  suffix="sin_ea"
-            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_') #suffix="sin_ea"
-
             mult = (d_metric_con_ea['roi_con_ea'] - d_metric_sin_ea['roi'])  / abs(d_metric_sin_ea['roi'])
             mult_ex = (d_metric_con_ea['expected_roi_con_ea'] - d_metric_sin_ea_ex['expected_roi']) / abs(d_metric_sin_ea_ex['expected_roi'])
 
@@ -238,7 +269,8 @@ def main(
             df_ite_bs = pd.DataFrame(data=rows)
 
             # Exporto datos
-            df_pred_met.to_excel(f"{d_paths['path_assess']}/{n_model}__{model_name}_predicciones_met.xlsx", index=True)
+            if use_assess_saved or predict_missing:
+                df_pred_met.to_excel(f"{d_paths['path_assess']}/{n_model}__{model_name}_predicciones_met.xlsx", index=True) # Cuando haces assess
             df_strat.to_excel(f"{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
             df_pred_with_stra.to_excel(f"{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx", index=True)
             df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
@@ -250,7 +282,7 @@ def main(
 
     # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
     ## 3.1. Calculo metrica combinada
-    metric = 'metric_assess'
+    metric = 'metric_test_assess'
     df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
 
     ## 3.2. Ordeno por metrica combinada
@@ -267,13 +299,14 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [55, 59, 77, 148]
+    l_countries = [48]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 50
+    select_candidates, n_max_candidates = True, 20
     bet_strat = True
     update_missing = False
-    predict_missing = False
+    predict_missing = True
+    use_assess_saved = False
     export = True
 
     d_countries = {
@@ -287,18 +320,18 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
+    l_metrics = ['roi', 'f1_score']
     d_weights = {
-        48: [0.45, 0.55],
-        55: [0.54, 0.46],
-        59: [1, 0],
-        77: [0.5, 0.5],
-        148: [0.44, 0.56]
+        48: [0.55, 0.45],
+        55: [0.47, 0.53],
+        59: [0.66, 0.34],
+        77: [0.45, 0.55],
+        148: [0.66, 0.34]
     }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_metrics, l_weights = ['f1_score', 'f1_score_draw'], d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
@@ -306,12 +339,13 @@ if __name__ == "__main__":
         main(
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
-            l_metrics=l_metrics, l_weights=l_weights, 
+            l_metrics=l_metrics, l_weights=d_weights[id_country], 
             select_candidates=select_candidates,
             n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,
             update_missing=update_missing,
             predict_missing=predict_missing,
+            use_assess_saved=use_assess_saved,
             export=export
             )
         

@@ -1039,10 +1039,12 @@ class Modeling:
             df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
         
             # Calculo metricas
-            d_metrics = asses_model.calculate_metrics(df_predicciones, advanced_metrics=True)
-            d_metrics_2 = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
-            d_metrics_2_renamed = asses_model.rename_dict_keys(d_metrics_2, prefix='expected_')
-            d_metrics.update(d_metrics_2_renamed)
+            d_metrics = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
+
+            # Renombro metricas para evitar sobreescribirlas
+            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')            
+            d_metrics.update(d_metric_sin_ea_ex)
 
         df_predicciones = self.reformat_pred(df_predicciones)
         
