@@ -177,15 +177,12 @@ def main(
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
-        ## 1.1. Filtro modelos por distribucion
-        df_ite = filter_models_by_distribution(df_ite)
-        df_ite.to_excel(f'{d_paths['path_select']}/1_df_filt_by_distrib.xlsx', index=False)
-
-        # 1.2. Calculo metrica combinada
+        # 1.1. Calculo metrica combinada
         metric_cand = 'metric_test' # es sin assess
-        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric_cand)
+        l_metrics_cand, l_weights_cand = ['roi', 'f1_score'] , [0.5, 0.5]
+        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric_cand)
 
-        ## 1.3. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
+        ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
         df_ite_filt = filter_models_by_metric(df_ite, metric_col=metric_cand, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
         df_ite_filt.to_excel(path_cand, index=False)
@@ -299,7 +296,6 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
 
     # Defino hiperparametros
     select_candidates, n_max_candidates = True, 20
@@ -320,13 +316,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
-    l_metrics = ['roi', 'f1_score']
+    l_metrics = ['f1_score', 'expected_f1_score']
     d_weights = {
-        48: [0.55, 0.45],
-        55: [0.47, 0.53],
-        59: [0.66, 0.34],
-        77: [0.45, 0.55],
-        148: [0.66, 0.34]
+        48: [0.82, 0.18],
+        55: [0.53, 0.47],
+        59: [0.48, 0.52],
+        77: [0.46, 0.54],
+        148: [1, 0]
     }
 
     for id_country in l_countries:
