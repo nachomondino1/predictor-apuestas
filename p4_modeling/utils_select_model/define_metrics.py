@@ -77,8 +77,6 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
     df_ite = pd.DataFrame(data=rows)
     merged_dict = {**d_metrics_test_sin_ea, **d_metrics_test_sin_ea_ex}
 
-    df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=True)
-
     return df_ite, merged_dict
 
 def calculate_correlation(df_ite, merged_dict):
@@ -99,9 +97,6 @@ def calculate_correlation(df_ite, merged_dict):
 
     # Ordeno por correlación con ROI
     df_corr = df_corr.sort_values(by='corr_roi', ascending=False)
-
-    # Exporto a Excel
-    df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
     return df_corr
 
 def eliminate_metrics(df_ite, df_corr, verbose: int = 0):
@@ -114,7 +109,7 @@ def eliminate_metrics(df_ite, df_corr, verbose: int = 0):
         print(f"A: {len(df_ite.columns)}", df_ite.columns)
 
     # Determino columnas a eliminar
-    l_strings_to_avoid = ["_prod", '_last_', '_filled_', '%_gp_', '_bm_', 'dif_', 'n_loc_r', 'n_emp_r', 'n_vis_r']
+    l_strings_to_avoid = ["_prod", '_last_', '_filled_', '%_gp_', '_bm_', 'dif_', 'n_loc_r', 'n_emp_r', 'n_vis_r', 'gp_total', 'dif_prec_bm']
     cols_to_avoid = [col for col in df_ite.columns if any(substring in col for substring in l_strings_to_avoid)]
     cols_to_avoid.remove('roi_prod')
     df_ite.drop(columns=cols_to_avoid, inplace=True)
@@ -183,15 +178,21 @@ def main(l_countries, calculate_metrics: bool = False, calculate_corr_with_roi: 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         # print(df_ite)
 
+        # Elimino modelos por distribucion
+        df_ite = msm.filter_models_by_distribution(df_ite)
+
         # 2. Calculo metricas por modelo + division en "test" y "prod"
         if calculate_metrics:
             df_ite, metrics = determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test=50)
+            df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=True)
         else:
             df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
         
         # 3. Calculo correlacion de metricas con ROI de prod
         if calculate_corr_with_roi:
             df_corr = calculate_correlation(df_ite, metrics)
+            df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
+
         else:
             df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
 

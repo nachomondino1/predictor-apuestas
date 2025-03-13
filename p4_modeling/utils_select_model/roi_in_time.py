@@ -17,7 +17,7 @@ def main(df_ite, country, iteration_date, assess):
 
     # Iterar sobre los modelos
     for idx, row in df_ite.iterrows():
-        n_model, model_name = row['n_model'], row['model_name'] # n_iteration
+        n_model, model_name = row['n_iteration'], row['model_name'] # n_model
         logger.info(f'{n_model} {model_name}')
         
         # Levanto predicciones del modelo (test o test + assess)
@@ -93,7 +93,6 @@ def roi_in_time_one_model(n_model, model_name):
 if __name__ == "__main__":
     # Defino parametroçs
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
 
     assess = True
 
@@ -107,7 +106,7 @@ if __name__ == "__main__":
         148: ["spain", '2025-03-04'], 
         }
 
-    n_models = 5
+    n_models = 10
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
