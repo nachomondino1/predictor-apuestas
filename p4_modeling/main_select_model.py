@@ -298,10 +298,10 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 20
+    select_candidates, n_max_candidates = True, 50
     bet_strat = True
     update_missing = False
-    predict_missing, use_assess_saved = False, True
+    predict_missing, use_assess_saved = True, False
     export = True
 
     d_countries = {
