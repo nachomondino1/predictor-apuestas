@@ -246,8 +246,8 @@ def main(
             d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_') #suffix="sin_ea"
 
             # 📌 Aplicar estrategia "con ea"
-            per_res, vary_dp = False, False
-            d_params = bs.define_hiperparameters(strategy='kelly_linear', big_space_m=True, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            per_res, vary_dp = True, False
+            d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=vary_dp) # kelly_linear  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
@@ -296,13 +296,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59, 55]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 50
+    select_candidates, n_max_candidates = False, 20
     bet_strat = True
     update_missing = False
-    predict_missing, use_assess_saved = True, False
+    predict_missing, use_assess_saved = False, True
     export = True
 
     d_countries = {
