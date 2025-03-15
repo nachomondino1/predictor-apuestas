@@ -109,9 +109,8 @@ def eliminate_metrics(df_ite, df_corr, verbose: int = 0):
         print(f"A: {len(df_ite.columns)}", df_ite.columns)
 
     # Determino columnas a eliminar
-    l_strings_to_avoid = ["_prod", '_last_', '_filled_', '%_gp_', '_bm_', 'dif_', 'n_loc_r', 'n_emp_r', 'n_vis_r', 'gp_total', 'dif_prec_bm']
+    l_strings_to_avoid = ['_last_', '_filled_', '%_gp_', '_bm_', 'dif_', 'n_loc_r', 'n_emp_r', 'n_vis_r', 'gp_total', 'dif_prec_bm']
     cols_to_avoid = [col for col in df_ite.columns if any(substring in col for substring in l_strings_to_avoid)]
-    cols_to_avoid.remove('roi_prod')
     df_ite.drop(columns=cols_to_avoid, inplace=True)
     if verbose >= 1:
         print(f"B: {len(df_ite.columns)}", df_ite.columns)
@@ -129,27 +128,10 @@ def eliminate_metrics(df_ite, df_corr, verbose: int = 0):
     df_corr_filt = df_corr[(df_corr['corr_roi'] >= thr) & (df_corr['corr_roi'] >= 0.01)]
 
     if verbose >= 1:
-        print(list(df_corr_filt.index))
+        print(f"Columnas que pasan en {country}: {list(df_corr_filt.index)}")
 
     # df_corr_triang.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_triang.xlsx')
-    return list(df_corr_filt.index)
-
-def determine_metrics(df):
-
-    # Defino metricas
-    df = df.sort_values(by='mean', ascending=False)
-    print(df.head(5))
-
-    # Metricas que hayan pasado la eliminacion de metricas en al menos un pais
-    df = df[df['n_selected'] >= 1]
-
-    # selecciono metricas finales
-    thr = df['mean'].quantile(0.9) 
-    df = df[df['mean'] >= thr]
-    print(df.head(5))
-    # print("Metricas seleccionadas: ", list(df.index))
-
-    return list(df.index)
+    return df_corr_filt
 
 def compute_weights(df):
     """
@@ -165,59 +147,36 @@ def compute_weights(df):
     df_weights.columns = [f'weight_{col}' for col in df_weights.columns]
     return df_weights
 
-def main(l_countries, calculate_metrics: bool = False, calculate_corr_with_roi: bool = False):
+def main(df_ite, calculate_metrics: bool = False, calculate_corr_with_roi: bool = False):
     
-    df_corr_ct = pd.DataFrame()
-   
-    for id_country in l_countries:
+    # 1. Calculo metricas por modelo + division en "test" y "prod"
+    if calculate_metrics:
+        df_ite, metrics = determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test=50)
+        df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=True)
+    else:
+        df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
 
-        country = d_countries[id_country][0]
-        iteration_date = d_countries[id_country][1]
-        
-        # 1: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        # print(df_ite)
-
-        # Elimino modelos por distribucion
-        df_ite = msm.filter_models_by_distribution(df_ite)
-
-        # 2. Calculo metricas por modelo + division en "test" y "prod"
-        if calculate_metrics:
-            df_ite, metrics = determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test=50)
-            df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=True)
-        else:
-            df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
-        
-        # 3. Calculo correlacion de metricas con ROI de prod
-        if calculate_corr_with_roi:
-            df_corr = calculate_correlation(df_ite, metrics)
-            df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
-
-        else:
-            df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
-
-        # 4. Elimino metricas
-        cols_selected = eliminate_metrics(df_ite, df_corr)
-        print(f"Columnas que pasan en {country}: {cols_selected}")
-
-        # Guardo datos del country
-        df_corr_country = df_corr[['corr_roi']].rename(columns={'corr_roi': country})
-        df_corr_ct = pd.concat([df_corr_ct, df_corr_country], axis=1)
-
-        if 'n_selected' not in df_corr_ct.columns:
-            df_corr_ct['n_selected'] = 0  
-        for col in cols_selected:
-            df_corr_ct.loc[col, 'n_selected'] += 1
-
-    # 5. Calculo correlacion media por metrica across all countries
-    df_corr_ct['mean'] = df_corr_ct.drop(columns=['n_selected'], errors='ignore').mean(axis=1)
+    # 2. Calculo correlacion entre metricas y ROI de prod
+    if calculate_corr_with_roi:
+        #Elimino metricas que no son float
+        df_ite = df_ite.select_dtypes(include=['float64'])
     
-    # 6. Determino metricas y pesos
-    metrics = determine_metrics(df_corr_ct)
-    df = compute_weights(df_corr_ct.loc[metrics])
+        df_corr = calculate_correlation(df_ite, metrics)
+        df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
+
+    else:
+        df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
+
+    # 3. Elimino metricas
+    df_corr = eliminate_metrics(df_ite, df_corr)
+
+    # 4. Determino metricas y pesos
+    # df_corr = df_corr.sort_values(by='corr_roi', ascending=False)     # Ordeno por 'mean' en orden descendente
+    metrics = list(df_corr.index)
+    df = compute_weights(df_corr.loc[metrics])
     print("Metricas y pesos por pais:", df)
 
-    df_corr_ct.to_excel(f'/Users/nachomondino/Desktop/df_corr_ct.xlsx')
+    df_corr.to_excel(f'/Users/nachomondino/Desktop/df_corr_roi.xlsx')
             
 if __name__ == "__main__":
     # Defino parametros
@@ -232,4 +191,29 @@ if __name__ == "__main__":
         148: ["spain", '2025-02-05'], 
         }
     
-    main(l_countries)
+    df_corr_roi = pd.DataFrame()
+    
+    for id_country in l_countries:
+
+        country = d_countries[id_country][0]
+        iteration_date = d_countries[id_country][1]
+        print(f" {country.upper()} ".center(120, "$"))
+        
+        # 1: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        # print(df_ite)
+
+        # Determino metricas
+        df_corr = main(df_ite)
+
+        '''
+        # Guardo datos del country
+        df_corr_country = df_corr[['corr_roi']].rename(columns={'corr_roi': country})
+        df_corr_roi = pd.concat([df_corr_roi, df_corr_country], axis=1)
+
+        # 5. Calculo correlacion promedio (≠ paises) entre el roi y cada metrica 
+        df_corr_roi['mean'] = df_corr_roi.mean(axis=1) # df_corr_roi.drop(columns=['n_selected'], errors='ignore').mean(axis=1)
+   
+        df_corr_roi.to_excel('/Users/nachomondino/Desktop/df_corr_roi.xlsx')'
+        '''
+

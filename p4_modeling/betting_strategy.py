@@ -41,7 +41,7 @@ class BettingStrategy:
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [10, 20, 40, 60, 80, 100, 120] # no uso 200 por si acertó todo en ese rdo.
+        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [60, 80, 100, 120, 140] # [10, 20, 40, 60, 80, 100, 120] # no uso 200 por si acertó todo en ese rdo.
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -243,7 +243,7 @@ class BettingStrategy:
 
             # Calcular m_ajustado para asegurar continuidad en kelly_criterion = 0
             m_ajustado = 2 * (df['prob_result_to_bet'] * m + b)
-            k = 1.5 # es una constante que controla la sensibilidad para disminuir stake con kelly negativo. Cuanto mayor de 1 es, mas decrecerá el stake
+            k = 2 # es una constante que controla la sensibilidad para disminuir stake con kelly negativo. Cuanto mayor de 1 es, mas decrecerá el stake
                       
             df['stake_to_bet'] = np.where(
                 df['kelly_criterion'] > 0, 
@@ -553,7 +553,8 @@ class BettingStrategy:
             if len(df_pred) > 0:
                 row_pred = df_hiper.loc[pred]
                 prob, curva, m, b = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b']
-        
+                curva = 'kelly_linear'
+
                 # Determino result to bet
                 df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
 

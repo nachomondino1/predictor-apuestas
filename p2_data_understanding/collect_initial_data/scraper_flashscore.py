@@ -18,9 +18,9 @@ class FlashscoreCrawler(Crawler):
     def __init__(self, headless: bool = True, browser: str = "Chrome", verbose: int = 0):
         super().__init__(headless, browser)
         self.child_driver = self.driver
-        self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
-        self.SEC_WAIT_MED = 1.5  # Espera para elementos que casi siempre estan
-        self.SEC_WAIT_MAX = 5  # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MIN = 0.8 * 2 # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
+        self.SEC_WAIT_MED = 1.5 * 2 # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MAX = 5 # Espera para elementos que casi siempre estan
         self.verbose =  verbose # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
 
     def accept_cookies(self):
@@ -253,10 +253,15 @@ class FlashscoreCrawler(Crawler):
         # Por formation ("Formation inicial", "Suplentes" y  "Ausentes")
         for formation, titularidad in d_formations.items():
 
-            SEC_WAIT = self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
+            SEC_WAIT = self.SEC_WAIT_MAX
+            # SEC_WAIT = self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
 
             # Si existe dicha formation
-            tag_lineup = super().extract_tag(xpath=f'.//div[contains(@class, "lf__lineUp")]//*[contains(text(), "{formation}")]', sec_wait=SEC_WAIT, print_fail=True) # Mas robusto que xpath=f'.//div[@class="lf__lineUp"]//div[@class="section"]/div/span[text()="{formation}"]'
+            tag_lineup = super().extract_tag(
+                xpath=f'//div[contains(@class, "lf__lineUp")]//span[contains(text(), "{formation}")]/ancestor::div[contains(@class, "wcl-headerSection")]/following-sibling::div', 
+                sec_wait=SEC_WAIT, 
+                print_fail=True
+            )
 
             if self.verbose >= 1:
                 print(formation, SEC_WAIT)
@@ -264,8 +269,19 @@ class FlashscoreCrawler(Crawler):
             if tag_lineup:
 
                 # Extraigo listado de jugadores
-                l_tags_player_home = super().extract_tags(tag_inicial=tag_lineup, xpath='./parent::div/following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
-                l_tags_player_away = super().extract_tags(tag_inicial=tag_lineup, xpath='./parent::div/following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+                l_tags_player_home = super().extract_tags(
+                    tag_inicial=tag_lineup, 
+                    xpath='.//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', 
+                    sec_wait=self.SEC_WAIT_MIN, 
+                    print_fail=False
+                )
+
+                l_tags_player_away = super().extract_tags(
+                    tag_inicial=tag_lineup, 
+                    xpath='.//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', 
+                    sec_wait=self.SEC_WAIT_MIN, 
+                    print_fail=False
+                )
 
                 if l_tags_player_home:
                     # Obtengo urls de jugadores
@@ -387,13 +403,29 @@ class FlashscoreCrawler(Crawler):
         d_row = {}
 
         # Extraer bajas
-        tag_bajas = super().extract_tag(xpath=f'.//div[@id="detail"]//div[text()="Will not play"]/../..', sec_wait=self.SEC_WAIT_MIN, print_fail=True)  # con '/../..' subo dos niveles (padre del padre)
+        tag_bajas = super().extract_tag(
+            xpath=f'//div[contains(@class, "section")]//*[contains(text(), "Will not play")]/ancestor::div[contains(@class, "wcl-headerSection")]/following-sibling::div',
+            sec_wait=self.SEC_WAIT_MIN, 
+            print_fail=True
+            )
+        # Tiene que saltar error si no existe el tag_bajas......
 
         if tag_bajas:
 
             # Extraigo listado de jugadores
-            l_tags_player_home = super().extract_tags(tag_inicial=tag_bajas, xpath='.//div[text()="Will not play" or text()="Questionable"]/following-sibling::div//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
-            l_tags_player_away = super().extract_tags(tag_inicial=tag_bajas, xpath='.//div[text()="Will not play" or text()="Questionable"]/following-sibling::div//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', sec_wait=self.SEC_WAIT_MIN, print_fail=False)  # Es lista de tags o None
+            l_tags_player_home = super().extract_tags(
+                tag_inicial=tag_bajas,
+                xpath='.//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]', 
+                sec_wait=self.SEC_WAIT_MIN, 
+                print_fail=False
+                )  # Es lista de tags o None
+            
+            l_tags_player_away = super().extract_tags(
+                tag_inicial=tag_bajas, 
+                xpath='.//div[@class="lf__side"][2]//a[starts-with(@href, "/player/")]', 
+                sec_wait=self.SEC_WAIT_MIN, 
+                print_fail=False
+                )  # Es lista de tags o None
 
             if l_tags_player_home:
                 # Obtengo urls de jugadores

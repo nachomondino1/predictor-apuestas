@@ -177,15 +177,12 @@ def main(
     # (1) SELECCION DE MODELOS CANDIDATOS
     if select_candidates:
         
-        ## 1.1. Filtro modelos por distribucion
-        df_ite = filter_models_by_distribution(df_ite)
-        df_ite.to_excel(f'{d_paths['path_select']}/1_df_filt_by_distrib.xlsx', index=False)
-
-        # 1.2. Calculo metrica combinada
+        # 1.1. Calculo metrica combinada
         metric_cand = 'metric_test' # es sin assess
-        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric_cand)
+        l_metrics_cand, l_weights_cand = ['roi', 'f1_score'] , [0.5, 0.5]
+        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics_cand, l_weights=l_weights_cand, metric_name=metric_cand)
 
-        ## 1.3. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
+        ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
         df_ite_filt = filter_models_by_metric(df_ite, metric_col=metric_cand, prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
         logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
         df_ite_filt.to_excel(path_cand, index=False)
@@ -250,7 +247,7 @@ def main(
 
             # 📌 Aplicar estrategia "con ea"
             per_res, vary_dp = True, False
-            d_params = bs.define_hiperparameters(strategy='linear', big_space_m=False, vary_dp=vary_dp)  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=vary_dp) # kelly_linear  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
             if per_res:
                 func = bs.define_model_betting_strategy_by_result
             else:
@@ -299,14 +296,12 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
 
     # Defino hiperparametros
-    select_candidates, n_max_candidates = True, 20
+    select_candidates, n_max_candidates = False, 20
     bet_strat = True
     update_missing = False
-    predict_missing = True
-    use_assess_saved = False
+    predict_missing, use_assess_saved = False, True
     export = True
 
     d_countries = {
@@ -320,18 +315,18 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
-    l_metrics = ['roi', 'f1_score']
-    d_weights = {
-        48: [0.55, 0.45],
-        55: [0.47, 0.53],
-        59: [0.66, 0.34],
-        77: [0.45, 0.55],
-        148: [0.66, 0.34]
-    }
+    d_metrics = {
+       48: {'gp_draw': 0.5731, 'f1_score': 0.42682},
+       55: {'f1_score_home': 0.2305, 'f1_score': 0.2127, 'acerte_draw': 0.20, 'expected_f1_score': 0.2305, 'expected_acerte_draw': 0.1666},
+       59: {'expected_gp_away': 0.2904, 'gp_home': 0.2033, 'gp_away': 0.2024, 'expected_recall': 0.169, 'test_accuracy': 0.1338},
+       77: {'expected_f1_score': 0.313, 'expected_f1_score_away': 0.2749, 'roi': 0.1851, 'f1_score_away': 0.1341, 'expected_f1_score_home': 0.09266},
+       148: {'roi': 0.3997, 'f1_score_draw': 0.2931, 'gp_away': 0.2228, 'f1_score_home': 0.0842}
+   }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
+        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
@@ -339,7 +334,7 @@ if __name__ == "__main__":
         main(
             df_ite=df_ite,
             id_country=id_country, country=country, iteration_date=iteration_date, 
-            l_metrics=l_metrics, l_weights=d_weights[id_country], 
+            l_metrics=l_metrics, l_weights=l_weights,
             select_candidates=select_candidates,
             n_max_candidates=n_max_candidates,
             bet_strat=bet_strat,
