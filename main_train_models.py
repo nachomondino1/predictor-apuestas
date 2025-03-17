@@ -30,6 +30,7 @@ def comprehensive_search(
     l_modelos, 
     data_unders: bool = True,
     data_prep_int: bool = True,
+    data_prep_int_miss: bool = True,
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
@@ -98,7 +99,7 @@ def comprehensive_search(
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
- 
+    
     ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
     if data_unders:
         directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa])
@@ -125,7 +126,7 @@ def comprehensive_search(
     if data_prep_int:
 
         # Format data
-        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, reformat=True, export=True)
+        df_match, df_match_player, df_match_odds, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_match_odds, df_player_fifa_sofifa, reformat=True, export=True)
         
         # Clean data
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=True)
@@ -133,24 +134,31 @@ def comprehensive_search(
         # Integrate data (tengo que volver a integrar... para generar df_player de fs bien y tener los nuevos jugadores que surgen en missing y mapearlos..)
         # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
         df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
-    
-        ####################################################################### DATA PREPARATION (MISSING) #######################################################################
-        # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
-        ## Eliminar preparacion de missing actual
-        l_dirs_to_remove = [
-            f'data/{country}/p6_deployment/missing/data_preparation',
-            f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx'
-        ]    
-        directories.remove_directories(directories=l_dirs_to_remove)
-
-        ## Volver a preaparar missing
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        main_next_matches.main(d_run, id_country, iteration_date=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
-
+  
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
-    
+
+     ####################################################################### DATA PREPARATION (MISSING) #######################################################################
+    # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
+    if data_prep_int_miss:
+
+        # Levanto datos missing (solamente missing)
+        df_match_miss = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+        idxs_missing = df_match_miss.index
+        print(df_match_miss.shape)
+
+        ## De df_integrated selecciono unicamente los missing (df_integrated ya tiene missing... no tengo que volver a integrar)
+        df_integrated_missing = df_integrated[df_integrated.index.isin(idxs_missing)]
+        print(df_integrated_missing.shape)
+
+        if len(df_match_miss) != len(df_integrated_missing):
+            logger.error("Fallo la obtencion del df_integrated_missing a partir del df_integrated. Revisar.")
+            raise ValueError
+        
+        df_integrated_missing.to_excel(f'{BASE_DIR_flashscore}/df_integrated.xlsx', index=True)
+        df_integrated_missing.to_excel(f'data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
+        
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
     # Determino registros a usar en test_set
     n_reg_test = d_params['modeling'].pop('n_reg_test', None)     # Obtener el valor de 'n_reg_test' y eliminarlo del diccionario
@@ -316,7 +324,7 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = True, verbose: int = 0):
+def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
     """    
@@ -468,8 +476,8 @@ def define_params_space(id_country, fast: bool = False):
                 'calculate_dif': [True, False],
             },
             'clean_data_2': {
-                'n_years_to_select': [1, 2, 3, 5], # 10
-                'fill_na': [None, "0", 'ml'], 
+                'n_years_to_select': [3, 5], # 10
+                'fill_na': [None, 'ml'], #  "0", 
             },
             'select': {
                 'thr_corr': [0.7, 0.85, None],
@@ -520,11 +528,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77, 48]
+    l_countries = [148]
 
-    data_unders = True
-    update_sofifa = False if data_unders else False
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_unders = False
+    update_sofifa = True if data_unders else False
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
@@ -532,8 +541,8 @@ if __name__ == "__main__":
 
         country = d_countries[id_country]
 
-        # Determino date 
-        date = datetime.datetime.now().date() # datetime.datetime.now().date() 
+        # Determino date  
+        date = datetime.datetime.now().date() # Si queres usar fecha en especifico: datetime.datetime.strptime('2025-03-16', '%Y-%m-%d').date()
         logger.info(f"Country: {country} Date: {date}")
         
         # Preparao datos, entreno modelos y evaluo en df_test
@@ -544,6 +553,6 @@ if __name__ == "__main__":
         df_iteration_comp = comprehensive_search(
             country=country, date=date, 
             data_unders=data_unders, update_sofifa=update_sofifa, 
-            data_prep_int=data_prep_int, 
+            data_prep_int=data_prep_int, data_prep_int_miss=data_prep_int_miss,
             d_params=d_params, l_modelos=l_modelos
             )
