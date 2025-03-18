@@ -331,7 +331,16 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
                 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.15, random_state=42, shuffle=True)
 
                 # Selecciono los mejores hiperparametros usando el set de validacion
-                model, params, best_metric, results  = select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=3, bayes=False, all_tuning=False, verbose=verbose) # Bayes tarda muchisimo (incluso reduciendo mucho el space) y tiene los = rdos.
+                model, params, best_metric, results  = select_best_hiperparameters(
+                    default_model, 
+                    X_train=X_train, 
+                    y_train=y_train, 
+                    X_val=X_val, 
+                    y_val=y_val, 
+                    k=3, 
+                    bayes=False, 
+                    verbose=verbose
+                    ) # Bayes tarda muchisimo (incluso reduciendo mucho el space) y tiene los = rdos.
 
                 # Predecir los valores faltantes
                 predicted_values = model.predict(X_test)
