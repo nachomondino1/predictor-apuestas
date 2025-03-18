@@ -421,7 +421,7 @@ class DataPreparation:
             'ball_possession', 'total_passes', 'attacking_efficiency',
             # Defensive
             'yellow_cards', 'red_cards', 'defensive_actions', 
-            'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
+            'PPDA', 'clean_sheet', 'defensive_efficiency',  # "efficiency" 
         ]
         return self.stats_to_derive + self.stats_to_construct
 
@@ -457,7 +457,6 @@ class DataPreparation:
             ## OFENSIVE
             ## Goal ratio
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
-            # df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="shots_on_goal", laplace=True,  column_name="G2SOG")  # Similar a G2A
 
             # Traduccion de posesion a tiros
             df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="total_passes", laplace=True,  column_name="PPS")  # home = home / home
@@ -466,8 +465,8 @@ class DataPreparation:
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
             # Attacking efficiency --> (lo evito por cantidad de NaN)
-            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
-            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
+            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(),  df['expected_goals_(xg)_home'] / (df['goals_home'] + 1), None)
+            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['expected_goals_(xg)_away'] / (df['goals_away'] + 1),  None)
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
@@ -480,12 +479,8 @@ class DataPreparation:
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
             # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
-            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
-            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
-
-            # Efficiency --> (lo evito por cantidad de NaN)
-            df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
-            df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
+            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] / (df['goals_away'] + 1), None)
+            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] / (df['goals_home'] + 1),  None)
 
             # VARIABLES HISTORICAS
             ## 1) EN PARTIDOS EN ULTIMOS N DAYS
@@ -528,7 +523,7 @@ class DataPreparation:
                 df.drop(columns=cols_to_drop, inplace=True)
 
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
-            # df = construct_data.determine_mean_last_matches_difference(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
+            # df = construct_data.determine_mean_last_matches_difference(df, min(n_last_matches), variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True) # Variable para ponderar estadisticas
             # df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
 
         # VARIABLE DE JUGADORES
@@ -939,7 +934,7 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = False, compare_tuning: bool = False, export: bool = True):
+                    bayes: bool = False, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         
@@ -956,7 +951,6 @@ class Modeling:
             params: Combinacion de hiperparametros del modelo (dict)
             train_accuracy: Precision de entrenamiento (float)
         """
-        # warnings.filterwarnings("ignore")
         print("\nTraining model...")
 
         if default_model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
@@ -967,33 +961,27 @@ class Modeling:
 
             # Seleccion mejor arquitectura con la validacion y entreno el modelo
             model_best_params, params, train_accuracy, results = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+            pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
+            return model_best_params, params, train_accuracy, results
 
-        else:
-            # Train model searching for best hiper
-            if params is None:
-                model_best_params, params, best_metric, results = build_model.select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
-                                                                                                          bayes=bayes, all_tuning=compare_tuning, verbose=1)
-                # model_best_params, params, best_metric, results = build_model.compare_scoring_methods(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=True, all_tuning=compare_tuning, verbose=1)
-                train_accuracy = best_metric # no es train_acc... es el scoring que uso, en este caso, f1_macro..
-      
-            # Train model with prefix params
-            else:
-                model_best_params = default_model.set_params(**params)
-
-                # Fit model
-                model_best_params.fit(X_train, y_train)
-
-                # Eval en val...
-
-                # Evaluo el modelo con Cross Validation
-                train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-                print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
+        # Train model searching for best hiper
+        if params is None:
+            model_best_params, params, d_metrics, results = build_model.select_best_hiperparameters(
+                default_model, 
+                X_train=X_train, 
+                y_train=y_train, 
+                X_val=X_val, 
+                y_val=y_val, 
+                k=k, 
+                bayes=bayes, 
+                verbose=1
+                )
 
         if export:
             pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
             # results.to_excel(f"./data/{self.country}/{ite_date}/p4_modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
 
-        return model_best_params, params, train_accuracy, results
+        return model_best_params, params, d_metrics, results
 
     def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, df_match: pd.DataFrame, df_match_odds: pd.DataFrame, df_filled: pd.DataFrame = None, prod: bool = False, export: bool = False):
         """
@@ -1130,13 +1118,13 @@ class Modeling:
                 # Entreno modelo y evaluo su rendimiento 
                 try:
                     # Entreno modelo
-                    model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
-
+                    model, params, d_metrics_train, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                    
                     # Evaluo modelo en test
                     df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, df_match, df_match_odds, df_filled)
 
                     # Hiperparametros del modelo y Metricas en testeo y train
-                    new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params, 'X_train': X_train.shape,
+                    new_row = {'n_iteration': cont_iter, 'model_name': model_name, **d_metrics_train, 'model_hiper': params, 'X_train': X_train.shape,
                                 'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns)}
                     new_row.update(d_metrics)
                     df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
