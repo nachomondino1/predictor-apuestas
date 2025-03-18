@@ -61,10 +61,8 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
 
         if n_iter is None:
             # Calcular iteraciones basadas en el tamaño del dataset
-            n_iter = 50 
-            # determine_n_iter(num_samples=len(X_val_train), num_hyperparameters=len(params.keys()), verbose=verbose)
-            # recommended_iters = estimate_bayes_iterations(params)
-
+            n_iter = 50 # Puedo usar estimate_bayes_iterations_2 o estimate_bayes_iterations 
+            
         with warnings.catch_warnings():  # Logistic te vuelve loco --> no funciona.
             warnings.simplefilter("ignore")  # Ignora todas las advertencias
 
@@ -207,101 +205,6 @@ def default_scoring(target_type: str, verbose: int = 0):
 
     return scoring
 
-def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
-                                scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
-    
-    """
-    Determinar mejor scoring method para seleccionar los hiperparametros optimos
-    """
-    results, models = [], []
-    if len(np.unique(y_train)) <= 5:
-        scoring_methods = {
-            "f1_macro": "f1_macro",
-            "f1_micro": "f1_micro",
-            "f1_weighted": "f1_weighted",
-            "log_loss": "neg_log_loss",
-            "accuracy": "accuracy",
-        }
-    else:
-        scoring_methods = {"neg_mean_squared_error": "neg_mean_squared_error"}
-
-    # Por metrica
-    for name, scoring in scoring_methods.items():
-        logger.info(f"Metrica: {scoring}")
-
-        # Selecciono mejor combinacion de hiperparametros segun metrica
-        best_estim, best_params, best_score, cv_res = select_best_hiperparameters(model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=bayes, scoring=scoring, verbose=1)
-
-        # Evaluar en el conjunto de validación
-        y_val_pred = best_estim.predict(X_val)
-        y_val_pred_proba = best_estim.predict_proba(X_val)
-
-        # Calcular métricas en el conjunto de validación
-        val_f1_macro = f1_score(y_val, y_val_pred, average="macro")
-        val_f1_weighted = f1_score(y_val, y_val_pred, average="weighted")
-        val_accuracy = accuracy_score(y_val, y_val_pred)
-        val_log_loss = log_loss(y_val, y_val_pred_proba)
-        
-        # Registro de resultados
-        results.append({
-            "scoring": name,
-            'val_f1': val_f1_macro,
-            "val_f1_weighted": val_f1_weighted,
-            "val_accuracy": val_accuracy,
-            "val_loss": val_log_loss,
-            # "best_score_val": best_score,
-            # 'best_model': best_estim,
-            # "best_params": best_params
-        })
-
-        models.append({
-            "scoring": name,
-            "best_score_val": best_score,
-            'best_model': best_estim,
-            "best_params": best_params
-        })
-
-    # Calculo metrica combinada entre f1_score y val_loss
-    results = combined_metric(results)
-
-    # Aquí podrías normalizar los valores o ponderar las métricas, si es necesario
-    results_df = pd.DataFrame(results)
-    results_df = results_df.sort_values(by='combined_metric', ascending=True)
-    models_df = pd.DataFrame(models)
-    logger.info("\nComparación de Métricas:\n" + results_df.to_string())
-
-    # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
-    best_scoring_row = results_df.loc[results_df["combined_metric"].idxmin()]
-    best_scoring = best_scoring_row['scoring']
-    logger.critical(f"Mejor Scoring: {best_scoring}")
-
-    # Obtener el mejor modelo y parámetros
-    row = models_df[models_df['scoring'] == best_scoring].iloc[0]  # Usa iloc[0] para obtener la primera (y única) fila
-    best_model = row['best_model']
-    best_score = row['best_score_val']
-    best_params = row['best_params']
-    logger.info(f"Model: {best_model} Score: {best_score} Params: {best_params}")
-
-    # results_df.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")
-    return best_model, best_params, best_score, results_df # best_scoring
-
-def combined_metric(results):
-    # Obtener los valores mínimo y máximo de cada métrica para escalar y evitar divisiones por cero
-    min_loss, max_loss = min(r['val_loss'] for r in results), max(r['val_loss'] for r in results)
-    min_f1, max_f1 = min(r['val_f1'] for r in results), max(r['val_f1'] for r in results)
-    
-    # Si max_loss == min_loss, el rango sería cero; en tal caso, forzamos el denominador a 1
-    loss_range = max_loss - min_loss if max_loss > min_loss else 1
-    f1_range = max_f1 - min_f1 if max_f1 > min_f1 else 1
-
-    # Crear una métrica combinada normalizada en results
-    for result in results:
-        normalized_loss = (result['val_loss'] - min_loss) / loss_range
-        normalized_f1 = (result['val_f1'] - min_f1) / f1_range
-        result['combined_metric'] = normalized_loss - normalized_f1  # Minimizar esta métrica
-    
-    return results
-
 def check_best_params_limits(best_params, space):
     for param, value in best_params.items():
         # Obtiene el rango del parámetro desde el espacio
@@ -333,7 +236,7 @@ def space_params(model_name, bayes, verbose: int = 0):
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
     # Arboles de decision
-    l_n_estimators = [50, 100, 300]
+    l_n_estimators = [10, 50, 100, 300]
     l_learning_rate = [0.001, 0.01, 0.1]
     l_max_depth = [3, 5, 10]
     l_min_samples_leaf = [2, 11, 21, 51] # [21, 51]
@@ -342,7 +245,7 @@ def space_params(model_name, bayes, verbose: int = 0):
     l_bootstrap = [True]
 
     # Logistic
-    l_max_it = [5000] # aumentar max_iter no causa overfitting en LogisticRegression()
+    l_max_it = [10000] # aumentar max_iter no causa overfitting en LogisticRegression()
     param_c = [0.0001, 0.001, 0.01, 0.1, 1, 10] # [0.01, 1, 10]
 
     d_params = {
@@ -504,7 +407,7 @@ def estimate_bayes_iterations(param_space, scaling_factor=0.01, min_iters=10, ma
     
     return max(min_iters, min(estimated_iters, max_iters))
 
-def determine_n_iter(num_samples, num_hyperparameters, mult_iter: float = 0.01, mult_hip: float = 200, min_iter: int = 20, max_iter: int = 60, verbose: int = 0):
+def estimate_bayes_iterations_2(num_samples, num_hyperparameters, mult_iter: float = 0.01, mult_hip: float = 200, min_iter: int = 20, max_iter: int = 60, verbose: int = 0):
     """
     Determina el número de iteraciones para BayesSearchCV basado en el tamaño del conjunto de datos
     y el número de hiperparámetros a optimizar.
@@ -527,35 +430,6 @@ def determine_n_iter(num_samples, num_hyperparameters, mult_iter: float = 0.01, 
         logger.info(f"n_reg: {n_iter_reg} (={num_samples} * {mult_iter}) + n_hip: {n_iter_hip} (={mult_hip} / {num_hyperparameters} ) = {n_iter}")
 
     return min(max(n_iter, min_iter), max_iter) # Asegurarse de que n_iter sea al menos 50
-
-def compare_tunners(bayes_search, grid_search, verbose: int = 0):
-    """
-    Comparacion de mejores modelos de cada search y seleccion del mejor.
-
-    # Parameters:
-        bayes_search: Elemento BayesSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (BayesSearchCV)
-        grid_search: Elemento GridSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (GridSearchCV)
-    
-    # Return
-        best_search: Elemento GridSearchCV / BayesSearchCV segun el que sea mejor. (BayesSearchCV o GridSearchCV)
-    """
-    # Hago Bayes y Grid
-    metric1 = bayes_search.best_score_
-    metric2 = grid_search.best_score_
-
-    # Comparacion y seleccion del mejor
-    if metric1 > metric2:
-        dif = (metric1 - metric2) / abs(metric2) * 100
-        ganador, best_search = "BayesSearch", bayes_search
-        if verbose >= 1:
-            logger.critical(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
-    else:
-        dif = (metric2 - metric1) / abs(metric1) * 100
-        ganador, best_search= "GridSearch", grid_search
-        if verbose >= 1:
-            logger.error(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
-
-    return best_search
 
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
     """
@@ -602,3 +476,130 @@ def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     pass
+
+'''
+# Comparacion de BayesSearchCV y GridSearchCV
+def compare_tunners(bayes_search, grid_search, verbose: int = 0):
+    """
+    Comparacion de mejores modelos de cada search y seleccion del mejor.
+
+    # Parameters:
+        bayes_search: Elemento BayesSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (BayesSearchCV)
+        grid_search: Elemento GridSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (GridSearchCV)
+    
+    # Return
+        best_search: Elemento GridSearchCV / BayesSearchCV segun el que sea mejor. (BayesSearchCV o GridSearchCV)
+    """
+    # Hago Bayes y Grid
+    metric1 = bayes_search.best_score_
+    metric2 = grid_search.best_score_
+
+    # Comparacion y seleccion del mejor
+    if metric1 > metric2:
+        dif = (metric1 - metric2) / abs(metric2) * 100
+        ganador, best_search = "BayesSearch", bayes_search
+        if verbose >= 1:
+            logger.critical(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
+    else:
+        dif = (metric2 - metric1) / abs(metric1) * 100
+        ganador, best_search= "GridSearch", grid_search
+        if verbose >= 1:
+            logger.error(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
+
+    return best_search
+
+def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
+                                scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
+    
+    """
+    Determinar mejor scoring method para seleccionar los hiperparametros optimos
+    """
+    results, models = [], []
+    if len(np.unique(y_train)) <= 5:
+        scoring_methods = {
+            "f1_macro": "f1_macro",
+            "f1_micro": "f1_micro",
+            "f1_weighted": "f1_weighted",
+            "log_loss": "neg_log_loss",
+            "accuracy": "accuracy",
+        }
+    else:
+        scoring_methods = {"neg_mean_squared_error": "neg_mean_squared_error"}
+
+    # Por metrica
+    for name, scoring in scoring_methods.items():
+        logger.info(f"Metrica: {scoring}")
+
+        # Selecciono mejor combinacion de hiperparametros segun metrica
+        best_estim, best_params, best_score, cv_res = select_best_hiperparameters(model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=bayes, scoring=scoring, verbose=1)
+
+        # Evaluar en el conjunto de validación
+        y_val_pred = best_estim.predict(X_val)
+        y_val_pred_proba = best_estim.predict_proba(X_val)
+
+        # Calcular métricas en el conjunto de validación
+        val_f1_macro = f1_score(y_val, y_val_pred, average="macro")
+        val_f1_weighted = f1_score(y_val, y_val_pred, average="weighted")
+        val_accuracy = accuracy_score(y_val, y_val_pred)
+        val_log_loss = log_loss(y_val, y_val_pred_proba)
+        
+        # Registro de resultados
+        results.append({
+            "scoring": name,
+            'val_f1': val_f1_macro,
+            "val_f1_weighted": val_f1_weighted,
+            "val_accuracy": val_accuracy,
+            "val_loss": val_log_loss,
+            # "best_score_val": best_score,
+            # 'best_model': best_estim,
+            # "best_params": best_params
+        })
+
+        models.append({
+            "scoring": name,
+            "best_score_val": best_score,
+            'best_model': best_estim,
+            "best_params": best_params
+        })
+
+    # Calculo metrica combinada entre f1_score y val_loss
+    results = combined_metric(results)
+
+    # Aquí podrías normalizar los valores o ponderar las métricas, si es necesario
+    results_df = pd.DataFrame(results)
+    results_df = results_df.sort_values(by='combined_metric', ascending=True)
+    models_df = pd.DataFrame(models)
+    logger.info("\nComparación de Métricas:\n" + results_df.to_string())
+
+    # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
+    best_scoring_row = results_df.loc[results_df["combined_metric"].idxmin()]
+    best_scoring = best_scoring_row['scoring']
+    logger.critical(f"Mejor Scoring: {best_scoring}")
+
+    # Obtener el mejor modelo y parámetros
+    row = models_df[models_df['scoring'] == best_scoring].iloc[0]  # Usa iloc[0] para obtener la primera (y única) fila
+    best_model = row['best_model']
+    best_score = row['best_score_val']
+    best_params = row['best_params']
+    logger.info(f"Model: {best_model} Score: {best_score} Params: {best_params}")
+
+    # results_df.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")
+    return best_model, best_params, best_score, results_df # best_scoring
+
+def combined_metric(results):
+    # Obtener los valores mínimo y máximo de cada métrica para escalar y evitar divisiones por cero
+    min_loss, max_loss = min(r['val_loss'] for r in results), max(r['val_loss'] for r in results)
+    min_f1, max_f1 = min(r['val_f1'] for r in results), max(r['val_f1'] for r in results)
+    
+    # Si max_loss == min_loss, el rango sería cero; en tal caso, forzamos el denominador a 1
+    loss_range = max_loss - min_loss if max_loss > min_loss else 1
+    f1_range = max_f1 - min_f1 if max_f1 > min_f1 else 1
+
+    # Crear una métrica combinada normalizada en results
+    for result in results:
+        normalized_loss = (result['val_loss'] - min_loss) / loss_range
+        normalized_f1 = (result['val_f1'] - min_f1) / f1_range
+        result['combined_metric'] = normalized_loss - normalized_f1  # Minimizar esta métrica
+    
+    return results
+'''
