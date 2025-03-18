@@ -134,7 +134,8 @@ def comprehensive_search(
         # Integrate data (tengo que volver a integrar... para generar df_player de fs bien y tener los nuevos jugadores que surgen en missing y mapearlos..)
         # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
         df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
-  
+        df_integrated.to_excel(f'{BASE_DIR_flashscore}/df_integrated.xlsx', index=True) # Exporto como df_int_old_updated
+
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
@@ -156,7 +157,6 @@ def comprehensive_search(
             logger.error("Fallo la obtencion del df_integrated_missing a partir del df_integrated. Revisar.")
             raise ValueError
         
-        df_integrated_missing.to_excel(f'{BASE_DIR_flashscore}/df_integrated.xlsx', index=True)
         df_integrated_missing.to_excel(f'data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
         
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
@@ -458,7 +458,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    # l_modelos = [DecisionTreeClassifier(), XGBClassifier(), SVC(), MLPClassifier()]   # , RandomForestClassifier(), GradientBoostingClassifier()
+    l_modelos = [DecisionTreeClassifier(), LogisticRegression(), SVC()]
     # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
 
     # 1728 iteraciones
@@ -473,20 +473,20 @@ def define_params_space(id_country, fast: bool = False):
                 'n_last_matches': [[5], [5, 15]],  # [15], # Variables historicas en ultimos n partidos
                 'n_years_h2h': [2],
                 'segun_localia': [True, False, 'both'],
-                'calculate_dif': [True, False],
+                'calculate_dif': [True, False], # False podria ser con dif_against
             },
             'clean_data_2': {
                 'n_years_to_select': [3, 5], # 10
-                'fill_na': [None, 'ml'], #  "0", 
+                'fill_na': [None, 'ml'], # "0", 
             },
             'select': {
-                'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [0.1, 0.2, 0.3],  # 0.5
+                'thr_corr': [0.7, 0.85, None], # 0.85,
+                'thr_fs': [0.25, 0.5, 0.75], # [0.1, 0.2, 0.3]
             },
             'modeling': {
-                'val_size': [0.1],
-                'n_reg_test': [50], # 25 es muy poco para selec el modelo
-                'bal_type': ['under'], # None, 
+                'val_size': [0.15],
+                'n_reg_test': [100], # 25 es muy poco para selec el modelo
+                'bal_type': ['under'], # None
                 'k': [5]
             }
         }
@@ -528,12 +528,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [48]
 
     data_unders = False
-    update_sofifa = True if data_unders else False
+    update_sofifa = False if data_unders else False
     data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = True
+    data_prep_int_miss = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
