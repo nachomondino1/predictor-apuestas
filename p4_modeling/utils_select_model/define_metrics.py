@@ -25,6 +25,13 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
         n_model, model_name = row['n_iteration'], row['model_name']
         # print(n_model)
 
+        d_metrics_train = {
+            'cv_accuracy': row['cv_accuracy'], 
+            'cv_f1_score_wei': row['cv_f1_score_wei'], 
+            'cv_f1_score': row['cv_f1_score'], 
+            'cv_cross_entropy_loss': row['cv_cross_entropy_loss']
+            }
+
         # Obtengo predicciones
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
         df_pred = pd.read_excel(path_test, index_col=0)
@@ -63,6 +70,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
         row_dict = {
             "n_model": n_model,
             "model_name": model_name,
+            **d_metrics_train,
             **d_metrics_test_sin_ea,  # Métricas de test sin ea
             # **d_metrics_test_sin_ea_ex,
         }
@@ -153,7 +161,7 @@ def compute_weights(df):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [59]
 
     d_countries = {
         # train viejos
@@ -163,9 +171,9 @@ if __name__ == "__main__":
         # 77: ["italy", '2025-02-05'],
         # 148: ["spain", '2025-02-05'], 
         # train nuevos
-        48: ["england", '2025-03-17'],
+        48: ["england", '2025-03-18'],
         55: ["france", '2025-03-16'], 
-        59: ["germany", '2025-03-17'],
+        59: ["germany", '2025-03-18'],
         77: ["italy", '2025-03-17'],
         148: ["spain", '2025-03-17']
         }
@@ -210,25 +218,6 @@ if __name__ == "__main__":
             df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
         else:
             df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
-
-        '''
-        # 3. Elimino metricas correlacionadas entre si (me quedo con la de mayor corr con metric)
-        df_ite_test_with_metric = eliminate_metrics_with_corr(df_ite_test_with_metric, metric_corr=corr_metric, thr_corr=0.8)
-        metrics = list(df_ite_test_with_metric.columns)
-        metrics.remove(corr_metric)
-
-        # 4. Elimino metricas con poca corr con corr_metric
-        df_corr_filt = df_corr.loc[metrics, :]
-        df_corr = eliminate_metrics_low_corr_metric(df_corr_filt)
-        '''
-
-        # 4. Determino metricas y pesos
-        # df_corr = df_corr.sort_values(by='corr_roi', ascending=False)     # Ordeno por 'mean' en orden descendente
-        # metrics = list(df_corr.index)
-        # df = compute_weights(df_corr.loc[metrics])
-        # print("Metricas y pesos por pais:", df)
-
-        # df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/metrics_selected.xlsx')      
 
         # Guardo datos del country
         df_corr_country = df_corr[['corr_roi']].rename(columns={'corr_roi': country})
