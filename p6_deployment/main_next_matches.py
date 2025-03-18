@@ -943,14 +943,13 @@ def main(
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
+        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
 
         if export and len(df_match_miss_new) > 0:
             # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
             mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
             mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
-
-        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
-
+        
         # Si extrajo missing
         if len(df_match_miss_new) > 0:
             
@@ -1192,7 +1191,14 @@ def main(
             d_strategy = lo.load_modeling_hyperparameters()
             d_strategy['curva'] = 'kelly_linear' # solo en prod pero no en ea para no afectar el m seleccionado
 
-        df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
+        # Predigo sobre proximos partidos usando modelo cargado
+        df_pred_proba = mo.predict_model(model=lo.load_model(), X_test=df, prod=True)
+
+        # Concateno df_matchs y demas 
+        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)         # Concateno todos los dfs en uno solo 
+        
+        #  Reformateo teams
+        df_predicciones = mo.reformat_pred(df_predicciones)
         df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
 
         # Aplico estrategia de apuesta
@@ -1237,23 +1243,28 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 148
+    id_country = 48
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 0.5
 
     # Defino country, iteration date y modelo
     d_countries = {
-        6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-03'], 
+        # 6: ["argentina", '2025-02-06'], 
+        48: ["england", '2025-03-18'], 
         55: ["france", '2025-03-03'], 
         59: ["germany", '2025-03-04'], 
         77: ["italy", '2025-03-04'],
         148: ["spain", '2025-03-04'], 
-        167: ["usa", '2024-12-05']
+        # 167: ["usa", '2024-12-05']
+        # 48: ["england", '2025-03-16'], 
+        # 55: ["france", '2025-03-16'], 
+        # 59: ["germany", '2025-03-17'], 
+        # 77: ["italy", '2025-03-17'],
+        # 148: ["spain", '2025-03-17'], 
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 2232, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 185, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1272,7 +1283,7 @@ if __name__ == "__main__":
             df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
 
         elif value == "prod":
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=0.3, export=True) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=1, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")

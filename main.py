@@ -14,6 +14,7 @@ from p3_data_preparation import format_data, select_data, clean_data, construct_
 from sklearn.preprocessing import StandardScaler
 import joblib
 ## Modeling
+from sklearn.metrics import log_loss
 from p4_modeling import generate_test_design, build_model, asses_model, betting_strategy
 ### Generate test design
 from random import randint
@@ -1000,48 +1001,43 @@ class Modeling:
         print("\nEvaluating trained model with test sets...")
 
         # Predigo sobre X_test
-        df_probabilities, y_pred = self.predict(model, X_test)
-            
+        df_pred_proba, y_pred_prob, y_pred = self.predict_model(model, X_test)
+
         # Combinar ambos DataFrames
-        if not prod:
-            df_pred_proba = pd.DataFrame({
-                    self.var_resp: y_test,
-                    self.var_pred: y_pred,
-                }, index=X_test.index)
-        else:
-            # En producción (excluye y_test)
-            df_pred_proba = pd.DataFrame({
+        df_resp_pred = pd.DataFrame({
+                self.var_resp: y_test,
                 self.var_pred: y_pred,
             }, index=X_test.index)
-        df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
+        df_pred_proba = pd.concat([df_pred_proba, df_resp_pred], axis=1)
 
         # Concateno todos los dfs en uno solo --> Necesario para roi?
         df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
 
-        d_metrics = None
-        if not prod:
-
-            # Aplico estrategia "sin ea" para tener bank, stakes y rois 
-            bs = betting_strategy.BettingStrategy(self.country, self.date)
-            param_dict = bs.define_hiperparameters(strategy='train')
-            df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+        # Test error con Cross-Entropy Loss (si usás predict_proba)
+        test_error = log_loss(y_test, y_pred_prob)  # Minimizar log-loss es mejor
         
-            # Calculo metricas
-            d_metrics = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
-            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
+        # Aplico estrategia "sin ea" para tener bank, stakes y rois 
+        bs = betting_strategy.BettingStrategy(self.country, self.date)
+        param_dict = bs.define_hiperparameters(strategy='train')
+        df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+    
+        # Calculo metricas
+        d_metrics = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
+        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
 
-            # Renombro metricas para evitar sobreescribirlas
-            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')            
-            d_metrics.update(d_metric_sin_ea_ex)
+        # Renombro metricas para evitar sobreescribirlas
+        d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')            
+        d_metrics.update(d_metric_sin_ea_ex)
+        d_metrics.update({'test_error': test_error})
 
         df_predicciones = self.reformat_pred(df_predicciones)
         
         if export:
             df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
 
-        return (df_predicciones, d_metrics) if not prod else df_predicciones
+        return df_predicciones, d_metrics
     
-    def predict(self, model, X_test: pd.DataFrame):
+    def predict_model(self, model, X_test: pd.DataFrame, prod: bool = False):
         """
         Predigo sobre X_test + Mapeo clases entre test y pred (pred genera clases con ≠ valor).
         """
@@ -1055,7 +1051,7 @@ class Modeling:
                 
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
             y_pred_prob = model.predict(X_test)
-            
+
         # Mapeo clases de y_test e y_pred (y_pred son ≠ nros)
         if hasattr(model, "classes_"):
             model_classes = model.classes_
@@ -1072,18 +1068,20 @@ class Modeling:
                 logger.info(y_pred)
         else:
             raise ValueError("El modelo no tiene el atributo 'classes_', no se puede determinar el mapeo.")
-
+        
         # Crear un DataFrame para visualizar las probabilidades con sus clases
         df_pred_proba = pd.DataFrame(
             y_pred_prob,
-            columns=[f'prob_class_{cls}' for cls in model_classes],
+            columns=[f'prob_class_{cls}' for cls in model.classes_],
             index=X_test.index
         )
+        
+        if prod:
+            # Agregar la columna con la clase predicha
+            df_pred_proba[self.var_pred] = y_pred
+            return df_pred_proba
 
-        if self.verbose >= 1:
-            logger.info(df_pred_proba)
-
-        return df_pred_proba, y_pred   
+        return df_pred_proba, y_pred_prob, y_pred
     
     def reformat_pred(self, df):
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
