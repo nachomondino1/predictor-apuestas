@@ -594,9 +594,12 @@ def determine_mean_last_matches_difference(df, n_matches, variable, segun_locali
 
     return df
 
-def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool, dif_con_against: bool = False): 
     """
     Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). No usa diferencia previa.
+
+    Mejoras:
+        - Revisar calculo de dif_con_against. Lo implemente rapido mirando como lo tenia antes. Pero por las. 
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=True) # True pues uso tail()
@@ -604,6 +607,7 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, vari
     n_days = n_matches * multplicador  # 1 partido cada multiplicador dias 
     d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
     results = {}
+    results_against = {}
 
     # inicializo diccionarios (para evitar Performance Warning)
     name_ext = "loc_" if segun_localia else ""
@@ -620,12 +624,14 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, vari
         for col_team, home_or_away in d_teams.items():
 
             variable_form = f'{variable}_{home_or_away}'
+            variable_against = f'{variable}_{'away' if home_or_away == 'home' else 'home'}'
             team = row[col_team]
 
             if segun_localia:
                 # Selecciono ultimos n matches del equipo en esa localia
                 df_team_matches = df_past_matches.loc[df_past_matches[col_team] == team].tail(n_matches)
                 values = df_team_matches[variable_form]
+                values_against = df_team_matches[variable_against]
 
             else:
                 # Selecciono ultimos n matches del equipo
@@ -636,17 +642,29 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, vari
                 values_away = df_team_matches.loc[df_team_matches["id_team_away"] == team, f"{variable}_away"]
                 values = pd.concat([values_home, values_away])
 
+                values_against_home = df_team_matches[f'{variable}_away']
+                values_against_away = df_team_matches[f'{variable}_home']
+                values_against = pd.concat([values_against_home, values_against_away])
+
             # Convertir a numérico y eliminar NaN
             values = pd.to_numeric(values, errors="coerce").dropna()
+            values_against = pd.to_numeric(values_against, errors="coerce").dropna()
 
             # Guardar media solo si hay datos
             if not values.empty:
                 results.setdefault(id_match, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable_form}"] = values.mean()
     
-    # Convertir el diccionario a un DataFrame y actualizar el original
+            if not values_against.empty:
+                results_against.setdefault(id_match, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable_against}_against"] = values_against.mean()
+    
+    # Convertir los diccionarios a DataFrames y actualizar el original
     if results:
         df_update = pd.DataFrame.from_dict(results, orient="index")
         df = df.join(df_update)  # Mucho más eficiente que usar df.loc en cada iteración
+
+    if dif_con_against and results_against:
+        df_update_ag = pd.DataFrame.from_dict(results_against, orient="index")
+        df = df.join(df_update_ag)
 
     return df
 
