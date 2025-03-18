@@ -999,6 +999,7 @@ class Modeling:
             Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
         """
         print("\nEvaluating trained model with test sets...")
+        d_metrics = {}
 
         # Predigo sobre X_test
         df_pred_proba, y_pred_prob, y_pred = self.predict_model(model, X_test)
@@ -1015,21 +1016,26 @@ class Modeling:
 
         # Test error con Cross-Entropy Loss (si usás predict_proba)
         test_error = log_loss(y_test, y_pred_prob)  # Minimizar log-loss es mejor
-        
+
         # Aplico estrategia "sin ea" para tener bank, stakes y rois 
         bs = betting_strategy.BettingStrategy(self.country, self.date)
         param_dict = bs.define_hiperparameters(strategy='train')
         df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
     
         # Calculo metricas
-        d_metrics = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
+        d_metrics_ = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
         d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
 
         # Renombro metricas para evitar sobreescribirlas
-        d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')            
-        d_metrics.update(d_metric_sin_ea_ex)
-        d_metrics.update({'test_error': test_error})
-
+        d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')     
+        
+        # Construyo d_metrics final
+        d_metrics = {
+            'test_error': test_error,
+            **d_metrics_,
+            **d_metric_sin_ea_ex
+        }
+       
         df_predicciones = self.reformat_pred(df_predicciones)
         
         if export:
