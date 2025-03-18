@@ -14,7 +14,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
     Automatizo el experimento para definir metricas segun correlacion con ROI prod y Ex ROI prod.
     Es un experimento retroactivo. Tengo el ROI de cada modelos en los partidos futuros y veo como seleccionar a los modelos que mejor les fue.
     """
-    rows = []
+    rows, rows_prod = [], []
     bs = betting_strategy.BettingStrategy(country, iteration_date, verbose=0)
 
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
@@ -46,85 +46,88 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
         # 📌 Sin ea 
         df_pred_fm_met_sin_ea, _ = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
         d_metrics_test_sin_ea = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='result', advanced_metrics=True)
-        d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='expected_result', advanced_metrics=True)
+        # d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='expected_result', advanced_metrics=True)
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_pred_lm_met_sin_ea, _ = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
-        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='result', advanced_metrics=False)
-        d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='expected_result', advanced_metrics=False)
+        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='result', advanced_metrics=True)
+        # d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='expected_result', advanced_metrics=False)
 
         # Renombro metricas para evitar sobreescribirlas
         d_metrics_test_sin_ea = asses_model.rename_dict_keys(d_metrics_test_sin_ea)
-        d_metrics_test_sin_ea_ex = asses_model.rename_dict_keys(d_metrics_test_sin_ea_ex, prefix="expected_")
+        # d_metrics_test_sin_ea_ex = asses_model.rename_dict_keys(d_metrics_test_sin_ea_ex, prefix="expected_")
         d_metrics_prod_sin_ea = asses_model.rename_dict_keys(d_metrics_prod_sin_ea, suffix='prod')
-        d_metrics_prod_sin_ea_ex = asses_model.rename_dict_keys(d_metrics_prod_sin_ea_ex, prefix="expected_", suffix='prod')
+        # d_metrics_prod_sin_ea_ex = asses_model.rename_dict_keys(d_metrics_prod_sin_ea_ex, prefix="expected_", suffix='prod')
 
         # Guardo métricas del modelo en un solo diccionario
         row_dict = {
             "n_model": n_model,
             "model_name": model_name,
             **d_metrics_test_sin_ea,  # Métricas de test sin ea
-            **d_metrics_test_sin_ea_ex,
+            # **d_metrics_test_sin_ea_ex,
+        }
+
+        row_dict_prod = {
+            "n_model": n_model,
+            "model_name": model_name,
             **d_metrics_prod_sin_ea,  # Agrego métricas de producción (prod)
-            **d_metrics_prod_sin_ea_ex
+            # **d_metrics_prod_sin_ea_ex
         }
 
         # Agrego la fila a la lista
         rows.append(row_dict)
+        rows_prod.append(row_dict_prod)
         progress_bar.update(1)
 
     progress_bar.close()
     df_ite = pd.DataFrame(data=rows)
-    merged_dict = {**d_metrics_test_sin_ea, **d_metrics_test_sin_ea_ex}
+    df_ite_prod = pd.DataFrame(data=rows_prod)
 
-    return df_ite, merged_dict
+    return df_ite, df_ite_prod
 
-def calculate_correlation(df_ite, merged_dict):
+def calculate_correlation(df_ite, corr_col: str = 'roi_prod'):
     """
     Calculo de correlacion de metricas con roi_prod
     """
+    metrics = list(df_ite.columns)
+    metrics.remove(corr_col)
+    
     # Crear un DataFrame vacío para la correlación
-    df_corr = pd.DataFrame(index=merged_dict.keys(), columns=['corr_roi', 'corr_ex_roi']) 
-
-    # Columnas de ROI de "PROD" o "ASSESS"
-    roi_col, ex_roi_col = 'roi_prod', 'expected_roi_prod'
+    df_corr = pd.DataFrame(index=metrics, columns=['corr_roi']) 
 
     # Calculo correlación entre métricas de init y prod con los ROIs
-    for col in merged_dict.keys():
-        if col in df_ite.columns:  # Verifico que la columna exista en df_ite
-            df_corr.loc[col, 'corr_roi'] = df_ite[col].corr(df_ite[roi_col])
-            df_corr.loc[col, 'corr_ex_roi'] = df_ite[col].corr(df_ite[ex_roi_col])
-
+    for col in metrics:
+        try:
+            df_corr.loc[col, 'corr_roi'] = df_ite[col].corr(df_ite[corr_col])
+            # df_corr.loc[col, 'corr_ex_roi'] = df_ite[col].corr(df_ite[ex_roi_col])
+        except ValueError:
+            print(f"Falló el calculo de corr de {col}")
+            # Elimino metricas que no son float
+            # df_ite_test_with_metric = df_ite_test_with_metric.select_dtypes(include=['float64'])
+            # print(f"B: {len(df_ite.columns)}", df_ite.columns)
+            
     # Ordeno por correlación con ROI
     df_corr = df_corr.sort_values(by='corr_roi', ascending=False)
     return df_corr
 
-def eliminate_metrics(df_ite, df_corr, verbose: int = 0):
-
-    # 3. Elimino metricas 
-    pos_metrics = list(df_corr.index)
-    pos_metrics.append('roi_prod')
-    df_ite = df_ite[pos_metrics]
-    if verbose >= 1:
-        print(f"A: {len(df_ite.columns)}", df_ite.columns)
-
-    # Determino columnas a eliminar
-    l_strings_to_avoid = ['_last_', '_filled_', '%_gp_', '_bm_', 'dif_', 'n_loc_r', 'n_emp_r', 'n_vis_r', 'gp_total', 'dif_prec_bm']
-    cols_to_avoid = [col for col in df_ite.columns if any(substring in col for substring in l_strings_to_avoid)]
-    df_ite.drop(columns=cols_to_avoid, inplace=True)
-    if verbose >= 1:
-        print(f"B: {len(df_ite.columns)}", df_ite.columns)
-
+def eliminate_metrics_with_corr(df_ite, thr_corr: float, metric_corr: str, verbose: int = 0):
+     
     ## x alta correlacion entre si
-    l_cols_to_elim, df_corr_triang = delete_correlated_columns(df_ite, var_resp='roi_prod', verbose=0)
+    l_cols_to_elim, df_corr_triang = delete_correlated_columns(df_ite, var_resp=metric_corr, thr_corr=thr_corr, verbose=0) # 'roi_prod'
     l_cols = [col for col in df_ite.columns if col not in l_cols_to_elim]
-    df_ite = df_ite[l_cols] # + ['roi_prod']
+    df_ite = df_ite[l_cols]
     if verbose >= 1:
         print(f"C: {len(df_ite.columns)}", df_ite.columns)
-    
+
+    df_corr_triang.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr_triang.xlsx')
+    return df_ite
+
+def eliminate_metrics_low_corr_metric(df_corr, verbose: int = 0):
+
+    metrics = df_corr.index
     ## con poca correlacion con roi_prod
-    df_corr = df_corr[df_corr.index.isin(df_ite.columns)]
-    thr = df_corr['corr_roi'].quantile(0.5)    
+    df_corr = df_corr[df_corr.index.isin(metrics)]
+    thr = df_corr['corr_roi'].quantile(0.75)    
     df_corr_filt = df_corr[(df_corr['corr_roi'] >= thr) & (df_corr['corr_roi'] >= 0.01)]
 
     if verbose >= 1:
@@ -146,74 +149,93 @@ def compute_weights(df):
     # Renombra las columnas con 'weight_'.
     df_weights.columns = [f'weight_{col}' for col in df_weights.columns]
     return df_weights
-
-def main(df_ite, calculate_metrics: bool = False, calculate_corr_with_roi: bool = False):
-    
-    # 1. Calculo metricas por modelo + division en "test" y "prod"
-    if calculate_metrics:
-        df_ite, metrics = determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test=50)
-        df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=True)
-    else:
-        df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
-
-    # 2. Calculo correlacion entre metricas y ROI de prod
-    if calculate_corr_with_roi:
-        #Elimino metricas que no son float
-        df_ite = df_ite.select_dtypes(include=['float64'])
-    
-        df_corr = calculate_correlation(df_ite, metrics)
-        df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
-
-    else:
-        df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
-
-    # 3. Elimino metricas
-    df_corr = eliminate_metrics(df_ite, df_corr)
-
-    # 4. Determino metricas y pesos
-    # df_corr = df_corr.sort_values(by='corr_roi', ascending=False)     # Ordeno por 'mean' en orden descendente
-    metrics = list(df_corr.index)
-    df = compute_weights(df_corr.loc[metrics])
-    print("Metricas y pesos por pais:", df)
-
-    df_corr.to_excel(f'/Users/nachomondino/Desktop/df_corr_roi.xlsx')
-            
+        
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
 
     d_countries = {
         # train viejos
-        48: ["england", '2025-02-05'],
-        55: ["france", '2025-02-05'], 
-        59: ["germany", '2025-02-05'],
-        77: ["italy", '2025-02-05'],
-        148: ["spain", '2025-02-05'], 
+        # 48: ["england", '2025-02-05'],
+        # 55: ["france", '2025-02-05'], 
+        # 59: ["germany", '2025-02-05'],
+        # 77: ["italy", '2025-02-05'],
+        # 148: ["spain", '2025-02-05'], 
+        # train nuevos
+        48: ["england", '2025-03-17'],
+        55: ["france", '2025-03-16'], 
+        59: ["germany", '2025-03-17'],
+        77: ["italy", '2025-03-17'],
+        148: ["spain", '2025-03-17']
         }
     
     df_corr_roi = pd.DataFrame()
-    
+    calculate_metrics, calculate_corr_with_roi = True, True
+    corr_col = 'roi'
+    corr_metric = f'{corr_col}_prod' # Si max f1_score_prod ? el roi es relativo para cada modelo por prob_res_to_bet...
+
     for id_country in l_countries:
 
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
         print(f" {country.upper()} ".center(120, "$"))
         
-        # 1: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
+        # 0: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         # print(df_ite)
 
-        # Determino metricas
-        df_corr = main(df_ite)
+        # Elimino modelos con f1_score bajo.
+        # df_ite = msm.filter_models_by_metric(df_ite, metric_col='expected_roi', perc_cutoff=50)
+        # l_metrics, l_weights = ['n_emp', 'acc_draw'],  [0.6, 0.4]
+        # df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name='metric_test')
+        # df_ite = msm.filter_models_by_metric(df_ite, metric_col='metric_test', perc_cutoff=20) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
+        
+        # 1. Por modelo: division en "test" y "prod" + Calculo metricas
+        if calculate_metrics:
+            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test=70)
+
+            df_ite_test_with_metric = pd.merge(df_ite_test, df_ite_prod.loc[:, ['n_model', corr_metric]], on='n_model', how='outer') 
+            df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
+            df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=False)
+        else:
+            df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
+            cols = [col for col in df_ite.columns if '_prod' in col]
+            cols.remove(corr_metric)
+            df_ite_test_with_metric = df_ite.drop(columns=cols)
+
+        # 2. Calculo correlacion entre metricas y ROI de prod
+        if calculate_corr_with_roi:
+            df_corr = calculate_correlation(df_ite_test_with_metric, corr_col=corr_metric)
+            df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
+        else:
+            df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
 
         '''
+        # 3. Elimino metricas correlacionadas entre si (me quedo con la de mayor corr con metric)
+        df_ite_test_with_metric = eliminate_metrics_with_corr(df_ite_test_with_metric, metric_corr=corr_metric, thr_corr=0.8)
+        metrics = list(df_ite_test_with_metric.columns)
+        metrics.remove(corr_metric)
+
+        # 4. Elimino metricas con poca corr con corr_metric
+        df_corr_filt = df_corr.loc[metrics, :]
+        df_corr = eliminate_metrics_low_corr_metric(df_corr_filt)
+        '''
+
+        # 4. Determino metricas y pesos
+        # df_corr = df_corr.sort_values(by='corr_roi', ascending=False)     # Ordeno por 'mean' en orden descendente
+        # metrics = list(df_corr.index)
+        # df = compute_weights(df_corr.loc[metrics])
+        # print("Metricas y pesos por pais:", df)
+
+        # df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/metrics_selected.xlsx')      
+
         # Guardo datos del country
         df_corr_country = df_corr[['corr_roi']].rename(columns={'corr_roi': country})
         df_corr_roi = pd.concat([df_corr_roi, df_corr_country], axis=1)
 
-        # 5. Calculo correlacion promedio (≠ paises) entre el roi y cada metrica 
-        df_corr_roi['mean'] = df_corr_roi.mean(axis=1) # df_corr_roi.drop(columns=['n_selected'], errors='ignore').mean(axis=1)
-   
-        df_corr_roi.to_excel('/Users/nachomondino/Desktop/df_corr_roi.xlsx')'
-        '''
+    # 5. Calculo correlacion promedio (≠ paises) entre el roi y cada metrica 
+    df_corr_roi['mean'] = df_corr_roi.mean(axis=1) # df_corr_roi.drop(columns=['n_selected'], errors='ignore').mean(axis=1)
+    df_corr_roi.to_excel('/Users/nachomondino/Desktop/df_corr_roi.xlsx')
+        
 
