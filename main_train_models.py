@@ -34,6 +34,7 @@ def comprehensive_search(
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
+    checkpoint: int = 100, 
     export: bool = True
 ):
     """
@@ -81,7 +82,8 @@ def comprehensive_search(
     """
     # Definicion de variables
     cont_iter = 0
-    df_iteration, df_ite_test = pd.DataFrame(), pd.DataFrame()
+    df_iteration, df_ite_train, df_ite_test = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    rows_ite_list, rows_train_list, rows_test_list = [], [], []
     dp, mo = DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
@@ -256,15 +258,15 @@ def comprehensive_search(
                             X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
 
                             # Entreno y evaluo modelos
-                            df_metrics = mo.train_and_assess_models(
+                            rows_train, rows_test = mo.train_and_assess_models(
                                 X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
                                 l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
                                 df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled_columns,
                                   k=k)
                         
-                        if len(df_metrics) > 0:
+                        if len(rows_test) > 0:
                             # Guardo datos en dataframe
-                            row_data = {
+                            rows_ite = {
                                 'n_iteration': cont_iter, 
                                 'comp_to_select': comp_to_select,
                                 'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif,
@@ -274,35 +276,63 @@ def comprehensive_search(
                                 'k': k
                                 }
                             
-                            # Concateno y exporto datos
-                            df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                            df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
-                            df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                            # Acumular filas en listas
+                            rows_train_list.extend(rows_train)  # Agregar todos los elementos de rows_train (si es una lista de diccionarios)
+                            rows_test_list.extend(rows_test)    # Agregar todos los elementos de rows_test (si es una lista de diccionarios)
+                            rows_ite_list.append(rows_ite)
 
-                            if export:    
-                                df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
-                                df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
+                            if cont_iter % checkpoint == 0 and export:
+                                logger.critical("Checkpoint. Guardado de datos")
+                    
+                                # Concatenar todas las filas acumuladas en DataFrames
+                                df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
+                                df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
+                                df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+
+                                # Exportar
+                                df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
+                                df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
+                                df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
+
+                                # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                                df_temp = pd.merge(df_iteration, df_ite_train, on='n_iteration', how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+                                df_iteration_comp = pd.merge(df_temp, df_ite_test, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
                                 df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
-                        if verbose >= 0:
-                            current_train = time.time()
-                            ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
-                            ite_restantes = n_iter - cont_iter
-                            horas_restantes = ite_restantes / ritmo
-                            min_restantes = horas_restantes * 60
-                            horas_train = n_iter / ritmo
-                            logger.info(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
-                            logger.info(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
-                            print()
+                                # Limpiar listas después de exportar
+                                rows_ite_list.clear()
+                                rows_train_list.clear()
+                                rows_test_list.clear()
+
+                                if verbose >= 0:
+                                    current_train = time.time()
+                                    ritmo = cont_iter / ((current_train - start_train) / 3600)  # iteraciones por hora
+                                    horas_restantes = (n_iter - cont_iter) / ritmo
+                                    horas_train = n_iter / ritmo
+
+                                    logger.info(f"Ritmo: {ritmo:.1f} iteraciones/hora (ideal >60). Quedan {n_iter - cont_iter} iteraciones.")
+                                    logger.info(f"Tiempo estimado para finalizar: {horas_restantes:.1f} horas (~{horas_restantes * 60:.1f} minutos).")
+                                    logger.info(f"Tiempo total proyectado de entrenamiento: {horas_train:.1f} horas.")
+
+    logger.critical("Guardado final. Exportando datos acumulados restantes.")
+    if rows_train_list or rows_test_list or rows_ite_list:  # Verificar si hay filas acumuladas pendientes
+        df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
+        df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
+        df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+
+        # Exportar datos restantes a disco
+        df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
+        df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
+        df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
+
+    # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+    df_temp = pd.merge(df_iteration, df_ite_train, on='n_iteration', how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+    df_iteration_comp = pd.merge(df_temp, df_ite_test, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
+    df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
     if verbose >= 0:
         end_train = time.time()
         logger.info(f"Tiempo total de entrenamiento: {(end_train - start_train) / 60:.1f} minutos")
-
-    # Guardo datos de todas las iteraciones
-    if export:
-        df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
-        df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
 
     return df_iteration_comp
 
@@ -528,7 +558,7 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [148]
 
     data_unders = False
     update_sofifa = False if data_unders else False
