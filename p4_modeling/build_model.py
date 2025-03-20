@@ -122,16 +122,11 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
     results = pd.DataFrame(data=best_search.cv_results_)  # Metricas de cada combinacion de params
 
     if var_resp == 'categorical':
-        # Calculo training error en el train set (y no val)
-        y_train_proba = best_model.predict_proba(X_train)
-        training_error = log_loss(y_train, y_train_proba)
-
         d_metrics = {
             'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_indice],
             'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_indice],
             'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_indice],
             'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_indice],  # Negar porque invertimos el log_loss
-            'training_error': training_error
         }
     else:
         d_metrics = {
@@ -143,10 +138,6 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
         # print("Índice seleccionado por GridSearchCV:", best_search.best_index_)
         # print("Mejor pérdida de entropía cruzada encontrada:", best_search.cv_results_['mean_test_cross_entropy_loss'][grid_search.best_index_])
         logger.info(f"Mejor combinación de parameters: {best_params} \n Metricas de la mejor comb (scoring): {d_metrics} ")
-  
-    #  Metricas para cada combinacion de hiperparametros
-    if verbose >= 2:
-        results.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")    
 
     return best_model, best_params, d_metrics, results
 

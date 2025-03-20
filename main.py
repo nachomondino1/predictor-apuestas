@@ -978,74 +978,21 @@ class Modeling:
                 verbose=1
                 )
 
+        # Training metrics (≠ a las de cross validation que son en el validation set)
+        _, d_metrics_train = self.assess_model(model=model_best_params, X_test=X_train, y_test=y_train)
+        d_metrics_train = asses_model.rename_dict_keys(d_metrics_train, suffix="_train")
+        d_metrics.update(d_metrics_train)
+        print("Train Metrics:", d_metrics_train)
+
         if export:
             pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
             # results.to_excel(f"./data/{self.country}/{ite_date}/p4_modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
 
         return model_best_params, params, d_metrics, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, df_match: pd.DataFrame, df_match_odds: pd.DataFrame, df_filled: pd.DataFrame = None, prod: bool = False, export: bool = False):
+    def predict_model(self, model, X_test: pd.DataFrame):
         """
-        Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
-
-        # Parameters:
-            model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
-            X_test: Dataframe de prueba con variables predictoras. (DataFrame)
-            y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
-            retrain: Boolean para definir si es un reentrenamiento de modelos con missing o no. (bool)
-            export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
-
-        # Returns:
-            Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
-        """
-        print("\nEvaluating trained model with test sets...")
-        d_metrics = {}
-
-        # Predigo sobre X_test
-        df_pred_proba, y_pred_prob, y_pred = self.predict_model(model, X_test)
-
-        # Combinar ambos DataFrames
-        df_resp_pred = pd.DataFrame({
-                self.var_resp: y_test,
-                self.var_pred: y_pred,
-            }, index=X_test.index)
-        df_pred_proba = pd.concat([df_pred_proba, df_resp_pred], axis=1)
-
-        # Concateno todos los dfs en uno solo --> Necesario para roi?
-        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
-
-        # Test error con Cross-Entropy Loss (si usás predict_proba)
-        test_error = log_loss(y_test, y_pred_prob)  # Minimizar log-loss es mejor
-
-        # Aplico estrategia "sin ea" para tener bank, stakes y rois 
-        bs = betting_strategy.BettingStrategy(self.country, self.date)
-        param_dict = bs.define_hiperparameters(strategy='train')
-        df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
-    
-        # Calculo metricas
-        d_metrics_ = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
-
-        # Renombro metricas para evitar sobreescribirlas
-        d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')     
-        
-        # Construyo d_metrics final
-        d_metrics = {
-            'test_error': test_error,
-            **d_metrics_,
-            **d_metric_sin_ea_ex
-        }
-       
-        df_predicciones = self.reformat_pred(df_predicciones)
-        
-        if export:
-            df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
-
-        return df_predicciones, d_metrics
-    
-    def predict_model(self, model, X_test: pd.DataFrame, prod: bool = False):
-        """
-        Predigo sobre X_test + Mapeo clases entre test y pred (pred genera clases con ≠ valor).
+        Predigo sobre X_test
         """
         # Predecir las etiquetas para los datos de prueba
         try:
@@ -1058,6 +1005,13 @@ class Modeling:
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
             y_pred_prob = model.predict(X_test)
 
+        y_pred = self.map_classes_test_and_pred(model, y_pred_prob)
+        return y_pred_prob, y_pred
+
+    def map_classes_test_and_pred(self, model, y_pred_prob):
+        """
+        Mapeo clases entre test y pred (por si pred genera clases con ≠ valor).
+        """
         # Mapeo clases de y_test e y_pred (y_pred son ≠ nros)
         if hasattr(model, "classes_"):
             model_classes = model.classes_
@@ -1072,22 +1026,117 @@ class Modeling:
             if self.verbose >= 1:
                 logger.info(f"Mapeo de índices a clases: {dict(enumerate(model_classes))}")
                 logger.info(y_pred)
+
         else:
             raise ValueError("El modelo no tiene el atributo 'classes_', no se puede determinar el mapeo.")
-        
-        # Crear un DataFrame para visualizar las probabilidades con sus clases
+        return y_pred
+    
+    def construct_predictions_dataframe(self, model, X_test, y_pred_prob, y_pred, y_test = None):
+        # Crear DataFrame con las probabilidades
         df_pred_proba = pd.DataFrame(
             y_pred_prob,
             columns=[f'prob_class_{cls}' for cls in model.classes_],
             index=X_test.index
         )
-        
-        if prod:
-            # Agregar la columna con la clase predicha
-            df_pred_proba[self.var_pred] = y_pred
-            return df_pred_proba
 
-        return df_pred_proba, y_pred_prob, y_pred
+        # Agregar las columnas de la variable real (y_test) y la predicción (y_pred)
+        if y_test is not None:
+            # df_pred_proba[self.var_resp] = y_test
+            df_pred_proba[self.var_resp] = pd.Series(y_test, index=X_test.index) # Asegurar que y_test e y_pred tengan el mismo índice que X_test
+
+        df_pred_proba[self.var_pred] = pd.Series(y_pred, index=X_test.index)
+        # df_pred_proba[self.var_pred] = y_pred
+        return df_pred_proba
+    
+    def assess_model(self, model, X_test, y_test):
+        """
+        Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas (basicas) de desempeño.
+
+        # Parameters:
+            model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
+            X_test: Dataframe de prueba con variables predictoras. (DataFrame)
+            y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
+            retrain: Boolean para definir si es un reentrenamiento de modelos con missing o no. (bool)
+            export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
+
+        # Returns:
+            Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
+        """
+        print("\nEvaluating trained model with test sets...")
+        # Predigo sobre X_test
+        y_pred_prob, y_pred = self.predict_model(model, X_test)
+        df_pred_proba = self.construct_predictions_dataframe(model=model, X_test=X_test, y_pred_prob=y_pred_prob, y_pred=y_pred, y_test=y_test)
+
+        # Test error con Cross-Entropy Loss (si usás predict_proba)
+        test_error = log_loss(y_test, y_pred_prob)  # Minimizar log-loss es mejor
+
+        # Calculo metricas
+        d_metrics_ = asses_model.calculate_metrics(df_pred_proba, var_resp='result')
+
+        # Construyo d_metrics final
+        d_metrics = {
+            'error': test_error,
+            **d_metrics_,
+        }
+       
+        return df_pred_proba, d_metrics
+
+    def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, df_filled, expected_metrics: bool = True, export: bool = True):
+        """
+        Aplico estrategia de apuesta y calculo ROI
+        """
+        # Concateno dfs
+        df_predicciones = self.prepare_dataframe_to_assess_with_roi(df_pred_proba, df_match, df_match_odds, df_filled)
+
+        # Aplico estrategia "sin ea" para tener bank, stakes y rois 
+        bs = betting_strategy.BettingStrategy()
+        param_dict = bs.define_hiperparameters(strategy='train')
+        df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+
+        # Calculo metricas de la bookie --> necesita df_match_odds
+        d_metrics_bm = asses_model.calculate_bookie_metrics(df_predicciones)
+        d_metrics_roi.update(d_metrics_bm)
+
+        # Calculo metricas "Expected" --> necesita df_match por expected_goals 
+        if expected_metrics:
+            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
+            df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) # Eliminar partidos sin expected_goals (puede no estar)
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_')
+            d_metrics_roi.update(d_metric_sin_ea_ex)
+
+        return df_predicciones, d_metrics_roi
+
+    def prepare_dataframe_to_assess_with_roi( 
+            self,
+            df_pred_proba: pd.DataFrame,
+            df_match: pd.DataFrame,
+            df_match_odds: pd.DataFrame,
+            df_filled: pd.DataFrame = None,
+            ):        
+        df_match = df_match[df_match.index.isin(df_pred_proba.index)]
+        df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
+        l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+        df_match = df_match[l_cols_match]
+
+        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
+        df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
+
+        # Concatenación selectiva
+        columns_to_concat = [
+            df_match,
+            df_match_odds,
+            df_pred_proba,
+        ]
+
+        if df_filled is not None:
+            df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
+            l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+            columns_to_concat.append(df_filled[l_cols_fill])
+            
+        df_predicciones = pd.concat(columns_to_concat, axis=1)
+        df_predicciones = self.reformat_pred(df_predicciones)
+        
+        return df_predicciones
     
     def reformat_pred(self, df):
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
@@ -1101,13 +1150,12 @@ class Modeling:
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
         """
         # Defino variables
-        df_metrics = pd.DataFrame()
+        train_rows, test_rows = [], []
         rows_to_features_min = 5
-        rows_test = len(X_test)
         rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
         
         if verbose >= 0:
-            logger.info(f"Rows X_test: {rows_test}")
+            logger.info(f"Rows X_test: {len(X_test)}")
             logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
 
         # Si hay suficientes datos
@@ -1125,27 +1173,36 @@ class Modeling:
                     model, params, d_metrics_train, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
                     
                     # Evaluo modelo en test
-                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, df_match, df_match_odds, df_filled)
+                    df_pred_proba, d_metrics_test = self.assess_model(model, X_test, y_test)
+                    df_predicciones, d_metrics_roi = self.assess_model_with_roi(df_pred_proba, df_match, df_match_odds, df_filled, export=True)
+                    d_metrics_test.update(d_metrics_roi)
 
                     # Hiperparametros del modelo y Metricas en testeo y train
-                    new_row = {'n_iteration': cont_iter, 'model_name': model_name, **d_metrics_train, 'model_hiper': params, 'X_train': X_train.shape,
-                                'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns)}
-                    new_row.update(d_metrics)
-                    df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
-                    df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
+                    new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'model_hiper': params, 'X_train': X_train.shape, 
+                               'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                               **d_metrics_train}
+                    new_row_test = {'n_iteration': cont_iter, 'model_name': model_name, **d_metrics_test}
 
+                    train_rows.append(new_row)
+                    test_rows.append(new_row_test)
+                    
                     # Exporto datos del modelo
                     pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
                     results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
                     df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
                 except KeyboardInterrupt as e:
-                    logger.warning(f"Se evitó entrenar este modelo mediante {e}")
-        
+                    logger.warning(f"Entrenamiento interrumpido: {e}")
+
+                except Exception as e:
+                    logger.error(f"Error inesperado al entrenar el modelo {model_name}: {e}", exc_info=True)  
         else:
             logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
-        return df_metrics
+        # Concatenar todo al final (mucho más eficiente)
+        # df_metrics_train = pd.concat([pd.DataFrame(train_rows)], ignore_index=True)
+        # df_metrics_test = pd.concat([pd.DataFrame(test_rows)], ignore_index=True)
+        return train_rows, test_rows
 
 def crear_variables(diccionario):
     return SimpleNamespace(**diccionario)

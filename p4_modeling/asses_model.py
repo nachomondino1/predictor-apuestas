@@ -6,6 +6,50 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score
 from p3_data_preparation import construct_data
 
 
+# CALCULO DE METRICAS BASICAS (ACCURACY, F1_SCORE, ETC)
+def calculate_metrics(
+        df_pred_proba, var_pred: str = 'predicted_result', var_resp: str = 'result',
+        metrics_by_result: bool = True, prefix: str = None, suffix: str = None, verbose: int = 0
+        ):
+    """
+    Calculo de metricas que no requieren mas que y_pred e y_test
+    """
+    # Defino los array para calc metrics
+    y_test = df_pred_proba[var_resp].values         # Etiquetas reales
+    y_pred = df_pred_proba[var_pred].values         # Predicciones del modelo
+
+    # Calculo métricas básicas
+    d_metrics = {
+        'test_accuracy': accuracy_score(y_test, y_pred) * 100,
+        'recall': recall_score(y_test, y_pred, average='macro') * 100,
+        'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
+    }
+
+    if metrics_by_result:
+        d_metrics.update ({
+            'accuracy_home': accuracy_score(y_test == 1, y_pred == 1) * 100,  # Accuracy para la clase "Local"
+            'accuracy_draw': accuracy_score(y_test == 0, y_pred == 0) * 100,  # Accuracy para la clase "Empate"
+            'accuracy_away': accuracy_score(y_test == 2, y_pred == 2) * 100,   # Accuracy para la clase "Visitante"
+            'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
+            'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
+            'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100
+        })
+
+    # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
+    if verbose >= 1:
+        df_conf_mat = confusion_matrix(y_test, y_pred)
+        # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
+
+    d_metrics.update(determine_distribution(df_pred_proba, var_resp=var_resp))
+
+    if prefix or suffix:
+        d_metrics = rename_dict_keys(d_metrics)
+
+    if verbose > 1:
+        print(d_metrics)
+
+    return d_metrics
+
 def confusion_matrix(y_real, y_pred):
     """
     Calcula matriz de confusion del modelo.
@@ -26,7 +70,22 @@ def confusion_matrix(y_real, y_pred):
     print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
-# Bookies 
+# Bookies
+def calculate_bookie_metrics(df_pred_proba, var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result'):
+    """
+    Requiere df_match_odds
+    """
+    # Defino los array para calc metrics
+    y_test = df_pred_proba[var_resp].values         # Etiquetas reales
+    y_pred_bm = df_pred_proba[var_pred_bm].values   # Predicciones del BET
+
+    # Calculo metricas de bookie
+    test_accuracy_bm = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
+    d_metrics = {
+        'test_accuracy_bm': test_accuracy_bm,
+        }
+    return d_metrics
+
 def determine_result_by_bookmaker(df, col_name):
     """
     Determina el resultado del partido predicho segun la casa de apuestas. 
@@ -157,9 +216,34 @@ def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
 
 def rename_dict_keys(d, prefix=None, suffix=None):
-    return {f"{prefix or ''}{k}{'_' + suffix if suffix else ''}": v for k, v in d.items()}
+    return {f"{prefix or ''}{k}{suffix if suffix else ''}": v for k, v in d.items()}
 
-# ROI
+# CALCULO DE METRICAS DE ROI
+def calculate_roi_metrics(df_pred_proba, 
+                      var_pred: str = 'predicted_result', var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result', 
+                      roi_metrics: bool = True, advanced_metrics: bool = False, 
+                      prefix: str = None, suffix: str = None,
+                      verbose: int = 0
+                      ):
+    """
+    Calculo de metricas
+    """
+    # roi = determine_roi(df_pred_proba, var_resp=var_resp) # hago el rename con expected por fuera de la funcion...
+    # d_metrics.update({'roi': roi})
+
+    # Otras métricas
+    if advanced_metrics:
+        # d_metrics.update(calculate_nan_metrics(df_pred_proba))
+        d_metrics.update(calculate_gp_by_result(df_pred_proba, var_resp=var_resp))
+
+    if prefix or suffix:
+        d_metrics = rename_dict_keys(d_metrics)
+
+    if verbose > 1:
+        print(d_metrics)
+
+    return d_metrics
+
 def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
@@ -304,98 +388,6 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def prepare_to_calc_metrics(df_pred_proba, var_pred_bm: str = 'bookmaker_result'):
-
-    # Ordeno por fecha de mas antiguo a mas reciente
-    df_pred_proba = df_pred_proba.sort_values(by='date', ascending=True)
-
-    # Determino expected result + probas de bookies
-    df_pred_proba = construct_data.determine_expected_result(df_pred_proba, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
-    df_pred_proba = calculate_result_probabilities_by_bookmaker(df_pred_proba) # Caculo probabilidades segun casa de apuesta
-    df_pred_proba = determine_result_by_bookmaker(df_pred_proba, col_name=var_pred_bm)  # Determino resultado predicho segun cuota minima (e.g. "Home")
-
-    df_pred_proba['expected_result'] = df_pred_proba['expected_result'].fillna(-100) # en SPA no se por que falla sino
-    return df_pred_proba
-
-def calculate_metrics(df_pred_proba, var_pred: str = 'predicted_result', var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result', advanced_metrics: bool = False, verbose: int = 0):
-        
-    # Preparacion previa a calc de metricas
-    df_pred_proba = prepare_to_calc_metrics(df_pred_proba)
-
-    # Defino los array para calc metrics
-    y_test = df_pred_proba[var_resp].values         # Etiquetas reales
-    y_pred = df_pred_proba[var_pred].values         # Predicciones del modelo
-    y_pred_bm = df_pred_proba[var_pred_bm].values   # Predicciones del BET
-
-    # Calculo métricas básicas
-    d_metrics = {
-        'test_accuracy': accuracy_score(y_test, y_pred) * 100,
-        'recall': recall_score(y_test, y_pred, average='macro') * 100,
-        'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
-        'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
-        'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
-        'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100
-
-    }
-
-    # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
-    if verbose >= 1:
-        df_conf_mat = confusion_matrix(y_test, y_pred)
-        # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
-
-    # Calculo metricas de bookie
-    test_accuracy_bm = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
-    d_metrics.update({
-        'test_accuracy_bm': test_accuracy_bm,
-        'dif_prec_bm': d_metrics['test_accuracy'] - test_accuracy_bm
-        }
-    )
-
-    # ROI
-    roi = determine_roi(df_pred_proba, var_resp=var_resp) # hago el rename con expected por fuera de la funcion...
-    d_metrics.update({'roi': roi})
-
-    # Otras métricas
-    if advanced_metrics:
-        d_metrics.update(determine_distribution(df_pred_proba, var_resp=var_resp))
-        # d_metrics.update(calculate_nan_metrics(df_pred_proba))
-        d_metrics.update(calculate_gp_by_result(df_pred_proba, var_resp=var_resp))
-        d_metrics.update(calculate_accuracy_by_result(df_pred_proba, var_resp=var_resp))
-
-    if verbose > 1:
-        print(d_metrics)
-
-    return d_metrics
-
-def concatenate_dfs( 
-        df_pred_proba: pd.DataFrame,
-        df_match: pd.DataFrame,
-        df_match_odds: pd.DataFrame,
-        df_filled: pd.DataFrame = None,
-        ):
-    
-    df_match = df_match[df_match.index.isin(df_pred_proba.index)]
-    df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
-    l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
-    df_match = df_match[l_cols_match]
-
-    df_match_odds = calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
-
-    # Concatenación selectiva
-    columns_to_concat = [
-        df_match,
-        df_match_odds,
-        df_pred_proba,
-    ]
-
-    if df_filled is not None:
-        df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
-        l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-        columns_to_concat.append(df_filled[l_cols_fill])
-        
-    df_predicciones = pd.concat(columns_to_concat, axis=1)
-    return df_predicciones
-
 def determine_roi(df_pred, var_resp):
 
     if var_resp == 'result':
@@ -450,38 +442,6 @@ def calculate_nan_metrics(df_predicciones):
     }
     return d
 
-def calculate_accuracy_by_result(df_predicciones, var_resp):
-    """
-    Calcula la precisión (accuracy) por tipo de resultado.
-    """
-    if var_resp == 'result':
-        col_acerte = 'acerte'
-    elif var_resp == 'expected_result':
-        col_acerte = 'expected_acerte'
-
-    # Dividir DataFrame por tipo de resultado
-    df_pred_home = df_predicciones[df_predicciones[var_resp] == 1]
-    df_pred_draw = df_predicciones[df_predicciones[var_resp] == 0]
-    df_pred_away = df_predicciones[df_predicciones[var_resp] == 2]
-
-    acerte_home =  int(df_pred_home[col_acerte].sum())
-    acerte_draw = int(df_pred_draw[col_acerte].sum())
-    acerte_away = int(df_pred_away[col_acerte].sum())
-
-    prec_home = acerte_home / len(df_pred_home) * 100 if len(df_pred_home) > 0 else 0
-    prec_draw =  acerte_draw / len(df_pred_draw) * 100 if len(df_pred_draw) > 0 else 0
-    prec_away =  acerte_away / len(df_pred_away) * 100 if len(df_pred_away) > 0 else 0
-
-    d = {
-        'acc_home': prec_home,
-        'acc_draw': prec_draw,
-        'acc_away': prec_away,
-        'acerte_home': acerte_home,
-        'acerte_draw': acerte_draw,
-        'acerte_away': acerte_away,
-    }
-    return d
-
 def calculate_gp_by_result(df_predicciones, var_resp):
     """
     Calcula el G/P por resultado (local, empate, visitante).
@@ -527,19 +487,7 @@ def calculate_perc_gp(gp, gp_total):
     else:
         return 0
 
-# Metrica para seleccionar modelos
-def calculate_metrics_for_last_matches(df_pred_proba, num_matches: int):
-    """
-    Calcula métricas de precisión y ROI para los últimos `num_matches` partidos.
-    """
-    df_last_matches = df_pred_proba.tail(num_matches)
-
-    # Obtener métricas de los últimos `num_matches` partidos
-    d_metrics_last = calculate_metrics(df_last_matches, advanced_metrics=False)
-
-    d_metrics_last = rename_dict_keys(d_metrics_last, suffix=f'last_{num_matches}')
-    return d_metrics_last
-
+# METRICA COMBINADA
 def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
     """
     Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
@@ -575,69 +523,6 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
     # Normalizo columna
     df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
     return df
-
-def select_metrics(df, col_corr: str, l_metrics: list, n_metrics=None, threshold=None):
-    """
-    Selecciona métricas basándose en correlación con ROI. Usa n_metrics o threshold, pero no ambos.
-
-    Args:
-        df (pd.DataFrame): DataFrame con los datos.
-        l_metrics (list): Lista de métricas (columnas) a evaluar.
-        n_metrics (int, optional): Número de métricas a seleccionar. Exclusivo con threshold.
-        threshold (float, optional): Umbral de correlación (positivo o negativo). Exclusivo con n_metrics.
-
-    Returns:
-        list: Lista de métricas seleccionadas.
-    """
-    correlations = {}
-
-    # Calcular correlación para cada métrica
-    for metric in l_metrics:
-        correlation = df[col_corr].corr(df[metric])
-        print(f"La correlación entre {col_corr} y {metric} es de {correlation*100:.0f}%.")
-        correlations[metric] = correlation
-
-    # Validar que no se usen ambos parámetros a la vez
-    if n_metrics is not None and threshold is not None:
-        raise ValueError("No se puede usar 'n_metrics' y 'threshold' al mismo tiempo. Especifique solo uno.")
-
-    # Selección basada en threshold
-    if threshold is not None:
-        filtered_metrics = [metric for metric, corr in correlations.items() if abs(corr) >= threshold]
-        print(f"Métricas que cumplen el umbral ({threshold}): {filtered_metrics}")
-        return filtered_metrics
-
-    # Selección basada en n_metrics
-    elif n_metrics is not None:
-        sorted_metrics = sorted(correlations, key=correlations.get, reverse=True)
-        selected_metrics = sorted_metrics[:n_metrics]
-        print(f"Métricas seleccionadas (top {n_metrics}): {selected_metrics}")
-        return selected_metrics
-
-    # Si no se especifica n_metrics ni threshold
-    else:
-        raise ValueError("Debe especificar 'n_metrics' o 'threshold'.")
-    
-def define_weights(df: pd.DataFrame, col_corr: str, l_metrics:list):
-    """
-    Defino pesos de variables segun correlacion con ROI
-    """
-    weights = []
-
-    # Por metrica
-    for metric in l_metrics:
-
-        # Calculo correlacion con ROI
-        correlacion = df[col_corr].corr(df[metric])
-        logger.info(f"La correlacion entre {col_corr} y {metric} es de {correlacion*100:.0f}%.")
-
-        weights.append(correlacion)
-    
-    total_weight = sum(weights)
-    weights_1 = [weight / total_weight for weight in weights]
-
-    logger.critical(weights_1)
-    return weights_1
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

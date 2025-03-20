@@ -9,7 +9,7 @@ from p4_modeling import betting_strategy, asses_model
 from tqdm import tqdm
 
 
-def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: int = 50):
+def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test: float = 0.75):
     """
     Automatizo el experimento para definir metricas segun correlacion con ROI prod y Ex ROI prod.
     Es un experimento retroactivo. Tengo el ROI de cada modelos en los partidos futuros y veo como seleccionar a los modelos que mejor les fue.
@@ -25,12 +25,10 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
         n_model, model_name = row['n_iteration'], row['model_name']
         # print(n_model)
 
-        d_metrics_train = {
-            'cv_accuracy': row['cv_accuracy'], 
-            'cv_f1_score_wei': row['cv_f1_score_wei'], 
-            'cv_f1_score': row['cv_f1_score'], 
-            'cv_cross_entropy_loss': row['cv_cross_entropy_loss']
-            }
+        # Filtrar columnas que contienen 'cv_' o '_train'
+        train_metrics_cols = [col for col in df_ite.columns if "cv_" in col or "_train" in col]
+        # Seleccionar solo las métricas de train
+        d_metrics_train = df_ite.loc[idx, train_metrics_cols].to_dict()
 
         # Obtengo predicciones
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
@@ -41,6 +39,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
         df_pred = msm.drop_old_metrics(df_pred)
 
         # Separo 75% como test y 25% como ROI en prod
+        n_matches_test = int(perc_matches_test * len(df_pred))
         n_matches_prod = len(df_pred) - n_matches_test
         df_first_matches = df_pred.head(n_matches_test)
         df_last_matches = df_pred.tail(n_matches_prod)
@@ -51,20 +50,15 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
-        df_pred_fm_met_sin_ea, _ = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
-        d_metrics_test_sin_ea = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='result', advanced_metrics=True)
-        # d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='expected_result', advanced_metrics=True)
+        df_pred_fm_met_sin_ea, d_rois = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
+        d_metrics_test_sin_ea = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='result')
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
-        df_pred_lm_met_sin_ea, _ = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
-        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='result', advanced_metrics=True)
-        # d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='expected_result', advanced_metrics=False)
+        df_pred_lm_met_sin_ea, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
+        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='result', suffix='_prod')
 
         # Renombro metricas para evitar sobreescribirlas
-        d_metrics_test_sin_ea = asses_model.rename_dict_keys(d_metrics_test_sin_ea)
-        # d_metrics_test_sin_ea_ex = asses_model.rename_dict_keys(d_metrics_test_sin_ea_ex, prefix="expected_")
-        d_metrics_prod_sin_ea = asses_model.rename_dict_keys(d_metrics_prod_sin_ea, suffix='prod')
-        # d_metrics_prod_sin_ea_ex = asses_model.rename_dict_keys(d_metrics_prod_sin_ea_ex, prefix="expected_", suffix='prod')
+        d_rois_prod = asses_model.rename_dict_keys(d_rois_prod, suffix='_prod')
 
         # Guardo métricas del modelo en un solo diccionario
         row_dict = {
@@ -72,14 +66,14 @@ def determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test: 
             "model_name": model_name,
             **d_metrics_train,
             **d_metrics_test_sin_ea,  # Métricas de test sin ea
-            # **d_metrics_test_sin_ea_ex,
+            **d_rois
         }
 
         row_dict_prod = {
             "n_model": n_model,
             "model_name": model_name,
             **d_metrics_prod_sin_ea,  # Agrego métricas de producción (prod)
-            # **d_metrics_prod_sin_ea_ex
+            **d_rois_prod
         }
 
         # Agrego la fila a la lista
@@ -161,7 +155,7 @@ def compute_weights(df):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
+    l_countries = [148]
 
     d_countries = {
         # train viejos
@@ -172,10 +166,10 @@ if __name__ == "__main__":
         # 148: ["spain", '2025-02-05'], 
         # train nuevos
         48: ["england", '2025-03-18'],
-        55: ["france", '2025-03-16'], 
-        59: ["germany", '2025-03-18'],
-        77: ["italy", '2025-03-17'],
-        148: ["spain", '2025-03-17']
+        55: ["france", '2025-03-20'], 
+        59: ["germany", '2025-03-20'],
+        77: ["italy", '2025-03-20'],
+        148: ["spain", '2025-03-20']
         }
     
     df_corr_roi = pd.DataFrame()
@@ -201,7 +195,7 @@ if __name__ == "__main__":
         
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
         if calculate_metrics:
-            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, n_matches_test=70)
+            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75)
 
             df_ite_test_with_metric = pd.merge(df_ite_test, df_ite_prod.loc[:, ['n_model', corr_metric]], on='n_model', how='outer') 
             df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 

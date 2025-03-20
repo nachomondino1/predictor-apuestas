@@ -1192,14 +1192,12 @@ def main(
             d_strategy['curva'] = 'kelly_linear' # solo en prod pero no en ea para no afectar el m seleccionado
 
         # Predigo sobre proximos partidos usando modelo cargado
-        df_pred_proba = mo.predict_model(model=lo.load_model(), X_test=df, prod=True)
+        y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
+        df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
 
-        # Concateno df_matchs y demas 
-        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)         # Concateno todos los dfs en uno solo 
-        
-        #  Reformateo teams
-        df_predicciones = mo.reformat_pred(df_predicciones)
-        df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
+        # Concateno dfs + Reformateo teams
+        df_predicciones = mo.prepare_dataframe_to_assess_with_roi(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)         # Concateno todos los dfs en uno solo 
+        # df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
@@ -1264,7 +1262,7 @@ if __name__ == "__main__":
         # 148: ["spain", '2025-03-17'], 
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 185, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 582, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
