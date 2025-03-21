@@ -22,13 +22,15 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
     # Itero sobre cada modelo
     for idx, row in df_ite.iterrows():
 
-        n_model, model_name = row['n_iteration'], row['model_name']
+        n_model, model_name = row['n_iteration'], row['model_name_x']
         # print(n_model)
 
+        '''
         # Filtrar columnas que contienen 'cv_' o '_train'
         train_metrics_cols = [col for col in df_ite.columns if "cv_" in col or "_train" in col]
         # Seleccionar solo las métricas de train
         d_metrics_train = df_ite.loc[idx, train_metrics_cols].to_dict()
+        '''
 
         # Obtengo predicciones
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
@@ -50,12 +52,13 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
-        df_pred_fm_met_sin_ea, d_rois = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
-        d_metrics_test_sin_ea = asses_model.calculate_metrics(df_pred_fm_met_sin_ea, var_resp='result')
+        df_test, d_rois = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
+        d_metrics_test_sin_ea = asses_model.calculate_metrics(df_test)
+        d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_')
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
-        df_pred_lm_met_sin_ea, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
-        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_pred_lm_met_sin_ea, var_resp='result', suffix='_prod')
+        df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
+        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_prod, suffix='_prod')
 
         # Renombro metricas para evitar sobreescribirlas
         d_rois_prod = asses_model.rename_dict_keys(d_rois_prod, suffix='_prod')
@@ -64,8 +67,9 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         row_dict = {
             "n_model": n_model,
             "model_name": model_name,
-            **d_metrics_train,
+            # **d_metrics_train,
             **d_metrics_test_sin_ea,  # Métricas de test sin ea
+            **d_metrics_test_sin_ea_ex,
             **d_rois
         }
 
@@ -155,7 +159,7 @@ def compute_weights(df):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [55]
 
     d_countries = {
         # train viejos
@@ -173,8 +177,8 @@ if __name__ == "__main__":
         }
     
     df_corr_roi = pd.DataFrame()
-    calculate_metrics, calculate_corr_with_roi = True, True
-    corr_col = 'roi'
+    calculate_metrics = True
+    corr_col = 'error'
     corr_metric = f'{corr_col}_prod' # Si max f1_score_prod ? el roi es relativo para cada modelo por prob_res_to_bet...
 
     for id_country in l_countries:
@@ -187,6 +191,10 @@ if __name__ == "__main__":
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         # print(df_ite)
 
+        # Para que la coreelacion positiva signifique que minimiza el error
+        if corr_col == 'error':
+            df_ite[corr_col] = -df_ite.loc[:, corr_col]
+
         # Elimino modelos con f1_score bajo.
         # df_ite = msm.filter_models_by_metric(df_ite, metric_col='expected_roi', perc_cutoff=50)
         # l_metrics, l_weights = ['n_emp', 'acc_draw'],  [0.6, 0.4]
@@ -196,23 +204,20 @@ if __name__ == "__main__":
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
         if calculate_metrics:
             df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75)
-
-            df_ite_test_with_metric = pd.merge(df_ite_test, df_ite_prod.loc[:, ['n_model', corr_metric]], on='n_model', how='outer') 
-            df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
-            df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=False)
+            df_ite_test.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite.xlsx', index=False)
+            df_ite_prod.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx', index=False)
         else:
-            df_ite = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
-            cols = [col for col in df_ite.columns if '_prod' in col]
-            cols.remove(corr_metric)
-            df_ite_test_with_metric = df_ite.drop(columns=cols)
+            df_ite_test = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite.xlsx")
+            df_ite_prod = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx")
 
-        # 2. Calculo correlacion entre metricas y ROI de prod
-        if calculate_corr_with_roi:
-            df_corr = calculate_correlation(df_ite_test_with_metric, corr_col=corr_metric)
-            df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
-        else:
-            df_corr = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_corr.xlsx", index_col=0)
-
+        # Agrego corr_metric a test
+        df_ite_test_with_metric = pd.merge(df_ite_test, df_ite_prod.loc[:, ['n_model', corr_metric]], on='n_model', how='outer') 
+        df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
+        
+        # Calculo correlacion entre metricas de test y corr_metric de prod
+        df_corr = calculate_correlation(df_ite_test_with_metric, corr_col=corr_metric)
+        df_corr.to_excel(f'/Users/nachomondino/Desktop/{country}/df_corr.xlsx', index=True)
+     
         # Guardo datos del country
         df_corr_country = df_corr[['corr_roi']].rename(columns={'corr_roi': country})
         df_corr_roi = pd.concat([df_corr_roi, df_corr_country], axis=1)
