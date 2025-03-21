@@ -6,6 +6,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from p3_data_preparation import clean_data
 from p4_modeling.build_model import select_best_hiperparameters
+from p4_modeling.asses_model import normalize_column
 from sklearn.feature_selection import SelectKBest, f_classif, chi2  # modelos estadisticos
 from sklearn.feature_selection import f_regression  # via
 from sklearn.feature_selection import RFE  # rfe
@@ -349,17 +350,18 @@ class FeatureSelection():
         :param df_importance: Dataframe con importancia de cada variable segun cada metodo. (DataFrame)
         :return: Dataframe con importancias normalizadas. (DataFrame)
         """
-        # Normalizar cada columna del DataFrame --> para poder sumar las importancias de cada metodo
-        df_normalized = pd.DataFrame(scale(df_importance), columns=df_importance.columns, index=df_importance.index)
+        print(df_importance)
+        for col in df_importance.columns:
+            df_importance = normalize_column(df_importance, col, norm_extension="_norm")
 
-        # Calcular la suma de columnas para cada fila
-        df_normalized['suma_de_imp'] = df_normalized.sum(axis=1)
+        # Seleccionar solo las columnas normalizadas
+        norm_columns = [col for col in df_importance.columns if col.endswith('_norm')]
 
-        # Re-escalo la variable "suma_de_imp" para que sea de 0 a 1 y facilitar la seleccion de variables
-        df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
-        return df_normalized
+        # Calcular el promedio de las columnas normalizadas y almacenarlo en una nueva columna
+        df_importance['suma_de_imp_norm'] = df_importance[norm_columns].mean(axis=1)
+        return df_importance
 
-def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = 'percentil', graf: bool = False):
+def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = None, graf: bool = False):
     """
     Selecciona las variables mas importantes para un Dataframe.
 
@@ -379,10 +381,8 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
 
     # Detemino importancia de cada variable para cada modelo
     df_importance = pd.DataFrame(index=X.columns)
-    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
+    df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
     df_importance = df_importance.merge(fs.via(X, y), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.random_forest(X, y), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.rfe(X, y), left_index=True, right_index=True)
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)
