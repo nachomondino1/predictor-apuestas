@@ -308,6 +308,8 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
 
             mode_value = X[col].mode()[0]
             X_filled[col] = X_filled[col].fillna(mode_value)
+            logger.warning("Tenes desarrollar el codigo para guardar la moda de la columna y usar la misma para rellenar en prod.")
+            raise ValueError
 
         elif fill_type == "0":
             X_filled[col] = X_filled[col].fillna(0)
@@ -349,6 +351,8 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
                 predicted_values_index = X_test.index
                 X_filled.loc[predicted_values_index, col] = predicted_values  # Creo que funciona
 
+                logger.warning("Tenes desarrollar el codigo para guardar el ml por columna y modelo y usar lo mismo para rellenar en prod.")
+                raise ValueError
             else:
                 logger.error(f"En la columna {col} no hay nan values para rellenar. X_test no tiene registros a los cuales predecir. No hacer nada.")
         else:

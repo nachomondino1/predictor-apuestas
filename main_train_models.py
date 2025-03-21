@@ -506,17 +506,17 @@ def define_params_space(id_country, fast: bool = False):
                 'calculate_dif': [True, False], # False podria ser con dif_against
             },
             'clean_data_2': {
-                'n_years_to_select': [3, 5], # 10
-                'fill_na': [None, 'ml'], # "0", 
+                'n_years_to_select': [3, 5, 10],
+                'fill_na': [None, "0"],
             },
             'select': {
-                'thr_corr': [0.7, 0.85, None], # 0.85,
+                'thr_corr': [0.7, 0.85, None],
                 'thr_fs': [0.25, 0.5, 0.75], # [0.1, 0.2, 0.3]
             },
             'modeling': {
                 'val_size': [0.15],
                 'n_reg_test': [100], # 25 es muy poco para selec el modelo
-                'bal_type': ['under'], # None
+                'bal_type': [None, 'under'],
                 'k': [5]
             }
         }
@@ -558,7 +558,7 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [55]
 
     data_unders = False
     update_sofifa = False if data_unders else False
