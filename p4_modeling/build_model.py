@@ -126,7 +126,8 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
             'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_indice],
             'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_indice],
             'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_indice],
-            'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_indice],  # Negar porque invertimos el log_loss
+            'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_indice]  # Negar porque invertimos el log_loss
+            # Agregar medidas de desviacion estandar. --> Solo mirar el promedio de la validación cruzada puede ocultar problemas de inconsistencia entre pliegues. Incluye siempre la desviación estándar.
         }
     else:
         d_metrics = {
@@ -154,7 +155,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     - Índice del mejor modelo según la métrica correspondiente.
     """
     metrics = {
-        'categorical': 'mean_test_cross_entropy_loss', # 'mean_test_f1_score_wei', # O f1_score si preferís
+        'categorical': 'mean_test_cross_entropy_loss',
         'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
     }
 
@@ -180,14 +181,14 @@ def default_scoring(target_type: str, verbose: int = 0):
         scoring: Métrica a utilizar en evaluación para determinar la mejor combinación de hiperparámetros.
     """
 
-    if target_type == 'categorical':
-        cross_entropy_scorer = make_scorer(log_loss, greater_is_better=False, response_method="predict_proba")
+    if target_type == 'categorical': 
 
         scoring = {
             'accuracy': 'accuracy',
             'f1_score': make_scorer(f1_score, average='macro'),
             'f1_score_wei': make_scorer(f1_score, average='weighted'),
-            'cross_entropy_loss': cross_entropy_scorer
+            # 'f1_score_0': make_scorer(custom_scorer),
+            'cross_entropy_loss': make_scorer(log_loss, greater_is_better=False, response_method="predict_proba")
         }
 
     elif target_type == 'continuous':
@@ -200,6 +201,18 @@ def default_scoring(target_type: str, verbose: int = 0):
         print(f"Target type: {target_type} --> Métrica por default: {scoring}")
 
     return scoring
+
+# Definir un scorer que priorice la clase 0
+def custom_scorer(y_true, y_pred):
+    # F1-Score para la clase 0 (pos_label=0 para priorizar esa clase)
+    f1_class_0 = f1_score(y_true, y_pred, labels=[0], average='micro')  # Solo clase 0
+    
+    # F1-Score general (macro promedio para todas las clases)
+    f1_macro = f1_score(y_true, y_pred, average='macro')
+
+    # Combinar los resultados favoreciendo a la clase 0
+    # Puedes ajustar los pesos (ej., 70% clase 0, 30% macro)
+    return 0.7 * f1_class_0 + 0.3 * f1_macro
 
 def check_best_params_limits(best_params, space):
     for param, value in best_params.items():
