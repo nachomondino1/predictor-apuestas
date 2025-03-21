@@ -2,24 +2,27 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from sklearn import metrics
-from sklearn.metrics import accuracy_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, recall_score, f1_score, log_loss
 from p3_data_preparation import construct_data
 
 
 # CALCULO DE METRICAS BASICAS (ACCURACY, F1_SCORE, ETC)
 def calculate_metrics(
-        df_pred_proba, var_pred: str = 'predicted_result', var_resp: str = 'result',
-        metrics_by_result: bool = True, prefix: str = None, suffix: str = None, verbose: int = 0
+        df, var_resp = 'result', var_pred = 'predicted_result',
+        metrics_by_result: bool = True, 
+        prefix: str = None, suffix: str = None, 
+        verbose: int = 0
         ):
     """
     Calculo de metricas que no requieren mas que y_pred e y_test
     """
-    # Defino los array para calc metrics
-    y_test = df_pred_proba[var_resp].values         # Etiquetas reales
-    y_pred = df_pred_proba[var_pred].values         # Predicciones del modelo
+    # Obtengo numpy arrays
+    y_test, y_pred = df[var_resp].values, df[var_pred].values
+    y_pred_prob = df[[f'prob_class_{cls}' for cls in [0, 1, 2]]].values
 
     # Calculo métricas básicas
     d_metrics = {
+        'error': log_loss(y_test, y_pred_prob),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
@@ -40,10 +43,23 @@ def calculate_metrics(
         df_conf_mat = confusion_matrix(y_test, y_pred)
         # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
-    d_metrics.update(determine_distribution(df_pred_proba, var_resp=var_resp))
+    # d_metrics.update(determine_distribution(df_pred_proba, var_resp=var_resp))
+    n_home, n_draw, n_away = np.sum(y_pred == 1), np.sum(y_pred == 0), np.sum(y_pred == 2)
+    n_home_r, n_draw_r, n_away_r = np.sum(y_test == 1), np.sum(y_test == 0), np.sum(y_test == 2)
+    dif_home = calculate_variation(end=n_home, ini=n_home_r)
+    dif_draw = calculate_variation(end=n_draw, ini=n_draw_r)
+    dif_away = calculate_variation(end=n_away, ini=n_away_r)
+
+    d_metrics.update({
+        'n_home': n_home, 'n_draw': n_draw, 'n_away': n_away,
+        'n_home_r': n_home_r, 'n_draw_r': n_draw_r, 'n_away_r': n_away_r,
+        'dif_home': dif_home, 'dif_draw': dif_draw, 'dif_away': dif_away,
+        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3
+        }
+    )
 
     if prefix or suffix:
-        d_metrics = rename_dict_keys(d_metrics)
+        d_metrics = rename_dict_keys(d_metrics, prefix=prefix, suffix=suffix)
 
     if verbose > 1:
         print(d_metrics)
@@ -167,50 +183,6 @@ def determine_confidence_margin(df):
     # Calcular confidence_margin
     df['confidence_margin'] = probs_sorted[:, -1] - probs_sorted[:, -2]
     return df
-
-def determine_distribution(df, var_resp: str = 'result', var_pred: str = 'predicted_result'):
-    """
-    Determina la cantidad de predicciones por resultado y las compara con la distribucion de resultados reales.
-
-    # Parameters
-        df: Nuestas predicciones y el resultado real. (DataFrame)
-
-    # Return
-        d: Diccionario con la distribucion de nuestras predicciones, las de los resultados reales y la variacion.
-    """
-    # Calculo distribucion de nuestros resultados
-    n_loc, n_emp, n_vis = count_results(df, col=var_pred)
-    n_loc_r, n_emp_r, n_vis_r = count_results(df, col=var_resp)
-
-    # Calculo variacion por resultado
-    var_loc = calculate_variation(end=n_loc, ini=n_loc_r)
-    var_emp = calculate_variation(end=n_emp, ini=n_emp_r)
-    var_vis = calculate_variation(end=n_vis, ini=n_vis_r)
-
-    # Calcular variaciones absolutas
-    var_loc_abs = abs(var_loc)
-    var_emp_abs = abs(var_emp)
-    var_vis_abs = abs(var_vis)
-
-    # Promedio de variaciones absolutas
-    var = (var_loc_abs + var_emp_abs + var_vis_abs) / 3
-
-    # Crear el diccionario con los resultados
-    d = {
-        'n_loc': n_loc, 'n_emp': n_emp, 'n_vis': n_vis,
-        'n_loc_r': n_loc_r, 'n_emp_r': n_emp_r, 'n_vis_r': n_vis_r,
-        'dif_loc': var_loc, 'dif_emp': var_emp, 'dif_vis': var_vis, '%_dif': var
-    }
-    return d
-
-def count_results(df, col):
-    """
-    Cuenta la cantidad de cada resultado.
-    """
-    n_local = len(df[df[col] == 1])
-    n_empate = len(df[df[col] == 0])
-    n_vis = len(df[df[col] == 2])
-    return n_local, n_empate, n_vis
 
 def calculate_variation(end, ini):
     return (end - ini) / abs(ini)
