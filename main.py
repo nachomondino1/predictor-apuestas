@@ -979,10 +979,9 @@ class Modeling:
                 )
 
         # Training metrics (≠ a las de cross validation que son en el validation set)
-        _, d_metrics_train = self.assess_model(model=model_best_params, X_test=X_train, y_test=y_train)
-        d_metrics_train = asses_model.rename_dict_keys(d_metrics_train, suffix="_train")
-        d_metrics.update(d_metrics_train)
+        _, d_metrics_train = self.assess_model(model=model_best_params, X_test=X_train, y_test=y_train, suffix="_train")
         print("Train Metrics:", d_metrics_train)
+        d_metrics.update(d_metrics_train)
 
         if export:
             pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
@@ -1048,7 +1047,7 @@ class Modeling:
         # df_pred_proba[self.var_pred] = y_pred
         return df_pred_proba
     
-    def assess_model(self, model, X_test, y_test):
+    def assess_model(self, model, X_test, y_test, suffix: str = None):
         """
         Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas (basicas) de desempeño.
 
@@ -1065,20 +1064,12 @@ class Modeling:
         print("\nEvaluating trained model with test sets...")
         # Predigo sobre X_test
         y_pred_prob, y_pred = self.predict_model(model, X_test)
+
+        # Construo df_pred_proba
         df_pred_proba = self.construct_predictions_dataframe(model=model, X_test=X_test, y_pred_prob=y_pred_prob, y_pred=y_pred, y_test=y_test)
 
-        # Test error con Cross-Entropy Loss (si usás predict_proba)
-        test_error = log_loss(y_test, y_pred_prob)  # Minimizar log-loss es mejor
-
         # Calculo metricas
-        d_metrics_ = asses_model.calculate_metrics(df_pred_proba, var_resp='result')
-
-        # Construyo d_metrics final
-        d_metrics = {
-            'error': test_error,
-            **d_metrics_,
-        }
-       
+        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix) 
         return df_pred_proba, d_metrics
 
     def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, df_filled, expected_metrics: bool = True, export: bool = True):
@@ -1099,8 +1090,14 @@ class Modeling:
 
         # Calculo metricas "Expected" --> necesita df_match por expected_goals 
         if expected_metrics:
+
+            # Construyo 'expected_result'
             df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
-            df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) # Eliminar partidos sin expected_goals (puede no estar)
+            
+            # Eliminar partidos sin expected_goals (puede no estar)
+            df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
+
+            # Calculo metricas
             d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_')
             d_metrics_roi.update(d_metric_sin_ea_ex)
 
