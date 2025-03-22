@@ -30,12 +30,12 @@ def calculate_metrics(
 
     if metrics_by_result:
         d_metrics.update ({
+            'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
+            'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
+            'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100,
             'accuracy_home': accuracy_score(y_test == 1, y_pred == 1) * 100,  # Accuracy para la clase "Local"
             'accuracy_draw': accuracy_score(y_test == 0, y_pred == 0) * 100,  # Accuracy para la clase "Empate"
             'accuracy_away': accuracy_score(y_test == 2, y_pred == 2) * 100,   # Accuracy para la clase "Visitante"
-            'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
-            'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
-            'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100
         })
 
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
@@ -43,7 +43,6 @@ def calculate_metrics(
         df_conf_mat = confusion_matrix(y_test, y_pred)
         # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
-    # d_metrics.update(determine_distribution(df_pred_proba, var_resp=var_resp))
     n_home, n_draw, n_away = np.sum(y_pred == 1), np.sum(y_pred == 0), np.sum(y_pred == 2)
     n_home_r, n_draw_r, n_away_r = np.sum(y_test == 1), np.sum(y_test == 0), np.sum(y_test == 2)
     dif_home = calculate_variation(end=n_home, ini=n_home_r)
@@ -95,10 +94,13 @@ def calculate_bookie_metrics(df_pred_proba, var_resp: str = 'result', var_pred_b
     y_test = df_pred_proba[var_resp].values         # Etiquetas reales
     y_pred_bm = df_pred_proba[var_pred_bm].values   # Predicciones del BET
 
-    # Calculo metricas de bookie
-    test_accuracy_bm = accuracy_score(y_test, y_pred_bm) * 100  # Calcula bien tras el reindex()
+    n_home, n_draw, n_away = np.sum(y_pred_bm == 1), np.sum(y_pred_bm == 0), np.sum(y_pred_bm == 2)
+
+    # Calculo metricas de bookie    
     d_metrics = {
-        'test_accuracy_bm': test_accuracy_bm,
+        'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex(),
+        'f1_score_bm': f1_score(y_test, y_pred_bm, average='macro') * 100,
+        'n_home_bm': n_home, 'n_draw_bm': n_draw, 'n_away_bm': n_away
         }
     return d_metrics
 
@@ -191,31 +193,6 @@ def rename_dict_keys(d, prefix=None, suffix=None):
     return {f"{prefix or ''}{k}{suffix if suffix else ''}": v for k, v in d.items()}
 
 # CALCULO DE METRICAS DE ROI
-def calculate_roi_metrics(df_pred_proba, 
-                      var_pred: str = 'predicted_result', var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result', 
-                      roi_metrics: bool = True, advanced_metrics: bool = False, 
-                      prefix: str = None, suffix: str = None,
-                      verbose: int = 0
-                      ):
-    """
-    Calculo de metricas
-    """
-    # roi = determine_roi(df_pred_proba, var_resp=var_resp) # hago el rename con expected por fuera de la funcion...
-    # d_metrics.update({'roi': roi})
-
-    # Otras métricas
-    if advanced_metrics:
-        # d_metrics.update(calculate_nan_metrics(df_pred_proba))
-        d_metrics.update(calculate_gp_by_result(df_pred_proba, var_resp=var_resp))
-
-    if prefix or suffix:
-        d_metrics = rename_dict_keys(d_metrics)
-
-    if verbose > 1:
-        print(d_metrics)
-
-    return d_metrics
-
 def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
