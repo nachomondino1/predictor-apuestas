@@ -389,7 +389,8 @@ class DataPreparation:
         ## usadas solo para construir y constantes
         cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
         cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        col_players_noise = [col for col in df.columns if 'rep_player' in col or 'hei_player' in col] # 'wage_player' in col  # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+        strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'age_player']
+        col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
         df.drop(columns=cols_to_drop, inplace=True)
         if self.verbose >= 0:
@@ -426,7 +427,7 @@ class DataPreparation:
         ]
         return self.stats_to_derive + self.stats_to_construct
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -440,7 +441,6 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("Constructing data...")
-        segun_localia_options = [False, True] if segun_localia == 'both' else [segun_localia] # Determinar las opciones de segun_localia según el valor recibido
 
         # Si quiero construir variables historicas
         if with_historic:
@@ -460,7 +460,7 @@ class DataPreparation:
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
 
             # Traduccion de posesion a tiros
-            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="total_passes", laplace=True,  column_name="PPS")  # home = home / home
+            df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # home = home / home
 
             # Dead balls
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
@@ -488,11 +488,13 @@ class DataPreparation:
             if not prod:
                 df = construct_data.h2h_by_date(df, n_years=n_years_h2h) # no mas por localia por alto nan.
 
+            for n_days in n_last_matches:
+                df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
+
             ## 2) EN ULTIMOS N PARTIDOS
-            for n_matches in n_last_matches:
+            for n_matches in [15]:
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True) # Hay que ver si funciona tanto sin como con localia.
-                df = construct_data.determine_number_matches_last_days(df, n_days=n_matches*8)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
             # Por stat (e.g. shots_on_goal)
             logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
@@ -507,19 +509,25 @@ class DataPreparation:
                     cols_to_drop.append(variable)
                 cols_to_drop.extend([f'{var}_home', f'{var}_away'])
 
-                for n_matches in n_last_matches:
-                    for loc in segun_localia_options:  # Iterar sobre las opciones de localía
-                        func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
-                        df = func(df, n_matches=n_matches, variable=variable, segun_localia=loc)
+                for n_days in n_last_matches:
 
-                        prefix = 'loc_' if loc else ''
-                        col1, col2 = f'{prefix}mean_last_{n_matches}_matches_{variable}_home', f'{prefix}mean_last_{n_matches}_matches_{variable}_away'
-                        
-                        try:
-                            df[f'{prefix}dif_mean_last_{n_matches}_matches_{variable}'] = df[col1] - df[col2]
-                            cols_to_drop.extend([col1, col2])
-                        except KeyError:
-                            pass
+                    # Calculo promedio en ultimos partidos
+                    func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
+                    df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate)
+
+                    # Calculo diferencia o suma con against
+                    prefix = 'loc_' if segun_localia else ''
+                    col1, col2 = f'{prefix}mean_last_{n_days}_days_{variable}_home', f'{prefix}mean_last_{n_days}_days_{variable}_away'
+                    col1_ag, col2_ag = f'{prefix}mean_last_{n_days}_days_against_{variable}_home', f'{prefix}mean_last_{n_days}_days_against_{variable}_away'
+
+                    if calculate_dif:
+                        df[f'{prefix}dif_mean_last_{n_days}_days_{variable}'] = df[col1] - df[col2]
+                        # cols_to_drop.extend([col1, col2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+                    else:
+                        df[f'sum_{col1}'] = df[col1] + df[col2_ag]
+                        df[f'sum_{col2}'] = df[col2] + df[col1_ag]
+                        df[f'dif_{prefix}mean_last_{n_days}_days_{variable}'] = df[f'sum_{col1}'] - df[f'sum_{col2}']                    
+                        cols_to_drop.extend([col1, col2, col1_ag, col2_ag]) # Elimino estas variables? Ya tengo las columnas extra "sum"
 
                 df.drop(columns=cols_to_drop, inplace=True)
 
@@ -1083,6 +1091,9 @@ class Modeling:
         bs = betting_strategy.BettingStrategy()
         param_dict = bs.define_hiperparameters(strategy='train')
         df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+
+        # G/P x rdo
+        d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones, var_resp=self.var_resp)) # KeyError G/P sin bank
 
         # Calculo metricas de la bookie --> necesita df_match_odds
         d_metrics_bm = asses_model.calculate_bookie_metrics(df_predicciones)
