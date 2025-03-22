@@ -182,7 +182,7 @@ def default_scoring(target_type: str, verbose: int = 0):
     """
 
     if target_type == 'categorical': 
-
+        
         scoring = {
             'accuracy': 'accuracy',
             'f1_score': make_scorer(f1_score, average='macro'),
@@ -245,35 +245,34 @@ def space_params(model_name, bayes, verbose: int = 0):
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
     # Arboles de decision
-    l_n_estimators = [10, 50, 100, 300]
+    l_n_estimators = [5, 11, 21, 41]
     l_learning_rate = [0.001, 0.01, 0.1]
-    l_max_depth = [3, 5, 10]
+    l_max_depth = [3, 5, 7, 10, None] # None
     l_min_samples_leaf = [2, 11, 21, 51] # [21, 51]
     l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
-    l_max_features = ["sqrt", "log2"]
+    l_max_features = ["sqrt", None] # "log2",  # None juega sobreotdo cdo quedan pocas variables predictoras...
     l_bootstrap = [True]
 
     # Logistic
     l_max_it = [10000] # aumentar max_iter no causa overfitting en LogisticRegression()
-    param_c = [0.0001, 0.001, 0.01, 0.1, 1, 10] # [0.01, 1, 10]
+    param_c = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]
 
     d_params = {
-
         # ARBOLES DE DECISION
         'DecisionTreeClassifier': {
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
-            'splitter': Categorical(['random', 'best']) if bayes else ['random', 'best'], 
-            'max_depth': Categorical(l_max_depth) if bayes else l_max_depth,
-            'min_samples_split': Integer(2, 20) if bayes else l_min_samples_split, # Mayor o igual a 2
-            'min_samples_leaf': Integer(2, 20) if bayes else l_min_samples_leaf, # Si usas 1 las probas van a ser 1-0-0, 0-1-0, 0-0-1, si usas 4 0.5-0.5-0 y asi.
+            'splitter': Categorical(['random', 'best']) if bayes else ['best', 'random'],
+            'max_depth': Categorical(l_max_depth) if bayes else [None, 3, 5, 10, 15],
+            'min_samples_split': Integer(10, 50) if bayes else l_min_samples_split, # Mayor o igual a 2
+            'min_samples_leaf': Integer(10, 50) if bayes else l_min_samples_leaf, # Si usas 1 las probas van a ser 1-0-0, 0-1-0, 0-0-1, si usas 4 0.5-0.5-0 y asi.
             'max_features': Categorical(l_max_features) if bayes else l_max_features, # Real(0.1, 1.0)
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(100, 500) if bayes else l_n_estimators,
+            'n_estimators': Integer(10, 200) if bayes else l_n_estimators,
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'max_depth': Categorical(l_max_depth) if bayes else l_max_depth,
-            'min_samples_split': Integer(2, 21) if bayes else l_min_samples_split, # Mayor o igual a 2
-            'min_samples_leaf': Integer(2, 21) if bayes else l_min_samples_leaf,
+            'min_samples_split': Integer(10, 51) if bayes else l_min_samples_split, # Mayor o igual a 2
+            'min_samples_leaf': Integer(10, 51) if bayes else l_min_samples_leaf,
             'max_features': Categorical(l_max_features) if bayes else l_max_features, # Real(0.1, 1.0)
             'bootstrap': Categorical(l_bootstrap) if bayes else l_bootstrap # False
         },
@@ -321,26 +320,26 @@ def space_params(model_name, bayes, verbose: int = 0):
             {
                 'penalty': Categorical([None]) if bayes else [None], 
                 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], # 'sag' --> ConvergenceWarning (talvez por la escala)
-                'max_iter': Integer(100, max(l_max_it)) if bayes else l_max_it
+                'max_iter': Categorical(l_max_it) if bayes else l_max_it
                 }, 
             {
                 'penalty': Categorical(['l2']) if bayes else ['l2'], 
                 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 
-                'C': Real(0.001, 10, prior='log-uniform') if bayes else param_c, 
-                'max_iter': Integer(100, max(l_max_it)) if bayes else l_max_it
+                'C': Real(0.001, 100, prior='log-uniform') if bayes else param_c, 
+                'max_iter': Categorical(l_max_it)  if bayes else l_max_it
                 },
             {
                 'penalty': Categorical(['l1']) if bayes else ['l1'], 
                 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 
-                'C': Real(0.001, 10, prior='log-uniform') if bayes else param_c, 
-                'max_iter': Integer(100, max(l_max_it)) if bayes else l_max_it
+                'C': Real(0.001, 100, prior='log-uniform') if bayes else param_c, 
+                'max_iter': Categorical(l_max_it) if bayes else l_max_it
                 },
             {
                 'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 
                 'solver': Categorical(['saga']) if bayes else ['saga'], 
-                'C': Real(0.001, 10, prior='log-uniform') if bayes else param_c, 
+                'C': Real(0.001, 100, prior='log-uniform') if bayes else param_c, 
                 'l1_ratio': Real(0, 1) if bayes else [0.5], 
-                'max_iter': Integer(100, max(l_max_it)) if bayes else l_max_it
+                'max_iter': Categorical(l_max_it) if bayes else l_max_it
                 }
         ],
         'SVC': {
@@ -358,11 +357,12 @@ def space_params(model_name, bayes, verbose: int = 0):
             # 'hidden_layer_sizes': Categorical([(50,), (100,)]) if bayes else [(50,), (100,)], # Tiene problema.
             'hidden_layer_sizes': Categorical([50, 100]) if bayes else [50, 100], # 50 va bien
             'activation': Categorical(['logistic', 'relu']) if bayes else ['logistic', 'relu'], # logistic va.
-            'solver': Categorical(['adam']) if bayes else ['adam'],
-            'alpha': Real(0.0001, 0.001) if bayes else [0.0001, 0.001],
+            'solver': Categorical(['adam']) if bayes else ['adam', 'lbfgs'],
+            'alpha': Real(0.0001, 0.001) if bayes else [0.00001, 0.0001, 0.001],
+            # 'learning_rate': ['constant', 'invscaling', 'adaptive'], # Only used when solver='sgd'.
             'learning_rate_init': Real(0.01, 0.1) if bayes else [0.01, 0.1],
-            'max_iter': Integer(500, 1000) if bayes else [500, 1000],
-            'early_stopping': Categorical([True, False]) if bayes else [True, False]
+            'max_iter': Integer(500, 1000) if bayes else [1000],
+            'early_stopping': Categorical([True, False]) if bayes else [True]
         },
 
         # OTROS 2
