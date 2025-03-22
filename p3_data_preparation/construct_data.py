@@ -277,14 +277,25 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
     for col, values in results_dict.items():
         df[col] = pd.Series(dict(values))  # Crea la columna usando un diccionario de índices
 
-    # Calculo diferencia entre local y visitante
-    l_cols = ['n_wins_last', 'n_draws_last', 'n_loss_last']
+    # Suma cruzada (En vez de calcular diferencia). Wins home + loss away ; loss home + wins_away
+    l_cols = ['n_wins_last', 'n_loss_last']
+    suffix = '_by_loc' if segun_localia else ''
+
     for col in l_cols:
-        dif_col = f'dif_{col}_{n_matches}_matches_by_loc' if segun_localia else f'dif_{col}_{n_matches}_matches'
-        col_home, col_away = f'{col}_{n_matches}_matches_home', f'{col}_{n_matches}_matches_away'
+        sum_col = f'sum_{col}_{n_matches}_matches{suffix}'
         
-        df[dif_col] = df[col_home] - df[col_away]
-        df = df.drop(columns=[col_home, col_away])
+        col_away = 'n_loss_last' if col == 'n_wins_last' else 'n_wins_last'
+
+        col1 = f'{col}_{n_matches}_matches_home'
+        col2 = f'{col_away}_{n_matches}_matches_away'
+        
+        df[sum_col] = df[col1] + df[col2]
+        df.drop(columns=[col1, col2], inplace=True)
+
+    # Diferencia entre n_wins y n_loss --> indicador de empate
+    dif_col = f'dif_{n_matches}_matches{suffix}'
+    df[dif_col] = df[f'sum_n_wins_last_{n_matches}_matches{suffix}'] - df[f'sum_n_loss_last_{n_matches}_matches{suffix}']
+    df.drop(columns=[f'n_draws_last_{n_matches}_matches_home', f'n_draws_last_{n_matches}_matches_away'], inplace=True) # no las uso
 
     return df
 
@@ -540,14 +551,12 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_last_matches_difference(df, n_matches, variable, segun_localia):
+def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1):
     """
     Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). Usa diferencia previa antes del promedio.
     """
-    df = df.sort_values(by='date', ascending=True)
+    df = df.sort_values(by='date', ascending=False)
     team_matches = {}
-    multplicador = 16 if segun_localia else 8
-    n_days = n_matches * multplicador  # 1 partido cada multiplicador dias...
     results = {}
 
     # Construyo df por equipo
@@ -570,22 +579,28 @@ def determine_mean_last_matches_difference(df, n_matches, variable, segun_locali
             match_date = row['date']
             home_or_away = 'home' if row['id_team_home'] == team else 'away'
 
-            # Filtrar últimos n partidos antes del actual
-            df_last_matches = df_team[df_team['date'] < match_date].tail(n_matches)
-            
-            # Filtrar por días límite
+            # Filtrar por fecha
             limit_date = match_date - timedelta(days=n_days)
-            df_last_matches = df_last_matches[df_last_matches['date'] >= limit_date]
+            df_last_matches = df_team[(df_team['date'] >= limit_date) & (df_team['date'] < match_date)] 
 
-            # Obtener los valores de la variable considerando si fue home o away
-            s_home = df_last_matches.loc[df_last_matches['id_team_home'] == team, variable]
-            s_away = df_last_matches.loc[df_last_matches['id_team_away'] == team, variable] * -1
-            s_values = pd.concat([s_home, s_away], ignore_index=True)
-            
-            # Calcular promedio
-            mean_value = s_values.mean() if not s_values.empty else np.nan
+            # Obtengo valores de la variable.
+            s_values = df_last_matches[variable]  # Obtiene los valores de la variable
 
-            results.setdefault(idx, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable}_{home_or_away}"] = mean_value
+            #  En los visitantes, invierto la diferencia pues es positiva para el visitante.
+            s_values = np.where(df_last_matches['id_team_away'] == team, -s_values, s_values)
+            s_values = pd.Series(s_values, index=df_last_matches.index)
+
+            # Convertir a numérico y eliminar NaN
+            s_values = pd.to_numeric(s_values, errors="coerce").dropna()
+
+            # Calcular promedio ponderado (priorizando registros recientes)
+            if not s_values.empty:
+                weights = np.exp(-decay_rate * np.arange(len(s_values)))  # Pesos exponenciales
+                weights /= weights.sum()  # Normalizar pesos
+                weighted_mean = np.dot(s_values, weights)  # Promedio ponderado
+
+                # Guardar resultado en el diccionario
+                results.setdefault(idx, {})[f"{name_ext}mean_last_{n_days}_days_{variable}_{home_or_away}"] = weighted_mean
             
     # Convertir a DataFrame y hacer join con el original
     if results:
@@ -594,22 +609,20 @@ def determine_mean_last_matches_difference(df, n_matches, variable, segun_locali
 
     return df
 
-def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, variable: str, segun_localia: bool, dif_con_against: bool = False): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1): 
     """
     Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). No usa diferencia previa.
 
     Mejoras:
         - Revisar calculo de dif_con_against. Lo implemente rapido mirando como lo tenia antes. Pero por las. 
     """
-    # Ordeno por fecha ascendente
-    df = df.sort_values(by='date', ascending=True) # True pues uso tail()
-    multplicador = 16 if segun_localia else 8
-    n_days = n_matches * multplicador  # 1 partido cada multiplicador dias 
+   # Ordeno por fecha descendente para iterar correctamente sobre los partidos
+    df = df.sort_values(by='date', ascending=False)
     d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
     results = {}
     results_against = {}
 
-    # inicializo diccionarios (para evitar Performance Warning)
+    # Inicializo diccionarios (para evitar Performance Warning)
     name_ext = "loc_" if segun_localia else ""
 
     # Por partido
@@ -619,52 +632,68 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_matches: int, vari
         match_date = row['date']
         limit_date = match_date - timedelta(days=n_days)
         df_past_matches = df[(df['date'] < match_date) & (df['date'] >= limit_date)]
-        
+
         # Por equipo
         for col_team, home_or_away in d_teams.items():
 
+            home_or_away_against =  f'away' if home_or_away == 'home' else f'home'
             variable_form = f'{variable}_{home_or_away}'
-            variable_against = f'{variable}_{'away' if home_or_away == 'home' else 'home'}'
+            variable_against = f'{variable}_{home_or_away_against}' 
             team = row[col_team]
 
             if segun_localia:
-                # Selecciono ultimos n matches del equipo en esa localia
-                df_team_matches = df_past_matches.loc[df_past_matches[col_team] == team].tail(n_matches)
+                # Selecciono los últimos n partidos del equipo en esa localía
+                df_team_matches = df_past_matches.loc[df_past_matches[col_team] == team]
                 values = df_team_matches[variable_form]
                 values_against = df_team_matches[variable_against]
 
             else:
-                # Selecciono ultimos n matches del equipo
-                df_team_matches = df_past_matches.loc[(df_past_matches["id_team_home"] == team) | (df_past_matches["id_team_away"] == team)].tail(n_matches)
+                # Selecciono los últimos n partidos del equipo en cualquier localía
+                df_team_matches = df_past_matches.loc[(df_past_matches["id_team_home"] == team) | (df_past_matches["id_team_away"] == team)]
 
-                # Extraer valores de la variable correspondiente
-                values_home = df_team_matches.loc[df_team_matches["id_team_home"] == team, f"{variable}_home"]
-                values_away = df_team_matches.loc[df_team_matches["id_team_away"] == team, f"{variable}_away"]
-                values = pd.concat([values_home, values_away])
+                # Extraer los valores de la variable correspondiente dependiendo de si el equipo fue local o visitante
+                values = np.where(
+                    df_team_matches["id_team_home"] == team,  
+                    df_team_matches[f"{variable}_home"],  
+                    df_team_matches[f"{variable}_away"]
+                )
+                values = pd.Series(values, index=df_team_matches.index)
 
-                values_against_home = df_team_matches[f'{variable}_away']
-                values_against_away = df_team_matches[f'{variable}_home']
-                values_against = pd.concat([values_against_home, values_against_away])
+                values_against = np.where(
+                    df_team_matches["id_team_home"] == team,  
+                    df_team_matches[f"{variable}_away"],  
+                    df_team_matches[f"{variable}_home"]
+                )
+                values_against = pd.Series(values_against, index=df_team_matches.index)
 
             # Convertir a numérico y eliminar NaN
             values = pd.to_numeric(values, errors="coerce").dropna()
             values_against = pd.to_numeric(values_against, errors="coerce").dropna()
 
-            # Guardar media solo si hay datos
+            # Calcular los pesos exponenciales solo si hay datos
             if not values.empty:
-                results.setdefault(id_match, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable_form}"] = values.mean()
-    
+                weights = np.exp(-decay_rate * np.arange(len(values)))
+                weights /= weights.sum()
+                weighted_mean = np.dot(values, weights)
+
+                results.setdefault(id_match, {})[f"{name_ext}mean_last_{n_days}_days_{variable_form}"] = weighted_mean
+
             if not values_against.empty:
-                results_against.setdefault(id_match, {})[f"{name_ext}mean_last_{n_matches}_matches_{variable_against}_against"] = values_against.mean()
-    
+                weights_ag = np.exp(-decay_rate * np.arange(len(values_against)))
+                weights_ag /= weights_ag.sum()
+                weighted_mean_ag = np.dot(values_against, weights_ag)
+
+                # Guardar media en el diccionario de resultados
+                results_against.setdefault(id_match, {})[f"{name_ext}mean_last_{n_days}_days_against_{variable_form}"] = weighted_mean_ag
+
     # Convertir los diccionarios a DataFrames y actualizar el original
     if results:
         df_update = pd.DataFrame.from_dict(results, orient="index")
         df = df.join(df_update)  # Mucho más eficiente que usar df.loc en cada iteración
 
-    if dif_con_against and results_against:
-        df_update_ag = pd.DataFrame.from_dict(results_against, orient="index")
-        df = df.join(df_update_ag)
+    if results_against:
+        df_update_against = pd.DataFrame.from_dict(results_against, orient="index")
+        df = df.join(df_update_against)
 
     return df
 
