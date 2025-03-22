@@ -350,7 +350,6 @@ class FeatureSelection():
         :param df_importance: Dataframe con importancia de cada variable segun cada metodo. (DataFrame)
         :return: Dataframe con importancias normalizadas. (DataFrame)
         """
-        print(df_importance)
         for col in df_importance.columns:
             df_importance = normalize_column(df_importance, col, norm_extension="_norm")
 
