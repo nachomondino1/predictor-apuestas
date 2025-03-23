@@ -256,6 +256,7 @@ def space_params(model_name, bayes, verbose: int = 0):
     # Logistic
     l_max_it = [10000] # aumentar max_iter no causa overfitting en LogisticRegression()
     param_c = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]
+    l_tol = [1e-4, 1e-3, 1e-2]
 
     d_params = {
         # ARBOLES DE DECISION
@@ -320,32 +321,40 @@ def space_params(model_name, bayes, verbose: int = 0):
             {
                 'penalty': Categorical([None]) if bayes else [None], 
                 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], # 'sag' --> ConvergenceWarning (talvez por la escala)
-                'max_iter': Categorical(l_max_it) if bayes else l_max_it
+                'max_iter': Categorical(l_max_it) if bayes else l_max_it,
+                'tol': Real(1e-6, 1e-2, prior='log-uniform') if bayes else l_tol,
+                'warm_start': Categorical([True, False]) if bayes else [True, False]
                 }, 
             {
                 'penalty': Categorical(['l2']) if bayes else ['l2'], 
                 'solver': Categorical(['newton-cg', 'lbfgs']) if bayes else ['newton-cg', 'lbfgs', 'sag'], 
                 'C': Real(0.001, 100, prior='log-uniform') if bayes else param_c, 
-                'max_iter': Categorical(l_max_it)  if bayes else l_max_it
+                'max_iter': Categorical(l_max_it)  if bayes else l_max_it,
+                'tol': Real(1e-6, 1e-2, prior='log-uniform') if bayes else l_tol,
+                'warm_start': Categorical([True, False]) if bayes else [True, False]
                 },
             {
                 'penalty': Categorical(['l1']) if bayes else ['l1'], 
                 'solver': Categorical(['liblinear', 'saga']) if bayes else ['liblinear', 'saga'], 
                 'C': Real(0.001, 100, prior='log-uniform') if bayes else param_c, 
-                'max_iter': Categorical(l_max_it) if bayes else l_max_it
+                'max_iter': Categorical(l_max_it) if bayes else l_max_it,
+                'tol': Real(1e-6, 1e-2, prior='log-uniform') if bayes else l_tol,
+                'warm_start': Categorical([True, False]) if bayes else [True, False]
                 },
             {
                 'penalty': Categorical(['elasticnet']) if bayes else ['elasticnet'], 
                 'solver': Categorical(['saga']) if bayes else ['saga'], 
                 'C': Real(0.001, 100, prior='log-uniform') if bayes else param_c, 
                 'l1_ratio': Real(0, 1) if bayes else [0.5], 
-                'max_iter': Categorical(l_max_it) if bayes else l_max_it
+                'max_iter': Categorical(l_max_it) if bayes else l_max_it,
+                'tol': Real(1e-6, 1e-2, prior='log-uniform') if bayes else l_tol,
+                'warm_start': Categorical([True, False]) if bayes else [True, False]
                 }
         ],
         'SVC': {
-            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3],
-            'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'],
-            'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'],
+            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3], # Controls strictness of the missclassifications. +, + over
+            'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'], # Tipo de plano separador de clases.
+            'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'], # Controls the influence of a single training point. +, + over
             'coef0': Real(0, 1) if bayes else [0.0, 0.5],
             'shrinking': Categorical([True, False]) if bayes else [True, False],
             'probability': Categorical([True]) if bayes else [True],
@@ -485,130 +494,3 @@ def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     pass
-
-'''
-# Comparacion de BayesSearchCV y GridSearchCV
-def compare_tunners(bayes_search, grid_search, verbose: int = 0):
-    """
-    Comparacion de mejores modelos de cada search y seleccion del mejor.
-
-    # Parameters:
-        bayes_search: Elemento BayesSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (BayesSearchCV)
-        grid_search: Elemento GridSearchCV con mejor modelo, mejores hiperparametros, metrics por combinacion de hiper, etc. (GridSearchCV)
-    
-    # Return
-        best_search: Elemento GridSearchCV / BayesSearchCV segun el que sea mejor. (BayesSearchCV o GridSearchCV)
-    """
-    # Hago Bayes y Grid
-    metric1 = bayes_search.best_score_
-    metric2 = grid_search.best_score_
-
-    # Comparacion y seleccion del mejor
-    if metric1 > metric2:
-        dif = (metric1 - metric2) / abs(metric2) * 100
-        ganador, best_search = "BayesSearch", bayes_search
-        if verbose >= 1:
-            logger.critical(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
-    else:
-        dif = (metric2 - metric1) / abs(metric1) * 100
-        ganador, best_search= "GridSearch", grid_search
-        if verbose >= 1:
-            logger.error(f"M1: {metric1} y M2: {metric2} --> Ganador: {ganador} por {dif:.0f}%.")
-
-    return best_search
-
-def compare_scoring_methods(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, #
-                                scoring: bool = None, all_tuning: bool = False, verbose: int = 1):
-    
-    """
-    Determinar mejor scoring method para seleccionar los hiperparametros optimos
-    """
-    results, models = [], []
-    if len(np.unique(y_train)) <= 5:
-        scoring_methods = {
-            "f1_macro": "f1_macro",
-            "f1_micro": "f1_micro",
-            "f1_weighted": "f1_weighted",
-            "log_loss": "neg_log_loss",
-            "accuracy": "accuracy",
-        }
-    else:
-        scoring_methods = {"neg_mean_squared_error": "neg_mean_squared_error"}
-
-    # Por metrica
-    for name, scoring in scoring_methods.items():
-        logger.info(f"Metrica: {scoring}")
-
-        # Selecciono mejor combinacion de hiperparametros segun metrica
-        best_estim, best_params, best_score, cv_res = select_best_hiperparameters(model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=bayes, scoring=scoring, verbose=1)
-
-        # Evaluar en el conjunto de validación
-        y_val_pred = best_estim.predict(X_val)
-        y_val_pred_proba = best_estim.predict_proba(X_val)
-
-        # Calcular métricas en el conjunto de validación
-        val_f1_macro = f1_score(y_val, y_val_pred, average="macro")
-        val_f1_weighted = f1_score(y_val, y_val_pred, average="weighted")
-        val_accuracy = accuracy_score(y_val, y_val_pred)
-        val_log_loss = log_loss(y_val, y_val_pred_proba)
-        
-        # Registro de resultados
-        results.append({
-            "scoring": name,
-            'val_f1': val_f1_macro,
-            "val_f1_weighted": val_f1_weighted,
-            "val_accuracy": val_accuracy,
-            "val_loss": val_log_loss,
-            # "best_score_val": best_score,
-            # 'best_model': best_estim,
-            # "best_params": best_params
-        })
-
-        models.append({
-            "scoring": name,
-            "best_score_val": best_score,
-            'best_model': best_estim,
-            "best_params": best_params
-        })
-
-    # Calculo metrica combinada entre f1_score y val_loss
-    results = combined_metric(results)
-
-    # Aquí podrías normalizar los valores o ponderar las métricas, si es necesario
-    results_df = pd.DataFrame(results)
-    results_df = results_df.sort_values(by='combined_metric', ascending=True)
-    models_df = pd.DataFrame(models)
-    logger.info("\nComparación de Métricas:\n" + results_df.to_string())
-
-    # Buscar la mejor combinación de hiperparámetros según la métrica (por ejemplo, accuracy)
-    best_scoring_row = results_df.loc[results_df["combined_metric"].idxmin()]
-    best_scoring = best_scoring_row['scoring']
-    logger.critical(f"Mejor Scoring: {best_scoring}")
-
-    # Obtener el mejor modelo y parámetros
-    row = models_df[models_df['scoring'] == best_scoring].iloc[0]  # Usa iloc[0] para obtener la primera (y única) fila
-    best_model = row['best_model']
-    best_score = row['best_score_val']
-    best_params = row['best_params']
-    logger.info(f"Model: {best_model} Score: {best_score} Params: {best_params}")
-
-    # results_df.to_excel(f"/Users/nachomondino/Desktop/hiperparametros.xlsx")
-    return best_model, best_params, best_score, results_df # best_scoring
-
-def combined_metric(results):
-    # Obtener los valores mínimo y máximo de cada métrica para escalar y evitar divisiones por cero
-    min_loss, max_loss = min(r['val_loss'] for r in results), max(r['val_loss'] for r in results)
-    min_f1, max_f1 = min(r['val_f1'] for r in results), max(r['val_f1'] for r in results)
-    
-    # Si max_loss == min_loss, el rango sería cero; en tal caso, forzamos el denominador a 1
-    loss_range = max_loss - min_loss if max_loss > min_loss else 1
-    f1_range = max_f1 - min_f1 if max_f1 > min_f1 else 1
-
-    # Crear una métrica combinada normalizada en results
-    for result in results:
-        normalized_loss = (result['val_loss'] - min_loss) / loss_range
-        normalized_f1 = (result['val_f1'] - min_f1) / f1_range
-        result['combined_metric'] = normalized_loss - normalized_f1  # Minimizar esta métrica
-    
-    return results
-'''
