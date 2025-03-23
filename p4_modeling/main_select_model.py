@@ -151,7 +151,6 @@ def main(
         l_metrics: list, 
         l_weights: list, 
         select_candidates: bool = True,
-        n_max_candidates: int = None,
         assess: bool = False,
         bet_strat: bool = True,
         update_missing: bool = True,
@@ -178,22 +177,7 @@ def main(
     rows = []
     d_paths = initialize_directories(country, iteration_date, assess)
 
-    # (1) SELECCION DE MODELOS CANDIDATOS 
-    path_cand = f'{d_paths['path_select']}/df_filt_by_metric_cand.xlsx'
-    if select_candidates:
-        
-        # 1.1. Calculo metrica combinada
-        df_ite = asses_model.calculate_combined_metric(df_ite, l_metrics=['f1_score'], l_weights=[1], metric_name='metric_test')
-
-        ## 1.2. Filtro modelos segun metrica (y no por ROI para evitar modelos con alto ROI pero predicciones malas)
-        df_ite_filt = filter_models_by_metric(df_ite, metric_col='metric_test', prop_to_max=0.35, n_models_max=n_max_candidates) # Creo que hasta 100 esta ok, mas no. En FRA gana el 220, y yo prefiero otro.
-        logger.warning(f'Shape: {df_ite.shape} --> {df_ite_filt.shape}')
-        df_ite_filt.to_excel(path_cand, index=False)
-
-    else:
-        df_ite_filt = pd.read_excel(path_cand)
-
-    # (2) Assess --> Fuera de servicio desde el 17/03/2025
+    # (1) Assess --> Fuera de servicio desde el 17/03/2025
     if assess:
         # (2) BETTING STRATEGY + CALCULO DE METRICAS
         if bet_strat:
@@ -284,7 +268,7 @@ def main(
         # Usar test viejo
         df_ite_bs = df_ite.copy()
 
-    # (3) SELECCION DEL MODELO (que maximiza la metrica combinada)
+    # (2) SELECCION DEL MODELO (que maximiza la metrica combinada)
     ## 3.1. Calculo metrica combinada
     metric = 'metric_test_assess'
     df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
@@ -294,7 +278,7 @@ def main(
 
     # 3.3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
-    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name']
+    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name_x']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
     
     # (4) ESTRATEGIA DE APUESTA
@@ -328,43 +312,21 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-17'],
-        # 55: ["france", '2025-03-16'], 
-        # 59: ["germany", '2025-03-17'],
-        # 77: ["italy", '2025-03-17'],
-        # 148: ["spain", '2025-03-17'], 
-        # Train nuevos
-        # 48: ["england", '2025-03-03'],
-        # 55: ["france", '2025-03-03'], 
-        # 59: ["germany", '2025-03-04'],
-        # 77: ["italy", '2025-03-04'],
-        # 148: ["spain", '2025-03-04'], 
+        48: ["england", '2025-03-22'],
+        55: ["france", '2025-03-22'], 
+        59: ["germany", '2025-03-23'],
+        77: ["italy", '2025-03-23'],
+        148: ["spain", '2025-03-23']
         }
     
     # Defino metricas y pesos
-    # l_metrics, l_weights = ['f1_score_draw', 'expected_f1_score_draw'], [0.6, 0.4] # Fuerzo a todos los modelos a ser cracks en empate. La rentabilidad esta ahi.
-    
-    '''
-    l_metrics = ['f1_score_home', 'f1_score_draw', 'f1_score_away']  # y menor 'varianza' # Fuerzo a todos los modelos a ser cracks en empate. La rentabilidad esta ahi.
-    d_weights = {
-        48: [0.31, 0.21, 0.47],
-        55: [0.37, 0.23, 0.38], 
-        59: [0.28, 0.41, 0.31],
-        77: [0.29, 0.46, 0.26],
-        148: [0.28, 0.35, 0.37], 
-    }
-    '''
-
-    # l_metrics = ['f1_score', 'f1_score_draw'] 
-    # l_weights = [0.5, 0.5]
-    l_metrics = ['f1_score_away', 'test_accuracy'] 
-    l_weights = [0.65, 0.35]
-
-    # Quizas puedo filtrar por f1_score previo a seleccionar...
+    # l_metrics = ['f1_score_away', 'f1_score_draw', 'roi'] # Por exp y viendo define_metrics de eng y fra?
+    l_metrics = ['f1_score', 'f1_score_draw'] # Segun el nuevo define_metrics con all_countries usando 75% test y 25% prod con ROI
+    l_metrics = ['accuracy_draw', 'roi'] # Segun el nuevo define_metrics con all_countries usando 75% test y 25% prod con F1_SCORE
+    l_weights = [0.5, 0.5]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -374,6 +336,9 @@ if __name__ == "__main__":
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
+
+        df_ite['error'] = df_ite['error'] * (-1)
+        df_ite['expected_error'] = df_ite['expected_error'] * (-1)
 
         main(
             df_ite=df_ite,
