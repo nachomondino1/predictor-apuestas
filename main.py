@@ -1093,7 +1093,7 @@ class Modeling:
         df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, param_dict)
 
         # G/P x rdo
-        d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones, var_resp=self.var_resp)) # KeyError G/P sin bank
+        d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones))
 
         # Calculo metricas de la bookie --> necesita df_match_odds
         d_metrics_bm = asses_model.calculate_bookie_metrics(df_predicciones)

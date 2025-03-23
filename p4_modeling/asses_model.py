@@ -391,19 +391,16 @@ def calculate_nan_metrics(df_predicciones):
     }
     return d
 
-def calculate_gp_by_result(df_predicciones, var_resp):
+def calculate_gp_by_result(df_predicciones, var_pred: str = 'predicted_result'):
     """
     Calcula el G/P por resultado (local, empate, visitante).
     """
-    if var_resp == 'result':
-        col_gp = 'G/P_sin_bank'
-    elif var_resp == 'expected_result':
-        col_gp = 'expected_G/P_sin_bank'
+    col_gp = 'G/P_sin_bank'
 
     # Dividir DataFrame por tipo de resultado
-    df_pred_home = df_predicciones[df_predicciones[var_resp] == 1]
-    df_pred_draw = df_predicciones[df_predicciones[var_resp] == 0]
-    df_pred_away = df_predicciones[df_predicciones[var_resp] == 2]
+    df_pred_home = df_predicciones[df_predicciones[var_pred] == 1]
+    df_pred_draw = df_predicciones[df_predicciones[var_pred] == 0]
+    df_pred_away = df_predicciones[df_predicciones[var_pred] == 2]
     
     # Calcular G/P por resultado
     gp_home = df_pred_home[col_gp].sum()
