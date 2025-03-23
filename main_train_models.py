@@ -489,23 +489,22 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [RandomForestClassifier()] # DecisionTreeClassifier(),
-    # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
+    l_modelos = [LogisticRegression(), RandomForestClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier() DecisionTreeClassifier(), XGBClassifier()
 
     # 1728 iteraciones
     if fast:
-        # l_modelos = [LogisticRegression()]
+        l_modelos = [LogisticRegression()]
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_sin_cups'], d_comps['comp_sin_b']], # d_comps['comp_solo_liga']
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b']], # d_comps['comp_solo_liga']
             },
             'construct': {
                 'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
                 'n_years_h2h': [2],
                 'segun_localia': [False, True],
                 'calculate_dif': [False, True], # False uso el enfoque de against?
-                'decay_rate': [0, 0.2, 0.5], 
+                'decay_rate': [0, 0.2], # 0.5
             },
             'clean_data_2': {
                 'n_years_to_select': [5, 10], # 3
@@ -513,7 +512,7 @@ def define_params_space(id_country, fast: bool = False):
             },
             'select': {
                 'thr_corr': [0.7, None], # 0.85,
-                'thr_fs': [0.15, 0.25, 0.4], # [0.1, 0.2, 0.3]
+                'thr_fs': [None, 0.1, 0.25],
             },
             'modeling': {
                 'val_size': [0.15],
@@ -551,31 +550,12 @@ def define_params_space(id_country, fast: bool = False):
     logger.info(f"Parametros para entrenar: {d_params}")
     return d_params, l_modelos
 
-def export_hiper_csv(d_params, ruta):
-
-    # Convertir el diccionario a una lista de combinaciones
-    param_names = []
-    param_values = []
-
-    for category, params in d_params.items():
-        for param, values in params.items():
-            param_names.append(f"{category}.{param}")
-            param_values.append(values)
-
-    # Generar todas las combinaciones posibles
-    combinations = list(itertools.product(*param_values))
-
-    # Crear DataFrame con combinaciones de hiperparámetros
-    df_params = pd.DataFrame(combinations, columns=param_names)
-
-    # Exportar a CSV
-    df_params.to_csv(ruta, index=False)
-
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [55, 59, 77, 148]
 
     data_unders = False
     update_sofifa = False if data_unders else False
