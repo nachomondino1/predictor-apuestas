@@ -278,7 +278,6 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -291,7 +290,7 @@ if __name__ == "__main__":
     
     # Defino metricas y pesos
     l_metrics = ['f1_score_away', 'f1_score_draw', 'error']  # paso 'expected_error' por poca corr entre si? ademas alta corr con expected_f1_score_away (74%)
-    l_weights = [0.25, 0.25, 0.5]
+    l_weights = [0.33, 0.33, 0.33]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
