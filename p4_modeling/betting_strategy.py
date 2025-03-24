@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from p3_data_preparation.construct_data import determine_expected_result
-from p4_modeling.asses_model import calculate_combined_metric, calculate_roi
+from p4_modeling.asses_model import calculate_combined_metric, calculate_roi, determine_roi, drop_old_metrics
 from utils import directories
 from itertools import product
 
@@ -48,7 +48,7 @@ class BettingStrategy:
                 'prob_dp': 0,
                 'curva': 'linear',
                 'm': 10,
-                'b': 0
+                'b': 0,
             }
         else:
             dic = {
@@ -56,6 +56,7 @@ class BettingStrategy:
                 'curva': [strategy], 
                 'm': list_m,
                 'b': [0],
+                'k': [1, 1.5, 2, 2.5, 3, 5, 10] if strategy == 'kelly_linear' else [None]
             }
     
         if self.verbose >= 1:
@@ -188,7 +189,7 @@ class BettingStrategy:
     # STAKE TO BET
     def determine_stake_to_bet(self, 
                                df, type_relation: str = 'equal',                                                                            # Estrategia
-                               p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None,                                   # Puntos de rectas
+                               p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, k: float = None,                                  # Puntos de rectas
                                porc_emergency: float = 0.5                                                                                  # Disminucion por relleno de emergencia
                                ):
         """
@@ -202,6 +203,7 @@ class BettingStrategy:
             p2: Segundo punto (x, y) para construir curva. (float)
             m: Pendiente de la recta. Solo cuando type_relation = 'linear'. (float)
             b: Ordenada al origen de la recta. Solo cuando type_relation = 'linear'. (float)
+            k: Constante que controla la sensibilidad para disminuir stake con kelly negativo. Cuanto mayor de 1 es, mas decrecerá el stake
 
         # Returns
             Dataframe pasado como parametro con nueva columna 'stake_to_bet'
@@ -243,7 +245,6 @@ class BettingStrategy:
 
             # Calcular m_ajustado para asegurar continuidad en kelly_criterion = 0
             m_ajustado = 2 * (df['prob_result_to_bet'] * m + b)
-            k = 2 # es una constante que controla la sensibilidad para disminuir stake con kelly negativo. Cuanto mayor de 1 es, mas decrecerá el stake
                       
             df['stake_to_bet'] = np.where(
                 df['kelly_criterion'] > 0, 
@@ -343,7 +344,7 @@ class BettingStrategy:
 
             # Emparejar cada parámetro con su nombre desde `param_grid`
             param_dict = dict(zip(d_params.keys(), params))
-            if self.verbose >= 1:
+            if self.verbose >= 0:
                 print(f"\nNº Combinacion: {cont}")
                 print(param_dict)
 
@@ -405,11 +406,11 @@ class BettingStrategy:
             df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
-        d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b']}
+        d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b'], 'k': param_dict['k']}
         df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
-    def select_best_parameters(self, data, roi_weight: int = 0.3):
+    def select_best_parameters(self, data, roi_weight: int = 1):
         
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
@@ -461,7 +462,12 @@ class BettingStrategy:
 
                 # Determinar mejor estrategia para el resultado      
                 n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
-         
+                
+                if pd.isna(n_comb):
+                    logger.error("La metrica es nan en todas las combinaciones. Eso puede ser porque todas las alternativas tienen el mismo roi y/o expected roi.")
+                    n_comb = 1
+                print("sefiqwiefjqiowfj", n_comb)
+                
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
                 d_metrics_res[pred] = d_metricas[n_comb]
@@ -552,13 +558,13 @@ class BettingStrategy:
             # Si no hay registros falla...
             if len(df_pred) > 0:
                 row_pred = df_hiper.loc[pred]
-                prob, curva, m, b = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b']
+                prob, curva, m, b, k = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b'], row_pred['k']
 
                 # Determino result to bet
                 df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
 
                 # Determino stake to bet
-                d_params_stake = {'type_relation': curva, 'm': m, 'b': b}
+                d_params_stake = {'type_relation': curva, 'm': m, 'b': b, 'k': k}
                 df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake)
 
                 df_comp = pd.concat([df_comp, df_pred], axis=0)
@@ -571,40 +577,45 @@ class BettingStrategy:
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    # Defino parametros
-    id_country = 77
-    n_model = 1339
-    model_name = 'LogisticRegression'
-    strategy = 'general'
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [59, 77, 148]
 
-    # Defino hiperparametros
-    asssess_models_in_prod = False
-    avoid_assess = True
-    select_best_model = True
-
-    # Defino variables
     d_countries = {
-        6: ["argentina", '2024-12-05'], 
-        48: ["england", '2024-12-23'],  # '2024-12-23'  '2025-01-02'
-        55: ["france", '2024-12-26'], 
-        59: ["germany", '2024-12-26'], 
-        77: ["italy", '2024-12-23'], 
-        # 77: ["italy", '2025-01-01'],
-        148: ["spain", '2024-12-25'], 
-        167: ["usa", '2024-12-05']
+        # 6: ["argentina", '2025-02-06'], 
+        48: ["england", '2025-03-23', 1071],
+        55: ["france", '2025-03-23', 918], 
+        59: ["germany", '2025-03-23', 385],
+        77: ["italy", '2025-03-23', 955],
+        148: ["spain", '2025-03-24', 1135]
         }
-    country = d_countries[id_country][0]
-    iteration_date = d_countries[id_country][1]
     
+    model_name = "LogisticRegression"
+    
+    for id_country in l_countries:
+        country = d_countries[id_country][0]
+        iteration_date = d_countries[id_country][1]
+        n_model = d_countries[id_country][2]
+    
+        # (4) ESTRATEGIA DE APUESTA
+        bs = BettingStrategy(country, iteration_date, verbose=0)
+        path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+        df_pred_test = pd.read_excel(path_test, index_col=0)
+        
+        # Dropeo old metrics (sino calcula mal las nuevas)
+        df_pred = drop_old_metrics(df_pred_test)
 
-    bs = BettingStrategy(country, iteration_date)
+        per_res = True
+        d_params = bs.define_hiperparameters(strategy='kelly_linear', big_space_m=True, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+        d_params['m'] = [10]
+        if per_res:
+            func = bs.define_model_betting_strategy_by_result
+        else:
+            func = bs.define_model_betting_strategy
+        df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1)
 
-    # Levanto el df del ultimo paso de la seleccion y obtengo el mejor modelo
-    df = pd.read_excel(f'{bs.BASE_PATH_sbm}/2_select_model/df_selected_model.xlsx', index_col=0)
-    row = df.head(1) # Selecciono la primera fila
-    logger.critical(f"El mejor modelo es el {row.index[0]} con ROIpp {row['roi_por_partido'].values[0]:.1f}")
+        ## Calculo metricas  ## Solo calculo el roi que es lo unico que cambia.. o que me interesa medir
+        roi_con_ea = determine_roi(df_pred_with_stra, var_resp='result')
 
-    from main_select_model import read_predicciones
-    df_pred = read_predicciones(n_model=n_model, model_name=model_name, assess=True, )
-
-    df = bs.define_model_betting_strategy_by_result(df_pred=df_pred, strategy="general", roi_weight=0.755)
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model//3_bet_strategy"
+        df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+        df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)

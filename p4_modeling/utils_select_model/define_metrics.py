@@ -36,7 +36,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         # print(df_pred.shape)
 
         # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = msm.drop_old_metrics(df_pred)
+        df_pred = asses_model.drop_old_metrics(df_pred)
 
         # Separo x% como "test" y (1-x)% como "prod"
         n_matches_test = int(perc_matches_test * len(df_pred))
@@ -58,6 +58,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
         d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_prod, suffix='_prod')
+        d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_prod, var_resp='expected_result', prefix='expected_', suffix='_prod')
         d_metrics_prod_sin_ea.update(asses_model.calculate_gp_by_result(df_prod))
 
         # Renombro metricas para evitar sobreescribirlas
@@ -77,6 +78,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
             "n_model": n_model,
             "model_name": model_name,
             **d_metrics_prod_sin_ea,  # Agrego métricas de producción (prod)
+            **d_metrics_prod_sin_ea_ex,
             **d_rois_prod
         }
 
@@ -127,15 +129,15 @@ if __name__ == "__main__":
 
     d_countries = {
         # train nuevos
-        48: ["england", '2025-03-22'],
-        55: ["france", '2025-03-22'], 
+        48: ["england", '2025-03-23'],
+        55: ["france", '2025-03-23'], 
         59: ["germany", '2025-03-23'],
         77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-23']
+        148: ["spain", '2025-03-24']
         }
     
     # Definir metrica a maximizar en produccion
-    corr_col = 'f1_score'
+    corr_col = 'roi' # error
     corr_metric = f'{corr_col}_prod'
 
     for id_country in l_countries:
@@ -173,6 +175,14 @@ if __name__ == "__main__":
 
         df_ct = pd.concat([df_ct, df_ite_test_with_metric], axis=0)
         print(df_ct.shape)
+
+        # Imprimir correlacion de metrica entre test y prod
+        corr = df_ite_test_with_metric[corr_metric].corr(df_ite_test_with_metric[corr_col]) * 100
+        print(f"La correlacion de la metrica {corr_col} entre test y prod es de: {corr:.1f}%")
+
+    # Imprimir correlacion de metrica entre test y prod
+    corr = df_ct[corr_metric].corr(df_ct[corr_col]) * 100
+    print(f"\n La correlacion de la metrica {corr_col} entre test y prod es de: {corr:.1f}%")
 
     df_ct = df_ct.dropna(axis=1, how='any')
     df_ct.to_excel("/Users/nachomondino/Desktop/AAA.xlsx")

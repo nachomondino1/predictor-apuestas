@@ -39,7 +39,7 @@ def main(
         df_pred = df_pred_test.copy()
 
         # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = msm.drop_old_metrics(df_pred)
+        df_pred = asses_model.drop_old_metrics(df_pred)
 
         # 📌 Aplicar estrategia "sin_ea"
         d_params = bs.define_hiperparameters(strategy='train')  

@@ -16,6 +16,12 @@ def calculate_metrics(
     """
     Calculo de metricas que no requieren mas que y_pred e y_test
     """
+    # Elimino filas con nan en variable respuesta (sobretodo para expected)
+    df_filt = df.dropna(subset=[var_resp])
+    if len(df) != len(df_filt):
+        logger.warning(f"La variable respuesta {var_resp} tiene {len(df) - len(df_filt)} valor/es NaN en {len(df)} partidos.")
+        df = df_filt.copy()
+
     # Obtengo numpy arrays
     y_test, y_pred = df[var_resp].values, df[var_pred].values
     y_pred_prob = df[[f'prob_class_{cls}' for cls in [0, 1, 2]]].values
@@ -469,6 +475,16 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
     # Normalizo columna
     df[f'{col}{norm_extension}'] = (df[col] - p_min) / (p_max - p_min)
     return df
+
+def drop_old_metrics(df_predicciones):
+    # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
+    columns_to_exclude = [
+        'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
+        'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank'
+        'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank'
+    ]
+    df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
+    return df_predicciones
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":

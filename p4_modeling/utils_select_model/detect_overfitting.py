@@ -40,6 +40,7 @@ def detect_overfitting_in_parameter(df):
             continue
 
         d[param] = {}
+        print(f"\n📊 Parámetro: {param}")
 
         # Iterar por cada valor único del parámetro
         for value in df[param].unique():
@@ -49,6 +50,9 @@ def detect_overfitting_in_parameter(df):
             else:  
                 idxs = df[param] == value
 
+            f1_test = df.loc[idxs, 'f1_score'].mean()
+            f1_train = df.loc[idxs, 'f1_score_train'].mean()
+
             test_error = df.loc[idxs, 'error'].mean()
             train_error = df.loc[idxs, 'error_train'].mean()
 
@@ -56,9 +60,12 @@ def detect_overfitting_in_parameter(df):
                 var = float('inf') if test_error > 0 else 0
             else:
                 var = (test_error - train_error) / train_error * 100
+                var_f1 = (f1_test - f1_train) / f1_test * 100
 
             d[param][value] = var
-            print(f"📊 Parámetro: {param} | Valor: {value} | Variación del error: {var:.0f}%")
+            # print(f"📊 Parámetro: {param} | Valor: {value} | Variación del error: {var:.0f}%")
+            # print(f"📊 Parámetro: {param} | Valor: {value} | \n\tVariación del f1_score: {var_f1:.0f}% \n\tVariación del error: {var:.0f}%")
+            print(f"Valor: {value} --> f1_train={f1_train:.1f}% f1_test={f1_test:.1f}% => Var: {var_f1:.0f}%")
 
     return d
 
@@ -111,10 +118,15 @@ def detect_overfitting(df_ite):
         error_test=results.get("error", {}).get("mean"),
     )
 
+    f1_test = results.get("f1_score", {}).get("mean")
+    f1_bet = df_ite['f1_score_bm'].values[0]
+    diff = (f1_test - f1_bet) / f1_bet *100
+
     corr_f1_score = df_ite['f1_score_train'].corr(df_ite['f1_score']) * 100
     corr_error = df_ite['error_train'].corr(df_ite['error']) * 100
     print(f"Correlacion f1_score train y test: {corr_f1_score:.1f}%")
     print(f"Correlacion error train y test: {corr_error:.1f}%")
+    print(f"\nMetric BET: {f1_bet:.1f} => Diff: {diff:.0f}%")
 
     print("\n✅ Análisis completado.")
     return results
@@ -148,15 +160,15 @@ def analyze_overfitting(f1_train, error_train, f1_cv, error_cv, f1_test, error_t
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [148]
 
     d_countries = { 
         # train nuevos
-        48: ["england", '2025-03-22'],
-        55: ["france", '2025-03-22'], 
-        59: ["germany", '2025-03-21'],
-        77: ["italy", '2025-03-21'],
-        148: ["spain", '2025-03-21']
+        48: ["england", '2025-03-23'],
+        55: ["france", '2025-03-23'], 
+        59: ["germany", '2025-03-23'],
+        77: ["italy", '2025-03-23'],
+        148: ["spain", '2025-03-24']
         }
     
     for id_country in l_countries:
