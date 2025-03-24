@@ -451,6 +451,14 @@ class BettingStrategy:
         # Por resultado
         for pred in [1, 0, 2]:
 
+            # Reducir stake de local
+            if pred == 1:
+                d_params_local = d_params.copy()  # Copia superficial (shallow copy)
+                d_params_local['m'] = [elem / 2 for elem in d_params_local['m']]
+                logger.warning(f"Reducción de m de local: {d_params_local['m']}")
+            else:
+                d_params_local = d_params  # Usa el original para los otros casos
+
             # Filtro predicciones por result
             df_result = df_pred[df_pred['predicted_result'] == pred] 
             if verbose >= 0:
@@ -459,7 +467,7 @@ class BettingStrategy:
             # Si hay predicciones del modelo para ese result
             if len(df_result) > 0:
                 # Calculo roi por cada set de hiper de apuesta
-                d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
+                d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params_local)
 
                 # Determinar mejor estrategia para el resultado      
                 n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
