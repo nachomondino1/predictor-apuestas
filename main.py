@@ -511,23 +511,42 @@ class DataPreparation:
 
                 for n_days in n_last_matches:
 
-                    # Calculo promedio en ultimos partidos
                     func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
-                    df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate)
 
-                    # Calculo diferencia o suma con against
-                    prefix = 'loc_' if segun_localia else ''
-                    col1, col2 = f'{prefix}mean_last_{n_days}_days_{variable}_home', f'{prefix}mean_last_{n_days}_days_{variable}_away'
-                    col1_ag, col2_ag = f'{prefix}mean_last_{n_days}_days_against_{variable}_home', f'{prefix}mean_last_{n_days}_days_against_{variable}_away'
+                    # Calculo promedio en ultimos partidos
+                    df = func(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate)
+                    col1, col2 = f'mean_last_{n_days}_days_{variable}_home', f'mean_last_{n_days}_days_{variable}_away'
+                    col1_ag, col2_ag = f'mean_last_{n_days}_days_against_{variable}_home', f'mean_last_{n_days}_days_against_{variable}_away'
+
+                    # Calculo por localia si segun_localia=True
+                    if segun_localia:
+                        df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate)
+                        
+                        prefix = 'loc_'
+                        col_loc_1, col_loc_2 = f'{prefix}mean_last_{n_days}_days_{variable}_home', f'{prefix}mean_last_{n_days}_days_{variable}_away'
+                        col1_loc_ag, col2_loc_ag = f'{prefix}mean_last_{n_days}_days_against_{variable}_home', f'{prefix}mean_last_{n_days}_days_against_{variable}_away'
 
                     if calculate_dif:
-                        df[f'{prefix}dif_mean_last_{n_days}_days_{variable}'] = df[col1] - df[col2]
-                        # cols_to_drop.extend([col1, col2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+                        df[f'dif_mean_last_{n_days}_days_{variable}'] = df[col1] - df[col2]
+                        cols_to_drop.extend([col1, col2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+
+                        if segun_localia:
+                            df[f'{prefix}dif_mean_last_{n_days}_days_{variable}'] = df[col_loc_1] - df[col_loc_2]
+                            cols_to_drop.extend([col_loc_1, col_loc_2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+
                     else:
                         df[f'sum_{col1}'] = df[col1] + df[col2_ag]
                         df[f'sum_{col2}'] = df[col2] + df[col1_ag]
-                        df[f'dif_{prefix}mean_last_{n_days}_days_{variable}'] = df[f'sum_{col1}'] - df[f'sum_{col2}']                    
+                        df[f'dif_mean_last_{n_days}_days_{variable}'] = df[f'sum_{col1}'] - df[f'sum_{col2}']                    
                         cols_to_drop.extend([col1, col2, col1_ag, col2_ag]) # Elimino estas variables? Ya tengo las columnas extra "sum"
+                        cols_to_drop.extend([f'sum_{col1}', f'sum_{col2}'])
+
+                        if segun_localia:
+                            df[f'sum_{col_loc_1}'] = df[col_loc_1] + df[col2_loc_ag]
+                            df[f'sum_{col_loc_2}'] = df[col_loc_2] + df[col1_loc_ag]
+                            df[f'dif_{prefix}mean_last_{n_days}_days_{variable}'] = df[f'sum_{col_loc_1}'] - df[f'sum_{col_loc_2}']                    
+                            cols_to_drop.extend([col_loc_1, col_loc_2, col1_loc_ag, col2_loc_ag]) # Elimino estas variables? Ya tengo las columnas extra "sum"
+                            cols_to_drop.extend([f'sum_{col_loc_1}', f'sum_{col_loc_2}'])
 
                 df.drop(columns=cols_to_drop, inplace=True)
 
