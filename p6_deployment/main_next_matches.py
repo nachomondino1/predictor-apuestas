@@ -674,7 +674,7 @@ class TrainingDataLoader():
 
             user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
             if user_input == 'y':
-                return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0}
+                return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
             
             raise ValueError(e)
 
@@ -1209,7 +1209,6 @@ def main(
         else:  
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
-            d_strategy['curva'] = 'kelly_linear' # solo en prod pero no en ea para no afectar el m seleccionado
 
         # Predigo sobre proximos partidos usando modelo cargado
         y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
@@ -1269,15 +1268,15 @@ if __name__ == "__main__":
     # Defino country, iteration date y modelo
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-22'], 
-        55: ["france", '2025-03-22'], 
-        59: ["germany", '2025-03-04'], 
-        77: ["italy", '2025-03-04'],
-        148: ["spain", '2025-03-04'], 
+        48: ["england", '2025-03-23'], 
+        55: ["france", '2025-03-23'], 
+        59: ["germany", '2025-03-23'], 
+        77: ["italy", '2025-03-23'],
+        148: ["spain", '2025-03-24'], 
         # 167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 77, 'model_name': "RandomForestClassifier"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1145, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
