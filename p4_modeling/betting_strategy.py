@@ -42,7 +42,8 @@ class BettingStrategy:
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [60, 80, 100, 120, 140] # [10, 20, 40, 60, 80, 100, 120] # no uso 200 por si acertó todo en ese rdo.
-        
+        list_k = [1, 1.5, 2, 2.5, 3, 5, 10] if strategy in ['kelly_linear', 'kelly'] else [None]
+
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': 0,
@@ -56,7 +57,7 @@ class BettingStrategy:
                 'curva': [strategy], 
                 'm': list_m,
                 'b': [0],
-                'k': [1, 1.5, 2, 2.5, 3, 5, 10] if strategy == 'kelly_linear' else [None]
+                'k': list_k
             }
     
         if self.verbose >= 1:
@@ -344,7 +345,7 @@ class BettingStrategy:
 
             # Emparejar cada parámetro con su nombre desde `param_grid`
             param_dict = dict(zip(d_params.keys(), params))
-            if self.verbose >= 0:
+            if self.verbose >= 1:
                 print(f"\nNº Combinacion: {cont}")
                 print(param_dict)
 
@@ -466,7 +467,6 @@ class BettingStrategy:
                 if pd.isna(n_comb):
                     logger.error("La metrica es nan en todas las combinaciones. Eso puede ser porque todas las alternativas tienen el mismo roi y/o expected roi.")
                     n_comb = 1
-                print("sefiqwiefjqiowfj", n_comb)
                 
                 # Guardo datos
                 d_hiper_res[pred] = d_hiper[n_comb]
@@ -578,7 +578,6 @@ class BettingStrategy:
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59, 77, 148]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
