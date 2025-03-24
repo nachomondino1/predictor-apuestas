@@ -663,7 +663,7 @@ class TrainingDataLoader():
                 logger.critical("Se levantó la estrategia de apuesta por resultado")
             else:
                 logger.warning("Se levanta una estrategia comun a todos los resultados")
-                return {'prob_dp': df_hiper['prob_dp'].values[0], 'curva': df_hiper['curva'].values[0], 'm': df_hiper['m'].values[0], 'b': df_hiper['b'].values[0]}
+                return {'prob_dp': df_hiper['prob_dp'].values[0], 'curva': df_hiper['curva'].values[0], 'm': df_hiper['m'].values[0], 'b': df_hiper['b'].values[0], 'k': df_hiper['k'].values[0]}
 
             if self.verbose >= 0:
                 logger.info("Hiperparametros cargados:")
@@ -1209,7 +1209,6 @@ def main(
         else:  
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
-            d_strategy['curva'] = 'kelly_linear' # solo en prod pero no en ea para no afectar el m seleccionado
 
         # Predigo sobre proximos partidos usando modelo cargado
         y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
@@ -1238,7 +1237,7 @@ def main(
             df = asses_model.determine_confidence_margin(df)
 
             # Reducir stake si confidence_margin < threshold
-            df.loc[(df['confidence_margin'] < 0.04) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.2
+            df.loc[(df['confidence_margin'] < 0.015) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.2
         
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
