@@ -131,17 +131,6 @@ def error_empty_dataframe(df):
         logger.error("El dataframe esta vació. Probablemente uno de los filtros eliminó todos los modelos que quedaban.")
         raise ValueError
 
-# Betting Strategy
-def drop_old_metrics(df_predicciones):
-    # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
-    columns_to_exclude = [
-        'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
-        'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank'
-        'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank'
-    ]
-    df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
-    return df_predicciones
-
 # Main
 def main(
         df_ite,
@@ -150,7 +139,6 @@ def main(
         iteration_date,
         l_metrics: list, 
         l_weights: list, 
-        select_candidates: bool = True,
         assess: bool = False,
         bet_strat: bool = True,
         update_missing: bool = True,
@@ -189,7 +177,7 @@ def main(
                 main_next_matches.main(d_run, id_country, iteration_date=iteration_date, export=d_run['export']) 
 
             # Por modelo
-            for idx, row in df_ite_filt.iterrows():
+            for idx, row in df_ite.iterrows():
                 n_model, model_name = row['n_iteration'], row['model_name']
                 logger.info(f'{n_model} {model_name}')
                 
@@ -221,7 +209,7 @@ def main(
                     df_pred = df_pred_test.copy()
 
                 # Dropeo old metrics (sino calcula mal las nuevas)
-                df_pred = drop_old_metrics(df_pred)
+                df_pred = asses_model.drop_old_metrics(df_pred)
 
                 # 📌 Aplicar estrategia "sin_ea"
                 d_params = bs.define_hiperparameters(strategy='train')  
@@ -280,28 +268,6 @@ def main(
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
     n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name_x']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
-    
-    # (4) ESTRATEGIA DE APUESTA
-    bs = betting_strategy.BettingStrategy(country, iteration_date, verbose=0)
-    path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
-    df_pred_test = pd.read_excel(path_test, index_col=0)
-    
-    # Dropeo old metrics (sino calcula mal las nuevas)
-    df_pred = drop_old_metrics(df_pred_test)
-
-    per_res = False
-    d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False) # kelly_linear  # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-    d_params['m'] = [10]
-    if per_res:
-        func = bs.define_model_betting_strategy_by_result
-    else:
-        func = bs.define_model_betting_strategy
-    df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1)
-    ## Calculo metricas  ## Solo calculo el roi que es lo unico que cambia.. o que me interesa medir
-    roi_con_ea = asses_model.determine_roi(df_pred_with_stra, var_resp='result')
-
-    df_strat.to_excel(f"{d_paths['path_bet_strategy']}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
-    df_pred_with_stra.to_excel(f"{d_paths['path_bet_strategy']}/predicciones_{n_model}_{model_name}.xlsx", index=True)
 
     # Exporto datos
     if export:
@@ -312,6 +278,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 

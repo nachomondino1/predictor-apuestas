@@ -36,7 +36,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         # print(df_pred.shape)
 
         # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = msm.drop_old_metrics(df_pred)
+        df_pred = asses_model.drop_old_metrics(df_pred)
 
         # Separo x% como "test" y (1-x)% como "prod"
         n_matches_test = int(perc_matches_test * len(df_pred))
