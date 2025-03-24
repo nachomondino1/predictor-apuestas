@@ -315,18 +315,16 @@ if __name__ == "__main__":
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-22'],
-        55: ["france", '2025-03-22'], 
+        48: ["england", '2025-03-23'],
+        55: ["france", '2025-03-23'], 
         59: ["germany", '2025-03-23'],
         77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-23']
+        148: ["spain", '2025-03-24']
         }
     
     # Defino metricas y pesos
-    # l_metrics = ['f1_score_away', 'f1_score_draw', 'roi'] # Por exp y viendo define_metrics de eng y fra?
-    l_metrics = ['f1_score', 'f1_score_draw'] # Segun el nuevo define_metrics con all_countries usando 75% test y 25% prod con ROI
-    l_metrics = ['accuracy_draw', 'roi'] # Segun el nuevo define_metrics con all_countries usando 75% test y 25% prod con F1_SCORE
-    l_weights = [0.5, 0.5]
+    l_metrics = ['f1_score_away', 'f1_score_draw', 'error']  # paso 'expected_error' por poca corr entre si? ademas alta corr con expected_f1_score_away (74%)
+    l_weights = [0.25, 0.25, 0.5]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -337,6 +335,7 @@ if __name__ == "__main__":
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
 
+        # para maximizar error en metrica
         df_ite['error'] = df_ite['error'] * (-1)
         df_ite['expected_error'] = df_ite['expected_error'] * (-1)
 

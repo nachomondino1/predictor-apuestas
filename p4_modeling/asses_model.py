@@ -16,6 +16,12 @@ def calculate_metrics(
     """
     Calculo de metricas que no requieren mas que y_pred e y_test
     """
+    # Elimino filas con nan en variable respuesta (sobretodo para expected)
+    df_filt = df.dropna(subset=[var_resp])
+    if len(df) != len(df_filt):
+        logger.warning(f"La variable respuesta {var_resp} tiene {len(df) - len(df_filt)} valor/es NaN en {len(df)} partidos.")
+        df = df_filt.copy()
+
     # Obtengo numpy arrays
     y_test, y_pred = df[var_resp].values, df[var_pred].values
     y_pred_prob = df[[f'prob_class_{cls}' for cls in [0, 1, 2]]].values
