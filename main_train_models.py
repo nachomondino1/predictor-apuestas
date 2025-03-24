@@ -5,6 +5,7 @@ from utils.set_up_logging import logger
 import pandas as pd
 import numpy as np
 import datetime
+import itertools
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
@@ -30,9 +31,11 @@ def comprehensive_search(
     l_modelos, 
     data_unders: bool = True,
     data_prep_int: bool = True,
+    data_prep_int_miss: bool = True,
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
+    checkpoint: int = 10, 
     export: bool = True
 ):
     """
@@ -80,7 +83,8 @@ def comprehensive_search(
     """
     # Definicion de variables
     cont_iter = 0
-    df_iteration, df_ite_test = pd.DataFrame(), pd.DataFrame()
+    df_iteration, df_ite_train, df_ite_test = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    rows_ite_list, rows_train_list, rows_test_list = [], [], []
     dp, mo = DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
@@ -98,7 +102,7 @@ def comprehensive_search(
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
- 
+    
     ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
     if data_unders:
         directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa])
@@ -125,7 +129,7 @@ def comprehensive_search(
     if data_prep_int:
 
         # Format data
-        df_match, df_match_player, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_player_fifa_sofifa, reformat=True, export=True)
+        df_match, df_match_player, df_match_odds, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_match_odds, df_player_fifa_sofifa, reformat=True, export=True)
         
         # Clean data
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=True)
@@ -133,24 +137,31 @@ def comprehensive_search(
         # Integrate data (tengo que volver a integrar... para generar df_player de fs bien y tener los nuevos jugadores que surgen en missing y mapearlos..)
         # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
         df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
-    
-        ####################################################################### DATA PREPARATION (MISSING) #######################################################################
-        # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
-        ## Eliminar preparacion de missing actual
-        l_dirs_to_remove = [
-            f'data/{country}/p6_deployment/missing/data_preparation',
-            f'data/{country}/p6_deployment/missing/old_updated/df_integrated.xlsx'
-        ]    
-        directories.remove_directories(directories=l_dirs_to_remove)
-
-        ## Volver a preaparar missing
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        main_next_matches.main(d_run, id_country, iteration_date=date, extract_missing=False, prepare_missing=True, export=d_run['export'])
+        df_integrated.to_excel(f'{BASE_DIR_flashscore}/df_integrated.xlsx', index=True) # Exporto como df_int_old_updated
 
     else:
         df_integrated = pd.read_excel(f'{BASE_DIR_dp}/df_integrated.xlsx', index_col=0)
         print(df_integrated)
-    
+
+     ####################################################################### DATA PREPARATION (MISSING) #######################################################################
+    # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
+    if data_prep_int_miss:
+
+        # Levanto datos missing (solamente missing)
+        df_match_miss = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+        idxs_missing = df_match_miss.index
+        print(df_match_miss.shape)
+
+        ## De df_integrated selecciono unicamente los missing (df_integrated ya tiene missing... no tengo que volver a integrar)
+        df_integrated_missing = df_integrated[df_integrated.index.isin(idxs_missing)]
+        print(df_integrated_missing.shape)
+
+        if len(df_match_miss) != len(df_integrated_missing):
+            logger.error("Fallo la obtencion del df_integrated_missing a partir del df_integrated. Revisar.")
+            raise ValueError
+        
+        df_integrated_missing.to_excel(f'data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
+        
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
     # Determino registros a usar en test_set
     n_reg_test = d_params['modeling'].pop('n_reg_test', None)     # Obtener el valor de 'n_reg_test' y eliminarlo del diccionario
@@ -179,15 +190,15 @@ def comprehensive_search(
         for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
             # Asigno valor a cada hiperpametro
-            n_last_matches, n_years_h2h, segun_localia, calculate_dif = param_values_2
+            n_last_matches, n_years_h2h, segun_localia, calculate_dif, decay_rate = param_values_2
             if verbose >= 0:
                 logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
                 print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; calculate_dif:{calculate_dif}')
 
             # Construyo datos
-            path_cons = f"{path_clean}__{n_last_matches}_{n_years_h2h}_{segun_localia}_{calculate_dif}"
+            path_cons = f"{path_clean}__{n_last_matches}_{n_years_h2h}_{segun_localia}_{calculate_dif}_{decay_rate}"
             path_construct = f'{BASE_DIR_dp}/construct_data/df_constructed_{path_cons}.xlsx'
-            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, export=True)
+            df_constructed = dp.construct_data(df_int_clean, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, decay_rate=decay_rate, export=True)
             if export:
                 df_constructed.to_excel(path_construct, index=True)
 
@@ -248,53 +259,81 @@ def comprehensive_search(
                             X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
 
                             # Entreno y evaluo modelos
-                            df_metrics = mo.train_and_assess_models(
+                            rows_train, rows_test = mo.train_and_assess_models(
                                 X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
                                 l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
                                 df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled_columns,
                                   k=k)
                         
-                        if len(df_metrics) > 0:
+                        if len(rows_test) > 0:
                             # Guardo datos en dataframe
-                            row_data = {
+                            rows_ite = {
                                 'n_iteration': cont_iter, 
                                 'comp_to_select': comp_to_select,
-                                'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif,
+                                'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif, 'decay_rate': decay_rate,
                                 'thr_corr': thr_corr, 'thr_fs': thr_fs,
                                 'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
                                 'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
                                 'k': k
                                 }
                             
-                            # Concateno y exporto datos
-                            df_iteration = pd.concat([df_iteration, pd.DataFrame([row_data])], axis=0)
-                            df_ite_test = pd.concat([df_ite_test, df_metrics], ignore_index=True) 
-                            df_iteration_comp = pd.merge(df_iteration, df_ite_test, on='n_iteration', how='outer')     # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                            # Acumular filas en listas
+                            rows_train_list.extend(rows_train)  # Agregar todos los elementos de rows_train (si es una lista de diccionarios)
+                            rows_test_list.extend(rows_test)    # Agregar todos los elementos de rows_test (si es una lista de diccionarios)
+                            rows_ite_list.append(rows_ite)
 
-                            if export:    
-                                df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
-                                df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
+                            if cont_iter % checkpoint == 0 and export:
+                                logger.critical("Checkpoint. Guardado de datos")
+                    
+                                # Concatenar todas las filas acumuladas en DataFrames
+                                df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
+                                df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
+                                df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+
+                                # Exportar
+                                df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
+                                df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
+                                df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
+
+                                # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                                df_temp = pd.merge(df_iteration, df_ite_train, on='n_iteration', how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+                                df_iteration_comp = pd.merge(df_temp, df_ite_test, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
                                 df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
-                        if verbose >= 0:
-                            current_train = time.time()
-                            ritmo = cont_iter / ((current_train - start_train) / 60 / 60)  # ite / hora
-                            ite_restantes = n_iter - cont_iter
-                            horas_restantes = ite_restantes / ritmo
-                            min_restantes = horas_restantes * 60
-                            horas_train = n_iter / ritmo
-                            logger.info(f"Dado el ritmo de {ritmo:.1f} ite/hora (ideal >60) y que quedan {ite_restantes} iteraciones, el tiempo estimado de finalizacion es en {min_restantes:.1f} minutos (={horas_restantes:.1f} horas)") # Proyeccion de cuantas horas quedan.
-                            logger.info(f"Tiempo total de entrenamiento proyectado de {horas_train:.1f} horas.")
-                            print()
+                                # Limpiar listas después de exportar
+                                rows_ite_list.clear()
+                                rows_train_list.clear()
+                                rows_test_list.clear()
+
+                                if verbose >= 0:
+                                    current_train = time.time()
+                                    ritmo = cont_iter / ((current_train - start_train) / 3600)  # iteraciones por hora
+                                    horas_restantes = (n_iter - cont_iter) / ritmo
+                                    horas_train = n_iter / ritmo
+
+                                    logger.info(f"Ritmo: {ritmo:.1f} iteraciones/hora (ideal >60). Quedan {n_iter - cont_iter} iteraciones.")
+                                    logger.info(f"Tiempo estimado para finalizar: {horas_restantes:.1f} horas (~{horas_restantes * 60:.1f} minutos).")
+                                    logger.info(f"Tiempo total proyectado de entrenamiento: {horas_train:.1f} horas.")
+
+    logger.critical("Guardado final. Exportando datos acumulados restantes.")
+    if rows_train_list or rows_test_list or rows_ite_list:  # Verificar si hay filas acumuladas pendientes
+        df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
+        df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
+        df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+
+        # Exportar datos restantes a disco
+        df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
+        df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
+        df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
+
+    # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+    df_temp = pd.merge(df_iteration, df_ite_train, on='n_iteration', how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+    df_iteration_comp = pd.merge(df_temp, df_ite_test, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
+    df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
     if verbose >= 0:
         end_train = time.time()
         logger.info(f"Tiempo total de entrenamiento: {(end_train - start_train) / 60:.1f} minutos")
-
-    # Guardo datos de todas las iteraciones
-    if export:
-        df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration_train.xlsx', index=False)
-        df_ite_test.to_excel(f'{BASE_DIR_mod}/df_iteration_test.xlsx', index=False)
 
     return df_iteration_comp
 
@@ -316,7 +355,7 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = True, verbose: int = 0):
+def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
     """    
@@ -450,8 +489,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    # l_modelos = [DecisionTreeClassifier(), XGBClassifier(), SVC(), MLPClassifier()]   # , RandomForestClassifier(), GradientBoostingClassifier()
-    # l_modelos = [LogisticRegression(), DecisionTreeClassifier(), XGBClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier()
+    l_modelos = [LogisticRegression(), RandomForestClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier() DecisionTreeClassifier(), XGBClassifier()
 
     # 1728 iteraciones
     if fast:
@@ -459,26 +497,27 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b']], #  d_comps['all_comp']
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b']], # d_comps['comp_solo_liga']
             },
             'construct': {
-                'n_last_matches': [[5], [5, 15]],  # [15], # Variables historicas en ultimos n partidos
+                'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
                 'n_years_h2h': [2],
-                'segun_localia': [True, False, 'both'],
-                'calculate_dif': [True, False],
+                'segun_localia': [False, True],
+                'calculate_dif': [False, True], # False uso el enfoque de against?
+                'decay_rate': [0, 0.2], # 0.5
             },
             'clean_data_2': {
-                'n_years_to_select': [1, 2, 3, 5], # 10
-                'fill_na': [None, "0", 'ml'], 
+                'n_years_to_select': [5, 10], # 3
+                'fill_na': [None, "0"],
             },
             'select': {
-                'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [0.1, 0.2, 0.3],  # 0.5
+                'thr_corr': [0.7, None], # 0.85,
+                'thr_fs': [None, 0.1, 0.25],
             },
             'modeling': {
-                'val_size': [0.1],
-                'n_reg_test': [50], # 25 es muy poco para selec el modelo
-                'bal_type': ['under'], # None, 
+                'val_size': [0.15],
+                'n_reg_test': [100], # 25 es muy poco para selec el modelo
+                'bal_type': ['under'], #  None
                 'k': [5]
             }
         }
@@ -509,10 +548,6 @@ def define_params_space(id_country, fast: bool = False):
         }
  
     logger.info(f"Parametros para entrenar: {d_params}")
-
-    # Exportar un archivo .txt con los hiperparametros probados. --> Asi tengo que hiper probe en cada entrenamiento...
-    # ...
-
     return d_params, l_modelos
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
@@ -520,11 +555,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77, 48]
+    l_countries = [55, 59, 77, 148]
 
-    data_unders = True
+    data_unders = False
     update_sofifa = False if data_unders else False
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
@@ -532,18 +568,26 @@ if __name__ == "__main__":
 
         country = d_countries[id_country]
 
-        # Determino date 
-        date = datetime.datetime.now().date() # datetime.datetime.now().date() 
+        # Determino date  
+        date = datetime.datetime.now().date() # Si queres usar fecha en especifico: datetime.datetime.strptime('2025-03-16', '%Y-%m-%d').date()
         logger.info(f"Country: {country} Date: {date}")
         
         # Preparao datos, entreno modelos y evaluo en df_test
         # Defino hiperparametros a probar
         d_params, l_modelos = define_params_space(id_country, fast=True)
         
+        # Exportar un archivo .txt con los hiperparametros probados. --> Asi tengo que hiper probe en cada entrenamiento...
+        df_params = pd.DataFrame.from_dict(
+            {(cat, param): values for cat, params in d_params.items() for param, values in params.items()},
+            orient="index"
+        )
+
         # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
         df_iteration_comp = comprehensive_search(
             country=country, date=date, 
             data_unders=data_unders, update_sofifa=update_sofifa, 
-            data_prep_int=data_prep_int, 
+            data_prep_int=data_prep_int, data_prep_int_miss=data_prep_int_miss,
             d_params=d_params, l_modelos=l_modelos
             )
+
+        df_params.to_csv(f'data/{country}/p4_modeling/{date}/hyperparameters.csv')

@@ -270,7 +270,8 @@ class DataPreparationNew(DataPreparation):
         return df
     
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
-                           n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, columns_used: list, verbose: int = 0):
+                           n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, decay_rate: float,
+                           columns_used: list, verbose: int = 0):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -296,7 +297,16 @@ class DataPreparationNew(DataPreparation):
             self.determine_stats_to_use()
             # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
             df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(df_concat_last, n_last_matches=n_last_matches, n_years_h2h=n_years_h2h, segun_localia=segun_localia, calculate_dif=calculate_dif, prod=True, export=False)
+            df_constructed = self.construct_data(
+                df_concat_last, 
+                n_last_matches=n_last_matches,
+                n_years_h2h=n_years_h2h, 
+                segun_localia=segun_localia, 
+                calculate_dif=calculate_dif, 
+                decay_rate=decay_rate, 
+                prod=True, 
+                export=False
+                )
             df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
 
         # Si no hay "ultimos partidos"
@@ -366,7 +376,7 @@ class DataPreparationNew(DataPreparation):
             df_etiquetas.to_excel(f'{self.BASE_DIR}/df_etiquetas_actualizado.xlsx', index=False) 
         return df
 
-    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_scaled, comp_to_select, columns_selected, verbose: int = 0):
+    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_scaled, columns_selected, verbose: int = 0):
         """
         Filtrado por competencias y escalado de datos.
         """
@@ -378,18 +388,23 @@ class DataPreparationNew(DataPreparation):
         # Para evitar ciertas competencias --> Moverlo a clean antes de construir?
         n_col_inic = len(df.columns)
 
-        # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
-        try:
-            df = df.loc[:, columns_scaled]
-            if verbose >= 1:
-                logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
+        # El scaler necesita exactamenete las mismas cols que escaló durante el train (no se por que ger tiene loc_efficiency de mas...)
+        missing_cols = set(columns_scaled) - set(df.columns)
+        extra_cols = set(df.columns) - set(columns_scaled)
 
-        except KeyError as e:
-            logger.error("Las columnas del scaler no coinciden con las de los proximos partidos.")
-            if verbose >= 1:
-                logger.info(df)
-                logger.info(df.shape)
-            raise e
+        if missing_cols:
+            logger.warning(f"Faltan columnas en los nuevos datos: {missing_cols}")
+            for col in missing_cols:
+                df[col] = 0  # O usa df[col] = df[col].mean() si prefieres
+            
+        if extra_cols:
+            logger.info(f"Se eliminarán columnas extra: {extra_cols}")
+            df = df[columns_scaled]  # Ahora sí seleccionas las columnas correctas
+
+        # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
+        df = df.loc[:, columns_scaled]
+        if verbose >= 1:
+            logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
         
         # Tratamiento de NaN values (antes de escalar para que el 0 realmente sea 0.)
         df, df_emergency_fill = self.treat_nan_values_new(df=df, columns_selected=columns_selected)
@@ -575,13 +590,16 @@ class TrainingDataLoader():
         d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
         if pd.isna(row_hiper['fill_na']):  # Verifica si es NaN o None
             d['fill_na'] = row_hiper['fill_na'] = None
+        elif isinstance(row_hiper['fill_na'], float):
+            d['fill_na'] = '0'
         else:
             d['fill_na'] = row_hiper['fill_na']
+        d['decay_rate'] = 0 if row_hiper['decay_rate'] == 0.0 else row_hiper['decay_rate'] 
         ## Select_data
         d['selected_columns'] = selected_columns
 
         self.path_clean = f'{d['comp_to_select']}'
-        self.path_construct = f'{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['calculate_dif']}'
+        self.path_construct = f'{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['calculate_dif']}_{d['decay_rate']}'
         self.path_clean_2 = f'{d['n_years_to_select']}_{d['fill_na']}'
 
         if self.verbose >= 0:
@@ -943,14 +961,13 @@ def main(
 
         # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
         df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
+        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
 
         if export and len(df_match_miss_new) > 0:
             # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
             mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
             mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
-
-        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss)}")
-
+        
         # Si extrajo missing
         if len(df_match_miss_new) > 0:
             
@@ -1140,19 +1157,21 @@ def main(
         ## Construct
         ### Selecciono los ultimos partidos de los ya jugados para construir
         logger.info("Seleccion de ultimos partidos para construccion de variables...")
-        df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=max(d_hiper['n_last_matches']) * 8) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
+        df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=max(d_hiper['n_last_matches'])) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
         df_last_old_matches_h2h = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=d_hiper['n_years_h2h']*365 + 100) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
         ### Construyo datos
         df = dp.construct_data_new(
             df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
-            n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], calculate_dif=d_hiper['calculate_dif'],columns_used=columns_scaled
+            n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], 
+            calculate_dif=d_hiper['calculate_dif'], decay_rate=d_hiper['decay_rate'],
+            columns_used=columns_scaled
             )
         
         ## Tag
         df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
         
         ## Clean data 2
-        df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, comp_to_select=comp_public, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
+        df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
         
         ## Select
         df = dp.select_data_new(df, d_hiper['selected_columns'])
@@ -1192,8 +1211,13 @@ def main(
             d_strategy = lo.load_modeling_hyperparameters()
             d_strategy['curva'] = 'kelly_linear' # solo en prod pero no en ea para no afectar el m seleccionado
 
-        df_predicciones = mo.assess_model(model=lo.load_model(), X_test=df, y_test=None, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled, prod=True)
-        df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
+        # Predigo sobre proximos partidos usando modelo cargado
+        y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
+        df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
+
+        # Concateno dfs + Reformateo teams
+        df_predicciones = mo.prepare_dataframe_to_assess_with_roi(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)         # Concateno todos los dfs en uno solo 
+        # df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
@@ -1237,23 +1261,23 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 148
+    id_country = 48
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 0.5
 
     # Defino country, iteration date y modelo
     d_countries = {
-        6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-03'], 
-        55: ["france", '2025-03-03'], 
+        # 6: ["argentina", '2025-02-06'], 
+        48: ["england", '2025-03-22'], 
+        55: ["france", '2025-03-22'], 
         59: ["germany", '2025-03-04'], 
         77: ["italy", '2025-03-04'],
         148: ["spain", '2025-03-04'], 
-        167: ["usa", '2024-12-05']
+        # 167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 2232, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 77, 'model_name': "RandomForestClassifier"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1272,7 +1296,7 @@ if __name__ == "__main__":
             df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
 
         elif value == "prod":
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=0.3, export=True) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=1, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")

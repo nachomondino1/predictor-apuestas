@@ -6,6 +6,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from p3_data_preparation import clean_data
 from p4_modeling.build_model import select_best_hiperparameters
+from p4_modeling.asses_model import normalize_column
 from sklearn.feature_selection import SelectKBest, f_classif, chi2  # modelos estadisticos
 from sklearn.feature_selection import f_regression  # via
 from sklearn.feature_selection import RFE  # rfe
@@ -118,59 +119,56 @@ class FeatureSelection():
     def __init__(self, graficar_cada_metodo: bool = False) -> None:
         self.k = 5 # Cantidad de Folds
         self.bayes = False # Random tarda banda y Logistic +
-        self.scoring = 'f1_macro' # Pues el dataset no esta balanceado.
-        self.all_tuning = False
         self.verbose = 1
         self.graficar_cada_metodo = graficar_cada_metodo
 
-    def modelos_estadisticos(self, X, y):
+    # Definir función según tipo de variable respuesta
+    def anova(self, X, y):
         """
-        Calculo de importancia de cada variable segun los modelos estadisticos.
+        Realiza un análisis de importancia de características usando ANOVA (Analysis of Variance).
+        Esta función puede usarse tanto para problemas de clasificación (variable respuesta discreta)
+        como para problemas de regresión (variable respuesta continua).
 
-        # Parameters
-            X: Dataframe con variables predictoras. (DataFrame)
-            y: Dataframe solo con variable respuesta. (DataFrame)
+        Parámetros:
+        - X: DataFrame con las variables predictoras (independientes).
+        - y: Variable respuesta (dependiente). Puede ser continua o discreta.
 
-        # Returns
-            Dataframe. Importancia por variable. (Dataframe)
+        Retorna:
+        - Un DataFrame con las características y sus estadísticas de importancia (mod_estadisticos).
         """
-        # Definicion de variables
         l_features, l_scores = [], []
 
-        # Selecciono variables numericas y categoricas
+        # Divido variables predictoras en categoricas (string) y numericas (int o float)
         numeric_vars = X.select_dtypes(include=['float64', 'int64']).columns.tolist()
         categorical_vars = X.select_dtypes(include='object').columns.tolist()
 
-        # Variables predictoras numéricas
+        # Seleccionar pruebas estadísticas según el tipo de variable respuesta (clasificación o regresión)
+        if pd.api.types.is_integer_dtype(y):  # Clasificación
+            score_func_num = f_classif  # para variables predictoras numéricas (ANOVA F-test para clasificación)
+            score_func_cat = chi2  # para variables predictoras categóricas (Chi-cuadrado para clasificación)
+        else:  # Regresión
+            score_func_num = f_regression  # para variables predictoras numéricas (ANOVA F-test para regresion)
+            score_func_cat = None  # No se usa chi2 en regresión
+
+        # Análisis de importancia para variables predictoras numéricas
         if len(numeric_vars) > 0:
-            numeric_X = X[numeric_vars].clip(lower=0)  # Asegurar que los valores sean no negativos
-            numeric_selector = SelectKBest(score_func=f_classif, k='all')  # Utiliza ANOVA o f-score, selecciona las 3 mejores características
-            numeric_selector.fit_transform(numeric_X, y)  # numeric_X_selected
-            numeric_selected_features = [numeric_vars[i] for i in range(len(numeric_vars)) if numeric_selector.get_support()[i]]
+            numeric_selector = SelectKBest(score_func=score_func_num, k='all')
+            numeric_selector.fit(X[numeric_vars], y)
             numeric_scores = numeric_selector.scores_
 
-            l_features += numeric_selected_features
+            l_features += numeric_vars
             l_scores += list(numeric_scores)
 
-        # Variables predictoras categóricas
-        if len(categorical_vars) > 0:
-            categorical_X = X[categorical_vars]
-            categorical_selector = SelectKBest(score_func=chi2, k='all')  # Utiliza chi-cuadrado, selecciona las 3 mejores características
-            categorical_selector.fit_transform(categorical_X, y)  # categorical_X_selected
-            categorical_selected_features = [categorical_vars[i] for i in range(len(categorical_vars)) if categorical_selector.get_support()[i]]
+        # Análisis de importancia para variables predictoras categoricas
+        if len(categorical_vars) > 0 and score_func_cat:
+            categorical_selector = SelectKBest(score_func=score_func_cat, k='all')
+            categorical_selector.fit(X[categorical_vars], y)
             categorical_scores = categorical_selector.scores_
 
-            l_features += categorical_selected_features
+            l_features += categorical_vars
             l_scores += list(categorical_scores)
 
-        # Obtengo importancias por variable
         df_importance = pd.DataFrame({'mod_estadisticos': l_scores}, index=l_features)
-        # print("Resultados estadisticos: \n", df_importance)
-
-        # Grafico variables y su importancia
-        if self.graficar_cada_metodo:
-            self.graficar_importancia_atrib(X=df_importance['mod_estadisticos'], y=df_importance.index)
-
         return df_importance
 
     def random_forest(self, X, y):
@@ -188,8 +186,16 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparámetros
-        model, params, best_metric, results  = select_best_hiperparameters(RandomForestClassifier(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=self.k, 
-                                                                           bayes=self.bayes, all_tuning=self.all_tuning, scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(
+            RandomForestClassifier(), 
+            X_train=X_train, 
+            y_train=y_train, 
+            X_val=X_val, 
+            y_val=y_val, 
+            k=self.k, 
+            bayes=self.bayes, 
+            verbose=self.verbose
+            )  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'random_forest': model.feature_importances_}, index=X.columns)   # AttributeError: 'BayesSearchCV' object has no attribute 'feature_importances_'
@@ -198,30 +204,6 @@ class FeatureSelection():
         # Grafico variables y su importancia
         if self.graficar_cada_metodo:
             self.graficar_importancia_atrib(X=df_importance['random_forest'], y=df_importance.index)
-
-        return df_importance
-
-    def via(self, X, y):
-        """
-        Calculo de importancia de cada variable segun via.
-
-        # Parameters
-        X: Dataframe con variables predictoras. (DataFrame)
-        y: Dataframe solo con variable respuesta. (DataFrame)
-        graf: Boolean. True para graficar importancia por variable. (bool)
-
-        # Return
-        Dataframe. Importancia por variable. (Dataframe)
-        """
-        # Entreno modelo
-        scores, _ = f_regression(X, y)
-
-        # Obtengo importancias por variable
-        df_importance = pd.DataFrame({'via': scores}, index=X.columns)
-        # print("Resultados via: \n", df_importance)
-
-        if self.graficar_cada_metodo:
-            self.graficar_importancia_atrib(X=df_importance['via'], y=df_importance.index)
 
         return df_importance
 
@@ -244,8 +226,15 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X_scaled, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelos buscando los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(LogisticRegression(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=self.k, 
-                                                                           bayes=self.bayes, all_tuning=self.all_tuning,  scoring=self.scoring, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(
+            LogisticRegression(), 
+            X_train=X_train, 
+            y_train=y_train, 
+            X_val=X_val, 
+            y_val=y_val, 
+            k=self.k, 
+            bayes=self.bayes, 
+            verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Entreno modelo RFE a partir de Logistic
         rfe = RFE(estimator=model, n_features_to_select=n_features)
@@ -277,8 +266,15 @@ class FeatureSelection():
         X_train, X_val, y_train, y_val= train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
         # Entreno modelo con los mejores hiperparametros
-        model, params, best_metric, results  = select_best_hiperparameters(Lasso(), X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=self.k,  scoring=self.scoring,
-                                                                           bayes=self.bayes, all_tuning=self.all_tuning, verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
+        model, params, best_metric, results  = select_best_hiperparameters(
+            Lasso(), 
+            X_train=X_train, 
+            y_train=y_train, 
+            X_val=X_val, 
+            y_val=y_val, 
+            k=self.k,  
+            bayes=self.bayes,
+            verbose=self.verbose)  # Tarda puesto que X no es del tamaño de X_val sino que de X_train
 
         # Obtengo importancias por variable
         df_importance = pd.DataFrame({'lasso': model.coef_}, index=X.columns)
@@ -329,15 +325,17 @@ class FeatureSelection():
         :param df_importance: Dataframe con importancia de cada variable segun cada metodo. (DataFrame)
         :return: Dataframe con importancias normalizadas. (DataFrame)
         """
-        # Normalizar cada columna del DataFrame --> para poder sumar las importancias de cada metodo
-        df_normalized = pd.DataFrame(scale(df_importance), columns=df_importance.columns, index=df_importance.index)
+        for col in df_importance.columns:
+            # remove inf
+            df_importance = df_importance.replace([np.inf, -np.inf], 0)
+            df_importance = normalize_column(df_importance, col, norm_extension="_norm")
 
-        # Calcular la suma de columnas para cada fila
-        df_normalized['suma_de_imp'] = df_normalized.sum(axis=1)
+        # Seleccionar solo las columnas normalizadas
+        norm_columns = [col for col in df_importance.columns if col.endswith('_norm')]
 
-        # Re-escalo la variable "suma_de_imp" para que sea de 0 a 1 y facilitar la seleccion de variables
-        df_normalized['suma_de_imp_norm'] = (df_normalized['suma_de_imp'] - df_normalized['suma_de_imp'].min()) / (df_normalized['suma_de_imp'].max() - df_normalized['suma_de_imp'].min())
-        return df_normalized
+        # Calcular el promedio de las columnas normalizadas y almacenarlo en una nueva columna
+        df_importance['suma_de_imp_norm'] = df_importance[norm_columns].mean(axis=1)
+        return df_importance
 
 def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = None, graf: bool = False):
     """
@@ -359,10 +357,16 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
 
     # Detemino importancia de cada variable para cada modelo
     df_importance = pd.DataFrame(index=X.columns)
-    # df_importance = df_importance.merge(fs.modelos_estadisticos(X, y), left_index=True, right_index=True)  # Solo levanta dt_loc y dt_vis, el resto da 0...
-    df_importance = df_importance.merge(fs.via(X, y), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.random_forest(X, y), left_index=True, right_index=True)
-    df_importance = df_importance.merge(fs.rfe(X, y), left_index=True, right_index=True)
+
+    # Verificar si es continua o discreta
+    if pd.api.types.is_integer_dtype(y):  
+        print("La variable respuesta es DISCRETA (clase)")
+        df_importance = df_importance.merge(fs.anova(X, y), left_index=True, right_index=True)
+
+    # Código para clasificación
+    elif pd.api.types.is_numeric_dtype(y):  
+        print("La variable respuesta es CONTINUA (regresión)")
+        df_importance = df_importance.merge(fs.anova(X, y), left_index=True, right_index=True)
 
     # Normalizo importancias para poder sumarlas
     df_normalized = fs.sum_and_normalize_importances(df_importance)

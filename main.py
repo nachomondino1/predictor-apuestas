@@ -14,6 +14,7 @@ from p3_data_preparation import format_data, select_data, clean_data, construct_
 from sklearn.preprocessing import StandardScaler
 import joblib
 ## Modeling
+from sklearn.metrics import log_loss
 from p4_modeling import generate_test_design, build_model, asses_model, betting_strategy
 ### Generate test design
 from random import randint
@@ -388,7 +389,8 @@ class DataPreparation:
         ## usadas solo para construir y constantes
         cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
         cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        col_players_noise = [col for col in df.columns if 'rep_player' in col or 'hei_player' in col] # 'wage_player' in col  # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+        strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'age_player']
+        col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
         df.drop(columns=cols_to_drop, inplace=True)
         if self.verbose >= 0:
@@ -421,11 +423,11 @@ class DataPreparation:
             'ball_possession', 'total_passes', 'attacking_efficiency',
             # Defensive
             'yellow_cards', 'red_cards', 'defensive_actions', 
-            'PPDA', 'clean_sheet', 'defensive_efficiency',  "efficiency" 
+            'PPDA', 'clean_sheet', 'defensive_efficiency',  # "efficiency" 
         ]
         return self.stats_to_derive + self.stats_to_construct
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -439,7 +441,6 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("Constructing data...")
-        segun_localia_options = [False, True] if segun_localia == 'both' else [segun_localia] # Determinar las opciones de segun_localia según el valor recibido
 
         # Si quiero construir variables historicas
         if with_historic:
@@ -457,17 +458,16 @@ class DataPreparation:
             ## OFENSIVE
             ## Goal ratio
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
-            # df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="shots_on_goal", laplace=True,  column_name="G2SOG")  # Similar a G2A
 
             # Traduccion de posesion a tiros
-            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="total_passes", laplace=True,  column_name="PPS")  # home = home / home
+            df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # home = home / home
 
             # Dead balls
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
             # Attacking efficiency --> (lo evito por cantidad de NaN)
-            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'], None)
-            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
+            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(),  df['expected_goals_(xg)_home'] / (df['goals_home'] + 1), None)
+            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['expected_goals_(xg)_away'] / (df['goals_away'] + 1),  None)
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
@@ -480,23 +480,21 @@ class DataPreparation:
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
             # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
-            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] - df['goals_away'], None)
-            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['goals_home'],  None)
-
-            # Efficiency --> (lo evito por cantidad de NaN)
-            df['efficiency_home'] = df['attacking_efficiency_home'] + df['defensive_efficiency_home']
-            df['efficiency_away'] = df['attacking_efficiency_away'] + df['defensive_efficiency_away']
+            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] / (df['goals_away'] + 1), None)
+            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] / (df['goals_home'] + 1),  None)
 
             # VARIABLES HISTORICAS
             ## 1) EN PARTIDOS EN ULTIMOS N DAYS
             if not prod:
                 df = construct_data.h2h_by_date(df, n_years=n_years_h2h) # no mas por localia por alto nan.
 
+            for n_days in n_last_matches:
+                df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
+
             ## 2) EN ULTIMOS N PARTIDOS
-            for n_matches in n_last_matches:
+            for n_matches in [15]:
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True) # Hay que ver si funciona tanto sin como con localia.
-                df = construct_data.determine_number_matches_last_days(df, n_days=n_matches*8)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
             # Por stat (e.g. shots_on_goal)
             logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
@@ -511,24 +509,30 @@ class DataPreparation:
                     cols_to_drop.append(variable)
                 cols_to_drop.extend([f'{var}_home', f'{var}_away'])
 
-                for n_matches in n_last_matches:
-                    for loc in segun_localia_options:  # Iterar sobre las opciones de localía
-                        func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
-                        df = func(df, n_matches=n_matches, variable=variable, segun_localia=loc)
+                for n_days in n_last_matches:
 
-                        prefix = 'loc_' if loc else ''
-                        col1, col2 = f'{prefix}mean_last_{n_matches}_matches_{variable}_home', f'{prefix}mean_last_{n_matches}_matches_{variable}_away'
-                        
-                        try:
-                            df[f'{prefix}dif_mean_last_{n_matches}_matches_{variable}'] = df[col1] - df[col2]
-                            cols_to_drop.extend([col1, col2])
-                        except KeyError:
-                            pass
+                    # Calculo promedio en ultimos partidos
+                    func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
+                    df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate)
+
+                    # Calculo diferencia o suma con against
+                    prefix = 'loc_' if segun_localia else ''
+                    col1, col2 = f'{prefix}mean_last_{n_days}_days_{variable}_home', f'{prefix}mean_last_{n_days}_days_{variable}_away'
+                    col1_ag, col2_ag = f'{prefix}mean_last_{n_days}_days_against_{variable}_home', f'{prefix}mean_last_{n_days}_days_against_{variable}_away'
+
+                    if calculate_dif:
+                        df[f'{prefix}dif_mean_last_{n_days}_days_{variable}'] = df[col1] - df[col2]
+                        # cols_to_drop.extend([col1, col2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+                    else:
+                        df[f'sum_{col1}'] = df[col1] + df[col2_ag]
+                        df[f'sum_{col2}'] = df[col2] + df[col1_ag]
+                        df[f'dif_{prefix}mean_last_{n_days}_days_{variable}'] = df[f'sum_{col1}'] - df[f'sum_{col2}']                    
+                        cols_to_drop.extend([col1, col2, col1_ag, col2_ag]) # Elimino estas variables? Ya tengo las columnas extra "sum"
 
                 df.drop(columns=cols_to_drop, inplace=True)
 
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
-            # df = construct_data.determine_mean_last_matches_difference(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True, dif_con_against=dif_con_against) # Variable para ponderar estadisticas
+            # df = construct_data.determine_mean_last_matches_difference(df, min(n_last_matches), variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True) # Variable para ponderar estadisticas
             # df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
 
         # VARIABLE DE JUGADORES
@@ -939,7 +943,7 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = False, compare_tuning: bool = False, export: bool = True):
+                    bayes: bool = False, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         
@@ -956,7 +960,6 @@ class Modeling:
             params: Combinacion de hiperparametros del modelo (dict)
             train_accuracy: Precision de entrenamiento (float)
         """
-        # warnings.filterwarnings("ignore")
         print("\nTraining model...")
 
         if default_model == "neural_network": # A diferencia de los otros modelos, la tengo que crear                
@@ -967,95 +970,36 @@ class Modeling:
 
             # Seleccion mejor arquitectura con la validacion y entreno el modelo
             model_best_params, params, train_accuracy, results = red.select_best_arquitecture(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+            pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
+            return model_best_params, params, train_accuracy, results
 
-        else:
-            # Train model searching for best hiper
-            if params is None:
-                model_best_params, params, best_metric, results = build_model.select_best_hiperparameters(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, 
-                                                                                                          bayes=bayes, all_tuning=compare_tuning, verbose=1)
-                # model_best_params, params, best_metric, results = build_model.compare_scoring_methods(default_model, X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, k=k, bayes=True, all_tuning=compare_tuning, verbose=1)
-                train_accuracy = best_metric # no es train_acc... es el scoring que uso, en este caso, f1_macro..
-      
-            # Train model with prefix params
-            else:
-                model_best_params = default_model.set_params(**params)
+        # Train model searching for best hiper
+        if params is None:
+            model_best_params, params, d_metrics, results = build_model.select_best_hiperparameters(
+                default_model, 
+                X_train=X_train, 
+                y_train=y_train, 
+                X_val=X_val, 
+                y_val=y_val, 
+                k=k, 
+                bayes=bayes, 
+                verbose=1
+                )
 
-                # Fit model
-                model_best_params.fit(X_train, y_train)
-
-                # Eval en val...
-
-                # Evaluo el modelo con Cross Validation
-                train_accuracy = build_model.manual_cross_validation(model_best_params, X_train, y_train, k)
-                print(f"\nAccuracy promedio de validación cruzada: {train_accuracy:.1f}%")
+        # Training metrics (≠ a las de cross validation que son en el validation set)
+        _, d_metrics_train = self.assess_model(model=model_best_params, X_test=X_train, y_test=y_train, suffix="_train")
+        print("Train Metrics:", d_metrics_train)
+        d_metrics.update(d_metrics_train)
 
         if export:
             pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
             # results.to_excel(f"./data/{self.country}/{ite_date}/p4_modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
 
-        return model_best_params, params, train_accuracy, results
+        return model_best_params, params, d_metrics, results
 
-    def assess_model(self, model, X_test: pd.DataFrame, y_test: pd.DataFrame, df_match: pd.DataFrame, df_match_odds: pd.DataFrame, df_filled: pd.DataFrame = None, prod: bool = False, export: bool = False):
+    def predict_model(self, model, X_test: pd.DataFrame):
         """
-        Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas de desempeño.
-
-        # Parameters:
-            model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
-            X_test: Dataframe de prueba con variables predictoras. (DataFrame)
-            y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
-            retrain: Boolean para definir si es un reentrenamiento de modelos con missing o no. (bool)
-            export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
-
-        # Returns:
-            Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
-        """
-        print("\nEvaluating trained model with test sets...")
-
-        # Predigo sobre X_test
-        df_probabilities, y_pred = self.predict(model, X_test)
-            
-        # Combinar ambos DataFrames
-        if not prod:
-            df_pred_proba = pd.DataFrame({
-                    self.var_resp: y_test,
-                    self.var_pred: y_pred,
-                }, index=X_test.index)
-        else:
-            # En producción (excluye y_test)
-            df_pred_proba = pd.DataFrame({
-                self.var_pred: y_pred,
-            }, index=X_test.index)
-        df_pred_proba = pd.concat([df_pred_proba, df_probabilities], axis=1)
-
-        # Concateno todos los dfs en uno solo --> Necesario para roi?
-        df_predicciones = asses_model.concatenate_dfs(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)
-
-        d_metrics = None
-        if not prod:
-
-            # Aplico estrategia "sin ea" para tener bank, stakes y rois 
-            bs = betting_strategy.BettingStrategy(self.country, self.date)
-            param_dict = bs.define_hiperparameters(strategy='train')
-            df_predicciones, _ = bs.calculate_roi_in_combination(df_predicciones, param_dict)
-        
-            # Calculo metricas
-            d_metrics = asses_model.calculate_metrics(df_predicciones, var_resp='result', advanced_metrics=True)
-            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones, var_resp='expected_result', advanced_metrics=True)
-
-            # Renombro metricas para evitar sobreescribirlas
-            d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')            
-            d_metrics.update(d_metric_sin_ea_ex)
-
-        df_predicciones = self.reformat_pred(df_predicciones)
-        
-        if export:
-            df_predicciones.to_excel(f'{self.base_path}/modeling/df_predicciones.xlsx')
-
-        return (df_predicciones, d_metrics) if not prod else df_predicciones
-    
-    def predict(self, model, X_test: pd.DataFrame):
-        """
-        Predigo sobre X_test + Mapeo clases entre test y pred (pred genera clases con ≠ valor).
+        Predigo sobre X_test
         """
         # Predecir las etiquetas para los datos de prueba
         try:
@@ -1067,7 +1011,14 @@ class Modeling:
                 
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
             y_pred_prob = model.predict(X_test)
-            
+
+        y_pred = self.map_classes_test_and_pred(model, y_pred_prob)
+        return y_pred_prob, y_pred
+
+    def map_classes_test_and_pred(self, model, y_pred_prob):
+        """
+        Mapeo clases entre test y pred (por si pred genera clases con ≠ valor).
+        """
         # Mapeo clases de y_test e y_pred (y_pred son ≠ nros)
         if hasattr(model, "classes_"):
             model_classes = model.classes_
@@ -1082,20 +1033,118 @@ class Modeling:
             if self.verbose >= 1:
                 logger.info(f"Mapeo de índices a clases: {dict(enumerate(model_classes))}")
                 logger.info(y_pred)
+
         else:
             raise ValueError("El modelo no tiene el atributo 'classes_', no se puede determinar el mapeo.")
-
-        # Crear un DataFrame para visualizar las probabilidades con sus clases
+        return y_pred
+    
+    def construct_predictions_dataframe(self, model, X_test, y_pred_prob, y_pred, y_test = None):
+        # Crear DataFrame con las probabilidades
         df_pred_proba = pd.DataFrame(
             y_pred_prob,
-            columns=[f'prob_class_{cls}' for cls in model_classes],
+            columns=[f'prob_class_{cls}' for cls in model.classes_],
             index=X_test.index
         )
 
-        if self.verbose >= 1:
-            logger.info(df_pred_proba)
+        # Agregar las columnas de la variable real (y_test) y la predicción (y_pred)
+        if y_test is not None:
+            # df_pred_proba[self.var_resp] = y_test
+            df_pred_proba[self.var_resp] = pd.Series(y_test, index=X_test.index) # Asegurar que y_test e y_pred tengan el mismo índice que X_test
 
-        return df_pred_proba, y_pred   
+        df_pred_proba[self.var_pred] = pd.Series(y_pred, index=X_test.index)
+        # df_pred_proba[self.var_pred] = y_pred
+        return df_pred_proba
+    
+    def assess_model(self, model, X_test, y_test, suffix: str = None):
+        """
+        Evalúa un modelo de machine learning utilizando datos de prueba y calcula métricas (basicas) de desempeño.
+
+        # Parameters:
+            model: Modelo de Machine Learning entrenado. (sklearn.ensemble)
+            X_test: Dataframe de prueba con variables predictoras. (DataFrame)
+            y_test: Dataframe de prueba solo con variable respuesta. (DataFrame)
+            retrain: Boolean para definir si es un reentrenamiento de modelos con missing o no. (bool)
+            export: Booleano para indicar si se debe exportar el DataFrame seleccionado. True para exportar, de lo contrario, False.  (bool)
+
+        # Returns:
+            Precisión del modelo y ROI en el conjunto de prueba. (int) y (float)
+        """
+        print("\nEvaluating trained model with test sets...")
+        # Predigo sobre X_test
+        y_pred_prob, y_pred = self.predict_model(model, X_test)
+
+        # Construo df_pred_proba
+        df_pred_proba = self.construct_predictions_dataframe(model=model, X_test=X_test, y_pred_prob=y_pred_prob, y_pred=y_pred, y_test=y_test)
+
+        # Calculo metricas
+        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix) 
+        return df_pred_proba, d_metrics
+
+    def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, df_filled, expected_metrics: bool = True, export: bool = True):
+        """
+        Aplico estrategia de apuesta y calculo ROI
+        """
+        # Concateno dfs
+        df_predicciones = self.prepare_dataframe_to_assess_with_roi(df_pred_proba, df_match, df_match_odds, df_filled)
+
+        # Aplico estrategia "sin ea" para tener bank, stakes y rois 
+        bs = betting_strategy.BettingStrategy()
+        param_dict = bs.define_hiperparameters(strategy='train')
+        df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+
+        # G/P x rdo
+        d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones))
+
+        # Calculo metricas de la bookie --> necesita df_match_odds
+        d_metrics_bm = asses_model.calculate_bookie_metrics(df_predicciones)
+        d_metrics_roi.update(d_metrics_bm)
+
+        # Calculo metricas "Expected" --> necesita df_match por expected_goals 
+        if expected_metrics:
+
+            # Construyo 'expected_result'
+            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
+            
+            # Eliminar partidos sin expected_goals (puede no estar)
+            df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
+
+            # Calculo metricas
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_')
+            d_metrics_roi.update(d_metric_sin_ea_ex)
+
+        return df_predicciones, d_metrics_roi
+
+    def prepare_dataframe_to_assess_with_roi( 
+            self,
+            df_pred_proba: pd.DataFrame,
+            df_match: pd.DataFrame,
+            df_match_odds: pd.DataFrame,
+            df_filled: pd.DataFrame = None,
+            ):        
+        df_match = df_match[df_match.index.isin(df_pred_proba.index)]
+        df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
+        l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+        df_match = df_match[l_cols_match]
+
+        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
+        df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
+
+        # Concatenación selectiva
+        columns_to_concat = [
+            df_match,
+            df_match_odds,
+            df_pred_proba,
+        ]
+
+        if df_filled is not None:
+            df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
+            l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+            columns_to_concat.append(df_filled[l_cols_fill])
+            
+        df_predicciones = pd.concat(columns_to_concat, axis=1)
+        df_predicciones = self.reformat_pred(df_predicciones)
+        
+        return df_predicciones
     
     def reformat_pred(self, df):
         # Convierto ids de equipos a nombres --> Hacerlo afuera de def assess_model...
@@ -1109,13 +1158,12 @@ class Modeling:
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
         """
         # Defino variables
-        df_metrics = pd.DataFrame()
+        train_rows, test_rows = [], []
         rows_to_features_min = 5
-        rows_test = len(X_test)
         rows_to_features = len(X_train) / len(X_train.columns)  # Idealmente mayor a 10. En caso de redes neuronales entre 30 y 100 veces mas.
         
         if verbose >= 0:
-            logger.info(f"Rows X_test: {rows_test}")
+            logger.info(f"Rows X_test: {len(X_test)}")
             logger.info(f"Relacion rows to features: {rows_to_features:.0f}")
 
         # Si hay suficientes datos
@@ -1130,30 +1178,39 @@ class Modeling:
                 # Entreno modelo y evaluo su rendimiento 
                 try:
                     # Entreno modelo
-                    model, params, cv_accuracy, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
-
+                    model, params, d_metrics_train, results = self.build_model(modelo, X_val, y_val, X_train, y_train, k, export=False)
+                    
                     # Evaluo modelo en test
-                    df_predicciones, d_metrics = self.assess_model(model, X_test, y_test, df_match, df_match_odds, df_filled)
+                    df_pred_proba, d_metrics_test = self.assess_model(model, X_test, y_test)
+                    df_predicciones, d_metrics_roi = self.assess_model_with_roi(df_pred_proba, df_match, df_match_odds, df_filled, export=True)
+                    d_metrics_test.update(d_metrics_roi)
 
                     # Hiperparametros del modelo y Metricas en testeo y train
-                    new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'cv_accurracy': cv_accuracy, 'model_hiper': params, 'X_train': X_train.shape,
-                                'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns)}
-                    new_row.update(d_metrics)
-                    df_metrics_new = pd.DataFrame([new_row])  # 1. Convertir el diccionario d_metrics en un DataFrame de una fila
-                    df_metrics = pd.concat([df_metrics, df_metrics_new], ignore_index=True)  # 2. Concatenar este nuevo DataFrame con df_metrics existente
+                    new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'model_hiper': params, 'X_train': X_train.shape, 
+                               'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
+                               **d_metrics_train}
+                    new_row_test = {'n_iteration': cont_iter, 'model_name': model_name, **d_metrics_test}
 
+                    train_rows.append(new_row)
+                    test_rows.append(new_row_test)
+                    
                     # Exporto datos del modelo
                     pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
                     results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
                     df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
                 except KeyboardInterrupt as e:
-                    logger.warning(f"Se evitó entrenar este modelo mediante {e}")
-        
+                    logger.warning(f"Entrenamiento interrumpido: {e}")
+
+                except Exception as e:
+                    logger.error(f"Error inesperado al entrenar el modelo {model_name}: {e}", exc_info=True)  
         else:
             logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
-        return df_metrics
+        # Concatenar todo al final (mucho más eficiente)
+        # df_metrics_train = pd.concat([pd.DataFrame(train_rows)], ignore_index=True)
+        # df_metrics_test = pd.concat([pd.DataFrame(test_rows)], ignore_index=True)
+        return train_rows, test_rows
 
 def crear_variables(diccionario):
     return SimpleNamespace(**diccionario)
