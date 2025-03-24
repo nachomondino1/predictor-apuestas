@@ -42,7 +42,7 @@ class BettingStrategy:
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [60, 80, 100, 120, 140] # [10, 20, 40, 60, 80, 100, 120] # no uso 200 por si acertó todo en ese rdo.
-        list_k = [1, 1.5, 2, 2.5, 3, 5, 10] if strategy in ['kelly_linear', 'kelly'] else [None]
+        list_k = [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [None]
 
         if strategy == "train": # "Sin estrategia"
             dic = {
