@@ -39,10 +39,13 @@ class BettingStrategy:
     def define_hiperparameters(self, strategy, big_space_m: bool = True, vary_dp: bool = False):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
+
+        Mejoras:
+            - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [10, 20, 40, 60, 80, 100] # [60, 80, 100, 120, 140]  # no uso 200 por si acertó todo en ese rdo.
-        list_k = [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [None]
+        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65] if big_space_m else [10, 20, 40, 60, 80, 100] # [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200]
+        list_k = [0, 1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [None]
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -585,12 +588,11 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-23', 1071],
-        55: ["france", '2025-03-23', 685], 
+        48: ["england", '2025-03-23', 1145],
+        55: ["france", '2025-03-23', 1129], 
         59: ["germany", '2025-03-23', 457],
         77: ["italy", '2025-03-23', 184],
-        148: ["spain", '2025-03-24', 546]
+        148: ["spain", '2025-03-24', 935]
         }
     
     model_name = "LogisticRegression"
@@ -614,7 +616,6 @@ if __name__ == "__main__":
 
         per_res = True
         d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-        # d_params['m'] = [10]
         if per_res:
             func = bs.define_model_betting_strategy_by_result
         else:
