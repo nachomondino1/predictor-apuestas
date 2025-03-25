@@ -289,14 +289,19 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
-    l_metrics = ['f1_score_away', 'f1_score_draw', 'error']  # paso 'expected_error' por poca corr entre si? ademas alta corr con expected_f1_score_away (74%)
-    l_weights = [0.33, 0.33, 0.33]
+    # 1 metrica gral (f1_score o roi) + 1 metrica de rdo
+    d_metrics = {
+       48: {'error': 0.5, 'gp_draw': 0.5},
+       55: {'error': 0.5, 'gp_home': 0.5},
+       59: {'f1_score': 0.5, 'f1_score_draw': 0.5},
+       77: {'roi': 0.5, 'gp_home': 0.5,},
+       148: {'error': 0.5, 'accuracy_draw': 0.5}
+   }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
-        # l_weights = d_weights[id_country]
+        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)

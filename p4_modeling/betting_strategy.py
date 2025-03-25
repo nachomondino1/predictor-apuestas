@@ -41,7 +41,7 @@ class BettingStrategy:
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [60, 80, 100, 120, 140] # [10, 20, 40, 60, 80, 100, 120] # no uso 200 por si acertó todo en ese rdo.
+        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200] if big_space_m else [10, 20, 40, 60, 80, 100] # [60, 80, 100, 120, 140]  # no uso 200 por si acertó todo en ese rdo.
         list_k = [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [None]
 
         if strategy == "train": # "Sin estrategia"
@@ -407,7 +407,12 @@ class BettingStrategy:
             df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
-        d_params_stake = {'type_relation': param_dict['curva'], 'm': param_dict['m'], 'b': param_dict['b'], 'k': param_dict['k']}
+        d_params_stake = {
+            'type_relation': param_dict.get('curva', None),  # None o algún valor por defecto
+            'm': param_dict.get('m', 10),  # 1 es un ejemplo de valor por defecto
+            'b': param_dict.get('b', 0),  # 0 por defecto si no está en el diccionario
+            'k': param_dict.get('k', 1)   # 1 por defecto si falta 'k'
+        }
         df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
@@ -451,14 +456,6 @@ class BettingStrategy:
         # Por resultado
         for pred in [1, 0, 2]:
 
-            # Reducir stake de local
-            if pred == 1:
-                d_params_local = d_params.copy()  # Copia superficial (shallow copy)
-                d_params_local['m'] = [elem / 2 for elem in d_params_local['m']]
-                logger.warning(f"Reducción de m de local: {d_params_local['m']}")
-            else:
-                d_params_local = d_params  # Usa el original para los otros casos
-
             # Filtro predicciones por result
             df_result = df_pred[df_pred['predicted_result'] == pred] 
             if verbose >= 0:
@@ -467,7 +464,7 @@ class BettingStrategy:
             # Si hay predicciones del modelo para ese result
             if len(df_result) > 0:
                 # Calculo roi por cada set de hiper de apuesta
-                d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params_local)
+                d_predic, d_hiper, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params)
 
                 # Determinar mejor estrategia para el resultado      
                 n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
@@ -589,11 +586,11 @@ if __name__ == "__main__":
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-23', 1145],
-        55: ["france", '2025-03-23', 1083], 
+        48: ["england", '2025-03-23', 1071],
+        55: ["france", '2025-03-23', 685], 
         59: ["germany", '2025-03-23', 457],
-        77: ["italy", '2025-03-23', 907],
-        148: ["spain", '2025-03-24', 649]
+        77: ["italy", '2025-03-23', 184],
+        148: ["spain", '2025-03-24', 546]
         }
     
     model_name = "LogisticRegression"
@@ -607,13 +604,17 @@ if __name__ == "__main__":
         bs = BettingStrategy(country, iteration_date, verbose=0)
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
         df_pred_test = pd.read_excel(path_test, index_col=0)
+
+        # Imprimo prob_result_to_bet promedio
+        mean_prob = df_pred_test['prob_result_to_bet'].mean()
+        print(f"Prob result to bet promedio: {mean_prob}")
         
         # Dropeo old metrics (sino calcula mal las nuevas)
         df_pred = drop_old_metrics(df_pred_test)
 
         per_res = True
-        d_params = bs.define_hiperparameters(strategy='kelly_linear', big_space_m=True, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-        d_params['m'] = [10]
+        d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+        # d_params['m'] = [10]
         if per_res:
             func = bs.define_model_betting_strategy_by_result
         else:
