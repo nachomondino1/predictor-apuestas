@@ -1032,7 +1032,8 @@ def main(
 
         if predict_missing:
             logger.info("Uso los partidos df_match MISSING ya extraidos.")
-            df_match, df_match_player, df_match_odds= df_match_miss.copy(), df_match_player_miss.copy(), df_match_odds_miss.copy()
+            df_match, df_match_player, df_match_odds = df_match_miss.copy(), df_match_player_miss.copy(), df_match_odds_miss.copy()
+            df_match = df_match[df_match['id_competition'].isin(comp_public)]
  
             # Levanto df_integrated de cuando entrené modelos
             df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0)
@@ -1260,7 +1261,7 @@ if __name__ == "__main__":
         'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
     }
 
-    id_country = 48
+    id_country = 77
     key, value = 'predict', 'try_a_specific_model'
     data_unders = False
     n_days = 0.5
@@ -1276,7 +1277,7 @@ if __name__ == "__main__":
         # 167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1145, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 184, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
