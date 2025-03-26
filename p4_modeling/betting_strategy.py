@@ -44,8 +44,7 @@ class BettingStrategy:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = [10, 15, 20, 25, 30, 35, 40, 45, 50, 65] if big_space_m else [10, 20, 40, 60, 80, 100] # [10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 80, 95, 110, 140, 170, 200]
-        list_k = [0, 1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [None]
+        list_m = list(range(10, 50, 10)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
 
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -57,10 +56,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy], 
+                'curva': [strategy, 'kelly_linear'], 
                 'm': list_m,
                 'b': [0],
-                'k': list_k
+                'k': [1]
             }
     
         if self.verbose >= 1:
@@ -193,7 +192,7 @@ class BettingStrategy:
     # STAKE TO BET
     def determine_stake_to_bet(self, 
                                df, type_relation: str = 'equal',                                                                            # Estrategia
-                               p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, k: float = None,                                  # Puntos de rectas
+                               p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, k: float = 1,                                  # Puntos de rectas
                                porc_emergency: float = 0.5                                                                                  # Disminucion por relleno de emergencia
                                ):
         """
@@ -255,6 +254,8 @@ class BettingStrategy:
                 df['prob_result_to_bet'] * m + b, # aplicar linear si kelly_crit > 0 para no inflar 
                 m_ajustado / (1 + np.exp(-k * df['kelly_criterion'])) # aplicar kelly si kelly_crit < 0 para reducir 
             )
+
+            # df['lin_stake_to_bet'] = df['prob_result_to_bet'] * m + b
 
         # STRATEGY: POLY
         elif type_relation == "poly":  # y = b + b1 * x1 + b2 * x2 + ... + bn * xn # a desarrollar en un futuro
@@ -505,8 +506,8 @@ class BettingStrategy:
         df_final.loc[0, '%_G/P'] = df_final.loc[0, 'roi'] / gp_total * 100
         df_final.loc[2, '%_G/P'] = df_final.loc[2, 'roi'] / gp_total * 100
 
-        if self.verbose >= 1:
-            logger.critical(f"La mejor estrategia de apuesta: {d_hiper}")
+        if self.verbose >= 0:
+            logger.critical(f"La mejor estrategia de apuesta: {d_hiper_res}")
 
         # Exportar el DataFrame final a un archivo Excel
         return df_final, best_df_pred
@@ -588,11 +589,11 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        48: ["england", '2025-03-23', 1145],
-        55: ["france", '2025-03-23', 1129], 
+        48: ["england", '2025-03-23', 1119],
+        55: ["france", '2025-03-23', 685], 
         59: ["germany", '2025-03-23', 457],
         77: ["italy", '2025-03-23', 184],
-        148: ["spain", '2025-03-24', 935]
+        148: ["spain", '2025-03-24', 546]
         }
     
     model_name = "LogisticRegression"
