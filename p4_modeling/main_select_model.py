@@ -164,7 +164,7 @@ def main(
 
     ## 3.1. Calculo metrica combinada
     metric = 'metric_test_assess'
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
 
     ## 3.2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
@@ -196,11 +196,11 @@ if __name__ == "__main__":
     # Defino metricas y pesos
     # 1 metrica gral (f1_score o roi) + 1 metrica de rdo
     d_metrics = {
-       48: {'f1_score': 0.5, 'gp_draw': 0.5}, # error
-       55: {'f1_score': 0.5, 'gp_home': 0.5}, # error
-       59: {'f1_score': 0.5, 'f1_score_draw': 0.5}, 
-       77: {'f1_score': 0.5, 'gp_home': 0.5,}, # roi
-       148: {'f1_score': 0.5, 'accuracy_draw': 0.5} # error
+       48: {'error': 0.33, 'expected_roi': 0.33, 'gp_draw': 0.33},
+       55: {'gp_home': 0.33, 'accuracy_away': 0.33, 'error': 0.33},
+       59: {'f1_score': 0.33, 'f1_score_draw': 0.33, 'expected_f1_score_away': 0.33}, 
+       77: {'f1_score_home': 0.33, 'roi': 0.33, 'expected_accuracy_away': 0.33}, 
+       148: {'accuracy_draw': 0.45, 'expected_accuracy_away': 0.45, 'error': 0.1} 
    }
 
     for id_country in l_countries:
