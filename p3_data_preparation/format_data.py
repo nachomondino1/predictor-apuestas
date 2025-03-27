@@ -139,8 +139,11 @@ def format_percentage_columns(df, base_columns):
 
         # Extraer datos de `home_col`
         # Paso 1: Aplicar la expresión regular 
-        extracted_home = df[home_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
-        extracted_away = df[away_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+        if home_col in df.columns:
+            extracted_home = df[home_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+            extracted_away = df[away_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
+        else:
+            logger.warning(f"La columna {home_col} no está en el dataframe")
         # logger.info(f'1) Extracted home: {extracted_home} Extracted away: {extracted_away}')
         
         # Paso 2: Convertir a float los valores extraídos
