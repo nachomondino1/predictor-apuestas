@@ -44,8 +44,7 @@ class BettingStrategy:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = list(range(10, 50, 10)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
-
+        list_m = list(range(25, 76, 5)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': 0,
@@ -56,7 +55,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'kelly_linear'], 
+                'curva': [strategy, 'kelly_linear'],
                 'm': list_m,
                 'b': [0],
                 'k': [1]
@@ -507,7 +506,10 @@ class BettingStrategy:
         df_final.loc[2, '%_G/P'] = df_final.loc[2, 'roi'] / gp_total * 100
 
         if self.verbose >= 0:
-            logger.critical(f"La mejor estrategia de apuesta: {d_hiper_res}")
+            logger.critical("La mejor estrategia de apuesta")
+            for k, v in d_hiper_res.items():
+                print(f"{k} --> {v}")
+
 
         # Exportar el DataFrame final a un archivo Excel
         return df_final, best_df_pred
@@ -542,7 +544,7 @@ class BettingStrategy:
             best_df_pred = d_predic
             df_final = pd.DataFrame([{**d_hiper, **d_metricas}])
 
-        if verbose >= 1:
+        if verbose >= 0:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
 
         return df_final, best_df_pred
