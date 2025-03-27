@@ -183,6 +183,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [148]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -194,13 +195,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
-    # 1 metrica gral (f1_score o roi) + 1 metrica de rdo
+    # Minimizando error en prod
     d_metrics = {
-       48: {'error': 0.33, 'expected_roi': 0.33, 'gp_draw': 0.33},
-       55: {'gp_home': 0.33, 'accuracy_away': 0.33, 'error': 0.33},
-       59: {'f1_score': 0.33, 'f1_score_draw': 0.33, 'expected_f1_score_away': 0.33}, 
-       77: {'f1_score_home': 0.33, 'roi': 0.33, 'expected_accuracy_away': 0.33}, 
-       148: {'accuracy_draw': 0.45, 'expected_accuracy_away': 0.45, 'error': 0.1} 
+       48: {'expected_error': 0.33, 'error': 0.33, 'gp_draw': 0.33},
+       55: {'expected_error': 0.33, 'error': 0.33, 'gp_draw': 0.33},
+       59: {'expected_error': 0.33, 'error': 0.33, 'gp_away': 0.33}, 
+       77: {'expected_error': 0.33, 'error': 0.33, 'gp_home': 0.33}, 
+       148: {'expected_error': 0.33, 'error': 0.33, 'gp_home': 0.33} 
    }
 
     for id_country in l_countries:

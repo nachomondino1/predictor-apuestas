@@ -126,6 +126,7 @@ if __name__ == "__main__":
 
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [148]
 
     d_countries = {
         # train nuevos
@@ -137,7 +138,7 @@ if __name__ == "__main__":
         }
     
     # Definir metrica a maximizar en produccion
-    corr_col = 'roi' # error
+    corr_col = 'error' # f1_score
     corr_metric = f'{corr_col}_prod'
 
     for id_country in l_countries:
@@ -148,7 +149,6 @@ if __name__ == "__main__":
         
         # 0: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        # print(df_ite)
 
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
         if calculate_metrics:
@@ -162,6 +162,19 @@ if __name__ == "__main__":
             df_ite_prod = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx")
             df_ite =  pd.read_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx')
      
+        # multiplico error por -1 para que la corr sea positiva
+        df_ite_test['error_train'] = df_ite_test['error_train'] * -1
+        df_ite_test['error'] = df_ite_test['error'] * -1
+        df_ite_test['expected_error'] = df_ite_test['expected_error'] * -1
+
+        df_ite['error_train'] = df_ite['error_train'] * -1
+        df_ite['error'] = df_ite['error'] * -1
+        df_ite['expected_error'] = df_ite['expected_error'] * -1
+
+        df_ite_prod['error_prod'] = df_ite_prod['error_prod'] * -1
+        # df_ite_prod['expected_error'] = df_ite_prod['expected_error'] * -1
+        # print(df_ite)
+
         # Drop columns 
         # Filtrar las columnas que contienen los strings en cols_drop
         cols_drop = ['dif_', '%_dif', 'gp_total', '_train']

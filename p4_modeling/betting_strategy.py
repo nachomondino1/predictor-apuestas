@@ -36,7 +36,7 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, big_space_m: bool = True, vary_dp: bool = False):
+    def define_hiperparameters(self, strategy, big_space_m: bool = True, vary_dp: bool = False, val_min: int = 25, mult_m: float = 3):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
 
@@ -44,7 +44,6 @@ class BettingStrategy:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        val_min, mult_m = 25, 3
         val_max =  val_min * mult_m
         list_m = list(range(val_min, val_max+1, 5)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
         
@@ -594,11 +593,11 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        48: ["england", '2025-03-23', 1119],
-        55: ["france", '2025-03-23', 685], 
-        59: ["germany", '2025-03-23', 457],
-        77: ["italy", '2025-03-23', 184],
-        148: ["spain", '2025-03-24', 546]
+        48: ["england", '2025-03-23', 1071],
+        55: ["france", '2025-03-23', 834], 
+        59: ["germany", '2025-03-23', 385],
+        77: ["italy", '2025-03-23', 223],
+        148: ["spain", '2025-03-24', 928]
         }
     
     model_name = "LogisticRegression"
@@ -621,7 +620,7 @@ if __name__ == "__main__":
         df_pred = drop_old_metrics(df_pred_test)
 
         per_res = True
-        d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+        d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False, val_min=10, mult_m=4) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
         if per_res:
             func = bs.define_model_betting_strategy_by_result
         else:
