@@ -620,7 +620,7 @@ if __name__ == "__main__":
         df_pred = drop_old_metrics(df_pred_test)
 
         per_res = True
-        d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False, val_min=10, mult_m=4) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+        d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False, val_min=15, mult_m=3) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
         if per_res:
             func = bs.define_model_betting_strategy_by_result
         else:
