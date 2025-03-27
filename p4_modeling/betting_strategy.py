@@ -44,7 +44,10 @@ class BettingStrategy:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = list(range(25, 76, 5)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
+        val_min, mult_m = 25, 3
+        val_max =  val_min * mult_m
+        list_m = list(range(val_min, val_max+1, 5)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
+        
         if strategy == "train": # "Sin estrategia"
             dic = {
                 'prob_dp': 0,
