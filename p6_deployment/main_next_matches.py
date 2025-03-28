@@ -958,16 +958,23 @@ def main(
         
         # Levanto datos: old + los ultimos missing extraidos
         df_match_upd, df_match_player_upd, df_match_odds_upd = mis.read_last_flashscore_data() # Last df_integrated con missing + old
+        extract_missing = False
+        if extract_missing:
+            # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
+            df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
+            logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
 
-        # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
-        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
+            if export and len(df_match_miss_new) > 0:
+                # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
+                mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
+                mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
+        else:
+            # Unicamente util para cuando falla la preparacion de missing pero ya extrajiste...
+            df_match_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_miss.xlsx', index_col=0)
+            df_match_player_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_player_miss.xlsx', index_col=0)
+            df_match_odds_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_odds_miss.xlsx', index_col=0)
+            print("Shape:", df_match_miss_new.shape, df_match_player_miss_new.shape, df_match_odds_miss_new.shape)
 
-        if export and len(df_match_miss_new) > 0:
-            # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
-            mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
-            mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
-        
         # Si extrajo missing
         if len(df_match_miss_new) > 0:
             
@@ -1262,7 +1269,7 @@ if __name__ == "__main__":
     }
 
     id_country = 148
-    key, value = 'predict', 'next_matches'
+    key, value = 'missing', 'next_matches'
     data_unders = False
     n_days = 0.5
 

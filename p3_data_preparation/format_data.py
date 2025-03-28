@@ -122,54 +122,47 @@ def format_percentage_columns(df, base_columns):
     Returns:
         pd.DataFrame: DataFrame con las columnas formateadas.
     """
-    # columns = [col for col in base_columns if col in df.columns]  # Evita KeyError dentro del for en caso que no exista la stat en los nuevos partidos missing
+    # column_specs = {
+    #     'accuracy': [0, 100],
+    #     'completed': [0, 3500],
+    #     'total': [0, 3500]
+    # }
 
     for base_col in base_columns:
+        for location in ['home', 'away']:
+            col_name = f"{base_col}_{location}"
+            if col_name not in df.columns:
+                continue  # Si no existe la columna, la salteamos
+            print(f"Column name: {col_name}")
+            print(df[col_name])
 
-        home_col = f"{base_col}_home"
-        away_col = f"{base_col}_away"
+            # Reemplazo saltos de línea para asegurar consistencia
+            df[col_name] = df[col_name].str.replace(r'\n', ' ', regex=True)
 
-        # Defino nombres de columnas tal que macheen los del df_match ya extraido
-        accuracy_col_home = f'accuracy_{home_col}'
-        accuracy_col_away = f'accuracy_{away_col}'
-        completed_col_home = f'n_correct_{base_col}_home' # No uso 'completed' por si ya existe "completed_passes" en missing.
-        completed_col_away = f'n_correct_{base_col}_away'
-        total_col_home = f'n_{home_col}'  # No uso total por si ya existe "total_passes" en missing.
-        total_col_away = f'n_{away_col}'
+            # Extraer valores con regex
+            extracted = df[col_name].str.extract(r'(\d+)%\s*\((\d+)/(\d+)\)')
+            print(f"Extracted: \n {extracted}")
+            if extracted.isnull().any().any():
+                raise ValueError(f"Error al extraer datos en la columna {col_name}")
 
-        # Extraer datos de `home_col`
-        # Paso 1: Aplicar la expresión regular 
-        if home_col in df.columns:
-            extracted_home = df[home_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
-            extracted_away = df[away_col].str.extract(r'(\d+)% \((\d+)/(\d+)\)')
-        else:
-            logger.warning(f"La columna {home_col} no está en el dataframe")
-        # logger.info(f'1) Extracted home: {extracted_home} Extracted away: {extracted_away}')
-        
-        # Paso 2: Convertir a float los valores extraídos
-        extracted_home = extracted_home.astype(float)
-        extracted_away = extracted_away.astype(float)
-        # logger.info(f'2) Extracted home: {extracted_home} Extracted away: {extracted_away}')
+            extracted = extracted.apply(pd.to_numeric, errors='coerce')
+            if extracted.isnull().any().any():
+                raise ValueError(f"Valores no convertibles a números en {col_name}")
 
-        # Paso 3: Asignar los valores extraídos a nuevas columnas
-        df[[accuracy_col_home, completed_col_home, total_col_home]] = extracted_home
-        df[[accuracy_col_away, completed_col_away, total_col_away]] = extracted_away
+            # Definir nombres de nuevas columnas
+            df[f'accuracy_{col_name}'], df[f'n_correct_{base_col}_{location}'], df[f'n_{col_name}'] = extracted.T.values
+            print(df[f'accuracy_{col_name}'])
+      
+            # Verificar rangos
+            # for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
+            #     if not df[new_col].between(min_val, max_val).all():
+            #         raise ValueError(f"Valores fuera de rango en {new_col}: {df[new_col].min()} - {df[new_col].max()}")
 
-        columm_specs = {
-            'accuracy_col_home': {'dtype': 'Int64', 'rango': [0, 100]}, # contiene valores fuera del rango [0, 100]. Valores min y max: 58.0 --> 108.0
-            'completed_col_home': {'dtype': 'Int64', 'rango': [0, 100]},
-            'total_col_home': {'dtype': 'Int64', 'rango': [0, 3500]},
-            'accuracy_col_away': {'dtype': 'Int64', 'rango': [0, 100]},
-            'completed_col_away': {'dtype': 'Int64', 'rango': [0, 2000]},
-            'total_col_away': {'dtype': 'Int64', 'rango': [0, 3500]},
-        }
-        # Verificacion de formato
-        df = verify_format(df, column_specs=columm_specs, verbose=-1)  # verbose=-1 para evitar warnings por no ver formato de todas las col
+            # Eliminar columna original
+            df.drop(columns=[col_name], inplace=True)
 
-        # Eliminar las columnas originales
-        df.drop(columns=[home_col, away_col], inplace=True)
-    
     return df
+
 
 def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
     """
