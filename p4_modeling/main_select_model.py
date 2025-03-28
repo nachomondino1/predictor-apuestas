@@ -197,11 +197,11 @@ if __name__ == "__main__":
     # Defino metricas y pesos
     # Minimizando error en prod
     d_metrics = {
-       48: {'expected_error': 0.33, 'error': 0.33, 'gp_draw': 0.33},
-       55: {'expected_error': 0.33, 'error': 0.33, 'gp_draw': 0.33},
-       59: {'expected_error': 0.33, 'error': 0.33, 'gp_away': 0.33}, 
-       77: {'expected_error': 0.33, 'error': 0.33, 'gp_home': 0.33}, 
-       148: {'expected_error': 0.33, 'error': 0.33, 'gp_home': 0.33} 
+       48: {'expected_error': 0.5, 'error': 0.25, 'gp_draw': 0.25},
+       55: {'gp_home': 0.4, 'f1_score_draw': 0.4,  'error': 0.2}, 
+       59: {'gp_away': 0.66, 'error': 0.33},
+       77: {'gp_home': 0.5, 'error': 0.5}, 
+       148: {'expected_error': 0.7, 'accuracy_draw': 0.3} 
    }
 
     for id_country in l_countries:
