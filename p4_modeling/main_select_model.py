@@ -201,7 +201,7 @@ if __name__ == "__main__":
        55: {'gp_home': 0.4, 'f1_score_draw': 0.4,  'error': 0.2}, 
        59: {'gp_away': 0.66, 'error': 0.33},
        77: {'gp_home': 0.5, 'error': 0.5}, 
-       148: {'expected_error': 0.7, 'accuracy_draw': 0.3} 
+       148: {'expected_error': 0.7, 'gp_draw': 0.3} 
    }
 
     for id_country in l_countries:
