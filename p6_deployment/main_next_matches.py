@@ -958,7 +958,7 @@ def main(
         
         # Levanto datos: old + los ultimos missing extraidos
         df_match_upd, df_match_player_upd, df_match_odds_upd = mis.read_last_flashscore_data() # Last df_integrated con missing + old
-        extract_missing = False
+        extract_missing = True
         if extract_missing:
             # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
             df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
@@ -1268,8 +1268,8 @@ if __name__ == "__main__":
         'predict': ['next_matches', 'missing'],
     }
 
-    id_country = 148
-    key, value = 'missing', 'next_matches'
+    id_country = 55
+    key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 0.5
 
@@ -1284,7 +1284,7 @@ if __name__ == "__main__":
         # 167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 546, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 918, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
