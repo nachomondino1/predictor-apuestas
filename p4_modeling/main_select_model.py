@@ -138,10 +138,6 @@ def main(
         l_metrics: list, 
         l_weights: list, 
         assess: bool = False,
-        bet_strat: bool = True,
-        update_missing: bool = True,
-        predict_missing: bool = True,
-        use_assess_saved: bool = True,
         export: bool = True,
         verbose: int = 0
         ):
@@ -162,14 +158,17 @@ def main(
     # Definicion de paths
     d_paths = initialize_directories(country, iteration_date, assess)
 
-    ## 3.1. Calculo metrica combinada
-    metric = 'metric_test_assess'
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+    # 1. Filtrar modelos por ROI (para asegurar rentabilidad)
+    df_ite_filt = filter_models_by_metric(df_ite, metric_col='roi', n_models_max=25)
 
-    ## 3.2. Ordeno por metrica combinada
+    ## 2. Calculo metrica combinada
+    metric = 'metric_test_assess'
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+
+    ## 3. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
-    # 3.3. Seleccion del modelo
+    # 4. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
     n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name_x']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
@@ -183,7 +182,6 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -196,13 +194,22 @@ if __name__ == "__main__":
     
     # Defino metricas y pesos
     # Minimizando error en prod
+    '''
     d_metrics = {
        48: {'expected_error': 0.5, 'error': 0.25, 'gp_draw': 0.25},
        55: {'gp_home': 0.4, 'f1_score_draw': 0.4,  'error': 0.2}, 
        59: {'gp_away': 0.66, 'error': 0.33},
        77: {'gp_home': 0.5, 'error': 0.5}, 
        148: {'expected_error': 0.7, 'gp_draw': 0.3} 
-   }
+    }
+    '''
+    d_metrics = {
+       48: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
+       55: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
+       59: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
+       77: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
+       148: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2}
+    }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
