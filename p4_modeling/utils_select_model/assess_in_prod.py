@@ -6,7 +6,8 @@ from utils.set_up_logging import logger
 from p3_data_preparation import construct_data
 from p4_modeling import betting_strategy, asses_model
 from p6_deployment import main_next_matches
-
+from utils import directories
+import datetime
 
 def main(
         df_ite,
@@ -16,7 +17,10 @@ def main(
         update_missing: bool = False,
         predict_missing: bool = True,
 ):
-    path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/"
+    
+    date = datetime.datetime.now().date()
+    path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date}"
+    directories.make_directories(l_directorios=[path])    
     bs = betting_strategy.BettingStrategy(country, iteration_date, verbose=0)
     rows = []
 
@@ -79,7 +83,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 59, 77]
+    l_countries = [59]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
