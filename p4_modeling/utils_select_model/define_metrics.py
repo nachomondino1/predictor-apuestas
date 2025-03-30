@@ -7,7 +7,7 @@ from p3_data_preparation.select_data import delete_correlated_columns
 import p4_modeling.main_select_model as msm
 from p4_modeling import betting_strategy, asses_model
 from tqdm import tqdm
-
+from sklearn.preprocessing import MinMaxScaler
 
 def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test: float = 0.75):
     """
@@ -122,11 +122,11 @@ if __name__ == "__main__":
         
     # Defino variables
     df_ct = pd.DataFrame()
-    calculate_metrics = False
+    calculate_metrics = True
 
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [48]
 
     d_countries = {
         # train nuevos
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         }
     
     # Definir metrica a maximizar en produccion
-    corr_col = 'error' # f1_score
+    corr_col = 'roi' # f1_score
     corr_metric = f'{corr_col}_prod'
 
     for id_country in l_countries:
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
         if calculate_metrics:
-            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75)
+            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.5)
             df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
             df_ite_test.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx', index=False)
             df_ite_prod.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx', index=False)
@@ -166,28 +166,32 @@ if __name__ == "__main__":
         df_ite_test['error_train'] = df_ite_test['error_train'] * -1
         df_ite_test['error'] = df_ite_test['error'] * -1
         df_ite_test['expected_error'] = df_ite_test['expected_error'] * -1
-
         df_ite['error_train'] = df_ite['error_train'] * -1
         df_ite['error'] = df_ite['error'] * -1
         df_ite['expected_error'] = df_ite['expected_error'] * -1
-
         df_ite_prod['error_prod'] = df_ite_prod['error_prod'] * -1
-        # df_ite_prod['expected_error'] = df_ite_prod['expected_error'] * -1
-        # print(df_ite)
 
         # Drop columns 
         # Filtrar las columnas que contienen los strings en cols_drop
-        cols_drop = ['dif_', '%_dif', 'gp_total', '_train']
+        cols_drop = ['gp_', '_train', 'expected_', 'accuracy_', 'f1_score_'] # 'dif_', '%_dif',
         df_ite_test = df_ite_test.drop(columns=[col for col in df_ite_test.columns if any(substring in col for substring in cols_drop)])
 
         # Concateno metrica de prod con test
         df_ite_test_with_metric = pd.merge(df_ite_test, df_ite_prod.loc[:, ['n_model', corr_metric]], on='n_model', how='outer') 
-        cols_float = df_ite_test_with_metric.select_dtypes(include=['float']).columns.tolist()
+        cols_float = df_ite_test_with_metric.select_dtypes(include=['float', 'int']).columns.tolist()
         df_ite_test_with_metric = df_ite_test_with_metric[cols_float]
         print(df_ite_test_with_metric.shape)
 
+        # Normalizar metricas para evitar diferencias entre paises solo por escala
+        # cols_float = df_ite_test_with_metric.select_dtypes(include=['float', 'int']).columns.tolist()
+        # df_ite_test_with_metric = df_ite_test_with_metric[cols_float]  # Seleccionar solo las columnas float
+        # scaler = MinMaxScaler()
+        # df_ite_test_with_metric[cols_float] = scaler.fit_transform(df_ite_test_with_metric[cols_float])
+        
+        # Guardo resultados del pais
         df_ct = pd.concat([df_ct, df_ite_test_with_metric], axis=0)
         print(df_ct.shape)
+        df_ct.to_excel("/Users/nachomondino/Desktop/df_ct.xlsx")
 
         # Imprimir correlacion de metrica entre test y prod
         corr = df_ite_test_with_metric[corr_metric].corr(df_ite_test_with_metric[corr_col]) * 100
@@ -200,7 +204,10 @@ if __name__ == "__main__":
     df_ct = df_ct.dropna(axis=1, how='any')
     df_ct.to_excel("/Users/nachomondino/Desktop/AAA.xlsx")
 
-    # Lasso
-    import p3_data_preparation.select_data as sd
-    l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
+    # Calculo correlacion de metricas test con la metrica de prod
+    df_normalized = calculate_correlation(df_ct, corr_col=corr_metric)
     df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
+
+    # import p3_data_preparation.select_data as sd --> le da importancia a metricas con corr negativa pero que deberian ser max no min.
+    # l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
+    # df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
