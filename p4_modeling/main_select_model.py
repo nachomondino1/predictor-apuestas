@@ -27,7 +27,6 @@ def initialize_directories(country, iteration_date, assess):
         'base_path_sbm': base_path_sbm,
         'path_old': f'{base_path}/best_model_old/{fecha_hoy}',
         'path_select': f'{base_path_sbm}/1_filter_models',
-        'path_assess': f'{base_path_sbm}/2_assess',
         'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy',
         # 'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
@@ -40,10 +39,8 @@ def initialize_directories(country, iteration_date, assess):
     
     # Crear directorios necesarios
     directories.make_directories([
-        d_paths['path_assess'], 
         d_paths['path_select'], 
         d_paths['path_bet_strategy'], 
-        # d_paths['path_assess_dep']
     ])
 
     return d_paths
@@ -132,7 +129,6 @@ def error_empty_dataframe(df):
 # Main
 def main(
         df_ite,
-        id_country, 
         country, 
         iteration_date,
         l_metrics: list, 
@@ -158,17 +154,14 @@ def main(
     # Definicion de paths
     d_paths = initialize_directories(country, iteration_date, assess)
 
-    # 1. Filtrar modelos por ROI (para asegurar rentabilidad)
-    df_ite_filt = filter_models_by_metric(df_ite, metric_col='roi', n_models_max=25)
-
-    ## 2. Calculo metrica combinada
+    ## 1. Calculo metrica combinada
     metric = 'metric_test_assess'
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
 
-    ## 3. Ordeno por metrica combinada
+    ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
-    # 4. Seleccion del modelo
+    # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
     n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name_x']
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
@@ -193,28 +186,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
-    # Minimizando error en prod
-    '''
-    d_metrics = {
-       48: {'expected_error': 0.5, 'error': 0.25, 'gp_draw': 0.25},
-       55: {'gp_home': 0.4, 'f1_score_draw': 0.4,  'error': 0.2}, 
-       59: {'gp_away': 0.66, 'error': 0.33},
-       77: {'gp_home': 0.5, 'error': 0.5}, 
-       148: {'expected_error': 0.7, 'gp_draw': 0.3} 
-    }
-    '''
-    d_metrics = {
-       48: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
-       55: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
-       59: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
-       77: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2},
-       148: {'expected_error': 0.3, 'error': 0.3, 'gp_draw': 0.2, 'gp_away': 0.2}
-    }
+    l_metrics = ['error', 'roi']
+    l_weights = [0.7, 0.3]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
@@ -225,7 +203,7 @@ if __name__ == "__main__":
 
         main(
             df_ite=df_ite,
-            id_country=id_country, country=country, iteration_date=iteration_date, 
+            country=country, iteration_date=iteration_date, 
             l_metrics=l_metrics, l_weights=l_weights,
             assess=False,
             export=True
