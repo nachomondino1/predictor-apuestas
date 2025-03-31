@@ -16,6 +16,7 @@ def main(
         iteration_date,
         update_missing: bool = False,
         predict_missing: bool = True,
+        export: bool = True
 ):
     
     date = datetime.datetime.now().date()
@@ -63,7 +64,7 @@ def main(
         df_pred = asses_model.drop_old_metrics(df_pred)
 
         # 📌 Aplicar estrategia "sin_ea"
-        d_params = bs.define_hiperparameters(strategy='train')  
+        d_params = bs.define_hiperparameters(strategy='train')
         df_pred_met, d_rois = bs.calculate_roi_in_combination(df_pred, d_params)
         
         ## Calculo metricas
@@ -76,14 +77,17 @@ def main(
         df_ite_bs = pd.DataFrame(data=rows)
 
         # Exporto datos
-        if predict_missing:
-            df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
-        df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
+        if export:
+            if predict_missing:
+                df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
+            df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
+    
+    return df_ite_bs
 
 if __name__ == "__main__":
     # Defino parametros
+    one_model, n_model = False, 500
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -98,14 +102,29 @@ if __name__ == "__main__":
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
-        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx").head(20)
-        print(df_ite)
+        if one_model:
+            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
+            df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
+    
+            df_ite_bs = main(
+                df_ite=df_ite,
+                id_country=id_country, 
+                country=country, 
+                iteration_date=iteration_date, 
+                export=False
+                )
+            
+            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
 
-        main(
-            df_ite=df_ite,
-            id_country=id_country, 
-            country=country, 
-            iteration_date=iteration_date, 
-            )
+        else:
+            # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx").head(20)
+            print(df_ite)
+
+            main(
+                df_ite=df_ite,
+                id_country=id_country, 
+                country=country, 
+                iteration_date=iteration_date, 
+                )
         
