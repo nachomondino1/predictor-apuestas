@@ -9,7 +9,7 @@ from p3_data_preparation import construct_data
 # CALCULO DE METRICAS BASICAS (ACCURACY, F1_SCORE, ETC)
 def calculate_metrics(
         df, var_resp = 'result', var_pred = 'predicted_result',
-        metrics_by_result: bool = True, 
+        metrics_by_result: bool = True, bet_metrics: bool = True,
         prefix: str = None, suffix: str = None, 
         verbose: int = 0
         ):
@@ -43,6 +43,16 @@ def calculate_metrics(
             'accuracy_draw': accuracy_score(y_test == 0, y_pred == 0) * 100,  # Accuracy para la clase "Empate"
             'accuracy_away': accuracy_score(y_test == 2, y_pred == 2) * 100,   # Accuracy para la clase "Visitante"
         })
+
+    # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
+    if bet_metrics:
+        # Determino probas de bookie y predicted_result
+        df = calculate_result_probabilities_by_bookmaker(df_match_odds=df)
+        df = determine_result_by_bookmaker(df=df, col_name='bookmaker_result')
+
+        # Calculo metricas
+        d_metrics_bm = calculate_bookie_metrics(df)
+        d_metrics.update(d_metrics_bm)
 
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
     if verbose >= 1:
@@ -99,11 +109,13 @@ def calculate_bookie_metrics(df_pred_proba, var_resp: str = 'result', var_pred_b
     # Defino los array para calc metrics
     y_test = df_pred_proba[var_resp].values         # Etiquetas reales
     y_pred_bm = df_pred_proba[var_pred_bm].values   # Predicciones del BET
+    y_pred_prob = df_pred_proba[['prob_home_bm', 'prob_draw_bm', 'prob_away_bm']].values
 
     n_home, n_draw, n_away = np.sum(y_pred_bm == 1), np.sum(y_pred_bm == 0), np.sum(y_pred_bm == 2)
 
     # Calculo metricas de bookie    
     d_metrics = {
+        'error_bm': log_loss(y_test, y_pred_prob),
         'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex(),
         'f1_score_bm': f1_score(y_test, y_pred_bm, average='macro') * 100,
         'n_home_bm': n_home, 'n_draw_bm': n_draw, 'n_away_bm': n_away
