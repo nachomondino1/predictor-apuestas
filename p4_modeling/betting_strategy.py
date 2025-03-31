@@ -7,6 +7,7 @@ from p3_data_preparation.construct_data import determine_expected_result
 from p4_modeling.asses_model import calculate_combined_metric, calculate_roi, determine_roi, drop_old_metrics
 from utils import directories
 from itertools import product
+from tqdm import tqdm
 
 
 class BettingStrategy:
@@ -36,7 +37,7 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, big_space_m: bool = True, vary_dp: bool = False, val_min: int = 25, mult_m: float = 3):
+    def define_hiperparameters(self, strategy, vary_dp: bool = False, val_min: int = 25, mult_m: float = 3, step_m: int = 10):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
 
@@ -44,8 +45,7 @@ class BettingStrategy:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        val_max =  val_min * mult_m
-        list_m = list(range(val_min, val_max+1, 5)) if big_space_m else [10, 20, 40, 60, 80, 100] # ojo que range no incluye b.
+        list_m = list(range(val_min, (val_min * mult_m) + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -57,7 +57,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'kelly_linear'],
+                'curva': [strategy], #  'kelly_linear'
                 'm': list_m,
                 'b': [0],
                 'k': [1]
@@ -507,7 +507,7 @@ class BettingStrategy:
         df_final.loc[0, '%_G/P'] = df_final.loc[0, 'roi'] / gp_total * 100
         df_final.loc[2, '%_G/P'] = df_final.loc[2, 'roi'] / gp_total * 100
 
-        if self.verbose >= 0:
+        if self.verbose >= 1:
             logger.critical("La mejor estrategia de apuesta")
             for k, v in d_hiper_res.items():
                 print(f"{k} --> {v}")
@@ -546,7 +546,7 @@ class BettingStrategy:
             best_df_pred = d_predic
             df_final = pd.DataFrame([{**d_hiper, **d_metricas}])
 
-        if verbose >= 0:
+        if verbose >= 1:
             logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
 
         return df_final, best_df_pred
@@ -587,9 +587,67 @@ class BettingStrategy:
 
         return df_comp
     
+
+def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, verbose: int = 0):
+    
+    bs = BettingStrategy(verbose=0)
+
+    # Imprimo prob_result_to_bet promedio
+    if verbose >= 1:
+        mean_prob = df_pred_test['prob_result_to_bet'].mean()
+        print(f"Prob result to bet promedio: {mean_prob}")
+    
+    # Dropeo old metrics (sino calcula mal las nuevas)
+    df_pred = drop_old_metrics(df_pred_test)
+
+    d_params = bs.define_hiperparameters(strategy='kelly', val_min=10, mult_m=5, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    if bs_per_res:
+        func = bs.define_model_betting_strategy_by_result
+    else:
+        func = bs.define_model_betting_strategy
+    df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1, verbose=verbose)
+
+    ## Calculo metricas  ## Solo calculo el roi que es lo unico que cambia.. o que me interesa medir
+    # roi_con_ea = determine_roi(df_pred_with_stra, var_resp='result')
+
+    return df_strat, df_pred_with_stra
+
+def determine_bs_all_models(df_ite, country, iteration_date):
+
+    d_rows = []
+    progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
+
+    for idx, row in df_ite.iterrows():
+        n_model = row['n_iteration']
+        model_name = row['model_name_x']
+
+        # Leo predicciones
+        df_pred_test = read_predictions(country, iteration_date, n_model, model_name)
+
+        # Determino ea
+        df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test)
+
+        # Guardo resultados
+        df_strat["idx"] = n_model
+        d_rows.append(df_strat)
+        progress_bar.update(1)
+
+    progress_bar.close()
+
+    # Concateno todos los resultados en un DataFrame
+    df_result = pd.concat(d_rows).set_index('idx')
+
+    return df_result
+        
+def read_predictions(country, iteration_date, n_model, model_name):
+    path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+    df_pred_test = pd.read_excel(path_test, index_col=0)
+    return df_pred_test
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
+    one_model = True
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
@@ -597,39 +655,31 @@ if __name__ == "__main__":
         55: ["france", '2025-03-23', 1129], 
         59: ["germany", '2025-03-23', 900],
         77: ["italy", '2025-03-23', 184],
-        148: ["spain", '2025-03-24', 887]
+        148: ["spain", '2025-03-24', 935]
         }
-    
-    model_name = "LogisticRegression"
     
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
         n_model = d_countries[id_country][2]
-    
-        # (4) ESTRATEGIA DE APUESTA
-        bs = BettingStrategy(country, iteration_date, verbose=0)
-        path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
-        df_pred_test = pd.read_excel(path_test, index_col=0)
+        model_name = "LogisticRegression"
 
-        # Imprimo prob_result_to_bet promedio
-        mean_prob = df_pred_test['prob_result_to_bet'].mean()
-        print(f"Prob result to bet promedio: {mean_prob}")
-        
-        # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = drop_old_metrics(df_pred_test)
+        # Leo predicciones
+        if one_model:
+            df_pred_test = read_predictions(country, iteration_date, n_model, model_name)
 
-        per_res = True
-        d_params = bs.define_hiperparameters(strategy='linear', big_space_m=True, vary_dp=False, val_min=25, mult_m=3) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-        if per_res:
-            func = bs.define_model_betting_strategy_by_result
+            # Calculo estrategia
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, verbose=1)
+
+            path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
+            df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+            df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
+
         else:
-            func = bs.define_model_betting_strategy
-        df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1)
+            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+            # df_ite = df_ite.head(10)
 
-        ## Calculo metricas  ## Solo calculo el roi que es lo unico que cambia.. o que me interesa medir
-        roi_con_ea = determine_roi(df_pred_with_stra, var_resp='result')
+            df_result = determine_bs_all_models(df_ite, country, iteration_date)
+            df_result.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/df_ite_bs.xlsx", index=True)
 
-        path = f"data/{country}/p4_modeling/{iteration_date}/best_model//3_bet_strategy"
-        df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
-        df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
+
