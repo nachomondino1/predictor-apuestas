@@ -186,8 +186,9 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos
+    # 75-25
     l_metrics = ['error', 'roi']
-    l_weights = [0.7, 0.3]
+    l_weights = [0.5, 0.5]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -200,6 +201,7 @@ if __name__ == "__main__":
         # para maximizar error en metrica
         df_ite['error'] = df_ite['error'] * (-1)
         df_ite['expected_error'] = df_ite['expected_error'] * (-1)
+        df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
 
         main(
             df_ite=df_ite,
