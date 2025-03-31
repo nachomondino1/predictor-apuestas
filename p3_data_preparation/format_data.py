@@ -110,7 +110,7 @@ def convert_capacity_to_int(df):
                 print(f"Fallo la conversion de la columna {col} a float")
     return df
 
-def format_percentage_columns(df, base_columns):
+def format_percentage_columns(df, base_columns, verbose: int = 0):
     """
     Formatea columnas que contienen porcentajes en sus versiones _home y _away.
     Extrae precisión, acciones exitosas y totales.
@@ -133,15 +133,17 @@ def format_percentage_columns(df, base_columns):
             col_name = f"{base_col}_{location}"
             if col_name not in df.columns:
                 continue  # Si no existe la columna, la salteamos
-            print(f"Column name: {col_name}")
-            print(df[col_name])
+            if verbose >= 1:
+                print(f"Column name: {col_name}")
+                print(df[col_name])
 
             # Reemplazo saltos de línea para asegurar consistencia
             df[col_name] = df[col_name].str.replace(r'\n', ' ', regex=True)
 
             # Extraer valores con regex
             extracted = df[col_name].str.extract(r'(\d+)%\s*\((\d+)/(\d+)\)')
-            print(f"Extracted: \n {extracted}")
+            if verbose >= 1:
+                print(f"Extracted: \n {extracted}")
             if extracted.isnull().any().any():
                 raise ValueError(f"Error al extraer datos en la columna {col_name}")
 
@@ -151,7 +153,8 @@ def format_percentage_columns(df, base_columns):
 
             # Definir nombres de nuevas columnas
             df[f'accuracy_{col_name}'], df[f'n_correct_{base_col}_{location}'], df[f'n_{col_name}'] = extracted.T.values
-            print(df[f'accuracy_{col_name}'])
+            if verbose >= 1:
+                print(df[f'accuracy_{col_name}'])
       
             # Verificar rangos
             # for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
