@@ -1094,7 +1094,7 @@ class Modeling:
         df_pred_proba = self.construct_predictions_dataframe(model=model, X_test=X_test, y_pred_prob=y_pred_prob, y_pred=y_pred, y_test=y_test)
 
         # Calculo metricas
-        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix) 
+        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix, bet_metrics=False) 
         return df_pred_proba, d_metrics
 
     def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, df_filled, expected_metrics: bool = True, export: bool = True):
@@ -1112,7 +1112,7 @@ class Modeling:
         # G/P x rdo
         d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones))
 
-        # Calculo metricas de la bookie --> necesita df_match_odds
+        # Calculo metricas de bet (en assess no tengo cuotas)
         d_metrics_bm = asses_model.calculate_bookie_metrics(df_predicciones)
         d_metrics_roi.update(d_metrics_bm)
 
