@@ -188,9 +188,9 @@ if __name__ == "__main__":
     # Defino metricas y pesos
     # 75-25
     d_metrics = {
-       48: {'error': 0.25, 'f1_score_draw': 0.25, 'f1_score_away': 0.5},
-       55: {'error': 0.25, 'f1_score_draw': 0.05, 'f1_score_away': 0.7},
-       59: {'error': 0.25, 'f1_score_draw': 0.3,'f1_score_away': 0.45}, 
+       48: {'error': 0.25, 'f1_score_draw': 0.1, 'f1_score_away': 0.65},
+       55: {'error': 0.25, 'f1_score_draw': 0.1, 'f1_score_away': 0.65},
+       59: {'error': 0.25, 'f1_score_draw': 0.2,'f1_score_away': 0.55}, 
        77: {'error': 0.25, 'f1_score_draw': 0.35, 'f1_score_away': 0.4}, 
        148: {'error': 0.25, 'f1_score_draw': 0.75, 'f1_score_away': 0} 
    }

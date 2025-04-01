@@ -591,7 +591,7 @@ class BettingStrategy:
         return df_comp
     
 
-def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, verbose: int = 0):
+def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
     val_min, val_max = 5, 100
@@ -658,7 +658,6 @@ if __name__ == "__main__":
 
     one_model = True
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [48]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
@@ -676,25 +675,28 @@ if __name__ == "__main__":
         row = df_best_models[df_best_models['id_country'] == id_country]
         iteration_date_dt = row['iteration_date'].values[0]
         iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
-        n_model = int(row['n_model'].values[0])
-        # n_model = 426
-        model_name = str(row['model_name'].values[0])
-        print(f"N_model: {n_model} Iteration date: {iteration_date}")
-
+       
         # Leo predicciones
         if one_model:
+            n_model = int(row['n_model'].values[0])
+            model_name = str(row['model_name'].values[0])
+            print(f"N_model: {n_model} Iteration date: {iteration_date}")
+
+            # Levanto df_test
             df_pred_test = read_predictions(country, iteration_date, n_model, model_name)
 
             # Calculo estrategia
             df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, verbose=1)
 
+            # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
             df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
             df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
 
         else:
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-            # df_ite = df_ite.head(10)
+            # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
+            df_ite = df_ite.head(10)
 
             df_result = determine_bs_all_models(df_ite, country, iteration_date)
             df_result.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/df_ite_bs.xlsx", index=True)
