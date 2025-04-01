@@ -187,13 +187,20 @@ if __name__ == "__main__":
     
     # Defino metricas y pesos
     # 75-25
-    l_metrics = ['error', 'roi']
-    l_weights = [0.5, 0.5]
+    d_metrics = {
+       48: {'error': 0.25, 'f1_score_draw': 0.25, 'f1_score_away': 0.5},
+       55: {'error': 0.25, 'f1_score_draw': 0.05, 'f1_score_away': 0.7},
+       59: {'error': 0.25, 'f1_score_draw': 0.3,'f1_score_away': 0.45}, 
+       77: {'error': 0.25, 'f1_score_draw': 0.35, 'f1_score_away': 0.4}, 
+       148: {'error': 0.25, 'f1_score_draw': 0.75, 'f1_score_away': 0} 
+   }
+    # l_metrics = ['error', 'roi'] 
+    # l_weights = [0.5, 0.5]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
