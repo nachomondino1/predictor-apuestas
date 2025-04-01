@@ -60,7 +60,7 @@ class BettingStrategy:
                 'curva': [strategy], #  'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2]
+                'k': [1]
             }
     
         if self.verbose >= 1:
@@ -600,7 +600,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, verbose: int 
     # Dropeo old metrics (sino calcula mal las nuevas)
     df_pred = drop_old_metrics(df_pred_test)
 
-    d_params = bs.define_hiperparameters(strategy='kelly', val_min=10, mult_m=5, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy='kelly_linear', val_min=25, mult_m=2, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
     if bs_per_res:
         func = bs.define_model_betting_strategy_by_result
     else:
@@ -669,7 +669,7 @@ if __name__ == "__main__":
             df_pred_test = read_predictions(country, iteration_date, n_model, model_name)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, verbose=1)
 
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
             df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
