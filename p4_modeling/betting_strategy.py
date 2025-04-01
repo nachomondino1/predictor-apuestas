@@ -57,10 +57,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy], #  'kelly_linear'
+                'curva': ['linear', strategy], #  'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1]
+                'k': [1, 2, 3]
             }
     
         if self.verbose >= 1:
@@ -600,7 +600,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, verbose: int 
     # Dropeo old metrics (sino calcula mal las nuevas)
     df_pred = drop_old_metrics(df_pred_test)
 
-    d_params = bs.define_hiperparameters(strategy='kelly_linear', val_min=25, mult_m=2, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy='kelly_linear', val_min=25, mult_m=3, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
     if bs_per_res:
         func = bs.define_model_betting_strategy_by_result
     else:
