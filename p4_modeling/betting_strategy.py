@@ -87,9 +87,9 @@ class BettingStrategy:
 
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
             odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
-            kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1) 
+            kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # creo que esta bien
 
-            # Si el modelo esta POCO seguro del resultado predicho
+            # Si el riesgo-beneficio es malo (ver si funciona bien con kelly_crit) --> creo que esta ok
             if (kelly_crit < thr_prob_min):
                 if self.verbose >= 1:
                     logger.warning(f"Aplicamos doble oportunidad por kelly_crit<{thr_prob_min}.")
@@ -100,7 +100,7 @@ class BettingStrategy:
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"kelly_crit < {thr_prob_min}"
 
-            # Si nuestro modelo esta seguro del rdo
+            # Si el riesgo-beneficio es alto
             else:
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
