@@ -44,12 +44,12 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [0, 0.45, 0.6, 0.75] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [0, -0.5, -1, -1.5] if vary_dp else [-10000]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, (val_min * mult_m) + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
             dic = {
-                'prob_dp': 0,
+                'prob_dp': -10000,
                 'curva': 'linear',
                 'm': 10,
                 'b': 0,
@@ -87,21 +87,24 @@ class BettingStrategy:
 
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
             odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
+            kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1) 
 
             # Si el modelo esta POCO seguro del resultado predicho
-            if (prob_result_to_bet < thr_prob_min):
-                
+            if (kelly_crit < thr_prob_min):
+                if self.verbose >= 1:
+                    logger.warning(f"Aplicamos doble oportunidad por kelly_crit<{thr_prob_min}.")
+
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
-                strategy = f"dif_prob_mod_bm < {thr_prob_min}"
+                strategy = f"kelly_crit < {thr_prob_min}"
 
             # Si nuestro modelo esta seguro del rdo
             else:
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
-                strategy = f"dif_prob_mod_bm > {thr_prob_min}"
+                strategy = f"kelly_crit > {thr_prob_min}"
 
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
@@ -649,20 +652,28 @@ if __name__ == "__main__":
 
     one_model = True
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
+    
+    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
     d_countries = {
-        48: ["england", '2025-03-23', 1119],
-        55: ["france", '2025-03-23', 1129], 
-        59: ["germany", '2025-03-23', 900],
-        77: ["italy", '2025-03-23', 184],
-        148: ["spain", '2025-03-24', 935]
+        48: ["england"],
+        55: ["france"], 
+        59: ["germany"],
+        77: ["italy"],
+        148: ["spain"]
         }
-    
+        
     for id_country in l_countries:
         country = d_countries[id_country][0]
-        iteration_date = d_countries[id_country][1]
-        n_model = d_countries[id_country][2]
-        model_name = "LogisticRegression"
+        
+        row = df_best_models[df_best_models['id_country'] == id_country]
+        iteration_date_dt = row['iteration_date'].values[0]
+        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
+        n_model = int(row['n_model'].values[0])
+        n_model = 426
+        model_name = str(row['model_name'].values[0])
+        print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
         # Leo predicciones
         if one_model:
