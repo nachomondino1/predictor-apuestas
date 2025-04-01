@@ -60,7 +60,7 @@ class BettingStrategy:
                 'curva': [strategy], #  'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1]
+                'k': [1, 2]
             }
     
         if self.verbose >= 1:
@@ -237,7 +237,7 @@ class BettingStrategy:
 
             # Usar la función sigmoide para reducir la variabilidad y escalar entre p_min y p_max
             num = m if m > 0 else 1
-            df['stake_to_bet'] = num / (1 + np.exp(-df['kelly_criterion']))
+            df['stake_to_bet'] = num / (1 + np.exp(-k * df['kelly_criterion']))
 
         # STRATEGY: LINEAR
         elif type_relation == "linear": # Vario stake con prob_result_to_bet y cuotas de la casa
@@ -651,7 +651,7 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        48: ["england", '2025-03-23', 1071],
+        48: ["england", '2025-03-23', 1119],
         55: ["france", '2025-03-23', 1129], 
         59: ["germany", '2025-03-23', 900],
         77: ["italy", '2025-03-23', 184],
