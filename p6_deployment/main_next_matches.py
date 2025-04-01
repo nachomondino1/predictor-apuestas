@@ -674,7 +674,7 @@ class TrainingDataLoader():
 
             user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
             if user_input == 'y':
-                return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
+                return {'prob_dp': -10000, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
             
             raise ValueError(e)
 
@@ -1213,7 +1213,7 @@ def main(
         # Predigo con modelo cargado
         if predict_missing:
             df_filled = df_fill.copy() 
-            d_strategy = {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0}
+            d_strategy = {'prob_dp': -10000, 'curva': 'linear', 'm': 10, 'b': 0}
         else:  
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
@@ -1268,7 +1268,7 @@ if __name__ == "__main__":
         'predict': ['next_matches', 'missing'],
     }
 
-    id_country = 55
+    id_country = 48
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 0.5
@@ -1284,7 +1284,7 @@ if __name__ == "__main__":
         # 167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 918, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1097, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         

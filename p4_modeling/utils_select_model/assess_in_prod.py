@@ -82,12 +82,13 @@ def main(
                 df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
     
-    return df_ite_bs
+    return df_ite_bs, df_pred_met
 
 if __name__ == "__main__":
     # Defino parametros
-    one_model, n_model = False, 500
+    one_model, n_model = False, 286
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -104,9 +105,11 @@ if __name__ == "__main__":
 
         if one_model:
             df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
+
+            # df_ite = df_ite.sort_values(by='f1_score_away', ascending=False).head(10)
             df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
     
-            df_ite_bs = main(
+            df_ite_bs, df_pred_met = main(
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 
@@ -114,7 +117,8 @@ if __name__ == "__main__":
                 export=False
                 )
             
-            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
+            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/metrics_{n_model}.xlsx')
+            df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
 
         else:
             # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
