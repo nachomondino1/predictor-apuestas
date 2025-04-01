@@ -37,7 +37,7 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, vary_dp: bool = False, val_min: int = 25, mult_m: float = 3, step_m: int = 10):
+    def define_hiperparameters(self, strategy, vary_dp: bool = False, val_min: int = 10, val_max: int = 100, step_m: int = 10):
         """
         Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
 
@@ -45,7 +45,7 @@ class BettingStrategy:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
         list_dp = [0, -0.5, -1, -1.5] if vary_dp else [-10000]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
-        list_m = list(range(val_min, (val_min * mult_m) + 1, step_m))
+        list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -594,6 +594,7 @@ class BettingStrategy:
 def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
+    val_min, val_max = 5, 100
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -603,17 +604,22 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, verbose: int 
     # Dropeo old metrics (sino calcula mal las nuevas)
     df_pred = drop_old_metrics(df_pred_test)
 
-    d_params = bs.define_hiperparameters(strategy='kelly_linear', val_min=25, mult_m=3, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy='kelly_linear', val_min=val_min, val_max=val_max, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
     if bs_per_res:
         func = bs.define_model_betting_strategy_by_result
     else:
         func = bs.define_model_betting_strategy
     df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1, verbose=verbose)
 
-    ## Calculo metricas  ## Solo calculo el roi que es lo unico que cambia.. o que me interesa medir
-    # roi_con_ea = determine_roi(df_pred_with_stra, var_resp='result')
+    # Escalar valores de m
+    df_strat.rename(columns={'m': 'm_old'}, inplace=True)
+    for idx, row in df_strat.iterrows():
+        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=5, new_max=15)
 
     return df_strat, df_pred_with_stra
+
+def scale_values(values: int, old_min: int, old_max: int, new_min: int, new_max: int):
+    return new_min + ((values - old_min) / (old_max - old_min)) * (new_max - new_min)
 
 def determine_bs_all_models(df_ite, country, iteration_date):
 
@@ -652,7 +658,7 @@ if __name__ == "__main__":
 
     one_model = True
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    # l_countries = [48]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
@@ -671,7 +677,7 @@ if __name__ == "__main__":
         iteration_date_dt = row['iteration_date'].values[0]
         iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
         n_model = int(row['n_model'].values[0])
-        n_model = 426
+        # n_model = 426
         model_name = str(row['model_name'].values[0])
         print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
