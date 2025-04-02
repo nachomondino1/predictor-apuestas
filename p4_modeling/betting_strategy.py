@@ -591,7 +591,7 @@ class BettingStrategy:
         return df_comp
     
 
-def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, verbose: int = 0):
+def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
     val_min, val_max = 5, 100
@@ -609,7 +609,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, verbose: int =
         func = bs.define_model_betting_strategy_by_result
     else:
         func = bs.define_model_betting_strategy
-    df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=1, verbose=verbose)
+    df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
 
     # Escalar valores de m
     df_strat.rename(columns={'m': 'm_old'}, inplace=True)
@@ -648,17 +648,22 @@ def determine_bs_all_models(df_ite, country, iteration_date):
 
     return df_result
         
-def read_predictions(country, iteration_date, n_model, model_name):
-    path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
-    df_pred_test = pd.read_excel(path_test, index_col=0)
+def read_predictions(country, iteration_date, n_model, model_name, assess: bool = False):
+    if assess:
+        date_assess = '2025-04-02'
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones.xlsx" 
+    else:
+        path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+
+    df_pred_test = pd.read_excel(path, index_col=0)
     return df_pred_test
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    one_model, n_model = True, 506
+    one_model, n_model = True, 1135
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [148]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
@@ -685,10 +690,11 @@ if __name__ == "__main__":
             print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
             # Levanto df_test
-            df_pred_test = read_predictions(country, iteration_date, n_model, model_name)
+            df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=True)
+            logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, roi_weight=0.5, verbose=1)
 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
