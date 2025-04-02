@@ -614,7 +614,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, verbose: int =
     # Escalar valores de m
     df_strat.rename(columns={'m': 'm_old'}, inplace=True)
     for idx, row in df_strat.iterrows():
-        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=5, new_max=15)
+        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=5, new_max=20)
 
     return df_strat, df_pred_with_stra
 
@@ -656,8 +656,9 @@ def read_predictions(country, iteration_date, n_model, model_name):
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    one_model = True
+    one_model, n_model = True, 506
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
@@ -678,7 +679,8 @@ if __name__ == "__main__":
        
         # Leo predicciones
         if one_model:
-            n_model = int(row['n_model'].values[0])
+            if n_model is  None:
+                n_model = int(row['n_model'].values[0])
             model_name = str(row['model_name'].values[0])
             print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
