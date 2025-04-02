@@ -1094,7 +1094,7 @@ class Modeling:
         df_pred_proba = self.construct_predictions_dataframe(model=model, X_test=X_test, y_pred_prob=y_pred_prob, y_pred=y_pred, y_test=y_test)
 
         # Calculo metricas
-        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix, bet_metrics=False) 
+        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix, bet_metrics=False, gp_result=False) 
         return df_pred_proba, d_metrics
 
     def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, df_filled, expected_metrics: bool = True, export: bool = True):

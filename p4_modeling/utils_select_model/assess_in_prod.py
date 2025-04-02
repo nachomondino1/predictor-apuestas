@@ -16,9 +16,9 @@ def main(
         iteration_date,
         update_missing: bool = False,
         predict_missing: bool = True,
+        concat_with_test: bool = True,
         export: bool = True
 ):
-    
     date = datetime.datetime.now().date()
     path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date}"
     directories.make_directories(l_directorios=[path])    
@@ -35,10 +35,6 @@ def main(
         n_model, model_name = row['n_iteration'], row['model_name_x']
         logger.info(f'{n_model} {model_name}')
         
-        # Levanto predicciones del modelo (test o test + assess)
-        # path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
-        # df_pred_test = pd.read_excel(path_test, index_col=0)
-
         if predict_missing:
             logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
 
@@ -47,9 +43,14 @@ def main(
             d_model = {'n_model': n_model, 'model_name': model_name}
             df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
             
-            # 2. Concat test + missing
-            # df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
-            df_pred = df_pred_missing.copy()
+            # 2. Concat test + missing 
+            if concat_with_test:
+                # Levanto predicciones del modelo (test o test + assess)
+                path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+                df_pred_test = pd.read_excel(path_test, index_col=0)
+                df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
+            else:
+                df_pred = df_pred_missing.copy()
 
             # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
             df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
@@ -86,9 +87,9 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    one_model, n_model = False, 286
+    one_model, n_model = False, 181
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [77, 148]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 

@@ -9,7 +9,7 @@ from p3_data_preparation import construct_data
 # CALCULO DE METRICAS BASICAS (ACCURACY, F1_SCORE, ETC)
 def calculate_metrics(
         df, var_resp = 'result', var_pred = 'predicted_result',
-        metrics_by_result: bool = True, bet_metrics: bool = True,
+        metrics_by_result: bool = True, bet_metrics: bool = True, gp_result: bool = True,
         prefix: str = None, suffix: str = None, 
         verbose: int = 0
         ):
@@ -53,6 +53,10 @@ def calculate_metrics(
         # Calculo metricas
         d_metrics_bm = calculate_bookie_metrics(df)
         d_metrics.update(d_metrics_bm)
+
+    # G/P x rdo --> neceseita cuotas y roi
+    if gp_result:
+        d_metrics.update(calculate_gp_by_result(df))
 
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
     if verbose >= 1:
