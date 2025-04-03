@@ -56,7 +56,7 @@ def calculate_metrics(
 
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
-        d_metrics.update(calculate_gp_by_result(df))
+        d_metrics.update(calculate_gp_by_result(df, var_pred=var_pred))
 
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
     if verbose >= 1:
@@ -417,7 +417,10 @@ def calculate_gp_by_result(df_predicciones, var_pred: str = 'predicted_result'):
     """
     Calcula el G/P por resultado (local, empate, visitante).
     """
-    col_gp = 'G/P_sin_bank'
+    if var_pred == 'predicted_result':
+        col_gp = 'G/P_sin_bank'
+    elif var_pred == 'expected_result':
+        col_gp = 'expected_G/P_sin_bank'
 
     # Dividir DataFrame por tipo de resultado
     df_pred_home = df_predicciones[df_predicciones[var_pred] == 1]
