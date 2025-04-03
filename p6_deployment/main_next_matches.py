@@ -674,7 +674,7 @@ class TrainingDataLoader():
 
             user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
             if user_input == 'y':
-                return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0}
+                return {'prob_dp': -10000, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
             
             raise ValueError(e)
 
@@ -958,16 +958,23 @@ def main(
         
         # Levanto datos: old + los ultimos missing extraidos
         df_match_upd, df_match_player_upd, df_match_odds_upd = mis.read_last_flashscore_data() # Last df_integrated con missing + old
+        extract_missing = True
+        if extract_missing:
+            # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
+            df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
+            logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
 
-        # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
-        df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
-        logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
+            if export and len(df_match_miss_new) > 0:
+                # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
+                mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
+                mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
+        else:
+            # Unicamente util para cuando falla la preparacion de missing pero ya extrajiste...
+            df_match_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_miss.xlsx', index_col=0)
+            df_match_player_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_player_miss.xlsx', index_col=0)
+            df_match_odds_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_odds_miss.xlsx', index_col=0)
+            print("Shape:", df_match_miss_new.shape, df_match_player_miss_new.shape, df_match_odds_miss_new.shape)
 
-        if export and len(df_match_miss_new) > 0:
-            # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
-            mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
-            mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
-        
         # Si extrajo missing
         if len(df_match_miss_new) > 0:
             
@@ -1032,7 +1039,8 @@ def main(
 
         if predict_missing:
             logger.info("Uso los partidos df_match MISSING ya extraidos.")
-            df_match, df_match_player, df_match_odds= df_match_miss.copy(), df_match_player_miss.copy(), df_match_odds_miss.copy()
+            df_match, df_match_player, df_match_odds = df_match_miss.copy(), df_match_player_miss.copy(), df_match_odds_miss.copy()
+            df_match = df_match[df_match['id_competition'].isin(comp_public)]
  
             # Levanto df_integrated de cuando entrené modelos
             df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0)
@@ -1205,7 +1213,7 @@ def main(
         # Predigo con modelo cargado
         if predict_missing:
             df_filled = df_fill.copy() 
-            d_strategy = {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0}
+            d_strategy = {'prob_dp': -10000, 'curva': 'linear', 'm': 10, 'b': 0}
         else:  
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
@@ -1253,26 +1261,26 @@ if __name__ == "__main__":
     directorio = os.getenv('BASE_DIR_LOCAL')
     d_run_type = {
         'missing': [0],
-        'predict': ['try_a_specific_model', 'predict_missing', 'prod'],
+        'predict': ['next_matches', 'missing'],
     }
 
     id_country = 48
-    key, value = 'predict', 'try_a_specific_model'
+    key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 0.5
 
     # Defino country, iteration date y modelo
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-22'], 
-        55: ["france", '2025-03-22'], 
-        59: ["germany", '2025-03-04'], 
-        77: ["italy", '2025-03-04'],
-        148: ["spain", '2025-03-04'], 
+        48: ["england", '2025-03-23'], 
+        55: ["france", '2025-03-23'], 
+        59: ["germany", '2025-03-23'], 
+        77: ["italy", '2025-03-23'],
+        148: ["spain", '2025-03-24'], 
         # 167: ["usa", '2024-12-05']
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 77, 'model_name': "RandomForestClassifier"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
+    d_model = {'n_model': 1097, 'model_name': "LogisticRegression"} # DecisionTreeClassifier, XGBClassifier, neural_networ, SVC, LogisticRegression, MLPClassifier
 
     if key == 'missing':
         
@@ -1283,15 +1291,12 @@ if __name__ == "__main__":
     elif key == 'predict':
         d_run = {'run_missing': False, 'data_unders': data_unders, 'data_prep': True, 'modeling': True, 'export': False} 
             
-        if value == "try_a_specific_model":
+        if value == "next_matches":
             logger.warning("Get predictions of specific model")
             df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=False) 
 
-        elif value == 'predict_missing':
+        elif value == 'missing':
             df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
-
-        elif value == "prod":
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, porc_m=1, export=True) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")

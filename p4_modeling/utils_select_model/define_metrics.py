@@ -7,7 +7,7 @@ from p3_data_preparation.select_data import delete_correlated_columns
 import p4_modeling.main_select_model as msm
 from p4_modeling import betting_strategy, asses_model
 from tqdm import tqdm
-
+from sklearn.preprocessing import MinMaxScaler
 
 def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test: float = 0.75):
     """
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         }
     
     # Definir metrica a maximizar en produccion
-    corr_col = 'roi' # error
+    corr_col = 'roi'
     corr_metric = f'{corr_col}_prod'
 
     for id_country in l_countries:
@@ -148,7 +148,6 @@ if __name__ == "__main__":
         
         # 0: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        # print(df_ite)
 
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
         if calculate_metrics:
@@ -164,30 +163,33 @@ if __name__ == "__main__":
      
         # Drop columns 
         # Filtrar las columnas que contienen los strings en cols_drop
-        cols_drop = ['dif_', '%_dif', 'gp_total', '_train']
+        cols_drop = ['dif_', '%_dif', 'gp_total', '_train'] #  'expected_', 'accuracy_', 'f1_score_'
         df_ite_test = df_ite_test.drop(columns=[col for col in df_ite_test.columns if any(substring in col for substring in cols_drop)])
 
         # Concateno metrica de prod con test
         df_ite_test_with_metric = pd.merge(df_ite_test, df_ite_prod.loc[:, ['n_model', corr_metric]], on='n_model', how='outer') 
-        cols_float = df_ite_test_with_metric.select_dtypes(include=['float']).columns.tolist()
+        cols_float = df_ite_test_with_metric.select_dtypes(include=['float', 'int']).columns.tolist()
         df_ite_test_with_metric = df_ite_test_with_metric[cols_float]
         print(df_ite_test_with_metric.shape)
 
-        df_ct = pd.concat([df_ct, df_ite_test_with_metric], axis=0)
+        # Calculo correlacion de metricas test con la metrica de prod
+        df_corr = calculate_correlation(df_ite_test_with_metric, corr_col=corr_metric)
+        df_corr.rename(columns={'corr_roi': country}, inplace=True)
+        # df_corr.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
+
+        # Guardo resultados del pais
+        df_ct = pd.concat([df_ct, df_corr], axis=1)
         print(df_ct.shape)
+        # df_ct.to_excel("/Users/nachomondino/Desktop/df_ct.xlsx")
 
         # Imprimir correlacion de metrica entre test y prod
         corr = df_ite_test_with_metric[corr_metric].corr(df_ite_test_with_metric[corr_col]) * 100
         print(f"La correlacion de la metrica {corr_col} entre test y prod es de: {corr:.1f}%")
 
-    # Imprimir correlacion de metrica entre test y prod
-    corr = df_ct[corr_metric].corr(df_ct[corr_col]) * 100
-    print(f"\n La correlacion de la metrica {corr_col} entre test y prod es de: {corr:.1f}%")
+    # Calculo correlacion de metricas test con la metrica de prod
+    df_ct["mean_corr"] = df_ct.mean(axis=1)
+    df_ct.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
 
-    df_ct = df_ct.dropna(axis=1, how='any')
-    df_ct.to_excel("/Users/nachomondino/Desktop/AAA.xlsx")
-
-    # Lasso
-    import p3_data_preparation.select_data as sd
-    l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
-    df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
+    # import p3_data_preparation.select_data as sd --> le da importancia a metricas con corr negativa pero que deberian ser max no min.
+    # l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
+    # df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")

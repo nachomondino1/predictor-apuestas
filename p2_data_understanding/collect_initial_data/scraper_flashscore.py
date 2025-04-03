@@ -18,8 +18,8 @@ class FlashscoreCrawler(Crawler):
     def __init__(self, headless: bool = True, browser: str = "Chrome", verbose: int = 0):
         super().__init__(headless, browser)
         self.child_driver = self.driver
-        self.SEC_WAIT_MIN = 0.8 * 2 # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
-        self.SEC_WAIT_MED = 1.5 * 2 # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MIN = 0.8 * 3 # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
+        self.SEC_WAIT_MED = 1.5 * 3 # Espera para elementos que casi siempre estan
         self.SEC_WAIT_MAX = 5 # Espera para elementos que casi siempre estan
         self.verbose =  verbose # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
 
