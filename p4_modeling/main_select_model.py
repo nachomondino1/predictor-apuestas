@@ -175,6 +175,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [59]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -185,19 +186,11 @@ if __name__ == "__main__":
         148: ["spain", '2025-03-24']
         }
     
-    # Defino metricas y pesos
-#     d_metrics = {
-#        48: {'error': 0.25, 'f1_score_draw': 0.1, 'f1_score_away': 0.65},
-#        55: {'error': 0.25, 'f1_score_draw': 0.1, 'f1_score_away': 0.65},
-#        59: {'error': 0.25, 'f1_score_draw': 0.2,'f1_score_away': 0.55}, 
-#        77: {'error': 0.25, 'f1_score_draw': 0.35, 'f1_score_away': 0.4}, 
-#        148: {'error': 0.25, 'f1_score_draw': 0.75, 'f1_score_away': 0} 
-#    }
-  
+    # Defino metricas y pesos  
     d_metrics = {
        48: {'n_away': 0.5, 'accuracy_away': 0.5},
        55: {'n_away': 0.5, 'accuracy_away': 0.5},
-       59: {'n_away': 0.5, 'accuracy_away': 0.5},
+       59: {'n_draw': 0.25, 'accuracy_draw': 0.25, 'n_away': 0.25, 'accuracy_away': 0.25},
        77: {'n_draw': 0.5, 'accuracy_draw': 0.5},
        148: {'n_draw': 0.5, 'accuracy_draw': 0.5}
    }
