@@ -190,7 +190,7 @@ if __name__ == "__main__":
     d_metrics = {
        48: {'n_away': 0.5, 'accuracy_away': 0.5},
        55: {'n_away': 0.5, 'accuracy_away': 0.5},
-       59: {'n_draw': 0.25, 'accuracy_draw': 0.25, 'n_away': 0.25, 'accuracy_away': 0.25},
+       59: {'n_draw': 0.2, 'accuracy_draw': 0.2, 'n_away': 0.3, 'accuracy_away': 0.3},
        77: {'n_draw': 0.5, 'accuracy_draw': 0.5},
        148: {'n_draw': 0.5, 'accuracy_draw': 0.5}
    }
