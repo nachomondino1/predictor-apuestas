@@ -142,33 +142,6 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
 
     return best_model, best_params, d_metrics, results
 
-def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
-    """
-    Selecciona el mejor modelo según la métrica adecuada. La metrica de las de "scoring" que usaremos para seleccionar
-    la mejor combinacion de hiperparametros.
-    
-    Parámetros:
-    - cv_results: dict con los resultados de la validación cruzada.
-    - target_type: 'categorical' para clasificación, 'continuous' para regresión.
-
-    Retorna:
-    - Índice del mejor modelo según la métrica correspondiente.
-    """
-    metrics = {
-        'categorical': 'mean_test_cross_entropy_loss',
-        'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
-    }
-
-    key = metrics.get(target_type)
-
-    if key not in cv_results:
-        raise ValueError(f"La métrica {key} no está en los resultados: {cv_results.keys()}")
-
-    if verbose >= 1:
-        print(f"Metrica a usar para selec la mejor comb {target_type}: {key}")
-
-    return cv_results[key].argmax() # # Mayor valor negativo (menor pérdida real) # CUIDADO con la metrica que uses para ver si usar argmax() o argmin()
-
 def default_scoring(target_type: str, verbose: int = 0):
     """
     Asigna un valor default a scoring según la variable respuesta. Metricas a medir en GridSeachCV.
@@ -187,8 +160,12 @@ def default_scoring(target_type: str, verbose: int = 0):
             'accuracy': 'accuracy',
             'f1_score': make_scorer(f1_score, average='macro'),
             'f1_score_wei': make_scorer(f1_score, average='weighted'),
-            # 'f1_score_0': make_scorer(custom_scorer),
-            'cross_entropy_loss': make_scorer(log_loss, greater_is_better=False, response_method="predict_proba")
+            'cross_entropy_loss': make_scorer(log_loss, greater_is_better=False, response_method="predict_proba"),
+            'metric_comb': make_scorer(
+                lambda y_true, y_pred_proba: combined_metric(y_true, y_pred_proba),
+                needs_proba=True,
+                greater_is_better=True
+                )
         }
 
     elif target_type == 'continuous':
@@ -202,17 +179,48 @@ def default_scoring(target_type: str, verbose: int = 0):
 
     return scoring
 
-# Definir un scorer que priorice la clase 0
-def custom_scorer(y_true, y_pred):
-    # F1-Score para la clase 0 (pos_label=0 para priorizar esa clase)
-    f1_class_0 = f1_score(y_true, y_pred, labels=[0], average='micro')  # Solo clase 0
-    
-    # F1-Score general (macro promedio para todas las clases)
-    f1_macro = f1_score(y_true, y_pred, average='macro')
+def combined_metric(y_true, y_proba, max_log_loss=1.1, f1_weight=0.5):
+    # Convertimos probabilidades a predicciones
+    y_pred = np.argmax(y_proba, axis=1)
 
-    # Combinar los resultados favoreciendo a la clase 0
-    # Puedes ajustar los pesos (ej., 70% clase 0, 30% macro)
-    return 0.7 * f1_class_0 + 0.3 * f1_macro
+    # Métricas individuales
+    f1 = f1_score(y_true, y_pred, average='macro')  # Ya va de 0 a 1.
+    ll = log_loss(y_true, y_proba) # va de 0 a +∞ donde 0 es lo mejor y valores grandes son malos.
+
+    # Invertimos log_loss normalizado para que valores más bajos sean mejores
+    log_loss_norm = 1 - min(ll / max_log_loss, 1.0)
+
+    # Score combinado
+    ll_weight = 1 - f1_weight
+    combined = f1_weight * f1 + ll_weight * log_loss_norm
+    return combined
+
+def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
+    """
+    Selecciona el mejor modelo según la métrica adecuada. La metrica de las de "scoring" que usaremos para seleccionar
+    la mejor combinacion de hiperparametros.
+    
+    Parámetros:
+    - cv_results: dict con los resultados de la validación cruzada.
+    - target_type: 'categorical' para clasificación, 'continuous' para regresión.
+
+    Retorna:
+    - Índice del mejor modelo según la métrica correspondiente.
+    """
+    metrics = {
+        'categorical': 'mean_test_cross_entropy_loss', # mean_test_metric_comb
+        'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
+    }
+
+    key = metrics.get(target_type)
+
+    if key not in cv_results:
+        raise ValueError(f"La métrica {key} no está en los resultados: {cv_results.keys()}")
+
+    if verbose >= 1:
+        print(f"Metrica a usar para selec la mejor comb {target_type}: {key}")
+
+    return cv_results[key].argmax() # # Mayor valor negativo (menor pérdida real) # CUIDADO con la metrica que uses para ver si usar argmax() o argmin()
 
 def check_best_params_limits(best_params, space):
     for param, value in best_params.items():
