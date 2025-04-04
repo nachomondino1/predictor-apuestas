@@ -650,7 +650,8 @@ def determine_bs_all_models(df_ite, country, iteration_date):
         
 def read_predictions(country, iteration_date, n_model, model_name, assess: bool = False):
     if assess:
-        date_assess = '2025-04-02'
+        import datetime
+        date_assess = datetime.datetime.now().date()
         path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones.xlsx" 
     else:
         path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
@@ -661,9 +662,9 @@ def read_predictions(country, iteration_date, n_model, model_name, assess: bool 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    one_model, n_model = True, 1135
+    one_model, n_model = True, 385
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [59]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
@@ -681,6 +682,8 @@ if __name__ == "__main__":
         row = df_best_models[df_best_models['id_country'] == id_country]
         iteration_date_dt = row['iteration_date'].values[0]
         iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
+
+        roi_weight = 0.65 if id_country == 59 else 0.5
        
         # Leo predicciones
         if one_model:
@@ -694,7 +697,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, roi_weight=0.5, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, roi_weight=roi_weight, verbose=1)
 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
