@@ -175,7 +175,6 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -198,7 +197,8 @@ if __name__ == "__main__":
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        l_metrics, l_weights = ['error', 'expected_error'], [0.7, 0.3]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
