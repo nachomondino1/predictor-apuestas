@@ -179,7 +179,7 @@ def default_scoring(target_type: str, verbose: int = 0):
 
     return scoring
 
-def combined_metric(y_true, y_proba, max_log_loss=1.1, f1_weight=0.5):
+def combined_metric(y_true, y_proba, max_log_loss=1.2, f1_weight=0.5):
     # Convertimos probabilidades a predicciones
     y_pred = np.argmax(y_proba, axis=1)
 
@@ -208,7 +208,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     - Índice del mejor modelo según la métrica correspondiente.
     """
     metrics = {
-        'categorical': 'mean_test_cross_entropy_loss', # mean_test_metric_comb
+        'categorical': 'mean_test_metric_comb', # mean_test_metric_comb --> no hay tanta dif entre f1_score y error pues estan corr.
         'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
     }
 
