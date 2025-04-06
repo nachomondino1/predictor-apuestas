@@ -57,10 +57,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': ['linear', strategy], #  'kelly_linear'
+                'curva': [strategy], #  'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 3]
+                'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
@@ -594,7 +594,7 @@ class BettingStrategy:
 def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
-    val_min, val_max = 5, 100
+    val_min, val_max = 0, 100
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -604,7 +604,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
     # Dropeo old metrics (sino calcula mal las nuevas)
     df_pred = drop_old_metrics(df_pred_test)
 
-    d_params = bs.define_hiperparameters(strategy='kelly_linear', val_min=val_min, val_max=val_max, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy='linear', val_min=val_min, val_max=val_max, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
     if bs_per_res:
         func = bs.define_model_betting_strategy_by_result
     else:
@@ -614,14 +614,14 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
     # Escalar valores de m
     df_strat.rename(columns={'m': 'm_old'}, inplace=True)
     for idx, row in df_strat.iterrows():
-        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=5, new_max=20)
+        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=15)
 
     return df_strat, df_pred_with_stra
 
 def scale_values(values: int, old_min: int, old_max: int, new_min: int, new_max: int):
     return new_min + ((values - old_min) / (old_max - old_min)) * (new_max - new_min)
 
-def determine_bs_all_models(df_ite, country, iteration_date):
+def determine_bs_all_models(df_ite, country, iteration_date, date_assess):
 
     d_rows = []
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
@@ -631,7 +631,7 @@ def determine_bs_all_models(df_ite, country, iteration_date):
         model_name = row['model_name_x']
 
         # Leo predicciones
-        df_pred_test = read_predictions(country, iteration_date, n_model, model_name)
+        df_pred_test = read_predictions(date_assess, country, iteration_date, n_model, model_name)
 
         # Determino ea
         df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test)
@@ -648,10 +648,9 @@ def determine_bs_all_models(df_ite, country, iteration_date):
 
     return df_result
         
-def read_predictions(country, iteration_date, n_model, model_name, assess: bool = False):
+def read_predictions(date_assess, country, iteration_date, n_model, model_name, assess: bool = False):
     if assess:
         import datetime
-        date_assess = datetime.datetime.now().date()
         path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones.xlsx" 
     else:
         path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
@@ -662,9 +661,8 @@ def read_predictions(country, iteration_date, n_model, model_name, assess: bool 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    one_model, n_model = True, 385
+    one_model = False 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [59]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
 
@@ -678,22 +676,22 @@ if __name__ == "__main__":
         
     for id_country in l_countries:
         country = d_countries[id_country][0]
+        date_assess = '2025-04-05' # datetime.datetime.now().date()
         
         row = df_best_models[df_best_models['id_country'] == id_country]
         iteration_date_dt = row['iteration_date'].values[0]
         iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
 
-        roi_weight = 0.65 if id_country == 59 else 0.5
+        roi_weight = 1
        
         # Leo predicciones
         if one_model:
-            if n_model is  None:
-                n_model = int(row['n_model'].values[0])
+            n_model = int(row['n_model'].values[0])
             model_name = str(row['model_name'].values[0])
             print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
             # Levanto df_test
-            df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=True)
+            df_pred_test = read_predictions(date_assess, country, iteration_date, n_model, model_name, assess=True)
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
@@ -709,7 +707,7 @@ if __name__ == "__main__":
             df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
             df_ite = df_ite.head(10)
 
-            df_result = determine_bs_all_models(df_ite, country, iteration_date)
+            df_result = determine_bs_all_models(df_ite, country, iteration_date, date_assess)
             df_result.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/df_ite_bs.xlsx", index=True)
 
 
