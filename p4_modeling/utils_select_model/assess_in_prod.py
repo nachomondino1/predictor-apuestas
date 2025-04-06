@@ -87,9 +87,9 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    one_model, n_model = False, 181
+    one_model, n_model = False, 1
+    concat_with_test = True
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77, 148]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -107,7 +107,6 @@ if __name__ == "__main__":
         if one_model:
             df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
 
-            # df_ite = df_ite.sort_values(by='f1_score_away', ascending=False).head(10)
             df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
     
             df_ite_bs, df_pred_met = main(
@@ -115,6 +114,7 @@ if __name__ == "__main__":
                 id_country=id_country, 
                 country=country, 
                 iteration_date=iteration_date, 
+                concat_with_test=concat_with_test,
                 export=False
                 )
             
@@ -131,5 +131,6 @@ if __name__ == "__main__":
                 id_country=id_country, 
                 country=country, 
                 iteration_date=iteration_date, 
+                concat_with_test=concat_with_test,
                 )
         

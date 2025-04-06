@@ -6,6 +6,7 @@ from utils.set_up_logging import logger
 from p3_data_preparation.construct_data import determine_expected_result
 from p4_modeling.asses_model import calculate_combined_metric, calculate_roi, determine_roi, drop_old_metrics
 from utils import directories
+import datetime
 from itertools import product
 from tqdm import tqdm
 
@@ -650,7 +651,6 @@ def determine_bs_all_models(df_ite, country, iteration_date, date_assess):
         
 def read_predictions(date_assess, country, iteration_date, n_model, model_name, assess: bool = False):
     if assess:
-        import datetime
         path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones.xlsx" 
     else:
         path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
@@ -661,7 +661,7 @@ def read_predictions(date_assess, country, iteration_date, n_model, model_name, 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    one_model = False 
+    one_model = True 
     l_countries = [48, 55, 59, 77, 148]
     
     df_best_models = pd.read_excel("./data/df_best_models.xlsx")
@@ -676,7 +676,7 @@ if __name__ == "__main__":
         
     for id_country in l_countries:
         country = d_countries[id_country][0]
-        date_assess = '2025-04-05' # datetime.datetime.now().date()
+        date_assess = datetime.datetime.now().date() # '2025-04-05'
         
         row = df_best_models[df_best_models['id_country'] == id_country]
         iteration_date_dt = row['iteration_date'].values[0]
