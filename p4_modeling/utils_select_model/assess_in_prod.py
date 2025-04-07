@@ -39,9 +39,13 @@ def main(
             logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
 
             # 1. Predict missing
-            d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
-            d_model = {'n_model': n_model, 'model_name': model_name}
-            df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
+            try:
+                df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx')
+                print(df_pred_missing.shape)
+            except FileNotFoundError:
+                d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
+                d_model = {'n_model': n_model, 'model_name': model_name}
+                df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
             
             # 2. Concat test + missing 
             if concat_with_test:
@@ -88,8 +92,9 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     one_model, n_model = False, 1
-    concat_with_test = True
+    concat_with_test = False
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [55, 59, 77, 148]
 
     d_countries = {
         # 6: ["argentina", '2025-02-06'], 
@@ -100,37 +105,64 @@ if __name__ == "__main__":
         148: ["spain", '2025-03-24']
         }
     
+    l_metrics = [
+        "roi",
+        "expected_roi",
+        "error",
+        "expected_error",
+        "test_accuracy",
+        "f1_score",
+        "f1_score_home",
+        "f1_score_draw",
+        "f1_score_away",
+        "gp_home",
+        "gp_draw",
+        "gp_away",
+        "n_home",
+        "n_draw",
+        "n_away",
+        "expected_f1_score"
+    ]
+
+
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
-        if one_model:
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
+        for metric in l_metrics:
+            print(f"Metric: {metric}")
 
-            df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
-    
-            df_ite_bs, df_pred_met = main(
-                df_ite=df_ite,
-                id_country=id_country, 
-                country=country, 
-                iteration_date=iteration_date, 
-                concat_with_test=concat_with_test,
-                export=False
-                )
-            
-            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/metrics_{n_model}.xlsx')
-            df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
+            if one_model:
+                df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
 
-        else:
-            # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx").head(20)
-            print(df_ite)
-
-            main(
-                df_ite=df_ite,
-                id_country=id_country, 
-                country=country, 
-                iteration_date=iteration_date, 
-                concat_with_test=concat_with_test,
-                )
+                df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
         
+                df_ite_bs, df_pred_met = main(
+                    df_ite=df_ite,
+                    id_country=id_country, 
+                    country=country, 
+                    iteration_date=iteration_date, 
+                    concat_with_test=concat_with_test,
+                    export=False
+                    )
+                
+                df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/metrics_{n_model}.xlsx')
+                df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
+
+            else:
+                # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+                df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
+                print(df_ite)
+
+                df_ite = df_ite.sort_values(by=metric, ascending=False).head(20)
+                print(df_ite[metric])                
+
+                df_ite_bs, _ = main(
+                    df_ite=df_ite,
+                    id_country=id_country, 
+                    country=country, 
+                    iteration_date=iteration_date, 
+                    concat_with_test=concat_with_test,
+                    )
+        
+                df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{metric}.xlsx")

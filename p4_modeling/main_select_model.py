@@ -186,19 +186,19 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos  
+    # l_metrics, l_weights = ['f1_score_away', 'gp_home', 'expected_error'], [0.45, 0.35, 0.2]
     d_metrics = {
-       48: {'n_away': 0.5, 'accuracy_away': 0.5},
-       55: {'n_away': 0.5, 'accuracy_away': 0.5},
-       59: {'n_draw': 0.2, 'accuracy_draw': 0.2, 'n_away': 0.3, 'accuracy_away': 0.3},
-       77: {'n_draw': 0.5, 'accuracy_draw': 0.5},
-       148: {'n_draw': 0.5, 'accuracy_draw': 0.5}
+       48: {'f1_score_draw': 0.5, 'f1_score_away': 0.3, 'expected_f1_score': 0.2},
+       55: {'n_away': 0.5, 'error': 0.5},
+       59: {'f1_score_away': 0.33, 'f1_score_home': 0.33, 'expected_error': 0.33},
+       77: {'gp_draw': 0.4, 'gp_home': 0.3, 'expected_error': 0.3},
+       148: {'f1_score_away': 0.33, 'f1_score_draw': 0.33, 'expected_f1_score': 0.33}
    }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
-        l_metrics, l_weights = ['error', 'expected_error'], [0.7, 0.3]
+        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
