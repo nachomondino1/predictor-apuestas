@@ -186,36 +186,15 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos  
-    # l_metrics, l_weights = ['f1_score_away', 'gp_home', 'expected_error'], [0.45, 0.35, 0.2]
-    '''
-    # Max ROI prod (metricas y pesos ≠ por pais)
-    d_metrics = {
-       48: {'gp_draw': 0.25, 'f1_score_away': 0.25, 'expected_roi': 0.25, 'test_accuracy': 0.25},
-       55: {'n_home': 0.33, 'n_away': 0.33,'error': 0.33},
-       59: {'f1_score_away': 0.4, 'f1_score_home': 0.4, 'expected_error': 0.2},
-       77: {'n_draw': 0.4, 'f1_score_home': 0.3, 'expected_error': 0.3},
-       148: {'n_away': 0.8, 'f1_score_draw': 0.2}
-   }'''
-    
     # Max ROI prod (metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_away', 'f1_score_home', 'expected_error', 'gp_draw']
+    l_metrics = ['f1_score_draw', 'f1_score_away', 'expected_error']
     d_weights = {
-       48: [0.31, 0.19, 0.13, 0.37],
-       55: [0.23, 0.26, 0.26, 0.26],
-       59: [0.33, 0.33, 0.28, 0.06],
-       77: [0.15, 0.26, 0.29, 0.3],
-       148: [0.37, 0.29, 0.24, 0.1]
+       48: [0.25, 0.5, 0.25],
+       55: [0.05, 0.7, 0.25],
+       59: [0.4, 0.55, 0.25],
+       77: [0.7, 0.05, 0.25],
+       148: [0.7, 0.05, 0.25]
     }
-
-    # Max f1_score_prod
-    '''l_metrics = ['f1_score_home', 'expected_f1_score', 'n_draw', 'f1_score_away']
-    d_weights = {
-       48: [0.18, 0.25, 0.37, 0.2],
-       55: [0.28, 0.25, 0.39, 0.09],
-       59: [0.37, 0.3, 0, 0.33],
-       77: [0.3, 0.19, 0.3, 0.21],
-       148: [0.25, 0.30, 0.22, 0.22]
-    }'''
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
