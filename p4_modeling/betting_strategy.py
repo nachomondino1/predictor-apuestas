@@ -663,8 +663,8 @@ if __name__ == "__main__":
 
     one_model = True 
     l_countries = [48, 55, 59, 77, 148]
-    
-    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+    assess = False
+    roi_weight = 0.85
 
     d_countries = {
         48: ["england"],
@@ -674,6 +674,8 @@ if __name__ == "__main__":
         148: ["spain"]
         }
         
+    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+
     for id_country in l_countries:
         country = d_countries[id_country][0]
         date_assess = datetime.datetime.now().date() # '2025-04-05'
@@ -681,8 +683,6 @@ if __name__ == "__main__":
         row = df_best_models[df_best_models['id_country'] == id_country]
         iteration_date_dt = row['iteration_date'].values[0]
         iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
-
-        roi_weight = 1
        
         # Leo predicciones
         if one_model:
@@ -691,7 +691,7 @@ if __name__ == "__main__":
             print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
             # Levanto df_test
-            df_pred_test = read_predictions(date_assess, country, iteration_date, n_model, model_name, assess=True)
+            df_pred_test = read_predictions(date_assess, country, iteration_date, n_model, model_name, assess=assess)
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
