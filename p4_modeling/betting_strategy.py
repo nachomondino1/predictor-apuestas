@@ -58,7 +58,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy], #  'kelly_linear'
+                'curva': [strategy, 'kelly_linear'], #  'kelly_linear'
                 'm': list_m,
                 'b': [0],
                 'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
@@ -663,8 +663,8 @@ if __name__ == "__main__":
 
     one_model = True 
     l_countries = [48, 55, 59, 77, 148]
-    assess = False
-    roi_weight = 0.85
+    assess = True
+    roi_weight = 1
 
     d_countries = {
         48: ["england"],
