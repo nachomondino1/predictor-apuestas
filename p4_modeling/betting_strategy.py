@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [0, -0.5, -1, -1.5] if vary_dp else [-10000]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [0, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9] if vary_dp else [-10000]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
@@ -58,7 +58,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'kelly_linear'], #  'kelly_linear'
+                'curva': [strategy, 'kelly_linear'],
                 'm': list_m,
                 'b': [0],
                 'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
@@ -91,27 +91,29 @@ class BettingStrategy:
             kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # creo que esta bien
 
             # Si el riesgo-beneficio es malo (ver si funciona bien con kelly_crit) --> creo que esta ok
-            if (kelly_crit < thr_prob_min):
+            if (prob_result_to_bet < thr_prob_min):
                 if self.verbose >= 1:
-                    logger.warning(f"Aplicamos doble oportunidad por kelly_crit<{thr_prob_min}.")
+                    logger.warning(f"Aplicamos doble oportunidad por prob_result_to_bet = {prob_result_to_bet} < {thr_prob_min}. ")
 
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
-                strategy = f"kelly_crit < {thr_prob_min}"
+                strategy = f"prob_result_to_bet < {thr_prob_min}"
+                kelly_crit =  ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # Lo recalculo pues ahora apuesto a otro rdo
 
             # Si el riesgo-beneficio es alto
             else:
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
-                strategy = f"kelly_crit > {thr_prob_min}"
+                strategy = f"prob_result_to_bet > {thr_prob_min}"
 
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
+            df.loc[id_match, 'kelly_criterion'] = kelly_crit
 
         return df
 
@@ -228,9 +230,6 @@ class BettingStrategy:
         if m is None:
             m = (y2-y1) / (x2-x1)
             b = y1 - m*x1
-
-        # Calculo kelly criterion
-        df['kelly_criterion'] = ((df['odd_to_bet'] - 1) * df['prob_result_to_bet'] - (1 - df['prob_result_to_bet'])) / (df['odd_to_bet'] - 1) 
 
         # STRATEGY: EQUAL
         if type_relation == "equal":  
@@ -591,11 +590,12 @@ class BettingStrategy:
 
         return df_comp
     
-
 def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
-    val_min, val_max = 0, 100
+    val_min, val_max, step_m = 0, 100, 5
+    vary_dp = True
+    strategy = 'linear'
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -605,7 +605,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
     # Dropeo old metrics (sino calcula mal las nuevas)
     df_pred = drop_old_metrics(df_pred_test)
 
-    d_params = bs.define_hiperparameters(strategy='linear', val_min=val_min, val_max=val_max, step_m=5, vary_dp=False) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy=strategy, val_min=val_min, val_max=val_max, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
     if bs_per_res:
         func = bs.define_model_betting_strategy_by_result
     else:
@@ -615,7 +615,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
     # Escalar valores de m
     df_strat.rename(columns={'m': 'm_old'}, inplace=True)
     for idx, row in df_strat.iterrows():
-        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=15)
+        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=30)
 
     return df_strat, df_pred_with_stra
 
@@ -664,6 +664,7 @@ if __name__ == "__main__":
     one_model = True 
     l_countries = [48, 55, 59, 77, 148]
     assess = True
+    date_assess = '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
     roi_weight = 1
 
     d_countries = {
@@ -678,7 +679,6 @@ if __name__ == "__main__":
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
-        date_assess = datetime.datetime.now().date() # '2025-04-05'
         
         row = df_best_models[df_best_models['id_country'] == id_country]
         iteration_date_dt = row['iteration_date'].values[0]
