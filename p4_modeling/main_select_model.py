@@ -185,27 +185,22 @@ if __name__ == "__main__":
         148: ["spain", '2025-03-24']
         }
     
-    # Defino metricas y pesos
-#     d_metrics = {
-#        48: {'error': 0.25, 'f1_score_draw': 0.1, 'f1_score_away': 0.65},
-#        55: {'error': 0.25, 'f1_score_draw': 0.1, 'f1_score_away': 0.65},
-#        59: {'error': 0.25, 'f1_score_draw': 0.2,'f1_score_away': 0.55}, 
-#        77: {'error': 0.25, 'f1_score_draw': 0.35, 'f1_score_away': 0.4}, 
-#        148: {'error': 0.25, 'f1_score_draw': 0.75, 'f1_score_away': 0} 
-#    }
-  
-    d_metrics = {
-       48: {'n_away': 0.5, 'accuracy_away': 0.5},
-       55: {'n_away': 0.5, 'accuracy_away': 0.5},
-       59: {'n_away': 0.5, 'accuracy_away': 0.5},
-       77: {'n_draw': 0.5, 'accuracy_draw': 0.5},
-       148: {'n_draw': 0.5, 'accuracy_draw': 0.5}
-   }
+    # Defino metricas y pesos  
+    # Max ROI prod (metricas comunes pero pesos ≠ por pais)
+    l_metrics = ['f1_score_draw', 'f1_score_away', 'expected_error']
+    d_weights = {
+       48: [0.25, 0.5, 0.25],
+       55: [0.05, 0.7, 0.25],
+       59: [0.4, 0.55, 0.25],
+       77: [0.7, 0.05, 0.25],
+       148: [0.7, 0.05, 0.25]
+    }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
+        l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)

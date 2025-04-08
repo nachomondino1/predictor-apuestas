@@ -939,7 +939,7 @@ class Modeling:
         test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
         val_size_ratio = val_size / (1 - test_size_ratio) 
 
-        # Separo en train y validation
+        # Separo en train y validation (A futuro, estaria bueno evitar partidos de copa en val porque no hay 0 y es falso)
         X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
 
         # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
@@ -1224,9 +1224,6 @@ class Modeling:
         else:
             logger.warning(f"EVITO TRAIN. Se evita entrenar modelo por pocas filas respecto a columnas. {rows_to_features} menor a {rows_to_features_min} ")
 
-        # Concatenar todo al final (mucho más eficiente)
-        # df_metrics_train = pd.concat([pd.DataFrame(train_rows)], ignore_index=True)
-        # df_metrics_test = pd.concat([pd.DataFrame(test_rows)], ignore_index=True)
         return train_rows, test_rows
 
 def crear_variables(diccionario):

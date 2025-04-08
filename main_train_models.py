@@ -296,8 +296,8 @@ def comprehensive_search(
                                 df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
 
                                 # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-                                df_temp = pd.merge(df_iteration, df_ite_train, on='n_iteration', how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
-                                df_iteration_comp = pd.merge(df_temp, df_ite_test, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
+                                df_temp = pd.merge(df_ite_train, df_ite_test, on=['n_iteration', 'model_name'], how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+                                df_iteration_comp = pd.merge(df_iteration, df_temp, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
                                 df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
                                 # Limpiar listas después de exportar
@@ -493,7 +493,7 @@ def define_params_space(id_country, fast: bool = False):
 
     # 1728 iteraciones
     if fast:
-        l_modelos = [LogisticRegression()]
+        l_modelos = [LogisticRegression(), SVC()]
 
         d_params = {  
             'clean_data_3': {
@@ -504,21 +504,21 @@ def define_params_space(id_country, fast: bool = False):
                 'n_years_h2h': [2],
                 'segun_localia': [False, True],
                 'calculate_dif': [False, True], # False uso el enfoque de against?
-                'decay_rate': [0, 0.2], # 0.5
+                'decay_rate': [0], # 0.5  0.2
             },
             'clean_data_2': {
-                'n_years_to_select': [5, 10], # 3
+                'n_years_to_select': [3, 5, 10],
                 'fill_na': [None, "0"],
             },
             'select': {
-                'thr_corr': [0.7, None], # 0.85,
+                'thr_corr': [0.7, 0.85, None], # 0.85,
                 'thr_fs': [None, 0.1, 0.25],
             },
             'modeling': {
-                'val_size': [0.15],
+                'val_size': [0.125],
                 'n_reg_test': [100], # 25 es muy poco para selec el modelo
-                'bal_type': ['under'], #  None
-                'k': [5]
+                'bal_type': ['under', None], #  None
+                'k': [10]
             }
         }
 
@@ -555,7 +555,7 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 77, 148]
+    l_countries = [148]
 
     data_unders = False
     update_sofifa = False if data_unders else False
