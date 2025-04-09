@@ -163,7 +163,7 @@ def main(
 
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
-    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name_x']
+    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name'] # model_name_x
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
 
     # Exporto datos
@@ -177,19 +177,17 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-23'],
-        55: ["france", '2025-03-23'], 
-        59: ["germany", '2025-03-23'],
-        77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-24']
+        48: ["england", '2025-04-08'],
+        55: ["france", '2025-04-08'], 
+        59: ["germany", '2025-04-08'],
+        77: ["italy", '2025-04-08'],
+        148: ["spain", '2025-04-08']
         }
     
-    # Defino metricas y pesos  
-    # Max ROI prod (metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_draw', 'f1_score_away', 'expected_error']
+    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
+    l_metrics = ['f1_score_draw', 'f1_score_away', 'error'] # no uso 'expected' pero si lo tengo en cuenta en los paises donde importa para elegir entre los candidatos. 
     d_weights = {
-       48: [0.25, 0.5, 0.25],
+       48: [0.35, 0.4, 0.25],
        55: [0.05, 0.7, 0.25],
        59: [0.4, 0.55, 0.25],
        77: [0.7, 0.05, 0.25],
@@ -199,7 +197,6 @@ if __name__ == "__main__":
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
         l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
