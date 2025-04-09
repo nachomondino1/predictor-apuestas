@@ -91,20 +91,14 @@ def roi_in_time_one_model(n_model, model_name):
 if __name__ == "__main__":
     # Defino parametroçs
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
 
     d_countries = {
-        # 48: ["england", '2025-02-05'],
-        # 55: ["france", '2025-02-05'], 
-        # 59: ["germany", '2025-02-05'],
-        # 77: ["italy", '2025-02-05'],
-        # 148: ["spain", '2025-02-05'], 
-        # Train nuevos
-        # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-03'],
-        55: ["france", '2025-03-03'], 
-        59: ["germany", '2025-03-04'],
-        77: ["italy", '2025-03-04'],
-        148: ["spain", '2025-03-04'], 
+        48: ["england", '2025-04-08'],
+        55: ["france", '2025-04-08'], 
+        59: ["germany", '2025-04-08'],
+        77: ["italy", '2025-04-08'],
+        148: ["spain", '2025-04-08']
         }
 
     for id_country in l_countries:

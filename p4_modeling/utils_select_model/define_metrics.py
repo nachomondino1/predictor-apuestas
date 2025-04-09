@@ -22,7 +22,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
     # Itero sobre cada modelo
     for idx, row in df_ite.iterrows():
 
-        n_model, model_name = row['n_iteration'], row['model_name_x']
+        n_model, model_name = row['n_iteration'], row['model_name']
         # print(n_model)
 
         # Filtrar columnas que contienen 'cv_' o '_train'
@@ -122,18 +122,18 @@ if __name__ == "__main__":
         
     # Defino variables
     df_ct = pd.DataFrame()
-    calculate_metrics = False
 
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
 
     d_countries = {
         # train nuevos
-        48: ["england", '2025-03-23'],
-        55: ["france", '2025-03-23'], 
-        59: ["germany", '2025-03-23'],
-        77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-24']
+        48: ["england", '2025-04-08'],
+        55: ["france", '2025-04-08'], 
+        59: ["germany", '2025-04-08'],
+        77: ["italy", '2025-04-08'],
+        148: ["spain", '2025-04-08']
         }
     
     # Definir metrica a maximizar en produccion
@@ -150,17 +150,17 @@ if __name__ == "__main__":
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
 
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
-        if calculate_metrics:
+        try:
+            df_ite_test = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx")
+            df_ite_prod = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx")
+            df_ite =  pd.read_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx')
+        except FileNotFoundError:
             df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75)
             df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
             df_ite_test.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx', index=False)
             df_ite_prod.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx', index=False)
             df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx', index=False)
-        else:
-            df_ite_test = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx")
-            df_ite_prod = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx")
-            df_ite =  pd.read_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx')
-     
+       
         # Drop columns 
         # Filtrar las columnas que contienen los strings en cols_drop
         cols_drop = ['dif_', '%_dif', 'gp_total', '_train'] #  'expected_', 'accuracy_', 'f1_score_'
