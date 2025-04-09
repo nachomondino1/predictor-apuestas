@@ -45,12 +45,12 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [0, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9] if vary_dp else [-10000]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [0, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
             dic = {
-                'prob_dp': -10000,
+                'prob_dp': 0,
                 'curva': 'linear',
                 'm': 10,
                 'b': 0,
@@ -58,10 +58,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'kelly_linear'],
+                'curva': [strategy], #'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [1, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
@@ -91,7 +91,7 @@ class BettingStrategy:
             kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # creo que esta bien
 
             # Si el riesgo-beneficio es malo (ver si funciona bien con kelly_crit) --> creo que esta ok
-            if (prob_result_to_bet < thr_prob_min):
+            if row['predicted_result'] != 0 and prob_result_to_bet < thr_prob_min:
                 if self.verbose >= 1:
                     logger.warning(f"Aplicamos doble oportunidad por prob_result_to_bet = {prob_result_to_bet} < {thr_prob_min}. ")
 
@@ -590,12 +590,12 @@ class BettingStrategy:
 
         return df_comp
     
-def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, verbose: int = 0):
+def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, roi_weight: int = 1, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
-    val_min, val_max, step_m = 0, 100, 5
+    val_min, val_max, step_m = 0, 200, 10
     vary_dp = True
-    strategy = 'linear'
+    strategy = 'kelly_linear'
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -612,10 +612,12 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
         func = bs.define_model_betting_strategy
     df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
 
-    # Escalar valores de m
-    df_strat.rename(columns={'m': 'm_old'}, inplace=True)
-    for idx, row in df_strat.iterrows():
-        df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=30)
+    # Si bs por rdo
+    if bs_per_res:
+        # Reescalar valores de m
+        df_strat.rename(columns={'m': 'm_old'}, inplace=True)
+        for idx, row in df_strat.iterrows():
+            df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=30)
 
     return df_strat, df_pred_with_stra
 
@@ -661,11 +663,10 @@ def read_predictions(date_assess, country, iteration_date, n_model, model_name, 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    one_model = True 
     l_countries = [48, 55, 59, 77, 148]
-    assess = True
-    date_assess = '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 1
+    one_model = True 
+    assess, date_assess = False, '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
+    roi_weight = 0.75
 
     d_countries = {
         48: ["england"],
@@ -695,7 +696,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=True, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, roi_weight=roi_weight, verbose=1)
 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
