@@ -135,7 +135,7 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
                 continue  # Si no existe la columna, la salteamos
 
             # Paso 1: normalizar solo valores no nulos
-            df[col_name] = df[col_name].where(df[col_name].isna(), df[col_name].str.replace(r'\s+', ' ', regex=True).str.strip())
+            df[col_name] = df[col_name].where(df[col_name].isna(), df[col_name].str.replace(r'\s+', ' ', regex=True).str.strip()) 
 
             # Paso 2: crear columnas vacías para luego completar según cada caso
             df[f'accuracy_{col_name}'] = np.nan
@@ -158,7 +158,7 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
             if extracted.isnull().any().any():
                 raise ValueError(f"Valores no convertibles a números en {col_name}")
 
-            df.loc[mask_extracted, f'accuracy_{col_name}'] = extracted[0].values
+            df.loc[mask_extracted, f'accuracy_{col_name}'] = extracted[0].values # # warning de Try using .loc[row_indexer,col_indexer] = value instead
             df.loc[mask_extracted, f'n_correct_{base_col}_{location}'] = extracted[1].values
             df.loc[mask_extracted, f'n_{col_name}'] = extracted[2].values
 
