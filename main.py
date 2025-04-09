@@ -1137,28 +1137,70 @@ class Modeling:
             df_match: pd.DataFrame,
             df_match_odds: pd.DataFrame,
             df_filled: pd.DataFrame = None,
-            ):        
+            ):      
+        # Selecciono los registros de df_pred_proba
         df_match = df_match[df_match.index.isin(df_pred_proba.index)]
         df_match_odds = df_match_odds[df_match_odds.index.isin(df_pred_proba.index)]
+
+        # Selecciono columnas de df_match
         l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
         df_match = df_match[l_cols_match]
 
+        # Calculo 'bookmaker_result" y sus probas
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
         df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
 
-        # Concatenación selectiva
-        columns_to_concat = [
-            df_match,
-            df_match_odds,
-            df_pred_proba,
-        ]
-
+        # Concatenación
         if df_filled is not None:
             df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
             l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-            columns_to_concat.append(df_filled[l_cols_fill])
+            df_filled = df_filled[l_cols_fill]        
             
-        df_predicciones = pd.concat(columns_to_concat, axis=1)
+        # Concatenar todos alineados por index
+        df_predicciones = pd.concat([
+            df_match,
+            df_match_odds,
+            df_pred_proba,
+            df_filled if df_filled is not None else pd.DataFrame(index=df_pred_proba.index)  # opcional si no querés if
+        ], axis=1)
+
+        # Reformateo id_teams de id a nombre
+        df_predicciones = self.reformat_pred(df_predicciones)
+        
+        return df_predicciones
+    
+    def prepare_dataframe_to_assess_with_roi_new( # ver si funciona
+            self,
+            df_pred_proba: pd.DataFrame,
+            df_match: pd.DataFrame,
+            df_match_odds: pd.DataFrame,
+            df_filled: pd.DataFrame = None,
+            ):        
+        # Selecciono columnas de df_match
+        l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
+        df_match = df_match[l_cols_match]
+
+        # Asegurar orden y coincidencia de índices
+        df_match = df_match.reindex(df_pred_proba.index)
+        df_match_odds = df_match_odds.reindex(df_pred_proba.index)
+
+        # Calculo 'bookmaker_result" y sus probas
+        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
+        df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
+
+        if df_filled is not None:
+            df_filled = df_filled.reindex(df_pred_proba.index)
+            l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
+            df_filled = df_filled[l_cols_fill]
+
+        # Concatenar todos alineados por index
+        df_predicciones = pd.concat([
+            df_match,
+            df_match_odds,
+            df_pred_proba,
+            df_filled if df_filled is not None else pd.DataFrame(index=df_pred_proba.index)  # opcional si no querés if
+        ], axis=1)
+
         df_predicciones = self.reformat_pred(df_predicciones)
         
         return df_predicciones
