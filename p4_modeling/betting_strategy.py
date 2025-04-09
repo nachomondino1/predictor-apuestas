@@ -61,7 +61,7 @@ class BettingStrategy:
                 'curva': [strategy], #'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [0.5, 1] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
@@ -363,11 +363,14 @@ class BettingStrategy:
             # Calculo de metricas (ROI y roi_pp)
             df_pred_with_metrics_roi, d_metrics = calculate_roi(df_aux)
             df_pred_with_metrics__ex, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
+
+            mean_stake = df_aux['stake_to_bet'].mean()
             
             # # Concateno datos de ROI y Expected ROI (no calculo metric aqui para poder normalizar dsp)
             missing_columns = [col for col in df_pred_with_metrics__ex.columns if col not in df_pred_with_metrics_roi.columns]
             df_pred_with_metrics = pd.concat([df_pred_with_metrics_roi, df_pred_with_metrics__ex[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
             d_metrics.update(d_metrics_2)
+            d_metrics.update({'mean_stake': mean_stake})
 
             if self.verbose >= 1:
                 print(f"Params: {params} \n Metrics: {d_metrics} \n")
@@ -424,18 +427,19 @@ class BettingStrategy:
         df = self.determine_stake_to_bet(df, **d_params_stake)
         return df
 
-    def select_best_parameters(self, data, roi_weight: int = 1):
+    def select_best_parameters(self, data, roi_weight: float = 1):
         
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
         
-        # Calcular metrica a maximizar (lo hago aqui para poder normalizar)
-        ex_weight = 1 - roi_weight
-        df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[roi_weight, ex_weight])
+        # Calcular metrica a maximizar (lo hago aqui para poder normalizar): Max Expected roi con minimo stake
+        ex_weight =  float(1 - roi_weight)
+        df['metric'] = ((roi_weight * df['roi']) + (ex_weight * df['expected_roi'])) / df['mean_stake'] # Si funciona. Si roi_weight es cero:  df['metric'] = df['expected_roi'] / df['mean_stake']
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
         if self.verbose >= 1:
+            print(roi_weight, ex_weight)
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
 
@@ -541,16 +545,17 @@ class BettingStrategy:
         if not isinstance(d_predic, pd.DataFrame):
             # Selecciono la mejor combinación
             n_comb = self.select_best_parameters(d_metricas, roi_weight)
-
+                
             # Guardo resultados
             best_df_pred = d_predic[n_comb]
             df_final = pd.DataFrame({**d_hiper[n_comb], **d_metricas[n_comb]}, index=[0])
+
+            if verbose >= 1:
+                logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
+
         else:
             best_df_pred = d_predic
             df_final = pd.DataFrame([{**d_hiper, **d_metricas}])
-
-        if verbose >= 1:
-            logger.critical(f"La mejor estrategia de apuesta: {d_hiper[n_comb]}")
 
         return df_final, best_df_pred
 
@@ -594,8 +599,8 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, roi_weight: i
     
     bs = BettingStrategy(verbose=0)
     val_min, val_max, step_m = 0, 200, 10
-    vary_dp = True
-    strategy = 'kelly_linear'
+    vary_dp = False
+    strategy = 'linear' # kelly_linear
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -613,31 +618,40 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, roi_weight: i
     df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
 
     # Si bs por rdo
-    if bs_per_res:
-        # Reescalar valores de m
-        df_strat.rename(columns={'m': 'm_old'}, inplace=True)
-        for idx, row in df_strat.iterrows():
-            df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=30)
+    # if bs_per_res:
+        # # Reescalar valores de m
+        # df_strat.rename(columns={'m': 'm_old'}, inplace=True)
+        # for idx, row in df_strat.iterrows():
+        #     df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=15)
 
     return df_strat, df_pred_with_stra
 
 def scale_values(values: int, old_min: int, old_max: int, new_min: int, new_max: int):
     return new_min + ((values - old_min) / (old_max - old_min)) * (new_max - new_min)
 
-def determine_bs_all_models(df_ite, country, iteration_date, date_assess):
+def determine_bs_all_models(df_ite, country, iteration_date, date_assess, roi_weight):
 
     d_rows = []
     progress_bar = tqdm(total=len(df_ite), ncols=80)  # Inicializo barra de progreso
 
     for idx, row in df_ite.iterrows():
         n_model = row['n_iteration']
-        model_name = row['model_name_x']
+        model_name = row['model_name']
 
         # Leo predicciones
         df_pred_test = read_predictions(date_assess, country, iteration_date, n_model, model_name)
 
         # Determino ea
-        df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test)
+        df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, roi_weight=roi_weight)
+        
+        # Calculo roi_sin_ea y multplicador
+        df_strat['roi_sin_ea'] = determine_roi(df_pred_test) * 100
+        df_strat['expected_roi_sin_ea'] = determine_roi(df_pred_test, var_resp='expected_result') * 100
+        df_strat['mean_stake_sin_ea'] = df_pred_test['stake_to_bet'].mean()
+        df_strat['mean_stake'] = df_pred_with_stra['stake_to_bet'].mean()
+        df_strat['x_roi'] = (df_strat['roi'] - df_strat['roi_sin_ea']) / df_strat['roi_sin_ea']
+        df_strat['x_exroi'] = (df_strat['expected_roi'] - df_strat['expected_roi_sin_ea']) / df_strat['expected_roi_sin_ea']
+        df_strat['x_stake'] = (df_strat['mean_stake'] - df_strat['mean_stake_sin_ea']) / df_strat['mean_stake_sin_ea']
 
         # Guardo resultados
         df_strat["idx"] = n_model
@@ -664,9 +678,9 @@ def read_predictions(date_assess, country, iteration_date, n_model, model_name, 
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
-    one_model = True 
+    one_model = False 
     assess, date_assess = False, '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 0.75
+    roi_weight = 0
 
     d_countries = {
         48: ["england"],
@@ -708,7 +722,7 @@ if __name__ == "__main__":
             df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
             df_ite = df_ite.head(10)
 
-            df_result = determine_bs_all_models(df_ite, country, iteration_date, date_assess)
+            df_result = determine_bs_all_models(df_ite, country, iteration_date, date_assess, roi_weight=roi_weight)
             df_result.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/df_ite_bs.xlsx", index=True)
 
 
