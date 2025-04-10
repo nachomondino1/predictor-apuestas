@@ -128,7 +128,7 @@ class FlashscoreCrawler(Crawler):
 
         ## Si tiene hoja "stats", extraigo campos
         if not next_matches:
-            boton_stats = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Stats"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
+            boton_stats = super().extract_tag(xpath='//a[@data-analytics-alias="match-statistics"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=True) # './/div[@class="filterOver filterOver--indent"]//button[text()="Stats"]'
             if super().click_boton(boton_stats) is not False:
                 d_row_match.update(self.extract_stats())
 
@@ -137,10 +137,10 @@ class FlashscoreCrawler(Crawler):
             d_row_match_odds.update(self.extract_odds())
         
         ## Si tiene hoja "Formations", extraigo campos
-        boton_formations = super().extract_tag(xpath='.//div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]', sec_wait=self.SEC_WAIT_MED, print_fail=True)
+        boton_formations = super().extract_tag(xpath='//a[@data-analytics-alias="lineups"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=True) #  # './/div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]'
         if super().click_boton(boton_formations) is not False:
             ### Alineaciones titulares, suplentes y ausentes
-            d_row_match_player.update(self.extract_lineups())
+            d_row_match_player.update(self.extract_lineups(next_matches))
             
             ### Coaches
             d_row_match.update(self.extract_coaches())
@@ -241,14 +241,18 @@ class FlashscoreCrawler(Crawler):
             print(f"Extracting goals: {d_row}")
         return d_row
     
-    def extract_lineups(self):
+    def extract_lineups(self, next_matches):
         """
         Extrae de jugadores titulares, suplentes y ausentes de cada equipo.
         :return: Diccionario.
         """
         # Definicion de variables
         d_row = {}
-        d_formations = {"Starting Lineups": "start", 'Substitutes': 'sub', 'Substituted players': 'sub_enter', 'Missing Players': 'miss'}
+
+        if next_matches:
+            d_formations = {'Predicted starting lineups': 'start', 'Will not play': 'miss'} # "Starting Lineups": "start" --> salvo que falten menos de 30 min
+        else:
+            d_formations = {"Starting Lineups": "start", 'Substitutes': 'sub', 'Substituted players': 'sub_enter', 'Missing Players': 'miss'}
 
         # Por formation ("Formation inicial", "Suplentes" y  "Ausentes")
         for formation, titularidad in d_formations.items():
