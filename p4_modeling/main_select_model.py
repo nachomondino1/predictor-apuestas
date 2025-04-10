@@ -178,6 +178,11 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
+        # 48: ["england", '2025-03-23'],
+        # 55: ["france", '2025-03-23'], 
+        # 59: ["germany", '2025-03-23'],
+        # 77: ["italy", '2025-03-23'],
+        # 148: ["spain", '2025-03-24']
         48: ["england", '2025-04-08'],
         55: ["france", '2025-04-08'], 
         59: ["germany", '2025-04-08'],
@@ -186,13 +191,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['expected_f1_score_draw', 'expected_f1_score_away', 'expected_roi', 'f1_score'] 
+    l_metrics = ['expected_f1_score', 'expected_error', 'error'] # 'expected_error' 'expected_f1_score_draw', 'expected_f1_score_away'
     d_weights = {
-       48: [0.35, 0.4, 0.25, 0.25],
-       55: [0.05, 0.7, 0.25, 0.25],
-       59: [0.4, 0.55, 0.25, 0.25],
-       77: [0.7, 0.05, 0.25, 0.25],
-       148: [0.7, 0.05, 0.25, 0.25]
+       48: [0.3, 0.4, 0.3],
+       55: [0.3, 0.4, 0.3],
+       59: [0.3, 0.4, 0.3],
+       77: [0.3, 0.4, 0.3],
+       148: [0.3, 0.4, 0.3],
     }
 
     for id_country in l_countries:
