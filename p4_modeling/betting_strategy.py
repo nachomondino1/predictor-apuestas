@@ -431,18 +431,25 @@ class BettingStrategy:
         
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
-        
+
         # Calcular metrica a maximizar (lo hago aqui para poder normalizar): Max Expected roi con minimo stake
-        ex_weight =  float(1 - roi_weight)
-        df['metric'] = ((roi_weight * df['roi']) + (ex_weight * df['expected_roi'])) / df['mean_stake'] # Si funciona. Si roi_weight es cero:  df['metric'] = df['expected_roi'] / df['mean_stake']
+        ex_weight =  float(1 - roi_weight)   
+        
+        ## Op 1: Normalizando antes de sumar --> Realmente creo que no es correcto. La diferente escala es info valiosa y que creo que debo usar.
+        # df = calculate_combined_metric(df, l_metrics=['roi', 'expected_roi'], l_weights=[roi_weight, ex_weight], metric_name='num') 
+        # df.loc[df['mean_stake'] != 0, 'metric'] = df['num'] / df['mean_stake'] # funcionana mal si stake es 0.
+        
+        ## Op 2: Sin normalizar (prefiero esta actualmente, con la dif de escala)
+        df['metric'] = ((roi_weight * df['roi']) + (ex_weight * df['expected_roi'])) / df['mean_stake'] 
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
-        if self.verbose >= 1:
+        if self.verbose >= 0:
             print(roi_weight, ex_weight)
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
-
+            df.to_excel('/Users/nachomondino/Desktop/prueba.xlsx')
+        raise ValueError
         return n_comb
 
     # Main
@@ -598,7 +605,7 @@ class BettingStrategy:
 def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, roi_weight: int = 1, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
-    val_min, val_max, step_m = 10, 11, 10
+    val_min, val_max, step_m = 0, 200, 10
     vary_dp = False
     strategy = 'kelly_linear'
 
