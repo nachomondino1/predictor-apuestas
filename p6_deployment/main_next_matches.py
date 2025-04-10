@@ -670,14 +670,15 @@ class TrainingDataLoader():
                 logger.info(df_hiper)
 
         except FileNotFoundError as e:
-            print("Falló la carga del df_strategy")
+            logger.error("Falló la carga del df_strategy")
 
-            user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
-            if user_input == 'y':
-                return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
-            
-            raise ValueError(e)
-
+            # user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
+            # if user_input == 'y':
+            #     return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
+            # else:
+            #     raise ValueError(e)
+            return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
+        
         return df_hiper
 
 class MissingData:
@@ -1264,7 +1265,7 @@ if __name__ == "__main__":
         'predict': ['next_matches', 'missing'],
     }
 
-    id_country = 48
+    id_country = 77
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 0.5
@@ -1278,7 +1279,7 @@ if __name__ == "__main__":
         148: ["spain", '2025-04-08'], 
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 199, 'model_name': "SVC"} # SVC, LogisticRegression
+    d_model = {'n_model': 1034, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
 
     if key == 'missing':
         

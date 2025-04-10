@@ -598,9 +598,9 @@ class BettingStrategy:
 def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, roi_weight: int = 1, verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
-    val_min, val_max, step_m = 0, 200, 10
+    val_min, val_max, step_m = 10, 11, 10
     vary_dp = False
-    strategy = 'linear' # kelly_linear
+    strategy = 'kelly_linear'
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -644,7 +644,7 @@ def determine_bs_all_models(df_ite, country, iteration_date, date_assess, roi_we
         # Determino ea
         df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, roi_weight=roi_weight)
         
-        # Calculo roi_sin_ea y multplicador
+        # Calculo roi_sin_ea y multplicador --> Funciona mal cuando hacemos ea por rdo...
         df_strat['roi_sin_ea'] = determine_roi(df_pred_test) * 100
         df_strat['expected_roi_sin_ea'] = determine_roi(df_pred_test, var_resp='expected_result') * 100
         df_strat['mean_stake_sin_ea'] = df_pred_test['stake_to_bet'].mean()
@@ -678,9 +678,9 @@ def read_predictions(date_assess, country, iteration_date, n_model, model_name, 
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
-    one_model = False 
+    one_model = True 
     assess, date_assess = False, '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 0
+    roi_weight = 0.5
 
     d_countries = {
         48: ["england"],
