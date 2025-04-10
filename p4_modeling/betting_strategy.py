@@ -58,10 +58,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy], #'kelly_linear'
+                'curva': [strategy, 'kelly_linear'],
                 'm': list_m,
                 'b': [0],
-                'k': [0.5, 1] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [1, 2, 4, 10] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
@@ -444,7 +444,7 @@ class BettingStrategy:
 
         # Encontrar la fila con el valor máximo de 'metric'
         n_comb = df['metric'].idxmax()
-        if self.verbose >= 0:
+        if self.verbose >= 1:
             print(roi_weight, ex_weight)
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
@@ -601,37 +601,6 @@ class BettingStrategy:
 
         return df_comp
     
-def determine_bs_for_model(df_pred_test, bs_per_res: bool = False, roi_weight: int = 1, verbose: int = 0):
-    
-    bs = BettingStrategy(verbose=0)
-    val_min, val_max, step_m = 0, 200, 10
-    vary_dp = False
-    strategy = 'kelly_linear'
-
-    # Imprimo prob_result_to_bet promedio
-    if verbose >= 1:
-        mean_prob = df_pred_test['prob_result_to_bet'].mean()
-        print(f"Prob result to bet promedio: {mean_prob}")
-    
-    # Dropeo old metrics (sino calcula mal las nuevas)
-    df_pred = drop_old_metrics(df_pred_test)
-
-    d_params = bs.define_hiperparameters(strategy=strategy, val_min=val_min, val_max=val_max, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-    if bs_per_res:
-        func = bs.define_model_betting_strategy_by_result
-    else:
-        func = bs.define_model_betting_strategy
-    df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
-
-    # Si bs por rdo
-    # if bs_per_res:
-        # # Reescalar valores de m
-        # df_strat.rename(columns={'m': 'm_old'}, inplace=True)
-        # for idx, row in df_strat.iterrows():
-        #     df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=15)
-
-    return df_strat, df_pred_with_stra
-
 def scale_values(values: int, old_min: int, old_max: int, new_min: int, new_max: int):
     return new_min + ((values - old_min) / (old_max - old_min)) * (new_max - new_min)
 
@@ -680,13 +649,44 @@ def read_predictions(date_assess, country, iteration_date, n_model, model_name, 
     df_pred_test = pd.read_excel(path, index_col=0)
     return df_pred_test
 
+def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, verbose: int = 0):
+    
+    bs = BettingStrategy(verbose=0)
+    val_min, val_max, step_m = 10, 11, 10
+    vary_dp = False
+    strategy = 'kelly'
+
+    # Imprimo prob_result_to_bet promedio
+    if verbose >= 1:
+        mean_prob = df_pred_test['prob_result_to_bet'].mean()
+        print(f"Prob result to bet promedio: {mean_prob}")
+    
+    # Dropeo old metrics (sino calcula mal las nuevas)
+    df_pred = drop_old_metrics(df_pred_test)
+
+    d_params = bs.define_hiperparameters(strategy=strategy, val_min=val_min, val_max=val_max, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    if bs_per_res:
+        func = bs.define_model_betting_strategy_by_result
+    else:
+        func = bs.define_model_betting_strategy
+    df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
+
+    # Si bs por rdo
+    # if bs_per_res:
+        # # Reescalar valores de m
+        # df_strat.rename(columns={'m': 'm_old'}, inplace=True)
+        # for idx, row in df_strat.iterrows():
+        #     df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=0, new_max=15)
+
+    return df_strat, df_pred_with_stra
+
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
     one_model = True 
     assess, date_assess = False, '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 0.5
+    roi_weight = 0.75
 
     d_countries = {
         48: ["england"],
