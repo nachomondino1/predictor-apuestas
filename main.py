@@ -491,8 +491,13 @@ class DataPreparation:
 
             ## 2) EN ULTIMOS N PARTIDOS
             for n_matches in [15]:
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False) # Hay que ver si funciona tanto sin como con localia.
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True) # Hay que ver si funciona tanto sin como con localia.
+                # Result
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False)
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True)
+
+                # Expected Result (nuevo, ver si funca)
+                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
+                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
 
             # Por stat (e.g. shots_on_goal)
             logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
