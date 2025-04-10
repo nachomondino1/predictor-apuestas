@@ -163,7 +163,8 @@ def main(
 
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
-    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name'] # model_name_x
+    col_name = 'model_name' if 'model_name' in df_ite_bs.columns else 'model_name_x'
+    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, col_name]
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
 
     # Exporto datos
@@ -185,13 +186,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_draw', 'f1_score_away', 'error'] # no uso 'expected' pero si lo tengo en cuenta en los paises donde importa para elegir entre los candidatos. 
+    l_metrics = ['expected_f1_score_draw', 'expected_f1_score_away', 'expected_roi', 'f1_score'] 
     d_weights = {
-       48: [0.35, 0.4, 0.25],
-       55: [0.05, 0.7, 0.25],
-       59: [0.4, 0.55, 0.25],
-       77: [0.7, 0.05, 0.25],
-       148: [0.7, 0.05, 0.25]
+       48: [0.35, 0.4, 0.25, 0.25],
+       55: [0.05, 0.7, 0.25, 0.25],
+       59: [0.4, 0.55, 0.25, 0.25],
+       77: [0.7, 0.05, 0.25, 0.25],
+       148: [0.7, 0.05, 0.25, 0.25]
     }
 
     for id_country in l_countries:
@@ -199,13 +200,13 @@ if __name__ == "__main__":
         iteration_date = d_countries[id_country][1]
         l_weights = d_weights[id_country]
 
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
 
         # para maximizar error en metrica
         df_ite['error'] = df_ite['error'] * (-1)
         df_ite['expected_error'] = df_ite['expected_error'] * (-1)
-        df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
+        # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
 
         main(
             df_ite=df_ite,
