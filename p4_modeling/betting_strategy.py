@@ -448,8 +448,7 @@ class BettingStrategy:
             print(roi_weight, ex_weight)
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
-            df.to_excel('/Users/nachomondino/Desktop/prueba.xlsx')
-        raise ValueError
+
         return n_comb
 
     # Main
