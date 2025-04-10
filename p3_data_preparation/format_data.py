@@ -133,17 +133,24 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
             col_name = f"{base_col}_{location}"
             if col_name not in df.columns:
                 continue  # Si no existe la columna, la salteamos
-            if verbose >= 1:
-                print(f"Column name: {col_name}")
-                print(df[col_name])
 
-            # Reemplazo saltos de línea para asegurar consistencia
-            df[col_name] = df[col_name].str.replace(r'\n', ' ', regex=True)
+            # Paso 1: normalizar solo valores no nulos
+            df[col_name] = df[col_name].where(df[col_name].isna(), df[col_name].str.replace(r'\s+', ' ', regex=True).str.strip()) 
 
-            # Extraer valores con regex
-            extracted = df[col_name].str.extract(r'(\d+)%\s*\((\d+)/(\d+)\)')
+            # Paso 2: crear columnas vacías para luego completar según cada caso
+            df[f'accuracy_{col_name}'] = np.nan
+            df[f'n_correct_{base_col}_{location}'] = np.nan
+            df[f'n_{col_name}'] = np.nan
+
+            # Paso 3: máscaras para los distintos casos
+            mask_extracted = df[col_name].notna() & df[col_name].str.contains(r'\d+%\s*\(\d+/\d+\)', na=False)
+            mask_direct = df[col_name].notna() & df[col_name].str.match(r'^\d+$')  # solo números
+
+            # Caso 1: extracción con regex
+            extracted = df.loc[mask_extracted, col_name].str.extract(r'(\d+)%\s*\((\d+)/(\d+)\)')
             if verbose >= 1:
                 print(f"Extracted: \n {extracted}")
+
             if extracted.isnull().any().any():
                 raise ValueError(f"Error al extraer datos en la columna {col_name}")
 
@@ -151,11 +158,13 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
             if extracted.isnull().any().any():
                 raise ValueError(f"Valores no convertibles a números en {col_name}")
 
-            # Definir nombres de nuevas columnas
-            df[f'accuracy_{col_name}'], df[f'n_correct_{base_col}_{location}'], df[f'n_{col_name}'] = extracted.T.values
-            if verbose >= 1:
-                print(df[f'accuracy_{col_name}'])
-      
+            df.loc[mask_extracted, f'accuracy_{col_name}'] = extracted[0].values # # warning de Try using .loc[row_indexer,col_indexer] = value instead
+            df.loc[mask_extracted, f'n_correct_{base_col}_{location}'] = extracted[1].values
+            df.loc[mask_extracted, f'n_{col_name}'] = extracted[2].values
+
+            # Caso 2: ya está en formato numérico, solo asignás `n_{col_name}`
+            df.loc[mask_direct, f'n_{col_name}'] = df.loc[mask_direct, col_name].astype(float) # Por ejemplo, n_tackles es "15" o "61% (22/36)" (no funciona no se por qué)
+
             # Verificar rangos
             # for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
             #     if not df[new_col].between(min_val, max_val).all():

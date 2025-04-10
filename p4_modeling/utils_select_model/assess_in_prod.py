@@ -32,7 +32,7 @@ def main(
 
     # Por modelo
     for idx, row in df_ite.iterrows():
-        n_model, model_name = row['n_iteration'], row['model_name_x']
+        n_model, model_name = row['n_iteration'], row['model_name'] #model_name_x
         logger.info(f'{n_model} {model_name}')
         
         if predict_missing:
@@ -147,12 +147,16 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-23'],
-        55: ["france", '2025-03-23'], 
-        59: ["germany", '2025-03-23'],
-        77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-24']
+        # 48: ["england", '2025-03-23'],
+        # 55: ["france", '2025-03-23'], 
+        # 59: ["germany", '2025-03-23'],
+        # 77: ["italy", '2025-03-23'],
+        # 148: ["spain", '2025-03-24']
+        48: ["england", '2025-04-08'],
+        55: ["france", '2025-04-08'], 
+        59: ["germany", '2025-04-08'],
+        77: ["italy", '2025-04-08'],
+        148: ["spain", '2025-04-08']
         }
     
     for id_country in l_countries:

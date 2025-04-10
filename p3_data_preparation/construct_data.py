@@ -209,7 +209,7 @@ def determine_number_matches_last_days(df: pd.DataFrame, n_days): # Ver si funci
 
     return df
 
-def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_localia: bool = False): # Ver si funciona
+def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_localia: bool = False, var_resp: str = 'result'): # Ver si funciona
     """
     Determinar numero de triunfos, empates y derrotas en los ultimos n partidos por equipo.
     
@@ -218,6 +218,7 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=True).copy()  # Hacer copia para evitar fragmentación
+    pf = '' if var_resp == 'result' else 'exp_'
 
     team_matches = {}
     # Construyo df por equipo
@@ -230,12 +231,12 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
         
     # Diccionarios para acumular valores y evitar asignaciones repetitivas con `.at[]`
     results_dict = {
-        f'n_wins_last_{n_matches}_matches_home': [],
-        f'n_draws_last_{n_matches}_matches_home': [],
-        f'n_loss_last_{n_matches}_matches_home': [],
-        f'n_wins_last_{n_matches}_matches_away': [],
-        f'n_draws_last_{n_matches}_matches_away': [],
-        f'n_loss_last_{n_matches}_matches_away': []
+        f'{pf}n_wins_last_{n_matches}_matches_home': [],
+        f'{pf}n_draws_last_{n_matches}_matches_home': [],
+        f'{pf}n_loss_last_{n_matches}_matches_home': [],
+        f'{pf}n_wins_last_{n_matches}_matches_away': [],
+        f'{pf}n_draws_last_{n_matches}_matches_away': [],
+        f'{pf}n_loss_last_{n_matches}_matches_away': []
     }
 
     # Por equipo
@@ -260,31 +261,33 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
                 raise ValueError
 
             # Construyo variables
-            n_wins = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 1]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 2])
-            n_draws = len(df_last_matches[df_last_matches['result'] == 0])
-            n_loss = len(df_match_team_filt_home[df_match_team_filt_home['result'] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away['result'] == 1])
+            n_wins = len(df_match_team_filt_home[df_match_team_filt_home[var_resp] == 1]) + len(df_match_team_filt_away[df_match_team_filt_away[var_resp] == 2])
+            n_draws = len(df_last_matches[df_last_matches[var_resp] == 0])
+            n_loss = len(df_match_team_filt_home[df_match_team_filt_home[var_resp] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away[var_resp] == 1])
 
             if n_games != (n_wins + n_draws + n_loss):
                 logger.error(f"Error en determinación de resultados en últimos días {n_wins} + {n_draws} + {n_loss} != {n_games}")
                 raise ValueError
 
             # Acumular valores en listas
-            results_dict[f'n_wins_last_{n_matches}_matches_{home_or_away}'].append((idx, n_wins))
-            results_dict[f'n_draws_last_{n_matches}_matches_{home_or_away}'].append((idx, n_draws))
-            results_dict[f'n_loss_last_{n_matches}_matches_{home_or_away}'].append((idx, n_loss))
+            results_dict[f'{pf}n_wins_last_{n_matches}_matches_{home_or_away}'].append((idx, n_wins))
+            results_dict[f'{pf}n_draws_last_{n_matches}_matches_{home_or_away}'].append((idx, n_draws))
+            results_dict[f'{pf}n_loss_last_{n_matches}_matches_{home_or_away}'].append((idx, n_loss))
 
     # Convertir listas en Series y asignarlas de una vez para evitar fragmentación
     for col, values in results_dict.items():
         df[col] = pd.Series(dict(values))  # Crea la columna usando un diccionario de índices
 
+
+
     # Suma cruzada (En vez de calcular diferencia). Wins home + loss away ; loss home + wins_away
-    l_cols = ['n_wins_last', 'n_loss_last']
+    l_cols = [f'{pf}n_wins_last', f'{pf}n_loss_last']
     suffix = '_by_loc' if segun_localia else ''
 
     for col in l_cols:
-        sum_col = f'sum_{col}_{n_matches}_matches{suffix}'
+        sum_col = f'{pf}sum_{col}_{n_matches}_matches{suffix}'
         
-        col_away = 'n_loss_last' if col == 'n_wins_last' else 'n_wins_last'
+        col_away = f'{pf}n_loss_last' if col == f'{pf}n_wins_last' else f'{pf}n_wins_last'
 
         col1 = f'{col}_{n_matches}_matches_home'
         col2 = f'{col_away}_{n_matches}_matches_away'
@@ -293,9 +296,9 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
         df.drop(columns=[col1, col2], inplace=True)
 
     # Diferencia entre n_wins y n_loss --> indicador de empate
-    dif_col = f'dif_{n_matches}_matches{suffix}'
-    df[dif_col] = df[f'sum_n_wins_last_{n_matches}_matches{suffix}'] - df[f'sum_n_loss_last_{n_matches}_matches{suffix}']
-    df.drop(columns=[f'n_draws_last_{n_matches}_matches_home', f'n_draws_last_{n_matches}_matches_away'], inplace=True) # no las uso
+    dif_col = f'{pf}dif_{n_matches}_matches{suffix}'
+    df[dif_col] = df[f'{pf}sum_n_wins_last_{n_matches}_matches{suffix}'] - df[f'{pf}sum_n_loss_last_{n_matches}_matches{suffix}']
+    df.drop(columns=[f'{pf}n_draws_last_{n_matches}_matches_home', f'{pf}n_draws_last_{n_matches}_matches_away'], inplace=True) # no las uso
 
     return df
 

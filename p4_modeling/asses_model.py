@@ -359,7 +359,7 @@ def calculate_reality_roi(df: pd.DataFrame):
 
     return df, d_rois
 
-def determine_roi(df_pred, var_resp):
+def determine_roi(df_pred, var_resp: str = 'result'):
 
     if var_resp == 'result':
         col_inic, col_fin = 'bank_inicial', 'bank_final'
@@ -419,8 +419,10 @@ def calculate_gp_by_result(df_predicciones, var_pred: str = 'predicted_result'):
     """
     if var_pred == 'predicted_result':
         col_gp = 'G/P_sin_bank'
+        preffix = ''
     elif var_pred == 'expected_result':
         col_gp = 'expected_G/P_sin_bank'
+        preffix = 'expected_'
 
     # Dividir DataFrame por tipo de resultado
     df_pred_home = df_predicciones[df_predicciones[var_pred] == 1]
@@ -440,13 +442,13 @@ def calculate_gp_by_result(df_predicciones, var_pred: str = 'predicted_result'):
     # Crear el diccionario de resultados
     d = {
         # Resultados por tipo
-        'gp_home': gp_home,
-        'gp_draw': gp_draw,
-        'gp_away': gp_away,
-        'gp_total': gp_total,
-        '%_gp_home': perc_gp_home,
-        '%_gp_draw': perc_gp_draw,
-        '%_gp_away': perc_gp_away,
+        f'{preffix}gp_home': gp_home,
+        f'{preffix}gp_draw': gp_draw,
+        f'{preffix}gp_away': gp_away,
+        f'{preffix}gp_total': gp_total,
+        f'{preffix}%_gp_home': perc_gp_home,
+        f'{preffix}%_gp_draw': perc_gp_draw,
+        f'{preffix}%_gp_away': perc_gp_away,
     }
     return d
 

@@ -497,27 +497,27 @@ def define_params_space(id_country, fast: bool = False):
 
         d_params = {  
             'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups'], d_comps['comp_sin_b']], # d_comps['comp_solo_liga']
+                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups']],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
             },
             'construct': {
                 'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
                 'n_years_h2h': [2],
                 'segun_localia': [False, True],
-                'calculate_dif': [False, True], # False uso el enfoque de against?
-                'decay_rate': [0], # 0.5  0.2
+                'calculate_dif': [False, True], # False uso el enfoque de against
+                'decay_rate': [0, 0.1], # ya 0.1 es alto
             },
             'clean_data_2': {
                 'n_years_to_select': [3, 5, 10],
                 'fill_na': [None, "0"],
             },
             'select': {
-                'thr_corr': [0.7, 0.85, None], # 0.85,
+                'thr_corr': [0.7, 0.85, None],
                 'thr_fs': [None, 0.1, 0.25],
             },
             'modeling': {
                 'val_size': [0.125],
-                'n_reg_test': [100], # 25 es muy poco para selec el modelo
-                'bal_type': ['under', None], #  None
+                'n_reg_test': [50], # 25 es muy poco para selec el modelo
+                'bal_type': ['under'], # None
                 'k': [10]
             }
         }
@@ -555,12 +555,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [77]
 
-    data_unders = False
+    data_unders = True
     update_sofifa = False if data_unders else False
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = False
+    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 

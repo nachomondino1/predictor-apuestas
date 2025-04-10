@@ -163,7 +163,8 @@ def main(
 
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
-    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, 'model_name_x']
+    col_name = 'model_name' if 'model_name' in df_ite_bs.columns else 'model_name_x'
+    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, col_name]
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
 
     # Exporto datos
@@ -177,38 +178,40 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        # 6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-23'],
-        55: ["france", '2025-03-23'], 
-        59: ["germany", '2025-03-23'],
-        77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-24']
+        # 48: ["england", '2025-03-23'],
+        # 55: ["france", '2025-03-23'], 
+        # 59: ["germany", '2025-03-23'],
+        # 77: ["italy", '2025-03-23'],
+        # 148: ["spain", '2025-03-24']
+        48: ["england", '2025-04-08'],
+        55: ["france", '2025-04-08'], 
+        59: ["germany", '2025-04-08'],
+        77: ["italy", '2025-04-08'],
+        148: ["spain", '2025-04-08']
         }
     
-    # Defino metricas y pesos  
-    # Max ROI prod (metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_draw', 'f1_score_away', 'expected_error']
+    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
+    l_metrics = ['expected_f1_score', 'expected_error', 'error'] # 'expected_error' 'expected_f1_score_draw', 'expected_f1_score_away'
     d_weights = {
-       48: [0.25, 0.5, 0.25],
-       55: [0.05, 0.7, 0.25],
-       59: [0.4, 0.55, 0.25],
-       77: [0.7, 0.05, 0.25],
-       148: [0.7, 0.05, 0.25]
+       48: [0.3, 0.4, 0.3],
+       55: [0.3, 0.4, 0.3],
+       59: [0.3, 0.4, 0.3],
+       77: [0.3, 0.4, 0.3],
+       148: [0.3, 0.4, 0.3],
     }
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_metrics, l_weights = d_metrics[id_country].keys(), d_metrics[id_country].values()
         l_weights = d_weights[id_country]
 
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
 
         # para maximizar error en metrica
         df_ite['error'] = df_ite['error'] * (-1)
         df_ite['expected_error'] = df_ite['expected_error'] * (-1)
-        df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
+        # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
 
         main(
             df_ite=df_ite,
