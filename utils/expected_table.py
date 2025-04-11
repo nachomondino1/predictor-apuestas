@@ -1,18 +1,22 @@
 import sys
 sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
+from p3_data_preparation import construct_data
 
 
 def main(id_competition):
 
-    rows = []
-    rows_ho = []
-    rows_aw = []
+    d_rows_ho = {}
+    d_rows_aw = {}
 
     # Levantar predicciones historicas
     # df = pd.read_excel("/Users/nachomondino/Desktop/historial_predicciones.xlsx", index_col=0)
     df = pd.read_excel('data/_dashboard/df.xlsx')
     print(df)
+
+    # Recalcular threshold de expected
+    thr = construct_data.adjust_ratio_to_match_distributions(df, initial_ratio=0.3, max_iterations=100)
+    df = construct_data.determine_expected_result(df, goals_to_xg_ratio=thr, verbose=1)
 
     # Filtrar por temporada y pais
     df_filt = df[df['id_competition'] == id_competition]
@@ -22,65 +26,76 @@ def main(id_competition):
     l_teams = df_filt['id_team_home'].unique()
 
     for team in l_teams:
-        print(team)
+        # print(team)
 
         # Partidos que jugo de local
         df_team_home = df_filt[df_filt['id_team_home'] == team]
         df_team_away = df_filt[df_filt['id_team_away'] == team]
-        print(df_team_home.shape)
-        print(df_team_away.shape)
+        # print(df_team_home.shape)
+        # print(df_team_away.shape)
 
-        # Sumar puntos segun expected result
-        n_wins_ho = len(df_team_home[df_team_home['expected_result'] == 1])
-        n_draws_ho = len(df_team_home[df_team_home['expected_result'] == 0])
-        n_loss_ho = len(df_team_home[df_team_home['expected_result'] == 2])
-        n_matches_ho = len(df_team_home)
-        points_ho = 3 * n_wins_ho + n_draws_ho
+        # Calculo tablas
+        d_rows_ho[team] = calculate_table(df=df_team_home, home=True)
+        d_rows_aw[team] = calculate_table(df=df_team_away, home=False)
 
-        n_wins_aw = len(df_team_away[df_team_away['expected_result'] == 2])
-        n_draws_aw = len(df_team_away[df_team_away['expected_result'] == 0])
-        n_loss_aw = len(df_team_away[df_team_away['expected_result'] == 1])
-        n_matches_aw = len(df_team_away)
-        points_aw = 3 * n_wins_aw + n_draws_aw
+    table_home = pd.DataFrame.from_dict(d_rows_ho, orient='index')
+    table_away = pd.DataFrame.from_dict(d_rows_aw, orient='index')
 
-        n_wins = n_wins_ho + n_wins_aw
-        n_draws = n_draws_ho + n_draws_aw
-        n_loss = n_loss_ho + n_loss_aw
-        n_matches = n_matches_ho + n_matches_aw
+    table = table_home.add(table_away, fill_value=0)  # Sumar ambas tablas, rellenando con 0 donde falte información
+    table_ct = table_home.join(table_away, how='outer', lsuffix='_home', rsuffix='_away')
 
-        points = points_ho + points_aw
-
-        rows.append([team, n_matches, n_wins, n_draws, n_loss, points])
-        rows_ho.append([team, n_matches_ho, n_wins_ho, n_draws_ho, n_loss_ho, points_ho])
-        rows_aw.append([team, n_matches_aw, n_wins_aw, n_draws_aw, n_loss_aw, points_aw])
-
-    table = pd.DataFrame(
-        rows,
-        columns=["team", "n_matches", "n_wins", "n_draws", "n_loss", "points"]
-    )
-    table_home = pd.DataFrame(
-        rows_ho,
-        columns=["team", 'n_matches_ho', 'n_wins_ho', 'n_draws_ho', 'n_loss_ho', 'points_ho']
-    )
-    table_away = pd.DataFrame(
-        rows_aw,
-        columns=["team", 'n_matches_aw', 'n_wins_aw', 'n_draws_aw', 'n_loss_aw', 'points_aw']
-    )
-
+    table_home = table_home.sort_values(by='points', ascending=False)
+    table_away = table_away.sort_values(by='points', ascending=False)
     table = table.sort_values(by='points', ascending=False)
-    table_ct = pd.merge(table, table_home, on='team')
-    table_ct = pd.merge(table_ct, table_away, on='team')
-    table_home = table_home.sort_values(by='points_ho', ascending=False)
-    table_away = table_away.sort_values(by='points_aw', ascending=False)
 
-    table.index = range(1, len(table) + 1)
-    table_home.index = range(1, len(table_home) + 1)
-    table_away.index = range(1, len(table_away) + 1)
-
-    table.to_excel(f"data/_expected_table/{id_competition}.xlsx")
     table_home.to_excel(f"data/_expected_table/{id_competition}_home.xlsx")
     table_away.to_excel(f"data/_expected_table/{id_competition}_away.xlsx")
-    table_ct.to_excel(f"data/_expected_table/{id_competition}_comp.xlsx")
+    table.to_excel(f"data/_expected_table/{id_competition}.xlsx")
+    table_ct.to_excel(f"data/_expected_table/{id_competition}_ct.xlsx")
 
-for comp in [481, 551, 591, 771, 1481]:
-    main(id_competition=comp)
+def calculate_table(df, home: bool):
+
+    suffix = 'home' if home else 'away'
+    suffix_ag = 'away' if home else 'home'
+    res_win = 1 if home else 2
+    res_loss = 2 if home else 1
+    
+    # Results
+    n_wins = len(df[df['result'] == res_win])
+    n_draws = len(df[df['result'] == 0])
+    n_loss = len(df[df['result'] == res_loss])
+    n_matches = len(df)
+    points = 3 * n_wins + n_draws
+    
+    # Goals
+    n_goals = df[f'goals_{suffix}'].sum()
+    n_goals_against = df[f'goals_{suffix_ag}'].sum()
+    dif_goals = n_goals - n_goals_against
+
+    # Expected results
+    x_n_wins = len(df[df['expected_result'] == res_win])
+    x_n_draws = len(df[df['expected_result'] == 0])
+    x_n_loss = len(df[df['expected_result'] == res_loss])
+    x_n_matches = len(df)
+    x_points = 3 * x_n_wins + x_n_draws
+    
+    # X_goals
+    x_n_goals = df[f'expected_goals_(xg)_{suffix}'].sum()
+    x_n_goals_against = df[f'expected_goals_(xg)_{suffix_ag}'].sum()
+    dif_x_goals = x_n_goals - x_n_goals_against
+
+    d = {"n_matches": n_matches, "n_wins": n_wins, "n_draws": n_draws, "n_loss": n_loss, "points": points, 
+         'GF': n_goals, 'GC': n_goals_against, 'dif': dif_goals,
+          "x_n_matches": x_n_matches, "x_n_wins": x_n_wins, "x_n_draws": x_n_draws, "x_n_loss": x_n_loss, "x_points": x_points, 
+           'x_GF': x_n_goals, 'x_GC': x_n_goals_against, 'x_dif': dif_x_goals
+         }
+    return d
+
+
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+
+    l_comps = [481, 551, 591, 771, 1481] 
+
+    for comp in l_comps:
+        main(id_competition=comp)
