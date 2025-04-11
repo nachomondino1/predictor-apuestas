@@ -193,11 +193,11 @@ if __name__ == "__main__":
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
     l_metrics = ['expected_f1_score', 'expected_error', 'error'] # 'expected_error' 'expected_f1_score_draw', 'expected_f1_score_away'
     d_weights = {
-       48: [0.3, 0.4, 0.3],
-       55: [0.3, 0.4, 0.3],
-       59: [0.3, 0.4, 0.3],
-       77: [0.3, 0.4, 0.3],
-       148: [0.3, 0.4, 0.3],
+       48: [0.6, 0.3, 0.1],
+       55: [0.6, 0.3, 0.1],
+       59: [0.6, 0.3, 0.1],
+       77: [0.6, 0.3, 0.1],
+       148: [0.6, 0.3, 0.1],
     }
 
     for id_country in l_countries:

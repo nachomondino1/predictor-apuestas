@@ -58,7 +58,7 @@ def main(
 
             # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
             df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
-            df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+            df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.38) # Intento hacerlo antes con df_match pero rompia.
             
             # df_pred.to_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
         
