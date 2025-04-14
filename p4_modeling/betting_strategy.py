@@ -61,7 +61,7 @@ class BettingStrategy:
                 'curva': [strategy, 'kelly_linear'],
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 4, 10] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [1, 2, 4] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
