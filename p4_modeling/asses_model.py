@@ -28,7 +28,7 @@ def calculate_metrics(
 
     # Calculo métricas básicas
     d_metrics = {
-        'error': log_loss(y_test, y_pred_prob),
+        'error': log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
