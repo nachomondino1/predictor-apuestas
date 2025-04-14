@@ -8,8 +8,10 @@ import p4_modeling.main_select_model as msm
 from p4_modeling import betting_strategy, asses_model
 from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler
+import datetime
 
-def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test: float = 0.75):
+
+def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test: float = 0.75, assess: bool = False):
     """
     Automatizo el experimento para definir metricas segun correlacion con ROI prod y Ex ROI prod.
     Es un experimento retroactivo. Tengo el ROI de cada modelos en los partidos futuros y veo como seleccionar a los modelos que mejor les fue.
@@ -32,18 +34,30 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
 
         # Obtengo predicciones
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
-        df_pred = pd.read_excel(path_test, index_col=0)
-        # print(df_pred.shape)
+        df_test = pd.read_excel(path_test, index_col=0)
+        
+        if assess:
+            df_first_matches = df_test.copy()
+
+            date_assess = datetime.datetime.now().date()
+            path_assess = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones.xlsx" 
+
+            df_last_matches = pd.read_excel(path_assess, index_col=0)
+            # print(df_pred.shape)
+
+        else:
+            df_pred = df_test.copy()
+
+            # Separo x% como "test" y (1-x)% como "prod"
+            n_matches_test = int(perc_matches_test * len(df_pred))
+            n_matches_prod = len(df_pred) - n_matches_test
+            df_first_matches = df_pred.head(n_matches_test)
+            df_last_matches = df_pred.tail(n_matches_prod)
+            # print(df_first_matches.shape, df_last_matches.shape)
 
         # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = asses_model.drop_old_metrics(df_pred)
-
-        # Separo x% como "test" y (1-x)% como "prod"
-        n_matches_test = int(perc_matches_test * len(df_pred))
-        n_matches_prod = len(df_pred) - n_matches_test
-        df_first_matches = df_pred.head(n_matches_test)
-        df_last_matches = df_pred.tail(n_matches_prod)
-        # print(df_first_matches.shape, df_last_matches.shape)
+        df_first_matches = asses_model.drop_old_metrics(df_first_matches)
+        df_last_matches = asses_model.drop_old_metrics(df_last_matches)
 
         # Aplico estrategia
         d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
@@ -125,7 +139,6 @@ if __name__ == "__main__":
 
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
 
     d_countries = {
         # train nuevos
@@ -147,19 +160,21 @@ if __name__ == "__main__":
         print(f" {country.upper()} ".center(120, "$"))
         
         # 0: Levanto df_ite_test (test) --> NUNCA REDUCIR EL NRO DE MODELOS PUES LOS RDOS PUEDEN SER MUY ≠ A LOS QUE REALMENTE SON.
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx").head(100)
 
         # 1. Por modelo: division en "test" y "prod" + Calculo metricas
-        try:
-            df_ite_test = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx")
-            df_ite_prod = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx")
-            df_ite =  pd.read_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx')
-        except FileNotFoundError:
-            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75)
-            df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
-            df_ite_test.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx', index=False)
-            df_ite_prod.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx', index=False)
-            df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx', index=False)
+        # try:
+        #     df_ite_test = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx")
+        #     df_ite_prod = pd.read_excel(f"/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx")
+        #     df_ite =  pd.read_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx')
+        
+        # except FileNotFoundError:
+        df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75, assess=True)
+        df_ite = pd.merge(df_ite_test, df_ite_prod, on='n_model', how='outer') 
+        df_ite_test.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_test.xlsx', index=False)
+        df_ite_prod.to_excel(f'/Users/nachomondino/Desktop/{country}/df_ite_prod.xlsx', index=False)
+        df_ite.to_excel(f'/Users/nachomondino/Desktop/{country}/df_iteration.xlsx', index=False)
        
         # Drop columns 
         # Filtrar las columnas que contienen los strings en cols_drop
