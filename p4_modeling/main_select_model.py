@@ -154,9 +154,12 @@ def main(
     # Definicion de paths
     d_paths = initialize_directories(country, iteration_date, assess)
 
+    # filtro por roi
+    df_ite_filt = filter_models_by_metric(df_ite, metric_col='roi', n_models_max=100)
+
     ## 1. Calculo metrica combinada
     metric = 'metric_test_assess'
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite_filt, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
@@ -191,19 +194,20 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['expected_f1_score', 'expected_error', 'error'] # 'expected_error' 'expected_f1_score_draw', 'expected_f1_score_away'
-    d_weights = {
-       48: [0.6, 0.3, 0.1],
-       55: [0.6, 0.3, 0.1],
-       59: [0.6, 0.3, 0.1],
-       77: [0.6, 0.3, 0.1],
-       148: [0.6, 0.3, 0.1],
-    }
+    l_metrics = ['error', 'expected_error', 'n_draw']
+    # d_weights = {
+    #    48: [0.6, 0.3, 0.1],
+    #    55: [0.6, 0.3, 0.1],
+    #    59: [0.6, 0.3, 0.1],
+    #    77: [0.6, 0.3, 0.1],
+    #    148: [0.6, 0.3, 0.1],
+    # }
+    l_weights = [0.6, 0.2, 0.2]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_weights = d_weights[id_country]
+        # l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
