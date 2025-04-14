@@ -40,7 +40,7 @@ def main(
 
             # 1. Predict missing
             try:
-                df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx')
+                df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
                 print(df_pred_missing.shape)
             except FileNotFoundError:
                 d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
@@ -74,7 +74,7 @@ def main(
         
         ## Calculo metricas
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
+        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='x_')
             
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
@@ -89,13 +89,11 @@ def main(
     
     return df_ite_bs, df_pred_met
 
-def assess_roi_selecting_by_metric(
+def assess_roi_selecting_by_metric( # La unica "cagada" de esto es que supone a cada metrica como independiente de la otra... en la realidad no hago eso.
         df_ite,
         id_country,
         country,
         iteration_date,
-        update_missing: bool = False,
-        predict_missing: bool = True,
         concat_with_test: bool = True,
         export: bool = True
     ):
@@ -122,15 +120,12 @@ def assess_roi_selecting_by_metric(
     for metric in l_metrics:
         print(f"Metric: {metric}")
 
-        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
-        print(df_ite)
-
-        df_ite = df_ite.sort_values(by=metric, ascending=False).head(20)
-        print(df_ite[metric])                
+        # Selecciono top 20 models segun metrica 
+        df_ite_aux = df_ite.sort_values(by=metric, ascending=False).head(20)
+        print(df_ite[metric])       
 
         df_ite_bs, _ = main(
-            df_ite=df_ite,
+            df_ite=df_ite_aux,
             id_country=id_country, 
             country=country, 
             iteration_date=iteration_date, 
@@ -145,6 +140,7 @@ if __name__ == "__main__":
     one_model, n_model = False, 328
     concat_with_test = False
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [148]
 
     d_countries = {
         # 48: ["england", '2025-03-23'],
@@ -163,6 +159,9 @@ if __name__ == "__main__":
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
+        # Levanto df_ite
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx") # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+
         if assess_metric:
 
             assess_roi_selecting_by_metric(
@@ -176,7 +175,6 @@ if __name__ == "__main__":
             pass
 
         elif one_model:
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
 
             df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
     
@@ -193,8 +191,7 @@ if __name__ == "__main__":
             df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
 
         else:
-            # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx").head(10)
+            df_ite = df_ite.head(100)
             print(df_ite)
 
             df_ite_bs, _ = main(
