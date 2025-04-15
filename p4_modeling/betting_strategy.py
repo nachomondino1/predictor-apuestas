@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [-10, -1.5, -1, -0.5, 0] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [-10, -1.5, -1.25, -1, -0.75, -0.5] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
