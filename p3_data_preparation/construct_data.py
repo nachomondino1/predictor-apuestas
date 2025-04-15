@@ -30,8 +30,6 @@ def compare_distributions(
     df: pd.DataFrame,
     col_expected: str = "expected_result",
     col_result: str = "result",
-    tolerance: float = 0.05,
-    exclude_classes: list = None,
     verbose: int = 1
 ) -> float:
     """
@@ -45,55 +43,34 @@ def compare_distributions(
     :param exclude_classes: Lista de valores a excluir de la comparación.
     :return: Diferencia máxima entre las proporciones.
     """
-    if exclude_classes is None:
-        exclude_classes = []
+    diffs = {}
 
     # Normalizar los conteos de valores
     expected_counts = df[col_expected].value_counts(normalize=True, dropna=True).sort_index()
     result_counts = df[col_result].value_counts(normalize=True, dropna=True).sort_index()
 
     # Imprimir las distribuciones
-    if verbose >= 1:
+    if verbose >= 2:
         print("Distribución de valores en expected_result:")
         print(expected_counts)
         print("\nDistribución de valores en result:")
         print(result_counts)
 
-    # Comparar distribuciones por valor
-    max_diff = 0
-    warnings = []
     for value in sorted(set(expected_counts.index).union(result_counts.index)):
-        if value in exclude_classes:
-            continue  # Saltar las clases excluidas
-
         expected_ratio = expected_counts.get(value, 0)
         result_ratio = result_counts.get(value, 0)
-        diff = abs(expected_ratio - result_ratio)
-        max_diff = max(max_diff, diff)
+        diffs[value] = abs(expected_ratio - result_ratio)
 
-        if verbose >= 0:
-            if diff > tolerance:
-                warnings.append(
-                    f"⚠️ WARNING: La proporción de {value} difiere significativamente (Diff: {diff:.2%})."
-                )
-
-    # Mostrar resultado de la comparación
-    if verbose >= 0:
-        if warnings:
-            for warning in warnings:
-                logger.warning(warning)
-        else:
-            logger.critical("\n✅ Las distribuciones son similares dentro del rango de tolerancia.") 
-
-    return max_diff
+    return diffs
 
 def adjust_ratio_to_match_distributions(
     df: pd.DataFrame,
     initial_ratio: float = 0.3,
-    tolerance: float = 0.05,
+    step: float = 0.01,
     max_iterations: int = 50,
     col_expected="expected_result",
-    col_actual="result"
+    col_actual="result",
+    verbose: int = 0
 ) -> float:
     """
     Ajusta el ratio para que las distribuciones de las columnas sean similares.
@@ -106,25 +83,40 @@ def adjust_ratio_to_match_distributions(
     :return: Ratio ajustado.
     """
     ratio = initial_ratio
-    step = 0.01  # Paso para ajustar el umbral
+    rows = []
 
     for _ in range(max_iterations):
+
+        if verbose >= 1:
+            print(f"Threshold a probar: {ratio:.2f}%")
+
         # Calcular la columna de resultados esperados
         df = determine_expected_result(df, goals_to_xg_ratio=ratio, col_name=col_expected, verbose=0)
         
-        # Comparar las distribuciones
-        diff = compare_distributions(df, col_expected, col_actual, tolerance=tolerance)
-        
-        if diff <= tolerance:
-            print(f"Ratio ajustado: {ratio:.2f}, Diferencia: {diff:.2f}%")
-            return ratio
-        
-        # Ajustar el umbral
-        ratio += step if diff > tolerance else -step
-        print(f"Umbral a probar: {ratio:.2f}%")
+        # Comparar las distribuciones y calcular diferencia por resultado
+        diff = compare_distributions(df, col_expected, col_actual, verbose=0)
+        total_diff = sum(diff.values())  # o diff.sum() si usás una Serie
+        if verbose >= 1:
+            print(diff)
 
-    print(f"Ratio final tras {max_iterations} iteraciones: {ratio:.2f}, Diferencia: {diff:.2f}%")
-    return ratio
+        # Guardar los resultados
+        rows.append({'ratio': ratio, 'diff': total_diff})
+
+        # Ajustar el ratio
+        ratio += step
+
+    # Convertir a DataFrame
+    df_results = pd.DataFrame(rows)
+
+    # Seleccionar el ratio que minimiza la diferencia
+    best_row = df_results.loc[df_results['diff'].idxmin()]
+    best_ratio = best_row['ratio']
+    best_diff = best_row['diff']
+
+    if verbose >= 0:
+        logger.critical(f"Ratio final tras {max_iterations} iteraciones: {best_ratio:.2f}, Diferencia: {best_diff:.2f}%")
+
+    return best_ratio
 
 def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.42, col_name="expected_result", verbose: int = 0):
     """
@@ -151,6 +143,7 @@ def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.42,
     valores = [1, 2]  # 1: Local, 2: Visitante
 
     # Crear una columna con valores por defecto para todas las filas
+    df = df.copy() # Evita SettingWithCopyWarning
     df[col_name] = np.nan
     df.loc[filas_validas, col_name] = np.select(condiciones, valores, default=0)
 

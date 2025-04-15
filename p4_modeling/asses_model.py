@@ -28,7 +28,7 @@ def calculate_metrics(
 
     # Calculo métricas básicas
     d_metrics = {
-        'error': log_loss(y_test, y_pred_prob),
+        'error': log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
@@ -119,7 +119,7 @@ def calculate_bookie_metrics(df_pred_proba, var_resp: str = 'result', var_pred_b
 
     # Calculo metricas de bookie    
     d_metrics = {
-        'error_bm': log_loss(y_test, y_pred_prob),
+        'error_bm': log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex(),
         'f1_score_bm': f1_score(y_test, y_pred_bm, average='macro') * 100,
         'n_home_bm': n_home, 'n_draw_bm': n_draw, 'n_away_bm': n_away

@@ -9,7 +9,7 @@ from p6_deployment import main_next_matches
 from utils import directories
 import datetime
 
-def main(
+def assess_models_in_prod(
         df_ite,
         id_country,
         country,
@@ -40,13 +40,10 @@ def main(
 
             # 1. Predict missing
             try:
-                df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx')
-                print(df_pred_missing.shape)
+                df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
             except FileNotFoundError:
-                d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
-                d_model = {'n_model': n_model, 'model_name': model_name}
-                df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
-            
+                df_pred_missing = assess_model_in_prod(id_country, iteration_date, n_model, model_name)
+  
             # 2. Concat test + missing 
             if concat_with_test:
                 # Levanto predicciones del modelo (test o test + assess)
@@ -58,7 +55,7 @@ def main(
 
             # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
             df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
-            df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.42) # Intento hacerlo antes con df_match pero rompia.
+            df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.38) # Intento hacerlo antes con df_match pero rompia.
             
             # df_pred.to_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
         
@@ -74,7 +71,7 @@ def main(
         
         ## Calculo metricas
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
+        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='x_')
             
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
@@ -87,64 +84,24 @@ def main(
                 df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
     
-    return df_ite_bs, df_pred_met
+    return df_ite_bs
 
-def assess_roi_selecting_by_metric(
-        df_ite,
-        id_country,
-        country,
-        iteration_date,
-        update_missing: bool = False,
-        predict_missing: bool = True,
-        concat_with_test: bool = True,
-        export: bool = True
-    ):
-
-    l_metrics = [
-        "roi",
-        "expected_roi",
-        "error",
-        "expected_error",
-        "test_accuracy",
-        "f1_score",
-        "f1_score_home",
-        "f1_score_draw",
-        "f1_score_away",
-        "gp_home",
-        "gp_draw",
-        "gp_away",
-        "n_home",
-        "n_draw",
-        "n_away",
-        "expected_f1_score"
-    ]
-
-    for metric in l_metrics:
-        print(f"Metric: {metric}")
-
-        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
-        print(df_ite)
-
-        df_ite = df_ite.sort_values(by=metric, ascending=False).head(20)
-        print(df_ite[metric])                
-
-        df_ite_bs, _ = main(
-            df_ite=df_ite,
-            id_country=id_country, 
-            country=country, 
-            iteration_date=iteration_date, 
-            concat_with_test=concat_with_test,
-            )
-        
-        df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{metric}.xlsx")
+def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
+    """
+    Assess de un modelo en especifico
+    """
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
+    d_model = {'n_model': n_model, 'model_name': model_name}
+    df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
+            
+    return df_pred_missing
 
 if __name__ == "__main__":
     # Defino parametros
-    assess_metric = False
-    one_model, n_model = False, 328
-    concat_with_test = False
     l_countries = [48, 55, 59, 77, 148]
+    one_model, n_model = False, 328
+    n_models = 20
+    concat_with_test = False
 
     d_countries = {
         # 48: ["england", '2025-03-23'],
@@ -163,24 +120,14 @@ if __name__ == "__main__":
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
-        if assess_metric:
-
-            assess_roi_selecting_by_metric(
-                df_ite=df_ite,
-                id_country=id_country, 
-                country=country, 
-                iteration_date=iteration_date, 
-                concat_with_test=concat_with_test,
-                export=False
-            )
-            pass
-
-        elif one_model:
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")
+        # Levanto df_ite
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx") # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+     
+        if one_model:
 
             df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
     
-            df_ite_bs, df_pred_met = main(
+            df_ite_bs, df_pred_met = assess_models_in_prod(
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 
@@ -193,11 +140,10 @@ if __name__ == "__main__":
             df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
 
         else:
-            # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-            df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx").head(10)
+            df_ite = df_ite.head(n_models)
             print(df_ite)
 
-            df_ite_bs, _ = main(
+            df_ite_bs, _ = assess_models_in_prod(
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 

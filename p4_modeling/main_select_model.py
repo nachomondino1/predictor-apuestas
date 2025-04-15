@@ -6,9 +6,9 @@ from utils.set_up_logging import logger
 from utils import directories
 import datetime
 from p4_modeling import asses_model
-import os
+from p4_modeling.utils_select_model import assess_in_prod
 
-def initialize_directories(country, iteration_date, assess):
+def initialize_directories(country, iteration_date):
     """
     Guarda la selección de modelo vieja en una carpeta y crea los directorios necesarios.
 
@@ -28,14 +28,12 @@ def initialize_directories(country, iteration_date, assess):
         'path_old': f'{base_path}/best_model_old/{fecha_hoy}',
         'path_select': f'{base_path_sbm}/1_filter_models',
         'path_bet_strategy': f'{base_path_sbm}/3_bet_strategy',
-        # 'path_assess_dep': f"data/{country}/p6_deployment/assess"
     }
 
     # Mover toda la carpeta si assess y bet_strategy son True
-    if assess:
-        if os.path.exists(base_path_sbm):
-            directories.make_directories([d_paths['path_old']])
-            directories.mover_archivo(base_path_sbm, d_paths['path_old'])
+    # if os.path.exists(base_path_sbm):
+    #     directories.make_directories([d_paths['path_old']])
+    #     directories.mover_archivo(base_path_sbm, d_paths['path_old'])
     
     # Crear directorios necesarios
     directories.make_directories([
@@ -152,7 +150,7 @@ def main(
         - A partir de nuevos train (donde ya calculo metrics en last matches), usar mismas metricas entre seleccion de candidatos y seleccion de modelo. Por el momento no puedo porque no estoy calculando metricas en ultimos partidos en df_test.
     """
     # Definicion de paths
-    d_paths = initialize_directories(country, iteration_date, assess)
+    d_paths = initialize_directories(country, iteration_date)
 
     ## 1. Calculo metrica combinada
     metric = 'metric_test_assess'
@@ -161,6 +159,24 @@ def main(
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
+    # Si assesss
+    if assess:
+        # Selecciono candidatos
+        df_ite_bs = df_ite_bs.head(20)
+
+        # Actualizo con assess
+        logger.warning("Tengo en cuenta tanto 'test' como 'assess' para seleccionar modelo...")
+        df_ite_bs = assess_in_prod.assess_models_in_prod(
+            df_ite=df_ite_bs,
+            id_country=id_country, 
+            country=country, 
+            iteration_date=iteration_date, 
+            concat_with_test=True,
+        )
+
+        df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+        df_ite_bs.to_excel("/Users/nachomondino/Desktop/qwergjnew.xlsx")
+        
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
     col_name = 'model_name' if 'model_name' in df_ite_bs.columns else 'model_name_x'
@@ -176,6 +192,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    assess = True
 
     d_countries = {
         # 48: ["england", '2025-03-23'],
@@ -191,19 +208,28 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['expected_f1_score', 'expected_error', 'error'] # 'expected_error' 'expected_f1_score_draw', 'expected_f1_score_away'
-    d_weights = {
-       48: [0.3, 0.4, 0.3],
-       55: [0.3, 0.4, 0.3],
-       59: [0.3, 0.4, 0.3],
-       77: [0.3, 0.4, 0.3],
-       148: [0.3, 0.4, 0.3],
-    }
+    # d_metrics = {
+    #    48: [['error', 'expected_error'] [0.5, 0.5]],
+    #    55: [['f1_score', 'test_accuracy'], [0.5, 0.5]],
+    #    59: [['test_accuracy', 'roi'], [0.6, 0.4]],
+    #    77: [['expected_error', 'error'], [0.8, 0.2]],
+    #    148: [['test_accuracy', 'roi'], [0.6, 0.4]],
+    # }
+    # d_weights = {
+    #    48: [0.33, 0.33, 0.33],
+    #    55: [0.6, 0.3, 0.1],
+    #    59: [0.6, 0.3, 0.1],
+    #    77: [0.6, 0.3, 0.1],
+    #    148: [0.6, 0.3, 0.1],
+    # }
+
+    l_metrics = ['f1_score', 'f1_score_draw', 'expected_f1_score']
+    l_weights = [0.33, 0.33, 0.33]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_weights = d_weights[id_country]
+        # l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
@@ -217,7 +243,7 @@ if __name__ == "__main__":
             df_ite=df_ite,
             country=country, iteration_date=iteration_date, 
             l_metrics=l_metrics, l_weights=l_weights,
-            assess=False,
+            assess=assess,
             export=True
             )
         

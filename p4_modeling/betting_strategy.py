@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [0, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [-10, -1.5, -1, -0.5, 0] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
@@ -61,7 +61,7 @@ class BettingStrategy:
                 'curva': [strategy, 'kelly_linear'],
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 4, 10] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [1, 2, 4] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
@@ -91,22 +91,22 @@ class BettingStrategy:
             kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # creo que esta bien
 
             # Si el riesgo-beneficio es malo (ver si funciona bien con kelly_crit) --> creo que esta ok
-            if row['predicted_result'] != 0 and prob_result_to_bet < thr_prob_min:
+            if row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
                 if self.verbose >= 1:
-                    logger.warning(f"Aplicamos doble oportunidad por prob_result_to_bet = {prob_result_to_bet} < {thr_prob_min}. ")
+                    logger.warning(f"Aplicamos doble oportunidad por kelly_crit = {kelly_crit} < {thr_prob_min}. ")
 
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
-                strategy = f"prob_result_to_bet < {thr_prob_min}"
+                strategy = f"kelly_crit < {thr_prob_min}"
                 kelly_crit =  ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # Lo recalculo pues ahora apuesto a otro rdo
 
             # Si el riesgo-beneficio es alto
             else:
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
-                strategy = f"prob_result_to_bet > {thr_prob_min}"
+                strategy = f"kelly_crit > {thr_prob_min}"
 
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
@@ -388,7 +388,7 @@ class BettingStrategy:
     def calculate_roi_in_combination(self, df, param_dict):
 
         if 'expected_result' not in df.columns:
-            df = determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
+            df = determine_expected_result(df, goals_to_xg_ratio=0.38, verbose=0)
 
         # Aplicar estrategia a df_pred
         df_aux = self.apply_strategy(df, param_dict, prod=False)
@@ -649,12 +649,12 @@ def read_predictions(date_assess, country, iteration_date, n_model, model_name, 
     df_pred_test = pd.read_excel(path, index_col=0)
     return df_pred_test
 
-def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, verbose: int = 0):
+def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, 
+                           vary_dp: bool = False, strategy: str = 'kelly',
+                           val_min: int = 10, val_max: int = 200, step_m: int = 10, 
+                           verbose: int = 0):
     
     bs = BettingStrategy(verbose=0)
-    val_min, val_max, step_m = 10, 11, 10
-    vary_dp = False
-    strategy = 'kelly'
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -684,8 +684,8 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
-    one_model = True 
-    assess, date_assess = False, '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
+    one_model = True
+    assess, date_assess = True, datetime.datetime.now().date() # '2025-04-05'
     roi_weight = 0.75
 
     d_countries = {
@@ -716,7 +716,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, val_max=11, vary_dp=True, roi_weight=roi_weight, verbose=1)
 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
