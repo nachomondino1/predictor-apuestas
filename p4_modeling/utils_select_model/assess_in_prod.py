@@ -84,7 +84,7 @@ def assess_models_in_prod(
                 df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
     
-    return df_ite_bs, df_pred_met
+    return df_ite_bs
 
 def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
     """
@@ -98,9 +98,10 @@ def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
 
 if __name__ == "__main__":
     # Defino parametros
-    one_model, n_model = False, 328
-    concat_with_test = False
     l_countries = [48, 55, 59, 77, 148]
+    one_model, n_model = False, 328
+    n_models = 20
+    concat_with_test = False
 
     d_countries = {
         # 48: ["england", '2025-03-23'],
@@ -139,10 +140,10 @@ if __name__ == "__main__":
             df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
 
         else:
-            df_ite = df_ite.head(30)
+            df_ite = df_ite.head(n_models)
             print(df_ite)
 
-            df_ite_bs, _ = main(
+            df_ite_bs, _ = assess_models_in_prod(
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 

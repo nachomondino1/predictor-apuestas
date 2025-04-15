@@ -685,7 +685,7 @@ if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
     one_model = True
-    assess, date_assess = False, '2025-04-07' # datetime.datetime.now().date() # '2025-04-05'
+    assess, date_assess = True, datetime.datetime.now().date() # '2025-04-05'
     roi_weight = 0.75
 
     d_countries = {

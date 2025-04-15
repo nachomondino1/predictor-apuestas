@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 from utils import directories
 from utils.set_up_logging import logger
+from p3_data_preparation.select_data import normalize_column
+import p3_data_preparation.select_data as sd # --> le da importancia a metricas con corr negativa pero que deberian ser max no min.
 from p4_modeling import betting_strategy, asses_model
 from p4_modeling.utils_select_model import assess_in_prod
 from tqdm import tqdm
@@ -199,9 +201,11 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     
     # Defino hiper
+    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score'][4]
+    l_metrics_test = ["roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", "expected_f1_score", 'f1_score_home', 'f1_score_draw', 'f1_score_away']
     saved_metrics = True
     assess = False
-    method = 'corr' # 'mean', 'fs'
+    method = ['corr', 'fs', 'mean'][0]
 
     d_countries = {
         # train nuevos
@@ -218,9 +222,7 @@ if __name__ == "__main__":
         }
     
     # 1. Definir metrica a optimizar en produccion
-    corr_col = 'roi'
     corr_metric = f'{corr_col}_prod'
-    l_metrics_test = ["roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", "expected_f1_score"]
 
     for id_country in l_countries:
 
@@ -243,7 +245,7 @@ if __name__ == "__main__":
             print(df_ite_test)
             print(df_ite_prod)
         else:
-            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.6, assess=assess)
+            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75, assess=assess)
             df_ite_test.to_excel(f'{path_save}/df_ite_test.xlsx', index=True)
             df_ite_prod.to_excel(f'{path_save}/df_ite_prod.xlsx', index=True)
 
@@ -264,7 +266,6 @@ if __name__ == "__main__":
 
         elif method == 'fs':
             ## Op 2: Feature selection # Usar df_ite en vez de df_ite_test para poder calcular los promedios ponderados de todas las metricas de prod... (asi no tengo que definirlo de antemano.)
-            import p3_data_preparation.select_data as sd # --> le da importancia a metricas con corr negativa pero que deberian ser max no min.
             l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
             df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
 
@@ -293,11 +294,10 @@ if __name__ == "__main__":
         # print(f"La correlacion de la metrica {corr_col} entre test y prod es de: {corr:.1f}%")
 
     # Calculo correlacion de metricas test con la metrica de prod
-    # Normalizo cols
-    # from p3_data_preparation.select_data import normalize_column
-    # for col in df_ct.columns:
-    #     df_ct = normalize_column(df_ct, col, norm_extension="")
-
-    df_ct["mean"] = df_ct.mean(axis=1)
+    if method == 'mean':
+        df_ct["sum"] = df_ct.sum(axis=1)
+    else:
+        df_ct["mean"] = df_ct.mean(axis=1)
+   
     df_ct.to_excel(f"{path_save}/df_normalized.xlsx")
 

@@ -449,7 +449,7 @@ class DataPreparation:
 
             # VARIABLES DERIVADAS
             # Expected Result and Expected Points (xPts)
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
+            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0) # 0.38?
             df = construct_data.determine_points(df, suffix='expected_')
             df = df.drop(['expected_result'], axis=1) # si no lo borras, hay fuga de informacion
 
@@ -1125,7 +1125,7 @@ class Modeling:
         if expected_metrics:
 
             # Construyo 'expected_result'
-            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
+            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.38, verbose=0)  # Durante la prep la elimino x fuga de info.
             
             # Eliminar partidos sin expected_goals (puede no estar)
             df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
