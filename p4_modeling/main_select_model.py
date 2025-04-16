@@ -151,14 +151,14 @@ def main(
     """
     # Definicion de paths
     d_paths = initialize_directories(country, iteration_date)
+    metric = 'metric_test_assess'
 
     ## 1. Calculo metrica combinada
-    metric = 'metric_test_assess'
     df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
-
+ 
     # Si assesss
     if assess:
         # Selecciono candidatos
@@ -172,15 +172,16 @@ def main(
             country=country, 
             iteration_date=iteration_date, 
             concat_with_test=True,
-        )
-
-        df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
-        df_ite_bs.to_excel("/Users/nachomondino/Desktop/qwergjnew.xlsx")
-        
+            export=True
+        )    
+      
+        df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
+ 
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
-    col_name = 'model_name' if 'model_name' in df_ite_bs.columns else 'model_name_x'
-    n_model, model_name = df_ite_bs.loc[idx_max, 'n_iteration'], df_ite_bs.loc[idx_max, col_name]
+    col_name_1 = 'n_iteration' if 'n_iteration' in df_ite_bs.columns else 'n_model'
+    col_name_2 = 'model_name' if 'model_name' in df_ite_bs.columns else 'model_name_x'
+    n_model, model_name = df_ite_bs.loc[idx_max, col_name_1], df_ite_bs.loc[idx_max, col_name_2]
     logger.critical(f"Modelo seleccionado: {n_model} {model_name}") # n_model
 
     # Exporto datos
@@ -208,21 +209,6 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    # d_metrics = {
-    #    48: [['error', 'expected_error'] [0.5, 0.5]],
-    #    55: [['f1_score', 'test_accuracy'], [0.5, 0.5]],
-    #    59: [['test_accuracy', 'roi'], [0.6, 0.4]],
-    #    77: [['expected_error', 'error'], [0.8, 0.2]],
-    #    148: [['test_accuracy', 'roi'], [0.6, 0.4]],
-    # }
-    # d_weights = {
-    #    48: [0.33, 0.33, 0.33],
-    #    55: [0.6, 0.3, 0.1],
-    #    59: [0.6, 0.3, 0.1],
-    #    77: [0.6, 0.3, 0.1],
-    #    148: [0.6, 0.3, 0.1],
-    # }
-
     l_metrics = ['f1_score', 'f1_score_draw', 'expected_f1_score']
     l_weights = [0.33, 0.33, 0.33]
 
