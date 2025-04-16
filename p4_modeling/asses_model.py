@@ -57,7 +57,7 @@ def calculate_metrics(
 
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
-        d_metrics.update(calculate_gp_by_result(df, var_pred=var_pred))
+        d_metrics.update(calculate_gp_by_result(df, var_resp=var_resp))
 
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
     if verbose >= 1:
@@ -414,16 +414,15 @@ def calculate_nan_metrics(df_predicciones):
     }
     return d
 
-def calculate_gp_by_result(df_predicciones, var_pred: str = 'predicted_result'):
+def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
     """
     Calcula el G/P por resultado (local, empate, visitante).
     """
-    if var_pred == 'predicted_result':
+    var_pred = 'predicted_result'
+    if var_resp == 'result':
         col_gp = 'G/P_sin_bank'
-        preffix = ''
-    elif var_pred == 'expected_result':
+    elif var_resp == 'expected_result':
         col_gp = 'expected_G/P_sin_bank'
-        preffix = 'expected_'
 
     # Dividir DataFrame por tipo de resultado
     df_pred_home = df_predicciones[df_predicciones[var_pred] == 1]
@@ -443,13 +442,13 @@ def calculate_gp_by_result(df_predicciones, var_pred: str = 'predicted_result'):
     # Crear el diccionario de resultados
     d = {
         # Resultados por tipo
-        f'{preffix}gp_home': gp_home,
-        f'{preffix}gp_draw': gp_draw,
-        f'{preffix}gp_away': gp_away,
-        f'{preffix}gp_total': gp_total,
-        f'{preffix}%_gp_home': perc_gp_home,
-        f'{preffix}%_gp_draw': perc_gp_draw,
-        f'{preffix}%_gp_away': perc_gp_away,
+        f'gp_home': gp_home,
+        f'gp_draw': gp_draw,
+        f'gp_away': gp_away,
+        f'gp_total': gp_total,
+        f'%_gp_home': perc_gp_home,
+        f'%_gp_draw': perc_gp_draw,
+        f'%_gp_away': perc_gp_away,
     }
     return d
 
