@@ -61,7 +61,7 @@ class BettingStrategy:
                 'curva': [strategy, 'kelly_linear'], # 'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1] if strategy in ['kelly_linear', 'kelly'] else [1] # Cuanto mayor es k, mas favorece los stakes en 0
+                'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1] # Cuanto mayor es k, mas favorece los stakes en 0
             }
     
         if self.verbose >= 1:
