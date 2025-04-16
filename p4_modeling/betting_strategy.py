@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [-10, -1.5, -1.25, -1, -0.75, -0.5] if vary_dp else [-100]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [None, -0.75, -0.5, -0.25, 0] if vary_dp else [None]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
@@ -58,10 +58,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'kelly_linear'],
+                'curva': [strategy, 'kelly_linear'], # 'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 4] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
             }
     
         if self.verbose >= 1:
@@ -687,7 +687,7 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     one_model = True
     assess, date_assess = True, datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 0.5
+    roi_weight = 1
 
     d_countries = {
         48: ["england"],
@@ -717,7 +717,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, val_max=11, vary_dp=True, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, val_max=11, strategy='kelly', vary_dp=True, roi_weight=roi_weight, verbose=1)
 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
