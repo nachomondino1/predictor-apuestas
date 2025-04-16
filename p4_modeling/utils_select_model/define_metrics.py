@@ -203,7 +203,7 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     
     # Defino hiper
-    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score', 'comb_roi', 'f1_score_draw'][6] # Una combinacion de roi y ex_roi?
+    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score', 'comb_roi', 'f1_score_draw'][4] # Una combinacion de roi y ex_roi?
     l_metrics_test = [
         "roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", 
         'accuracy_home', 'accuracy_draw', 'accuracy_away',
@@ -216,16 +216,16 @@ if __name__ == "__main__":
 
     d_countries = {
         # train nuevos
-        # 48: ["england", '2025-03-23'],
-        # 55: ["france", '2025-03-23'], 
-        # 59: ["germany", '2025-03-23'],
-        # 77: ["italy", '2025-03-23'],
-        # 148: ["spain", '2025-03-24']
-        48: ["england", '2025-04-08'],
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'],
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08']
+        48: ["england", '2025-03-23'],
+        55: ["france", '2025-03-23'], 
+        59: ["germany", '2025-03-23'],
+        77: ["italy", '2025-03-23'],
+        148: ["spain", '2025-03-24']
+        # 48: ["england", '2025-04-08'],
+        # 55: ["france", '2025-04-08'], 
+        # 59: ["germany", '2025-04-08'],
+        # 77: ["italy", '2025-04-08'],
+        # 148: ["spain", '2025-04-08']
         }
         
     # 1. Definir metrica a optimizar en produccion

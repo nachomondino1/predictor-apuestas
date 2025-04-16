@@ -4,7 +4,7 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p6_deployment.main_next_matches import main
 
-def predict_models():
+def predict_models(n_models_predict: int = 5):
     """
     Para obtener predicciones en prox partidos de los modelos candidatos
     """
@@ -29,7 +29,7 @@ def predict_models():
         df_country = pd.DataFrame()
 
         # Determino mejores n modelos
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx').head(11)
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx').head(n_models_predict)
         print(df_ite)
 
         # Por modelo

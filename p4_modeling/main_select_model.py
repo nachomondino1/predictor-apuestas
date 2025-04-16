@@ -210,7 +210,7 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_draw', 'error']
+    l_metrics = ['f1_score_draw', 'f1_score']
     d_weights = {
         48: [0.7, 0.3],
         55: [0.7, 0.3],
