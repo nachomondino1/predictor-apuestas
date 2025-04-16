@@ -671,13 +671,7 @@ class TrainingDataLoader():
 
         except FileNotFoundError as e:
             logger.error("Falló la carga del df_strategy")
-
-            # user_input = str(input("Quiere predecir sin estrategia igual (y para aceptar)?: "))
-            # if user_input == 'y':
-            #     return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
-            # else:
-            #     raise ValueError(e)
-            return {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
+            return {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0, 'k': 1}
         
         return df_hiper
 
@@ -1214,7 +1208,7 @@ def main(
         # Predigo con modelo cargado
         if predict_missing:
             df_filled = df_fill.copy() 
-            d_strategy = {'prob_dp': 0, 'curva': 'linear', 'm': 10, 'b': 0}
+            d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}
         else:  
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()

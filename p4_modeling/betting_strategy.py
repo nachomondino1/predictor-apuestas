@@ -45,12 +45,12 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [-10, -1.5, -1.25, -1, -0.75, -0.5] if vary_dp else [0]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [-10, -1.5, -1.25, -1, -0.75, -0.5] if vary_dp else [-100]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
             dic = {
-                'prob_dp': 0,
+                'prob_dp': None,
                 'curva': 'linear',
                 'm': 10,
                 'b': 0,
@@ -91,7 +91,8 @@ class BettingStrategy:
             kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # creo que esta bien
 
             # Si el riesgo-beneficio es malo (ver si funciona bien con kelly_crit) --> creo que esta ok
-            if row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
+            if thr_prob_min is not None and row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
+            # if row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
                 if self.verbose >= 1:
                     logger.warning(f"Aplicamos doble oportunidad por kelly_crit = {kelly_crit} < {thr_prob_min}. ")
 

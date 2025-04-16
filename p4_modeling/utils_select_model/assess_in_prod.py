@@ -43,7 +43,10 @@ def assess_models_in_prod(
                 df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
             except FileNotFoundError:
                 df_pred_missing = assess_model_in_prod(id_country, iteration_date, n_model, model_name)
-  
+                
+                if export:
+                    df_pred_missing.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True)
+
             # 2. Concat test + missing 
             if concat_with_test:
                 # Levanto predicciones del modelo (test o test + assess)
@@ -56,9 +59,7 @@ def assess_models_in_prod(
             # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
             df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
             df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.38) # Intento hacerlo antes con df_match pero rompia.
-            
-            # df_pred.to_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index=True) # sin ea pero con metricas
-        
+                    
         else:
             df_pred = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
 
@@ -71,7 +72,7 @@ def assess_models_in_prod(
         
         ## Calculo metricas
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='x_')
+        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
             
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
@@ -80,8 +81,7 @@ def assess_models_in_prod(
 
         # Exporto datos
         if export:
-            if predict_missing:
-                df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
+            df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones_met.xlsx", index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
     
     return df_ite_bs

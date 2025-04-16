@@ -53,6 +53,7 @@ def calculate_metrics(
         # Calculo metricas
         d_metrics_bm = calculate_bookie_metrics(df)
         d_metrics.update(d_metrics_bm)
+        d_metrics.update({'%_match_bm': (df['predicted_result'] == df['bookmaker_result']).mean() * 100})
 
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
