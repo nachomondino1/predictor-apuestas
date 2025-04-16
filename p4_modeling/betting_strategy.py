@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [None, -0.75, -0.5, -0.25, 0] if vary_dp else [None]  # el 0.4 esta muy cerca del cambio de result to bet entre assess y prod.
+        list_dp = [None, -0.35, -0.25, 0] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
@@ -61,7 +61,7 @@ class BettingStrategy:
                 'curva': [strategy, 'kelly_linear'], # 'kelly_linear'
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1]
+                'k': [1, 2, 4, 10] if strategy in ['kelly_linear', 'kelly'] else [1] # Cuanto mayor es k, mas favorece los stakes en 0
             }
     
         if self.verbose >= 1:
@@ -687,7 +687,7 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     one_model = True
     assess, date_assess = True, datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 1
+    roi_weight = 0.75
 
     d_countries = {
         48: ["england"],
