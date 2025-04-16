@@ -158,7 +158,7 @@ def main(
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
- 
+
     # Si assesss
     if assess:
         # Selecciono candidatos
@@ -173,10 +173,11 @@ def main(
             iteration_date=iteration_date, 
             concat_with_test=True,
             export=True
-        )    
-      
+        )       
+
+        df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
         df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
- 
+
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
     col_name_1 = 'n_iteration' if 'n_iteration' in df_ite_bs.columns else 'n_model'
@@ -209,20 +210,27 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score', 'f1_score_draw', 'expected_f1_score']
-    l_weights = [0.33, 0.33, 0.33]
+    l_metrics = ['f1_score_draw', 'error']
+    d_weights = {
+        48: [0.7, 0.3],
+        55: [0.7, 0.3],
+        59: [0.7, 0.3],
+        77: [0.7, 0.3],
+        148: [0.7, 0.3]
+    }
+    # l_weights = [0.25, 0.25, 0.5] # Pues f1_score y f1_score_draw tienen alta corr (70%)?
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_weights = d_weights[id_country]
+        l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
 
-        # para maximizar error en metrica
-        df_ite['error'] = df_ite['error'] * (-1)
-        df_ite['expected_error'] = df_ite['expected_error'] * (-1)
+        # Para maximizar error en metrica
+        df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
+        df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
         # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
 
         main(

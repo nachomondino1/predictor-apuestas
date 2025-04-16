@@ -9,7 +9,6 @@ def predict_models():
     Para obtener predicciones en prox partidos de los modelos candidatos
     """
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 59, 148]
 
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}         
 
@@ -36,7 +35,8 @@ def predict_models():
         # Por modelo
         for idx, row in df_ite.iterrows():
 
-            n_model = row['n_iteration']
+            col_name = 'n_iteration' if 'n_iteration' in df_ite.columns else 'n_model'
+            n_model = row[col_name]
             model_name = row['model_name']
             print(n_model, model_name)
             d_model = {'n_model': n_model, 'model_name': model_name}

@@ -643,7 +643,7 @@ def determine_bs_all_models(df_ite, country, iteration_date, date_assess, roi_we
         
 def read_predictions(date_assess, country, iteration_date, n_model, model_name, assess: bool = False):
     if assess:
-        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones.xlsx" 
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones_met.xlsx" 
     else:
         path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
 
@@ -687,7 +687,7 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     one_model = True
     assess, date_assess = True, datetime.datetime.now().date() # '2025-04-05'
-    roi_weight = 0.75
+    roi_weight = 0.5
 
     d_countries = {
         48: ["england"],
