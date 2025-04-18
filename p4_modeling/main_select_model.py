@@ -210,13 +210,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_draw', 'f1_score']
+    l_metrics = ['f1_score_draw', 'f1_score', 'error']
     d_weights = {
-        48: [0.7, 0.3],
-        55: [0.7, 0.3],
-        59: [0.7, 0.3],
-        77: [0.7, 0.3],
-        148: [0.7, 0.3]
+        48: [0.4, 0.4, 0.2],
+        55: [0.4, 0.4, 0.2],
+        59: [0.4, 0.4, 0.2],
+        77: [0.4, 0.4, 0.2],
+        148: [0.4, 0.4, 0.2]
     }
     # l_weights = [0.25, 0.25, 0.5] # Pues f1_score y f1_score_draw tienen alta corr (70%)?
 
