@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [None, -0.35, -0.25, 0] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
+        list_dp = [None, -1, -0.75, -0.5] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
         list_m = list(range(val_min, val_max + 1, step_m))
         
         if strategy == "train": # "Sin estrategia"
@@ -58,10 +58,10 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'kelly_linear'], # 'kelly_linear'
+                'curva': [strategy, 'kelly_linear'],
                 'm': list_m,
                 'b': [0],
-                'k': [1, 2, 3] if strategy in ['kelly_linear', 'kelly'] else [1] # Cuanto mayor es k, mas favorece los stakes en 0
+                'k': [1, 3] # Cuanto mayor es k, mas favorece los stakes en 0
             }
     
         if self.verbose >= 1:
@@ -654,7 +654,11 @@ def determine_bs_all_models(df_ite, country, iteration_date, date_assess, roi_we
 
     return df_result
         
-def read_predictions(date_assess, country, iteration_date, n_model, model_name, assess: bool = False):
+def read_predictions(country, iteration_date, n_model, model_name, assess: bool = False, date_assess: str = None):
+
+    if assess and date_assess is None:
+        date_assess = datetime.datetime.now().date()
+        
     if assess:
         path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones_met.xlsx" 
     else:
@@ -692,7 +696,7 @@ if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
     one_model = True
-    assess, date_assess = True, datetime.datetime.now().date() # '2025-04-05'
+    assess, date_assess = True, '2025-04-18'
     roi_weight = 1
 
     d_countries = {
@@ -719,11 +723,11 @@ if __name__ == "__main__":
             print(f"N_model: {n_model} Iteration date: {iteration_date}")
 
             # Levanto df_test
-            df_pred_test = read_predictions(date_assess, country, iteration_date, n_model, model_name, assess=assess)
+            df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, step_m=10, val_max=50, strategy='kelly_linear', vary_dp=False, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, step_m=10, val_max=11, strategy='linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
 
             for idx, row in df_strat.iterrows():
                 roi = row['roi']
