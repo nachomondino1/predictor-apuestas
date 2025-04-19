@@ -210,8 +210,8 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['test_accuracy'] # complemento con doble oportunidad en la bs
-    l_weights = [1]
+    l_metrics = ['test_accuracy', 'error'] # complemento con doble oportunidad en la bs
+    l_weights = [0.8, 0.2]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
