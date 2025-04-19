@@ -210,20 +210,13 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score_draw', 'f1_score', 'error']
-    d_weights = {
-        48: [0.4, 0.4, 0.2],
-        55: [0.4, 0.4, 0.2],
-        59: [0.4, 0.4, 0.2],
-        77: [0.4, 0.4, 0.2],
-        148: [0.4, 0.4, 0.2]
-    }
-    # l_weights = [0.25, 0.25, 0.5] # Pues f1_score y f1_score_draw tienen alta corr (70%)?
+    l_metrics = ['test_accuracy'] # complemento con doble oportunidad en la bs
+    l_weights = [1]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        l_weights = d_weights[id_country]
+        # l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
