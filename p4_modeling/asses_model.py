@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from sklearn import metrics
-from sklearn.metrics import accuracy_score, recall_score, f1_score, log_loss
+from sklearn.metrics import accuracy_score, recall_score, f1_score, log_loss, precision_score
 from p3_data_preparation import construct_data
 
 
@@ -39,9 +39,9 @@ def calculate_metrics(
             'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
             'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
             'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100,
-            'accuracy_home': accuracy_score(y_test[y_test == 1], y_pred[y_test == 1]) * 100,  
-            'accuracy_draw': accuracy_score(y_test[y_test == 0], y_pred[y_test == 0]) * 100,  
-            'accuracy_away': accuracy_score(y_test[y_test == 2], y_pred[y_test == 2]) * 100,  
+            'precision_home': precision_score(y_test, y_pred, labels=[1], average="micro", zero_division=0) * 100,
+            'precision_draw': precision_score(y_test, y_pred, labels=[0], average="micro", zero_division=0) * 100,
+            'precision_away': precision_score(y_test, y_pred, labels=[2], average="micro", zero_division=0) * 100
         })
 
     # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
