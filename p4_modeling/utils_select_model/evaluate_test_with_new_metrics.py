@@ -30,6 +30,7 @@ def main(
 
     # Por modelo
     for idx, row in df_ite.iterrows():
+
         n_model, model_name = row['n_iteration'], row['model_name']
         logger.info(f'{n_model} {model_name}')
         
@@ -46,11 +47,8 @@ def main(
         df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params)
 
         # Calculo metricas
-        d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result', advanced_metrics=True)
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', advanced_metrics=True)
-
-        # Renombro metricas para evitar sobreescribirlas
-        d_metric_sin_ea_ex = asses_model.rename_dict_keys(d_metric_sin_ea_ex, prefix='expected_')
+        d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
+        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
 
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_sin_ea_ex}
@@ -90,16 +88,15 @@ def concat_dfs(df_ite_train, df_ite_test, df_ite_new_test):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [48]
 
     d_countries = {
         # Train nuevos
-        6: ["argentina", '2025-02-06'], 
-        48: ["england", '2025-03-03'],
-        55: ["france", '2025-03-03'], 
-        59: ["germany", '2025-03-04'],
-        77: ["italy", '2025-03-04'],
-        148: ["spain", '2025-03-04'], 
+        48: ["england", '2025-04-20'],
+        55: ["france", '2025-04-21'], 
+        59: ["germany", '2025-04-21'],
+        77: ["italy", '2025-04-20'],
+        148: ["spain", '2025-04-21'], 
         }
 
     for id_country in l_countries:
@@ -108,13 +105,13 @@ if __name__ == "__main__":
 
         # Levanto datos
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        df_ite_train = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration_train.xlsx")
-        df_ite_test = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration_test.xlsx")
+        df_ite_train = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_train.xlsx")
+        df_ite_test = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite.shape, df_ite_train.shape, df_ite_test.shape)
 
         # Calculo nuevas metricas en test
-        # df_ite_test_new = main(df_ite=df_ite, country=country, iteration_date=iteration_date, )
-        df_ite_test_new = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration_test_new.xlsx')
+        df_ite_test_new = main(df_ite=df_ite_test, country=country, iteration_date=iteration_date)
+        # df_ite_test_new = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/df_iteration_test_new.xlsx')
         print(df_ite_test_new.head(5))
         
         # Concateno nuevo test a trian para generar el nuevo df_ite

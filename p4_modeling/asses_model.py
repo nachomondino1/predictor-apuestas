@@ -39,9 +39,9 @@ def calculate_metrics(
             'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
             'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
             'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100,
-            'accuracy_home': accuracy_score(y_test == 1, y_pred == 1) * 100,  # Accuracy para la clase "Local"
-            'accuracy_draw': accuracy_score(y_test == 0, y_pred == 0) * 100,  # Accuracy para la clase "Empate"
-            'accuracy_away': accuracy_score(y_test == 2, y_pred == 2) * 100,   # Accuracy para la clase "Visitante"
+            'accuracy_home': accuracy_score(y_test[y_test == 1], y_pred[y_test == 1]) * 100,  
+            'accuracy_draw': accuracy_score(y_test[y_test == 0], y_pred[y_test == 0]) * 100,  
+            'accuracy_away': accuracy_score(y_test[y_test == 2], y_pred[y_test == 2]) * 100,  
         })
 
     # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
