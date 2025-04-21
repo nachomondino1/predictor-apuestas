@@ -1259,21 +1259,21 @@ if __name__ == "__main__":
         'predict': ['next_matches', 'missing'],
     }
 
-    id_country = 77
+    id_country = 148
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 0.5
 
     # Defino country, iteration date y modelo
     d_countries = {
-        48: ["england", '2025-04-08'], 
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'], 
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08'], 
+        48: ["england", '2025-04-20'], 
+        55: ["france", '2025-04-21'], 
+        59: ["germany", '2025-04-21'], 
+        77: ["italy", '2025-04-20'],
+        148: ["spain", '2025-04-21'], 
         }
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1034, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
+    d_model = {'n_model': 148, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
 
     if key == 'missing':
         
