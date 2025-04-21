@@ -194,29 +194,24 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    assess = True
+    l_countries = [48, 55, 77, 148]
+    assess = False
 
     d_countries = {
-        # 48: ["england", '2025-03-23'],
-        # 55: ["france", '2025-03-23'], 
-        # 59: ["germany", '2025-03-23'],
-        # 77: ["italy", '2025-03-23'],
-        # 148: ["spain", '2025-03-24']
-        48: ["england", '2025-04-08'],
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'],
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08']
+        48: ["england", '2025-04-20'],
+        55: ["france", '2025-04-21'], 
+        59: ["germany", '2025-04-21'],
+        77: ["italy", '2025-04-20'],
+        148: ["spain", '2025-04-21']
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['test_accuracy', 'error'] # complemento con doble oportunidad en la bs
-    l_weights = [0.8, 0.2]
+    l_metrics = ['f1_score', 'gp_draw', 'error'] # el f1_score tiene en cuenta el f1_score_draw y con el acc_draw garantizo que acierte mucho...
+    l_weights = [0.3, 0.4, 0.3]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
-        # l_weights = d_weights[id_country]
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
         print(df_ite)
