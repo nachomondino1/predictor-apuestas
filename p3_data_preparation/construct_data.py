@@ -118,7 +118,7 @@ def adjust_ratio_to_match_distributions(
 
     return best_ratio
 
-def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.42, col_name="expected_result", verbose: int = 0):
+def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.40, col_name="expected_result", verbose: int = 0):
     """
     Determina el 'expected_result' a partir de los expected goals de cada equipo.
     :param df: DataFrame con columnas 'expected_goals_(xg)_home' y 'expected_goals_(xg)_away'.
@@ -211,7 +211,7 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
     """
     # Ordeno por fecha ascendente
     df = df.sort_values(by='date', ascending=True).copy()  # Hacer copia para evitar fragmentación
-    pf = '' if var_resp == 'result' else 'exp_'
+    pf = '' if var_resp == 'result' else 'x_'
 
     team_matches = {}
     # Construyo df por equipo
@@ -243,6 +243,11 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
 
             # Filtrar últimos n partidos antes del actual
             df_last_matches = df_team[df_team['date'] < match_date].tail(n_matches)
+            
+            # Eliminar registros con NaN en la columna "expected_result"
+            if var_resp == 'expected_result':
+                df_last_matches = df_last_matches.dropna(subset=['expected_result'])
+
             n_games = len(df_last_matches)
 
             # Obtener los valores de la variable considerando si fue home o away
@@ -258,40 +263,27 @@ def determine_number_results_last_matches(df: pd.DataFrame, n_matches, segun_loc
             n_draws = len(df_last_matches[df_last_matches[var_resp] == 0])
             n_loss = len(df_match_team_filt_home[df_match_team_filt_home[var_resp] == 2]) + len(df_match_team_filt_away[df_match_team_filt_away[var_resp] == 1])
 
-            if n_games != (n_wins + n_draws + n_loss):
+            if n_games == (n_wins + n_draws + n_loss):
+                # Acumular valores en listas
+                results_dict[f'{pf}n_wins_last_{n_matches}_matches_{home_or_away}'].append((idx, n_wins))
+                results_dict[f'{pf}n_draws_last_{n_matches}_matches_{home_or_away}'].append((idx, n_draws))
+                results_dict[f'{pf}n_loss_last_{n_matches}_matches_{home_or_away}'].append((idx, n_loss))
+                
+            else:
                 logger.error(f"Error en determinación de resultados en últimos días {n_wins} + {n_draws} + {n_loss} != {n_games}")
-                raise ValueError
-
-            # Acumular valores en listas
-            results_dict[f'{pf}n_wins_last_{n_matches}_matches_{home_or_away}'].append((idx, n_wins))
-            results_dict[f'{pf}n_draws_last_{n_matches}_matches_{home_or_away}'].append((idx, n_draws))
-            results_dict[f'{pf}n_loss_last_{n_matches}_matches_{home_or_away}'].append((idx, n_loss))
+                raise ValueError # en el caso de expected_result este puede ser nan... y por ende fallar --> ahora elimino partidos con expected_result none.
 
     # Convertir listas en Series y asignarlas de una vez para evitar fragmentación
     for col, values in results_dict.items():
         df[col] = pd.Series(dict(values))  # Crea la columna usando un diccionario de índices
 
-
-
-    # Suma cruzada (En vez de calcular diferencia). Wins home + loss away ; loss home + wins_away
-    l_cols = [f'{pf}n_wins_last', f'{pf}n_loss_last']
-    suffix = '_by_loc' if segun_localia else ''
-
-    for col in l_cols:
-        sum_col = f'{pf}sum_{col}_{n_matches}_matches{suffix}'
+    for elem in ['wins', 'draws', 'loss']:
+        dif_col = f'dif_{pf}n_{elem}_last_{n_matches}_matches'
+        col1 = f'{pf}n_{elem}_last_{n_matches}_matches_home'
+        col2 = f'{pf}n_{elem}_last_{n_matches}_matches_away'
         
-        col_away = f'{pf}n_loss_last' if col == f'{pf}n_wins_last' else f'{pf}n_wins_last'
-
-        col1 = f'{col}_{n_matches}_matches_home'
-        col2 = f'{col_away}_{n_matches}_matches_away'
-        
-        df[sum_col] = df[col1] + df[col2]
-        df.drop(columns=[col1, col2], inplace=True)
-
-    # Diferencia entre n_wins y n_loss --> indicador de empate
-    dif_col = f'{pf}dif_{n_matches}_matches{suffix}'
-    df[dif_col] = df[f'{pf}sum_n_wins_last_{n_matches}_matches{suffix}'] - df[f'{pf}sum_n_loss_last_{n_matches}_matches{suffix}']
-    df.drop(columns=[f'{pf}n_draws_last_{n_matches}_matches_home', f'{pf}n_draws_last_{n_matches}_matches_away'], inplace=True) # no las uso
+        df[dif_col] = df[col1] - df[col2] 
+        df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
 
     return df
 
@@ -521,7 +513,7 @@ def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = 
     
     return df
 
-def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str=None, laplace: bool = False):
+def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str = None, laplace: bool = False):
     """
     Nueva columna siendo el porcentaje resultante de la division de otras dos columnas.
     """
@@ -547,7 +539,7 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1):
+def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True):
     """
     Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). Usa diferencia previa antes del promedio.
     """
@@ -602,10 +594,18 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
     if results:
         df_update = pd.DataFrame.from_dict(results, orient="index")
         df = df.join(df_update)
+    
+    if diff:
+        dif_col = f'dif_{name_ext}mean_last_{n_days}_days_{variable}'
+        col1 = f'{name_ext}mean_last_{n_days}_days_{variable}_home'
+        col2 = f'{name_ext}mean_last_{n_days}_days_{variable}_away'
+        
+        df[dif_col] = df[col1] - df[col2] 
+        df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
 
     return df
 
-def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True): 
     """
     Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). No usa diferencia previa.
 
@@ -616,6 +616,77 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
     df = df.sort_values(by='date', ascending=False)
     d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
     results = {}
+
+    # Inicializo diccionarios (para evitar Performance Warning)
+    name_ext = "loc_" if segun_localia else ""
+
+    # Por partido
+    for id_match, row in df.iterrows():
+        
+        # Obtener los últimos partidos antes de la fecha actual
+        match_date = row['date']
+        limit_date = match_date - timedelta(days=n_days)
+        df_past_matches = df[(df['date'] < match_date) & (df['date'] >= limit_date)]
+
+        # Por equipo
+        for col_team, home_or_away in d_teams.items():
+
+            variable_form = f'{variable}_{home_or_away}'
+            team = row[col_team]
+
+            if segun_localia:
+                # Selecciono los últimos n partidos del equipo en esa localía
+                df_team_matches = df_past_matches.loc[df_past_matches[col_team] == team]
+                values = df_team_matches[variable_form]
+
+            else:
+                # Selecciono los últimos n partidos del equipo en cualquier localía
+                df_team_matches = df_past_matches.loc[(df_past_matches["id_team_home"] == team) | (df_past_matches["id_team_away"] == team)]
+
+                # Extraer los valores de la variable correspondiente dependiendo de si el equipo fue local o visitante
+                values = np.where(
+                    df_team_matches["id_team_home"] == team,  
+                    df_team_matches[f"{variable}_home"],  
+                    df_team_matches[f"{variable}_away"]
+                )
+                values = pd.Series(values, index=df_team_matches.index)
+
+            # Convertir a numérico y eliminar NaN
+            values = pd.to_numeric(values, errors="coerce").dropna()
+
+            # Calcular los pesos exponenciales solo si hay datos
+            if not values.empty:
+                weights = np.exp(-decay_rate * np.arange(len(values)))
+                weights /= weights.sum()
+                weighted_mean = np.dot(values, weights)
+
+                results.setdefault(id_match, {})[f"{name_ext}mean_last_{n_days}_days_{variable_form}"] = weighted_mean
+
+    # Convertir los diccionarios a DataFrames y actualizar el original
+    if results:
+        df_update = pd.DataFrame.from_dict(results, orient="index")
+        df = df.join(df_update)  # Mucho más eficiente que usar df.loc en cada iteración
+
+    if diff:
+        dif_col = f'dif_{name_ext}mean_last_{n_days}_days_{variable}'
+        col1 = f'{name_ext}mean_last_{n_days}_days_{variable}_home'
+        col2 = f'{name_ext}mean_last_{n_days}_days_{variable}_away'
+        
+        df[dif_col] = df[col1] - df[col2] 
+        df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
+
+    return df
+
+def determine_mean_last_matches_home_away_against(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True): 
+    """
+    Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). No usa diferencia previa.
+
+    Mejoras:
+        - Revisar calculo de dif_con_against. Lo implemente rapido mirando como lo tenia antes. Pero por las. 
+    """
+   # Ordeno por fecha descendente para iterar correctamente sobre los partidos
+    df = df.sort_values(by='date', ascending=False)
+    d_teams = {'id_team_home': 'home', 'id_team_away': 'away'}
     results_against = {}
 
     # Inicializo diccionarios (para evitar Performance Warning)
@@ -640,20 +711,11 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
             if segun_localia:
                 # Selecciono los últimos n partidos del equipo en esa localía
                 df_team_matches = df_past_matches.loc[df_past_matches[col_team] == team]
-                values = df_team_matches[variable_form]
                 values_against = df_team_matches[variable_against]
 
             else:
                 # Selecciono los últimos n partidos del equipo en cualquier localía
                 df_team_matches = df_past_matches.loc[(df_past_matches["id_team_home"] == team) | (df_past_matches["id_team_away"] == team)]
-
-                # Extraer los valores de la variable correspondiente dependiendo de si el equipo fue local o visitante
-                values = np.where(
-                    df_team_matches["id_team_home"] == team,  
-                    df_team_matches[f"{variable}_home"],  
-                    df_team_matches[f"{variable}_away"]
-                )
-                values = pd.Series(values, index=df_team_matches.index)
 
                 values_against = np.where(
                     df_team_matches["id_team_home"] == team,  
@@ -663,16 +725,7 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
                 values_against = pd.Series(values_against, index=df_team_matches.index)
 
             # Convertir a numérico y eliminar NaN
-            values = pd.to_numeric(values, errors="coerce").dropna()
             values_against = pd.to_numeric(values_against, errors="coerce").dropna()
-
-            # Calcular los pesos exponenciales solo si hay datos
-            if not values.empty:
-                weights = np.exp(-decay_rate * np.arange(len(values)))
-                weights /= weights.sum()
-                weighted_mean = np.dot(values, weights)
-
-                results.setdefault(id_match, {})[f"{name_ext}mean_last_{n_days}_days_{variable_form}"] = weighted_mean
 
             if not values_against.empty:
                 weights_ag = np.exp(-decay_rate * np.arange(len(values_against)))
@@ -682,14 +735,17 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
                 # Guardar media en el diccionario de resultados
                 results_against.setdefault(id_match, {})[f"{name_ext}mean_last_{n_days}_days_against_{variable_form}"] = weighted_mean_ag
 
-    # Convertir los diccionarios a DataFrames y actualizar el original
-    if results:
-        df_update = pd.DataFrame.from_dict(results, orient="index")
-        df = df.join(df_update)  # Mucho más eficiente que usar df.loc en cada iteración
-
     if results_against:
         df_update_against = pd.DataFrame.from_dict(results_against, orient="index")
         df = df.join(df_update_against)
+
+    if diff:
+        dif_col = f'dif_{name_ext}mean_last_{n_days}_days_against_{variable}'
+        col1 = f'{name_ext}mean_last_{n_days}_days_against_{variable}_home'
+        col2 = f'{name_ext}mean_last_{n_days}_days_against_{variable}_away'
+        
+        df[dif_col] = df[col1] - df[col2] 
+        df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
 
     return df
 

@@ -387,7 +387,7 @@ class DataPreparation:
         ## usadas solo para construir y constantes
         cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
         cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'age_player']
+        strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
         col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
         df.drop(columns=cols_to_drop, inplace=True)
@@ -416,7 +416,7 @@ class DataPreparation:
         self.stats_to_construct = [
             # Ofensive
             'goals', 'points', 'expected_goals_(xg)', 'expected_points',
-            'shots_on_goal', 'goal_attempts', 'PPS', 'goal_ratio', 
+            'shots_on_goal', 'goal_attempts', 'PPS', 'goal_ratio', 'x_goal_ratio',
             'dead_balls', 
             'ball_possession', 'total_passes', 'attacking_efficiency',
             # Defensive
@@ -449,13 +449,13 @@ class DataPreparation:
 
             # VARIABLES DERIVADAS
             # Expected Result and Expected Points (xPts)
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0) # 0.38?
+            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.40, verbose=0) 
             df = construct_data.determine_points(df, suffix='expected_')
-            df = df.drop(['expected_result'], axis=1) # si no lo borras, hay fuga de informacion
 
             ## OFENSIVE
             ## Goal ratio
             df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
+            df = construct_data.construct_percentaje_column(df, col_num='expected_goals_(xg)', col_den="goal_attempts", laplace=True,  column_name="x_goal_ratio")
 
             # Traduccion de posesion a tiros
             df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # home = home / home
@@ -464,8 +464,8 @@ class DataPreparation:
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
             # Attacking efficiency --> (lo evito por cantidad de NaN)
-            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(),  df['expected_goals_(xg)_home'] / (df['goals_home'] + 1), None)
-            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['expected_goals_(xg)_away'] / (df['goals_away'] + 1),  None)
+            df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(),  df['goals_home'] - df['expected_goals_(xg)_home'] , None) # Cociente puede ser 0 y perder info porque goals es 0.
+            df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
 
             ## DEFENSIVE 
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
@@ -478,8 +478,8 @@ class DataPreparation:
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
             # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
-            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['expected_goals_(xg)_away'] / (df['goals_away'] + 1), None)
-            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] / (df['goals_home'] + 1),  None)
+            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['goals_away'] - df['expected_goals_(xg)_away'], None)
+            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
 
             # VARIABLES HISTORICAS
             ## 1) EN PARTIDOS EN ULTIMOS N DAYS
@@ -490,14 +490,15 @@ class DataPreparation:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
             ## 2) EN ULTIMOS N PARTIDOS
-            for n_matches in [15]:
+            for n_matches in [5, 20]:
+
                 # Result
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False)
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True)
 
-                # Expected Result (nuevo, ver si funca)
-                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
-                # df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
+                # Expected Result
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.                
 
             # Por stat (e.g. shots_on_goal)
             logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
@@ -514,51 +515,33 @@ class DataPreparation:
 
                 for n_days in n_last_matches:
 
-                    func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
-
-                    # Calculo promedio en ultimos partidos
-                    df = func(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate)
-                    col1, col2 = f'mean_last_{n_days}_days_{variable}_home', f'mean_last_{n_days}_days_{variable}_away'
-                    col1_ag, col2_ag = f'mean_last_{n_days}_days_against_{variable}_home', f'mean_last_{n_days}_days_against_{variable}_away'
-
-                    # Calculo por localia si segun_localia=True
-                    if segun_localia:
-                        df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate)
-                        
-                        prefix = 'loc_'
-                        col_loc_1, col_loc_2 = f'{prefix}mean_last_{n_days}_days_{variable}_home', f'{prefix}mean_last_{n_days}_days_{variable}_away'
-                        col1_loc_ag, col2_loc_ag = f'{prefix}mean_last_{n_days}_days_against_{variable}_home', f'{prefix}mean_last_{n_days}_days_against_{variable}_away'
-
+                    # Si calculo diferencia previa a promediar (e.g. dif_goals = goals_home - goals_away)
                     if calculate_dif:
-                        df[f'dif_mean_last_{n_days}_days_{variable}'] = df[col1] - df[col2]
-                        cols_to_drop.extend([col1, col2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+                        df = construct_data.determine_mean_last_matches_difference(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
 
                         if segun_localia:
-                            df[f'{prefix}dif_mean_last_{n_days}_days_{variable}'] = df[col_loc_1] - df[col_loc_2]
-                            cols_to_drop.extend([col_loc_1, col_loc_2]) # Deberia dejar de eliinar estas variables? para tener + info y que decida el modelo.
+                            df = construct_data.determine_mean_last_matches_difference(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
 
+                    # Si NO calculo diferencia previa a promediar (e.g. goals_home y goals_away)
                     else:
-                        df[f'sum_{col1}'] = df[col1] + df[col2_ag]
-                        df[f'sum_{col2}'] = df[col2] + df[col1_ag]
-                        df[f'dif_mean_last_{n_days}_days_{variable}'] = df[f'sum_{col1}'] - df[f'sum_{col2}']                    
-                        cols_to_drop.extend([col1, col2, col1_ag, col2_ag]) # Elimino estas variables? Ya tengo las columnas extra "sum"
-                        cols_to_drop.extend([f'sum_{col1}', f'sum_{col2}'])
+                        df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
+                        # df = construct_data.determine_mean_last_matches_home_away_against(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
 
                         if segun_localia:
-                            df[f'sum_{col_loc_1}'] = df[col_loc_1] + df[col2_loc_ag]
-                            df[f'sum_{col_loc_2}'] = df[col_loc_2] + df[col1_loc_ag]
-                            df[f'dif_{prefix}mean_last_{n_days}_days_{variable}'] = df[f'sum_{col_loc_1}'] - df[f'sum_{col_loc_2}']                    
-                            cols_to_drop.extend([col_loc_1, col_loc_2, col1_loc_ag, col2_loc_ag]) # Elimino estas variables? Ya tengo las columnas extra "sum"
-                            cols_to_drop.extend([f'sum_{col_loc_1}', f'sum_{col_loc_2}'])
+                            df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
+                            # df = construct_data.determine_mean_last_matches_home_away_against(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
 
                 df.drop(columns=cols_to_drop, inplace=True)
 
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
-            # df = construct_data.determine_mean_last_matches_difference(df, min(n_last_matches), variable='mean_rat_player_start', segun_localia=segun_localia, calculate_dif=True) # Variable para ponderar estadisticas
+            # df = construct_data.determine_mean_last_matches_home_away_against(df, min(n_last_matches), variable='mean_rat_player_start', segun_localia=segun_localia, diff=True) # Variable para ponderar estadisticas
             # df = df.drop([f'dif_mean_last_{n_days_final}_matches_mean_rat_player_start'], axis=1)  # Solo dejo against. Es para tener medida de los rivales
 
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
+
+        # Elimino expected result. si no lo borras, hay fuga de informacion
+        df = df.drop(['expected_result'], axis=1) 
 
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
@@ -1125,7 +1108,7 @@ class Modeling:
         if expected_metrics:
 
             # Construyo 'expected_result'
-            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.42, verbose=0)  # Durante la prep la elimino x fuga de info.
+            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.40, verbose=0)  # Durante la prep la elimino x fuga de info.
             
             # Eliminar partidos sin expected_goals (puede no estar)
             df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
