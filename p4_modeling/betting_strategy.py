@@ -59,7 +59,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'linear'], 
+                'curva': [strategy], 
                 'm': list_m,
                 'b': [0],
                 'k': list_k # Cuanto mayor es k, mas favorece los stakes en 0
@@ -390,7 +390,7 @@ class BettingStrategy:
     def calculate_roi_in_combination(self, df, param_dict):
 
         if 'expected_result' not in df.columns:
-            df = determine_expected_result(df, goals_to_xg_ratio=0.38, verbose=0)
+            df = determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
 
         # Aplicar estrategia a df_pred
         df_aux = self.apply_strategy(df, param_dict, prod=False)
@@ -668,10 +668,12 @@ def read_predictions(country, iteration_date, n_model, model_name, assess: bool 
     df_pred_test = pd.read_excel(path, index_col=0)
     return df_pred_test
 
-def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, 
-                           vary_dp: bool = False, strategy: str = 'kelly',
-                           val_min: int = 10, val_max: int = 200, step_m: int = 10, 
-                           verbose: int = 0):
+def determine_bs_for_model(
+        df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, 
+        vary_dp: bool = False, strategy: str = 'kelly',
+        val_min: int = 10, val_max: int = 200, step_m: int = 10, 
+        verbose: int = 0
+        ):
     
     bs = BettingStrategy(verbose=0)
 
@@ -684,6 +686,7 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
     df_pred = drop_old_metrics(df_pred_test)
 
     d_params = bs.define_hiperparameters(strategy=strategy, val_min=val_min, val_max=val_max, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    print(d_params)
     if bs_per_res:
         func = bs.define_model_betting_strategy_by_result
     else:
@@ -696,8 +699,9 @@ def determine_bs_for_model(df_pred_test, bs_per_res: bool = True, roi_weight: in
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48, 55, 77, 148]
     one_model = True
-    assess, date_assess = True, '2025-04-19'
+    assess, date_assess = False, '2025-04-19'
     roi_weight = 1
 
     d_countries = {
@@ -728,7 +732,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, step_m=10, val_max=11, strategy='kelly_linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, step_m=5, val_max=100, strategy='linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
 
             for idx, row in df_strat.iterrows():
                 roi = row['roi']
