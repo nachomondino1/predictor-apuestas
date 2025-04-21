@@ -97,7 +97,7 @@ def comprehensive_search(
     # Defino rutas segun country y date
     BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated/{date}"
     BASE_DIR_flashscore = f'data/{country}/p6_deployment/missing/old_updated'
-    BASE_DIR_sofifa = f'data/{country}/p2_data_understanding/sofifa_update/{date}' if retrain else f'data/{country}/p2_data_understanding'
+    BASE_DIR_sofifa = f'data/{country}/p2_data_understanding/sofifa_update' if retrain else f'data/{country}/p2_data_understanding'
     BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
@@ -485,68 +485,40 @@ def determine_rows_for_test_set(df_match, n_reg_test: int = 100, verbose : int =
     logger.info(f"Index test set: {len(index_last_matches)}")
     return index_last_matches
 
-def define_params_space(id_country, fast: bool = False):
+def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), RandomForestClassifier()]   # SVC(), RandomForestClassifier(), GradientBoostingClassifier() DecisionTreeClassifier(), XGBClassifier()
-
-    # 1728 iteraciones
-    if fast:
-        l_modelos = [LogisticRegression(), SVC()]
-
-        d_params = {  
-            'clean_data_3': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups']],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
-            },
-            'construct': {
-                'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
-                'n_years_h2h': [2],
-                'segun_localia': [False, True],
-                'calculate_dif': [False, True], # False uso el enfoque de against
-                'decay_rate': [0, 0.1], # ya 0.1 es alto
-            },
-            'clean_data_2': {
-                'n_years_to_select': [3, 5, 10],
-                'fill_na': [None, "0"],
-            },
-            'select': {
-                'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [None, 0.1, 0.25],
-            },
-            'modeling': {
-                'val_size': [0.125],
-                'n_reg_test': [50], # 25 es muy poco para selec el modelo
-                'bal_type': ['under'], # None
-                'k': [10]
-            }
-        }
-
-    else:
-        d_params = {
-            'construct': {
-                'n_dias_ult_part': [[60], [30, 180]], # [30, 180] 
-                'n_years_h2h': [2],
-                'segun_localia': [True, False],
-                'dif_con_against': [False, True] 
-            },
-            'clean_data_2': {
-                'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_b'], d_comps['comp_sin_cups'], d_comps['all_comp']],
-                'n_years_to_select': [2, 3, 5, 10], 
-                'fill_na': [None, "0", 'ml'],
-            },
-            'select': {
-                'thr_corr': [0.7, 0.85, None],
-                'thr_fs': [None, 0.25, 0.5, 0.75],
-            },
-            'modeling': {
-                'val_size': [0.10],
-                'n_reg_test': [100], 
-                'bal_type': [None, 'under'], # None
-                'k': [5] 
-            }
-        }
+    l_modelos = [LogisticRegression(), SVC()] # SVC(), RandomForestClassifier(), GradientBoostingClassifier() DecisionTreeClassifier(), XGBClassifier()
  
+    # 1728 iteraciones
+    d_params = {  
+        'clean_data_3': {
+            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups']],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
+        },
+        'construct': {
+            'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
+            'n_years_h2h': [2],
+            'segun_localia': [False, True],
+            'calculate_dif': [False, True], # False uso el enfoque de against
+            'decay_rate': [0, 0.1], # ya 0.1 es alto
+        },
+        'clean_data_2': {
+            'n_years_to_select': [3, 5, 10],
+            'fill_na': [None, "0"],
+        },
+        'select': {
+            'thr_corr': [0.7, None], # 0.85
+            'thr_fs': [0.1, 0.25], # None
+        },
+        'modeling': {
+            'val_size': [0.125],
+            'n_reg_test': [100], # 25 es muy poco para selec el modelo
+            'bal_type': ['under'], # None
+            'k': [10]
+        }
+    }
+
     logger.info(f"Parametros para entrenar: {d_params}")
     return d_params, l_modelos
 
@@ -555,7 +527,6 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
 
     data_unders = True
     update_sofifa = False if data_unders else False
@@ -572,9 +543,8 @@ if __name__ == "__main__":
         date = datetime.datetime.now().date() # Si queres usar fecha en especifico: datetime.datetime.strptime('2025-03-16', '%Y-%m-%d').date()
         logger.info(f"Country: {country} Date: {date}")
         
-        # Preparao datos, entreno modelos y evaluo en df_test
         # Defino hiperparametros a probar
-        d_params, l_modelos = define_params_space(id_country, fast=True)
+        d_params, l_modelos = define_params_space(id_country)
         
         # Exportar un archivo .txt con los hiperparametros probados. --> Asi tengo que hiper probe en cada entrenamiento...
         df_params = pd.DataFrame.from_dict(
