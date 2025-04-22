@@ -55,7 +55,7 @@ class FlashscoreCrawler(Crawler):
         if isinstance(season_year, str):
             season_year = season_year.replace("/", "_")
         else:
-            print("The season is not a string. Probably it failed the extraction.")
+            print(f"The season ({season_year})) is not a string. Probably it failed the extraction.")
         return season_year
 
     def click_results_page(self):
