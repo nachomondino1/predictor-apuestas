@@ -75,12 +75,14 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         d_metrics_test_sin_ea = asses_model.calculate_metrics(df_test)
         d_metrics_test_sin_ea.update(asses_model.calculate_gp_by_result(df_test))
         d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_')
+        d_rois.update({'comb_roi': d_rois['roi'] + d_rois['expected_roi']}) # Calculo roi + ex_roi
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
         d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_prod, suffix='_prod')
         d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_prod, var_resp='expected_result', prefix='expected_', suffix='_prod')
         d_metrics_prod_sin_ea.update(asses_model.calculate_gp_by_result(df_prod))
+        d_rois_prod.update({'comb_roi': d_rois_prod['roi'] + d_rois_prod['expected_roi']}) # Calculo roi + ex_roi
 
         # Renombro metricas para evitar sobreescribirlas
         d_rois_prod = asses_model.rename_dict_keys(d_rois_prod, suffix='_prod')
@@ -201,26 +203,31 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     
     # Defino hiper
-    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score'][4]
-    l_metrics_test = ["roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", "expected_f1_score", 'f1_score_home', 'f1_score_draw', 'f1_score_away']
+    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score', 'comb_roi', 'f1_score_draw', 'test_accuracy'][7] # Una combinacion de roi y ex_roi?
+    l_metrics_test = [
+        "roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", 
+        'accuracy_home', 'accuracy_draw', 'accuracy_away',
+        'f1_score_home', 'f1_score_draw', 'f1_score_away',  # 'gp_home', 'gp_draw', 'gp_away', 
+        "expected_f1_score", 'expected_f1_score_home', 'expected_f1_score_draw', 'expected_f1_score_away'
+        ]
     saved_metrics = True
     assess = False
     method = ['corr', 'fs', 'mean'][0]
 
     d_countries = {
         # train nuevos
-        48: ["england", '2025-03-23'],
-        55: ["france", '2025-03-23'], 
-        59: ["germany", '2025-03-23'],
-        77: ["italy", '2025-03-23'],
-        148: ["spain", '2025-03-24']
-        # 48: ["england", '2025-04-08'],
-        # 55: ["france", '2025-04-08'], 
-        # 59: ["germany", '2025-04-08'],
-        # 77: ["italy", '2025-04-08'],
-        # 148: ["spain", '2025-04-08']
+        # 48: ["england", '2025-03-23'],
+        # 55: ["france", '2025-03-23'], 
+        # 59: ["germany", '2025-03-23'],
+        # 77: ["italy", '2025-03-23'],
+        # 148: ["spain", '2025-03-24']
+        48: ["england", '2025-04-08'],
+        55: ["france", '2025-04-08'], 
+        59: ["germany", '2025-04-08'],
+        77: ["italy", '2025-04-08'],
+        148: ["spain", '2025-04-08']
         }
-    
+        
     # 1. Definir metrica a optimizar en produccion
     corr_metric = f'{corr_col}_prod'
 
@@ -234,9 +241,11 @@ if __name__ == "__main__":
         directories.make_directories(l_directorios=[path_save])
 
         # 2. Preseleccionar modelos 
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx") # df_iteration esta mal x +1 models?
-        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx")        
-       
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx") # df_iteration esta mal x +1 models? # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx") 
+
+        df_ite.loc[df_ite['error'] > 0, 'error'] *= -1  # Convierto error a negativo
+        df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
+
         # 3. Por modelo: division en "test" y "prod" + Calculo metricas
         # 3.1. Divido en "test" y "prod" y 3.2. recalculo metricas
         if saved_metrics:
@@ -248,6 +257,10 @@ if __name__ == "__main__":
             df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75, assess=assess)
             df_ite_test.to_excel(f'{path_save}/df_ite_test.xlsx', index=True)
             df_ite_prod.to_excel(f'{path_save}/df_ite_prod.xlsx', index=True)
+
+        # calcular correlacion entre metricas de test (para definir pesos)
+        df_correlacion = df_ite_test.select_dtypes(exclude=['object']).corr().abs()
+        df_correlacion.to_excel(f'{path_save}/df_corr.xlsx', index=True)
 
         # Concateno "test" y "prod" en un solo df    
         df_ite = pd.merge(

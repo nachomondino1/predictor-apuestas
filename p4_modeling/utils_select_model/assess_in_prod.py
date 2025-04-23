@@ -45,7 +45,7 @@ def assess_models_in_prod(
                 df_pred_missing = assess_model_in_prod(id_country, iteration_date, n_model, model_name)
                 
                 if export:
-                    df_pred_missing.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True)
+                    df_pred_missing.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
 
             # 2. Concat test + missing 
             if concat_with_test:
@@ -58,7 +58,7 @@ def assess_models_in_prod(
 
             # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
             df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
-            df_pred = construct_data.determine_expected_result(df_pred, goals_to_xg_ratio=0.38) # Intento hacerlo antes con df_match pero rompia.
+            df_pred = construct_data.determine_expected_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
                     
         else:
             df_pred = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)

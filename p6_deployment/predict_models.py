@@ -4,22 +4,22 @@ sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p6_deployment.main_next_matches import main
 
-def predict_models():
+def predict_models(n_models_predict: int = 5):
     """
     Para obtener predicciones en prox partidos de los modelos candidatos
     """
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 59, 148]
+    l_countries = [48, 77, 148]
 
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}         
 
     # Defino country, iteration date y modelo
     d_countries = {
-        48: ["england", '2025-04-08'], 
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'], 
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08'], 
+        48: ["england", '2025-04-20'], 
+        55: ["france", '2025-04-21'], 
+        59: ["germany", '2025-04-21'], 
+        77: ["italy", '2025-04-20'],
+        148: ["spain", '2025-04-21'], 
         }
     
     # Por pais
@@ -30,13 +30,15 @@ def predict_models():
         df_country = pd.DataFrame()
 
         # Determino mejores n modelos
-        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx').head(11)
+        df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx')
         print(df_ite)
+        df_ite = df_ite.head(n_models_predict)
 
         # Por modelo
         for idx, row in df_ite.iterrows():
 
-            n_model = row['n_iteration']
+            col_name = 'n_iteration' if 'n_iteration' in df_ite.columns else 'n_model'
+            n_model = row[col_name]
             model_name = row['model_name']
             print(n_model, model_name)
             d_model = {'n_model': n_model, 'model_name': model_name}

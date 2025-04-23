@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from sklearn import metrics
-from sklearn.metrics import accuracy_score, recall_score, f1_score, log_loss
+from sklearn.metrics import accuracy_score, recall_score, f1_score, log_loss, precision_score
 from p3_data_preparation import construct_data
 
 
@@ -28,7 +28,7 @@ def calculate_metrics(
 
     # Calculo métricas básicas
     d_metrics = {
-        'error': log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
+        'error': -log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
@@ -39,9 +39,9 @@ def calculate_metrics(
             'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
             'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
             'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100,
-            'accuracy_home': accuracy_score(y_test == 1, y_pred == 1) * 100,  # Accuracy para la clase "Local"
-            'accuracy_draw': accuracy_score(y_test == 0, y_pred == 0) * 100,  # Accuracy para la clase "Empate"
-            'accuracy_away': accuracy_score(y_test == 2, y_pred == 2) * 100,   # Accuracy para la clase "Visitante"
+            'precision_home': precision_score(y_test, y_pred, labels=[1], average="micro", zero_division=0) * 100,
+            'precision_draw': precision_score(y_test, y_pred, labels=[0], average="micro", zero_division=0) * 100,
+            'precision_away': precision_score(y_test, y_pred, labels=[2], average="micro", zero_division=0) * 100
         })
 
     # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
@@ -120,7 +120,7 @@ def calculate_bookie_metrics(df_pred_proba, var_resp: str = 'result', var_pred_b
 
     # Calculo metricas de bookie    
     d_metrics = {
-        'error_bm': log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
+        'error_bm': -log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy_bm': accuracy_score(y_test, y_pred_bm) * 100,  # Calcula bien tras el reindex(),
         'f1_score_bm': f1_score(y_test, y_pred_bm, average='macro') * 100,
         'n_home_bm': n_home, 'n_draw_bm': n_draw, 'n_away_bm': n_away
@@ -483,6 +483,9 @@ def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name:
     
     # Aplicar la función fila por fila
     df[metric_name] = df.apply(calculate_row_metric, axis=1)
+    
+    # Calcular la varianza de las métricas normalizadas por fila
+    df['var'] = np.var(df[norm_metrics].values, axis=1)
     return df
 
 def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):

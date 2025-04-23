@@ -10,8 +10,10 @@ from sklearn.metrics import log_loss, make_scorer, f1_score, accuracy_score
 from skopt import BayesSearchCV
 from skopt.space import Real, Integer, Categorical
 
-def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params: dict = None, bayes: bool = True, n_iter:int = None, 
-                                scoring: bool = None, verbose: int = 1):
+def select_best_hiperparameters(
+        model, X_train: pd.DataFrame, y_train:  pd.DataFrame, X_val:  pd.DataFrame, y_val: pd.DataFrame, 
+        k: int, params: dict = None, bayes: bool = True, n_iter: int = None, 
+        refit: str = None, verbose: int = 1):
     """
     Selecciona los mejores hiperparametros para un modelo.
 
@@ -22,7 +24,6 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
         k: Numero de folds. (int)
         params: Parametros a evaluar (dict)
         bayes: True para usar BayesSearchCV y false para usar GridSearchCV (bool)
-        all_tunning: True para usar tanto BayesSearchCV como GridSearchCV y elegir el mejor (bool)
         scoring: Métrica de evaluación para definir mejor combinacion de hiperparametros (e.g. 'accuracy', 'precision', 'recall', 'roc_auc', 'f1', etc) (str)
 
     # Return
@@ -47,7 +48,10 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
     # Determino numero de clases
     num_classes = len(np.unique(y_val_train))
     var_resp = 'categorical' if num_classes <= 5 else 'continuous'
-    scoring = default_scoring(target_type=var_resp) #  if scoring is None else scoring
+    scoring = default_scoring(target_type=var_resp)
+    if refit is None:
+        logger.warning("No se paso un refit a usar, por lo que, se asigna el default.")
+        refit = lambda cv_results: custom_refit(cv_results, target_type=var_resp)
 
     if verbose >= 1:
         logger.info(f"Seleccionando mejores hiperparametros para {model_name} con k={k}")
@@ -63,23 +67,20 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
             # Calcular iteraciones basadas en el tamaño del dataset
             n_iter = 50 # Puedo usar estimate_bayes_iterations_2 o estimate_bayes_iterations 
             
-        with warnings.catch_warnings():  # Logistic te vuelve loco --> no funciona.
-            warnings.simplefilter("ignore")  # Ignora todas las advertencias
+        # Crear el objeto BayesSearchCV
+        bayes_search = BayesSearchCV(
+            estimator=model, 
+            search_spaces=params, 
+            cv=pds, 
+            n_iter=n_iter, 
+            scoring=scoring,
+            refit="cross_entropy_loss" if var_resp == 'categorical' else 'neg_mean_squared_error',  # O la métrica que prefieras
+            n_jobs=-1
+            )
 
-            # Crear el objeto BayesSearchCV
-            bayes_search = BayesSearchCV(
-                estimator=model, 
-                search_spaces=params, 
-                cv=pds, 
-                n_iter=n_iter, 
-                scoring=scoring,
-                refit="cross_entropy_loss" if var_resp == 'categorical' else 'neg_mean_squared_error',  # O la métrica que prefieras
-                n_jobs=-1
-                )
-
-            # Ajustar el objeto BayesSearchCV a los datos de entrenamiento
-            bayes_search.fit(X_val_train, y_val_train)
-            best_search = bayes_search
+        # Ajustar el objeto BayesSearchCV a los datos de entrenamiento
+        bayes_search.fit(X_val_train, y_val_train)
+        best_search = bayes_search
 
         end_bayes = time.time()
         if verbose >= 1:
@@ -95,20 +96,18 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
         params_grid = space_params(model_name, bayes=False)
 
         # Crear el objeto GridSearchCV
-        with warnings.catch_warnings():  # Logistic te vuelve loco
-            warnings.simplefilter("ignore")  # Ignora todas las advertencias
-            grid_search = GridSearchCV(
-                estimator=model, 
-                param_grid=params_grid, 
-                cv=pds,
-                scoring=scoring, 
-                refit=lambda cv_results: custom_refit(cv_results, target_type=var_resp), 
-                n_jobs=-1  # el n_jons -1 evitaria el error  "warnings.warn(f"resource_tracker: {name}: {e!r}")"" (AUN NO LO PROBÉ, NO SE SI FUNCIONA)
-                )
+        grid_search = GridSearchCV(
+            estimator=model, 
+            param_grid=params_grid, 
+            cv=pds,
+            scoring=scoring, 
+            refit=refit,
+            n_jobs=-1  # el n_jons -1 evitaria el error  "warnings.warn(f"resource_tracker: {name}: {e!r}")"" (AUN NO LO PROBÉ, NO SE SI FUNCIONA)
+            )
 
-            # Ajustar el objeto GridSearchCV a los datos de entrenamiento
-            grid_search.fit(X_val_train, y_val_train)  # Esta ok X_val_train y y_val_train
-            best_search = grid_search         
+        # Ajustar el objeto GridSearchCV a los datos de entrenamiento
+        grid_search.fit(X_val_train, y_val_train)  # Esta ok X_val_train y y_val_train
+        best_search = grid_search         
 
         # Obtener los mejores hiperparámetros
         end_grid = time.time()
@@ -126,6 +125,8 @@ def select_best_hiperparameters(model, X_train, y_train, X_val, y_val, k, params
             'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_indice],
             'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_indice],
             'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_indice],
+            'cv_f1_score_draw': best_search.cv_results_['mean_test_f1_score_draw'][best_indice],
+            'cv_f1_combo': best_search.cv_results_['mean_test_f1_combo'][best_indice],
             'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_indice]  # Negar porque invertimos el log_loss
             # Agregar medidas de desviacion estandar. --> Solo mirar el promedio de la validación cruzada puede ocultar problemas de inconsistencia entre pliegues. Incluye siempre la desviación estándar.
         }
@@ -160,12 +161,12 @@ def default_scoring(target_type: str, verbose: int = 0):
             'accuracy': 'accuracy',
             'f1_score': make_scorer(f1_score, average='macro'),
             'f1_score_wei': make_scorer(f1_score, average='weighted'),
+            'f1_score_draw': make_scorer(f1_score_class_0),
             'cross_entropy_loss': make_scorer(log_loss, greater_is_better=False, response_method="predict_proba"),
-            'metric_comb': make_scorer(
-                lambda y_true, y_pred_proba: combined_metric(y_true, y_pred_proba),
-                needs_proba=True,
-                greater_is_better=True
-                )
+            'f1_combo': make_scorer(
+                lambda y_true, y_pred: 0.6 * f1_score(y_true, y_pred, average='macro') + 
+                                    0.4 * f1_score(y_true, y_pred, labels=[0], average="micro") # 0.3 + 0.7 genera modelos que predicen solo 0.
+            ),
         }
 
     elif target_type == 'continuous':
@@ -179,21 +180,9 @@ def default_scoring(target_type: str, verbose: int = 0):
 
     return scoring
 
-def combined_metric(y_true, y_proba, max_log_loss=1.2, f1_weight=0.5):
-    # Convertimos probabilidades a predicciones
-    y_pred = np.argmax(y_proba, axis=1)
-
-    # Métricas individuales
-    f1 = f1_score(y_true, y_pred, average='macro')  # Ya va de 0 a 1.
-    ll = log_loss(y_true, y_proba) # va de 0 a +∞ donde 0 es lo mejor y valores grandes son malos.
-
-    # Invertimos log_loss normalizado para que valores más bajos sean mejores
-    log_loss_norm = 1 - min(ll / max_log_loss, 1.0)
-
-    # Score combinado
-    ll_weight = 1 - f1_weight
-    combined = f1_weight * f1 + ll_weight * log_loss_norm
-    return combined
+# Función personalizada para medir solo la clase 0 en problemas multiclase
+def f1_score_class_0(y_true, y_pred):
+    return f1_score(y_true, y_pred, labels=[0], average="micro")  # 'micro' cuenta solo los positivos en la clase 0
 
 def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     """
@@ -208,7 +197,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     - Índice del mejor modelo según la métrica correspondiente.
     """
     metrics = {
-        'categorical': 'mean_test_cross_entropy_loss', # mean_test_metric_comb --> no hay tanta dif entre f1_score y error pues estan corr.
+        'categorical': 'mean_test_cross_entropy_loss', # --> no hay tanta dif entre f1_score y error pues estan corr.
         'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
     }
 
