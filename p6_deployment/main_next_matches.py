@@ -967,11 +967,6 @@ def main(
             # Extraer partidos missing teniendo en cuenta df_match + df_match_missing
             df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new = du.collect_missing_data(df_match_upd, df_comp_country=df_comp_country, n_seasons_max=n_seasons_missing)
             logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
-
-            if export and len(df_match_miss_new) > 0:
-                # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
-                mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
-                mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
         else:
             # Unicamente util para cuando falla la preparacion de missing pero ya extrajiste...
             df_match_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_miss.xlsx', index_col=0)
@@ -983,10 +978,10 @@ def main(
         if len(df_match_miss_new) > 0:
             
             # Preparo datos missing            
-            df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_player_fifa_sofifa = dp.format_data(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_player_fifa_sofifa, reformat=True, export=False)            
-            df_match_miss_new, df_match_player_miss_new, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss_new, df_match_player_miss_new, df_player_sofifa, df_player_fifa_sofifa, export=False)
+            df_match_miss_new_f, df_match_player_miss_new_f, df_match_odds_miss_new_f, df_player_fifa_sofifa = dp.format_data(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_player_fifa_sofifa, reformat=True, export=False)            
+            df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss_new_f, df_match_player_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, export=False)
             # df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
-            df_integrated_missing_new = dp.integrate_data(df_match_miss_new, df_match_player_miss_new, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
+            df_integrated_missing_new = dp.integrate_data(df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_integrated_updated = pd.concat([df_integrated_upd, df_integrated_missing_new], axis=0)
@@ -996,7 +991,11 @@ def main(
             # Guardo registro de todos los partidos missing juntos (los recien recolectados y los que ya tenia)
             df_integrated_missing_all = pd.concat([df_integrated_missing, df_integrated_missing_new], axis=0)
             
-            if export:                
+            if export:
+                if extract_missing:    
+                    # Exporto datos extraidos una vez que la integracion funcionó (sino lo extrae pero no lo integra) --> # Mucho cuidado si falla la preparacion pues los missing estaran en old_updated pero no integrados correctamente. (deberias exportar si la prep funciona o algo asi)
+                    mis.concat_with_missing_already_extracted(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_match_miss, df_match_player_miss, df_match_odds_miss)  # missing all --> NO HACERLO CUANDO SOLO QUIERO PREPARAR... Deberia evitar que concatene si los partidos missing ya estan...
+                    mis.concat_old_with_missing(df_match_upd, df_match_player_upd, df_match_odds_upd, df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new) # Old + missing # # No lo quiero cuando ya extraje missing y solo quiero preparar...
                 df_integrated_missing_new.to_excel(f'{mis.BASE_DIR_MISSING_DP}/df_integrated_missing.xlsx', index=True)
                 df_integrated_updated.to_excel(f'{mis.BASE_DIR_MISSING_AND_OLD}/df_integrated.xlsx', index=True)
                 df_integrated_missing_all.to_excel(f'{mis.BASE_DIR_MISSING_ALL_dp}/df_integrated_missing.xlsx', index=True)
@@ -1004,7 +1003,7 @@ def main(
         else:
             df_integrated_updated = df_integrated_upd.copy()
             logger.warning(f"Ya se habian extriado todos los partidos missing. Aun no hay partidos nuevos. {df_integrated_updated.shape}")
-
+       
     else:
         df_integrated_updated = df_integrated_upd.copy()
         logger.warning(f"Se evito por comando la extraccion de missing. Levanto integrated ya concatenado {df_integrated_updated.shape}...")
