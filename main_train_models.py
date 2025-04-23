@@ -135,8 +135,8 @@ def comprehensive_search(
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=True)
 
         # Integrate data (tengo que volver a integrar... para generar df_player de fs bien y tener los nuevos jugadores que surgen en missing y mapearlos..)
-        # df_map, df_player_sofifa, df_player_fifa_sofifa = concat_mapeos.concat_integrate_data_by_country(l_countries=d_countries.values()) No se como lo implementaria...
-        df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, export=True) 
+        prod = True if id_country == -1 else False # No vuelvo a mapear si es para all_countries
+        df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, prod=prod, export=True) 
         df_integrated.to_excel(f'{BASE_DIR_flashscore}/df_integrated.xlsx', index=True) # Exporto como df_int_old_updated
 
     else:
@@ -489,18 +489,18 @@ def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), SVC()] # SVC(), RandomForestClassifier(), GradientBoostingClassifier() DecisionTreeClassifier(), XGBClassifier()
+    l_modelos = [LogisticRegression(), SVC()] # GradientBoostingClassifier() # SVC()# SVC(), RandomForestClassifier(),  DecisionTreeClassifier(), XGBClassifier()
  
     # 1728 iteraciones
     d_params = {  
         'clean_data_3': {
-            'competencies_to_select': [d_comps['comp_solo_liga'], d_comps['comp_sin_cups']],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
+            'competencies_to_select': [d_comps['comp_sin_cups'], d_comps['all_comp']], # d_comps['comp_solo_liga'],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
         },
         'construct': {
             'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
             'segun_localia': [False, True],
-            'calculate_dif': [False, True], # False uso el enfoque de against
+            'calculate_dif': [False, True],  # Ahora manejo si calculo las dif entre mean_home y mean_away o no...      # de antes:  True --> ya no tiene sentido pues calculo dif desde construct... "against" tampoco porque tambien lo hago desde construct.
             'decay_rate': [0, 0.1], # ya 0.1 es alto
         },
         'clean_data_2': {
@@ -527,11 +527,13 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [55, 59, 77, 148]
+    # l_countries = [-1]
 
-    data_unders = True
+    data_unders = False  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = True
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
