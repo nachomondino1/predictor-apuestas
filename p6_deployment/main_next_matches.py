@@ -15,6 +15,7 @@ from p2_data_understanding import describe_data
 from main import DataPreparation, Modeling
 from p3_data_preparation import format_data, clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
+from p3_data_preparation.select_data import determine_country_competitions
 # Modeling
 from p4_modeling import asses_model, betting_strategy
 import pickle
@@ -108,7 +109,7 @@ class DataUnderstandingNew():
         for id_competition in l_competencies:
 
             # Obtengo nombre de competicion y is_cup
-            df_comp_filt = df_comp_country[df_comp_country['id_competition'] == id_competition]  # Para extrar varios countryes?: df = df_comp[df_comp['country'].isin(l_countryes)]
+            df_comp_filt = df_comp_country[df_comp_country['id_competition'] == id_competition] 
             competition, is_cup = df_comp_filt['competition_flashscore'].values[0], df_comp_filt['is_cup'].values[0]
             if _print:
                 print(f" Competition: {competition} ".center(120, '+'))
@@ -909,22 +910,30 @@ def main(
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
         porc_m: float = None, d_model: dict = None,                                                     # Modeling
-        verbose: int = 1, export: bool = True,
+        verbose: int = 1, export: bool = True, country: str = None
         ):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
     """
     start = time.time()
 
-    # Levanto datasets 
-    df_countries = pd.read_excel('./data/df_countries.xlsx')
-    df_comp = pd.read_excel('./data/df_competencies.xlsx')
+    # Determino country si es None
+    if country is None:
+        df_countries = pd.read_excel('./data/df_countries.xlsx')
+        country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
 
-    # Determino country, competence e ite_date
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
-    df_comp_country = df_comp[df_comp['id_country'] == id_country]
+    # Determino competence e ite_date
     iteration_date_dt = pd.to_datetime(iteration_date, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
-    comp_public = df_comp_country[(df_comp_country['is_cup'] == 0) & (df_comp_country['is_second_division'] == 0)]['id_competition'].values  # dev --> para incluir ARG y USA
+    
+    d_comps = determine_country_competitions(id_country)
+    print(d_comps['all_comp'])
+
+    df_comp = pd.read_excel('./data/df_competencies.xlsx')
+    if id_country == -1:
+        df_comp_country = df_comp[df_comp['id_competition'].isin(d_comps['all_comp'])] 
+    else:
+        df_comp_country = df_comp[df_comp['id_country'] == id_country] 
+    comp_public = d_comps['comp_solo_liga'] 
 
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
@@ -937,7 +946,7 @@ def main(
     mo = Modeling(country=country, date=iteration_date_dt) # Creo objeto de clase DataPreparation
     mis = MissingData(country=country, iteration_date=iteration_date_dt)
 
-    # Read data usada en mas de una seccion
+    # Read data usada en mas de una seccion (para levantarla 1 sola vez)
     # Missing data
     if d_run['run_missing'] or predict_missing:
         df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
@@ -1258,38 +1267,42 @@ if __name__ == "__main__":
         'missing': [0],
         'predict': ['next_matches', 'missing'],
     }
-
-    id_country = 148
-    key, value = 'predict', 'next_matches'
-    data_unders = False
-    n_days = 0.5
-
-    # Defino country, iteration date y modelo
+    
+    # Defino country
     d_countries = {
+        -1: ["all", '2025-04-22'],
         48: ["england", '2025-04-20'], 
         55: ["france", '2025-04-21'], 
         59: ["germany", '2025-04-21'], 
         77: ["italy", '2025-04-20'],
         148: ["spain", '2025-04-21'], 
         }
+
+    id_country = -1
+    key, value = 'predict', 'next_matches'
+    data_unders = True
+    n_days = 1
+
+    # iteration date y modelo
+    country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 148, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
+    d_model = {'n_model': 1, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
 
     if key == 'missing':
         
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
         logger.warning("Extract and prepare missing matches")
-        df = main(d_run, id_country, iteration_date=iteration_date, export=d_run['export']) 
+        df = main(d_run, id_country, iteration_date=iteration_date, export=d_run['export'], country=country) 
 
     elif key == 'predict':
         d_run = {'run_missing': False, 'data_unders': data_unders, 'data_prep': True, 'modeling': True, 'export': False} 
             
         if value == "next_matches":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=False, country=country) 
 
         elif value == 'missing':
-            df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False, country=country) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
