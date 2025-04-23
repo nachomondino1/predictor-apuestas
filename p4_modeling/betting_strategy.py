@@ -59,7 +59,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy], 
+                'curva': [strategy, 'linear'], 
                 'm': list_m,
                 'b': [0],
                 'k': list_k # Cuanto mayor es k, mas favorece los stakes en 0
@@ -699,7 +699,7 @@ def determine_bs_for_model(
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 77, 148]
+    l_countries = [48, 55, 77]
     one_model = True
     assess, date_assess = False, '2025-04-19'
     roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
@@ -732,14 +732,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, step_m=5, val_max=100, strategy='linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
-
-            for idx, row in df_strat.iterrows():
-                roi = row['roi']
-                print(roi)
-
-                if roi < 0:
-                    df_strat.loc[idx, 'm'] = 0
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, step_m=5, val_max=100, strategy='kelly_linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
                 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
