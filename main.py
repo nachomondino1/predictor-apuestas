@@ -386,7 +386,7 @@ class DataPreparation:
         # (2) Eliminacion de columnas         
         ## usadas solo para construir y constantes
         cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
-        cols_basics_noise = ['attendance', 'capacity', 'venue', 'referee']  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        cols_basics_noise = ['attendance', 'capacity', 'venue'] # 'referee'  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
         strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
         col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
         cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
@@ -411,17 +411,20 @@ class DataPreparation:
         Es necesaria para usarla desde prod.
         Mejoras: Garantizar que esten en df.columns...
         """
-        self.stats_to_derive = ['fouls', 'tackles', 'interceptions', 'clearances_total', 'blocked_shots', 'throw-ins', 'corner_kicks', 'free_kicks']
+        self.stats_to_derive = ['offsides', 'fouls', 'tackles', 'interceptions', 'yellow_cards', 'red_cards', 'clearances_total', 'blocked_shots', 'throw-ins', 'corner_kicks', 'free_kicks']
 
         self.stats_to_construct = [
-            # Ofensive
+            # (1) Ofensive
             'goals', 'points', 'expected_goals_(xg)', 'expected_points',
-            'shots_on_goal', 'goal_attempts', 'PPS', 'goal_ratio', 'x_goal_ratio',
-            'dead_balls', 
+            'shots_on_goal', 'goal_attempts', 'PPS', 'S2G', 'xS2G', "SOG2S",
+            'dead_balls', 'O2S',
             'ball_possession', 'total_passes', 'attacking_efficiency',
-            # Defensive
-            'yellow_cards', 'red_cards', 'defensive_actions', 
+            # (2) Defensive
+            'defensive_actions', "KGP", "x_KGP", "FPC",
             'PPDA', 'clean_sheet', 'defensive_efficiency',  # "efficiency" 
+            # (3) Diferencia
+            'dif_goals', 'dif_expected_goals_(xg)', 'dif_goals_attempts',
+            'dif_shots_on_goal', 'dif_total_passes', 'dif_PPS'
         ]
         return self.stats_to_derive + self.stats_to_construct
 
@@ -448,38 +451,63 @@ class DataPreparation:
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
-            # Expected Result and Expected Points (xPts)
-            df = construct_data.determine_expected_result(df, goals_to_xg_ratio=0.40, verbose=0) 
-            df = construct_data.determine_points(df, suffix='expected_')
+            # Expected Result and  Expected Points (xPts)
+            df = construct_data.determine_expected_result(df, verbose=0)
+            df = construct_data.determine_points(df, suffix='expected_') 
 
-            ## OFENSIVE
-            ## Goal ratio
-            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="goal_attempts", laplace=True,  column_name="goal_ratio") # G2S # Similar a G2A
-            df = construct_data.construct_percentaje_column(df, col_num='expected_goals_(xg)', col_den="goal_attempts", laplace=True,  column_name="x_goal_ratio")
+            ## (1) OFENSIVE
+            ## Shots on goal --> Shots
+            df = construct_data.construct_percentaje_column(df, col_num='shots_on_goal', col_den="goal_attempts", laplace=True,  column_name="SOG2S") # Precision al arco
 
-            # Traduccion de posesion a tiros
-            df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # home = home / home
+            ## Tiros por gol
+            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="goals", laplace=True,  column_name="S2G") # Tiros por gol
+            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="expected_goals_(xg)", laplace=True,  column_name="xS2G") # Tiros por x_gol
 
+            # Pases por gol
+            df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # Passes por tiro # home = home + home
+ 
             # Dead balls
             df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
 
-            # Attacking efficiency --> (lo evito por cantidad de NaN)
+            # Concentracion
+            df = construct_data.construct_percentaje_column(df, col_num='offsides', col_den="goal_attempts", laplace=True, column_name="O2S") # O solo offsides como intensidad ofensiva
+
+            # Attacking efficiency (goals vs x_goals)
             df['attacking_efficiency_home'] = np.where(df['expected_goals_(xg)_home'].notna(),  df['goals_home'] - df['expected_goals_(xg)_home'] , None) # Cociente puede ser 0 y perder info porque goals es 0.
             df['attacking_efficiency_away'] = np.where(df['expected_goals_(xg)_away'].notna(), df['goals_away'] - df['expected_goals_(xg)_away'],  None)
 
-            ## DEFENSIVE 
+            ## (2) DEFENSIVE  --> es como tener en cuenta against ya desde la construccion misma
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
             df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances_total', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
             df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
             df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
 
+            # Tiros recibidos por gol concedido (Keep goals prevented)
+            df['KGP_home'] = np.where(df['goal_attempts_away'].notna(), df['goal_attempts_away'] / (df['goals_away'] + 1), None) 
+            df['KGP_away'] = np.where(df['goal_attempts_home'].notna(), df['goal_attempts_home'] / (df['goals_home'] + 1),  None)
+            df['x_KGP_home'] = np.where(df['goal_attempts_away'].notna(), df['goal_attempts_away'] / (df['expected_goals_(xg)_away'] + 1), None)
+            df['x_KGP_away'] = np.where(df['goal_attempts_home'].notna(), df['goal_attempts_home'] / (df['expected_goals_(xg)_home'] + 1),  None)
+
+            # Disciplina
+            df['cards_home'] = df['yellow_cards_home'] + 2 * df['red_cards_home']
+            df['cards_away'] = df['yellow_cards_away'] + 2 * df['red_cards_away']
+            df = construct_data.construct_percentaje_column(df, col_num='fouls', col_den="cards", laplace=True,  column_name="FPC") # Faltas por tarjeta
+
             # Clean Sheets
             df['clean_sheet_home'] = (df['goals_away'] == 0).astype(int)
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
-            # Defensive efficiency (en la teoria esto es KGP) --> (lo evito por cantidad de NaN)
+            # Defensive efficiency (goals vs x_goals)
             df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['goals_away'] - df['expected_goals_(xg)_away'], None)
             df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
+
+            # (3) DIFERENCIA (diferencias con el rival: local - visitante)
+            df['dif_goals'] = np.where(df['goals_home'].notna(), df['goals_home'] - df['goals_away'], None) 
+            df['dif_expected_goals_(xg)'] = np.where(df['expected_goals_(xg)_home'].notna(), df['expected_goals_(xg)_home'] - df['expected_goals_(xg)_away'], None) 
+            df['dif_goals_attempts'] = np.where(df['goal_attempts_home'].notna(), df['goal_attempts_home'] - df['goal_attempts_away'], None) 
+            df['dif_shots_on_goal'] = np.where(df['shots_on_goal_home'].notna(), df['shots_on_goal_home'] - df['shots_on_goal_away'], None) 
+            df['dif_total_passes'] = np.where(df['total_passes_home'].notna(), df['total_passes_home'] - df['total_passes_away'], None) 
+            df['dif_PPS'] = np.where(df['PPS_home'].notna(), df['PPS_home'] - df['PPS_away'], None) 
 
             # VARIABLES HISTORICAS
             ## 1) EN PARTIDOS EN ULTIMOS N DAYS
@@ -490,7 +518,7 @@ class DataPreparation:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
             ## 2) EN ULTIMOS N PARTIDOS
-            for n_matches in [5, 20]:
+            for n_matches in [10, 25]:
 
                 # Result
                 df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False)
@@ -506,31 +534,26 @@ class DataPreparation:
                 logger.info(f"Estadística a promediar: {var}")
                 
                 cols_to_drop = []
-                variable = f'dif_{var}' if calculate_dif else var
-
-                if calculate_dif:
-                    df[variable] = df[f'{var}_home'] - df[f'{var}_away']
-                    cols_to_drop.append(variable)
-                cols_to_drop.extend([f'{var}_home', f'{var}_away'])
 
                 for n_days in n_last_matches:
 
-                    # Si calculo diferencia previa a promediar (e.g. dif_goals = goals_home - goals_away)
-                    if calculate_dif:
-                        df = construct_data.determine_mean_last_matches_difference(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
-
+                    # Si la variable es diferencia (e.g. dif_goals)
+                    if 'dif_' in var:
+                        df = construct_data.determine_mean_last_matches_difference(df, n_days=n_days, variable=var, segun_localia=False, decay_rate=decay_rate, diff=calculate_dif) # e.g. mean_last_50_matches_dif_goals_home
                         if segun_localia:
-                            df = construct_data.determine_mean_last_matches_difference(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
+                            df = construct_data.determine_mean_last_matches_difference(df, n_days=n_days, variable=var, segun_localia=segun_localia, decay_rate=decay_rate, diff=calculate_dif)
 
-                    # Si NO calculo diferencia previa a promediar (e.g. goals_home y goals_away)
+                        cols_to_drop.extend([var]) # (e.g. dif_goals)
+
+                    # si la variable NO es diferencia (e.g. goals_home)
                     else:
-                        df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
-                        # df = construct_data.determine_mean_last_matches_home_away_against(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
-
+                        df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=var, segun_localia=False, decay_rate=decay_rate, diff=calculate_dif) # ya no calcular dif pues construyo las dif_goals y esas antes
                         if segun_localia:
-                            df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
-                            # df = construct_data.determine_mean_last_matches_home_away_against(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
+                            df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=var, segun_localia=segun_localia, decay_rate=decay_rate, diff=calculate_dif)
 
+                        cols_to_drop.extend([f'{var}_home', f'{var}_away']) # (e.g. goals_home y goals_away)
+
+                # Elimino variables utilizadas para construir historicas
                 df.drop(columns=cols_to_drop, inplace=True)
 
             # Historica de jugadores --> Para tener nocion de los rivales enfrentados.
@@ -1108,7 +1131,7 @@ class Modeling:
         if expected_metrics:
 
             # Construyo 'expected_result'
-            df_predicciones = construct_data.determine_expected_result(df_predicciones, goals_to_xg_ratio=0.40, verbose=0)  # Durante la prep la elimino x fuga de info.
+            df_predicciones = construct_data.determine_expected_result(df_predicciones, verbose=0)  # Durante la prep la elimino x fuga de info.
             
             # Eliminar partidos sin expected_goals (puede no estar)
             df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
