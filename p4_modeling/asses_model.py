@@ -461,12 +461,16 @@ def calculate_perc_gp(gp, gp_total):
         return 0
 
 # METRICA COMBINADA
-def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
+def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric', penalize_std: bool = False, std_weight: float = 0.1):
     """
     Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
-    Normaliza las columnas en 'l_metrics' antes del cálculo y agrega el resultado como una nueva columna.
+    Incluye la opción de penalizar alta variabilidad en las métricas normalizadas.
+
+    # Parameters:
+        penalize_variance: Permite decidir si deseas aplicar o no el castigo por alta variabilidad.
+        variance_weight: Controla la magnitud del castigo. Valores más altos dan mayor importancia a reducir el desvio. (float)
     """
-    # Validar que el número de métricas y pesos coincida
+        # Validar que el número de métricas y pesos coincida
     if len(l_metrics) != len(l_weights):
         raise ValueError("El número de métricas debe coincidir con el número de pesos.")
     
@@ -479,13 +483,18 @@ def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name:
     
     # Definir función para calcular la métrica por fila
     def calculate_row_metric(row):
-        return sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
+        base_metric = sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
+        if penalize_std:
+            # Penalizar alta variabilidad usando el desvío estándar
+            std_penalty = std_weight * np.std([row[norm_metric] for norm_metric in norm_metrics])
+            return base_metric - std_penalty  # Resta el castigo basado en el desvío estándar
+        return base_metric
     
     # Aplicar la función fila por fila
     df[metric_name] = df.apply(calculate_row_metric, axis=1)
     
-    # Calcular la varianza de las métricas normalizadas por fila
-    df['var'] = np.var(df[norm_metrics].values, axis=1)
+    # Calcular el desvío estándar de las métricas normalizadas por fila
+    df['std'] = np.std(df[norm_metrics].values, axis=1)
     return df
 
 def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):

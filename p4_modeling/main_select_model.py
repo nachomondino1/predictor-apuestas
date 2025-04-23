@@ -154,7 +154,7 @@ def main(
     metric = 'metric_test_assess'
 
     ## 1. Calculo metrica combinada
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=True)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
@@ -194,7 +194,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
+    l_countries = [55, 77, 148]
     assess = False
 
     d_countries = {
