@@ -118,7 +118,7 @@ def adjust_ratio_to_match_distributions(
 
     return best_ratio
 
-def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.40, col_name="expected_result", verbose: int = 0):
+def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio_sup: float = 0.46, goals_to_xg_ratio_inf: float = -0.35, col_name="expected_result", verbose: int = 0):
     """
     Determina el 'expected_result' a partir de los expected goals de cada equipo.
     :param df: DataFrame con columnas 'expected_goals_(xg)_home' y 'expected_goals_(xg)_away'.
@@ -137,8 +137,8 @@ def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.40,
 
     # Definir condiciones y valores
     condiciones = [
-        dif_expected_goals[filas_validas] > goals_to_xg_ratio,
-        dif_expected_goals[filas_validas] < -goals_to_xg_ratio,
+        dif_expected_goals[filas_validas] > goals_to_xg_ratio_sup,
+        dif_expected_goals[filas_validas] < goals_to_xg_ratio_inf,
     ]
     valores = [1, 2]  # 1: Local, 2: Visitante
 
@@ -150,6 +150,25 @@ def determine_expected_result(df: pd.DataFrame, goals_to_xg_ratio: float = 0.40,
     if verbose >= 1:
         compare_distributions(df)
 
+    return df
+
+def determine_expected_result_ml(df):
+
+    ## Op 2: ML (Funciona? --> si pero peor)
+    import pickle
+
+    # Load model
+    loaded_model = pickle.load(open("./data/expected_result.pkl", "rb")) 
+
+    # Seleccion columnas predictoras + variable respuesta
+    X = df.loc[:, ['id_country', 'id_competition', 'expected_goals_(xg)_home', 'expected_goals_(xg)_away']]
+
+    # Treat nan: Elimino nan values en varibles predictoras
+    X.dropna(subset=['expected_goals_(xg)_home', 'expected_goals_(xg)_away'], inplace=True)
+
+    # Predecir expected result
+    y_pred = loaded_model.predict(X)
+    df.loc[X.index, 'expected_result'] = y_pred  # Guardar y_pred como 'expected_result'
     return df
 
 def determine_number_matches_last_days(df: pd.DataFrame, n_days): # Ver si funciona
@@ -574,12 +593,13 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
             # Obtengo valores de la variable.
             s_values = df_last_matches[variable]  # Obtiene los valores de la variable
 
-            #  En los visitantes, invierto la diferencia pues es positiva para el visitante.
-            s_values = np.where(df_last_matches['id_team_away'] == team, -s_values, s_values)
-            s_values = pd.Series(s_values, index=df_last_matches.index)
-
             # Convertir a numérico y eliminar NaN
             s_values = pd.to_numeric(s_values, errors="coerce").dropna()
+            df_last_matches = df_last_matches.loc[s_values.index]  # <-- alineación necesaria con s_values
+
+            # En los visitantes, invierto la diferencia pues es positiva para el visitante.
+            s_values = np.where(df_last_matches['id_team_away'] == team, -s_values, s_values)
+            s_values = pd.Series(s_values, index=df_last_matches.index)
 
             # Calcular promedio ponderado (priorizando registros recientes)
             if not s_values.empty:

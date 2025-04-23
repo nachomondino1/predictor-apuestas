@@ -14,9 +14,8 @@ def main(id_competition):
     df = pd.read_excel('data/_dashboard/df.xlsx')
     print(df)
 
-    # Recalcular threshold de expected
-    thr = construct_data.adjust_ratio_to_match_distributions(df, initial_ratio=0.3, max_iterations=100)
-    df = construct_data.determine_expected_result(df, goals_to_xg_ratio=thr, verbose=1)
+    # Determino expected result
+    df = construct_data.determine_expected_result(df, verbose=1)
 
     # Filtrar por temporada y pais
     df_filt = df[df['id_competition'] == id_competition]

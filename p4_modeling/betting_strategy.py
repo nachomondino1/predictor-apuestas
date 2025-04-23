@@ -390,7 +390,7 @@ class BettingStrategy:
     def calculate_roi_in_combination(self, df, param_dict):
 
         if 'expected_result' not in df.columns:
-            df = determine_expected_result(df, goals_to_xg_ratio=0.42, verbose=0)
+            df = determine_expected_result(df, verbose=0)
 
         # Aplicar estrategia a df_pred
         df_aux = self.apply_strategy(df, param_dict, prod=False)
@@ -702,7 +702,7 @@ if __name__ == "__main__":
     l_countries = [48, 55, 77, 148]
     one_model = True
     assess, date_assess = False, '2025-04-19'
-    roi_weight = 1
+    roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
 
     d_countries = {
         48: ["england"],
