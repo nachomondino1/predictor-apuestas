@@ -194,20 +194,21 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 77, 148]
+    l_countries = [77]
     assess = False
 
     d_countries = {
-        48: ["england", '2025-04-20'],
-        55: ["france", '2025-04-21'], 
-        59: ["germany", '2025-04-21'],
-        77: ["italy", '2025-04-20'],
-        148: ["spain", '2025-04-21']
+        -1: ['all', '2025-04-22'],
+        48: ["england", '2025-04-22'],
+        55: ["france", '2025-04-23'], 
+        59: ["germany", '2025-04-23'],
+        77: ["italy", '2025-04-23'],
+        148: ["spain", '2025-04-23']
         }
     
-    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)
-    l_metrics = ['f1_score', 'gp_draw', 'error'] # el f1_score tiene en cuenta el f1_score_draw y con el acc_draw garantizo que acierte mucho...
-    l_weights = [0.3, 0.4, 0.3]
+    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
+    l_metrics = ['roi', 'expected_roi'] # --> deberia tener mas en cuenta expected pues tiene mayor corr con resultados futuros?
+    l_weights = [0.5, 0.5] 
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
