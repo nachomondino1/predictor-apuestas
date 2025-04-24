@@ -430,6 +430,17 @@ class BettingStrategy:
         return df
 
     def select_best_parameters(self, data, roi_weight: float = 1, normalize: bool = False):
+        """
+        Seleccion de la combinacion de hiper de apuesta que maximizan el roi y expected roi minimizando el stake.
+        
+        # Parameters:
+            data: diferentes alternativas con sus roi y expected roi.
+            roi_weight: Peso del roi para seleccionar la alternativa. Su complemento es el peso del expected_roi. (float)
+            normalize: Normalizando antes de sumar roi y expected_roi--> Con True funciona mal + Realmente creo que no es correcto. La diferente escala es info valiosa y que creo que debo usar.
+
+        # Return
+            n_comb: Numero de combinacion de hiper de apuesta ganador.
+        """
         
         # Convierto diccionario a dataframe para facilitar manejo
         df = pd.DataFrame.from_dict(data, orient='index')
@@ -438,16 +449,14 @@ class BettingStrategy:
         ex_weight =  float(1 - roi_weight)   
         
         ## Sin normalizar (prefiero esta actualmente, con la dif de escala)
-        #  Normalizando antes de sumar --> Realmente creo que no es correcto. La diferente escala es info valiosa y que creo que debo usar.
         if normalize:
-            df = normalize_column(df, col='roi', norm_extension='norm')
-            df = normalize_column(df, col='expected_roi', norm_extension='norm')
-            df = normalize_column(df, col='mean_stake', norm_extension='norm')
-            col1, col2, col3 = 'roi_norm', 'expected_roi_norm', 'mean_stake_norm'
+            df = normalize_column(df, col='roi')
+            df = normalize_column(df, col='expected_roi')
+            col1, col2 = 'roi_norm', 'expected_roi_norm'
         else:
-            col1, col2, col3 = 'roi', 'expected_roi', 'mean_stake'
+            col1, col2 = 'roi', 'expected_roi'
 
-        df['metric'] = ((roi_weight * df[col1]) + (ex_weight * df[col2])) / df[col3]
+        df['metric'] = ((roi_weight * df[col1]) + (ex_weight * df[col2])) / df['mean_stake']
     
         # Encontrar la mejor alternativa según la métrica
         best_metric = df['metric'].max()
@@ -458,7 +467,7 @@ class BettingStrategy:
         else:
             # Seleccionar el menor ROI negativo con el menor stake
             df_negativos = df[df['roi'] < 0]  # Filtrar solo los casos con pérdidas
-            n_comb = df_negativos.loc[df_negativos['roi'] == df_negativos['roi'].max()].idxmin()[col3]
+            n_comb = df_negativos.loc[df_negativos['roi'] == df_negativos['roi'].max()].idxmin()['mean_stake']
 
         if self.verbose >= 1:
             print(roi_weight, ex_weight)
@@ -698,8 +707,7 @@ def determine_bs_for_model(
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
-    l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 77]
+    l_countries = [48, 55, 59, 77, 148] 
     one_model = True
     assess, date_assess = False, '2025-04-19'
     roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
