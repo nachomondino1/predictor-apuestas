@@ -59,7 +59,7 @@ class BettingStrategy:
         else:
             dic = {
                 'prob_dp': list_dp,
-                'curva': [strategy, 'linear'], 
+                'curva': [strategy, 'linear'],  
                 'm': list_m,
                 'b': [0],
                 'k': list_k # Cuanto mayor es k, mas favorece los stakes en 0
@@ -675,7 +675,7 @@ def read_predictions(country, iteration_date, n_model, model_name, assess: bool 
     return df_pred_test
 
 def determine_bs_for_model(
-        df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, 
+        df_pred_test, bs_per_res: bool = False, roi_weight: int = 1, 
         vary_dp: bool = False, strategy: str = 'kelly',
         val_min: int = 10, val_max: int = 200, step_m: int = 10, 
         verbose: int = 0,
@@ -683,7 +683,6 @@ def determine_bs_for_model(
         ):
     
     bs = BettingStrategy(verbose=0)
-    val1, val2 = 10, 11
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -691,22 +690,33 @@ def determine_bs_for_model(
         print(f"Prob result to bet promedio: {mean_prob}")
     
     # Dropeo old metrics (sino calcula mal las nuevas)
+    roi_sin_ea = determine_roi(df_pred_test) * 100
+    xroi_sin_ea = determine_roi(df_pred_test, var_resp='expected_result') * 100
     df_pred = drop_old_metrics(df_pred_test)
 
-    d_params = bs.define_hiperparameters(strategy=strategy, val_min=val1, val_max=val2, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+    d_params = bs.define_hiperparameters(strategy=strategy, val_min=val_min, val_max=val_max, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
     print(d_params)
     if bs_per_res:
+        logger.warning("WARNING! Mucho cuidado con usar bs por rdo puesto que es muy facil caer en overfitting ya sea por 1) pocos datos en el test 2) muchos parametros de bs y/o espacio de valores de cada uno. Esto le permite ajustarse mucho al test.")
         func = bs.define_model_betting_strategy_by_result
     else:
         func = bs.define_model_betting_strategy
     df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
     
+    # Calculo multiplicador
+    df_strat['roi_sin_ea'] = roi_sin_ea
+    df_strat['x_roi_sin_ea'] = xroi_sin_ea
+    df_strat['mult'] = df_strat['roi'] / roi_sin_ea  # Puede ser menor a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi...
+    df_strat['xmult'] = df_strat['expected_roi'] / xroi_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
+
     # Reescalo m (para reducir amplitud y evitar overfitting)
     if bs_per_res and rescale:
+        val1, val2 = 8, 12 
+
         # Reescalar valores de m
         df_strat.rename(columns={'m': 'm_old'}, inplace=True)
         for idx, row in df_strat.iterrows():
-            df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val1, old_max=val2, new_min=val_min, new_max=val_max)
+            df_strat.loc[idx, 'm'] = scale_values(row['m_old'], old_min=val_min, old_max=val_max, new_min=val1, new_max=val2)
  
     return df_strat, df_pred_with_stra
 
@@ -746,7 +756,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, val_min=8, val_max=12, step_m=5, strategy='kelly_linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=False, val_min=10, val_max=11, strategy='kelly_linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
                 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
