@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [None, -1, -0.75, -0.5, -0.25] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
+        list_dp = [None, -0.5, -0.25, 0] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
         list_m = list(range(val_min, val_max + 1, step_m))
         list_k = [1, 3, 5] if strategy in ['kelly', 'kelly_linear'] else [1]
         
