@@ -475,7 +475,7 @@ class BettingStrategy:
             print(roi_weight, ex_weight)
             logger.info(df)
             logger.critical(f"Nº combination: {n_comb}")
-        
+
         return n_comb
 
     # Main
@@ -517,13 +517,11 @@ class BettingStrategy:
                     raise ValueError # Solucion: n_comb = 1
 
                 # Guardo datos
-                # d_hiper_res[pred] = d_hiper[n_comb]
                 d_metrics_res[pred] = d_metricas[n_comb] # Son sin ea ???
                 best_df_pred = pd.concat([best_df_pred, d_predic[n_comb]], axis=0)
 
             else:
                 logger.warning(f"No hay predicciones con el resultado {pred} (o sea, el modelo no lo predice). Asigno strategy de train.")
-                # d_hiper_res[pred] = self.define_hiperparameters(strategy="train")
                 d_metrics_res[pred] = {}
 
         # Concateno datos y guardo
@@ -666,9 +664,10 @@ def read_predictions(country, iteration_date, n_model, model_name, assess: bool 
 
     if assess and date_assess is None:
         date_assess = datetime.datetime.now().date()
-        
+
     if assess:
-        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones_met.xlsx" 
+        logger.warning("Debe ser test + assess concatenado")
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones_met.xlsx"  # Debe ser test + assess concatenado
     else:
         path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
 
@@ -714,8 +713,9 @@ def determine_bs_for_model(
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148] 
+    l_countries = [55] 
     one_model = True
-    assess, date_assess = False, '2025-04-19'
+    assess, date_assess = True, '2025-04-27'
     roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
 
     d_countries = {

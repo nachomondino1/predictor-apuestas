@@ -162,7 +162,7 @@ def main(
     # Si assesss
     if assess:
         # Selecciono candidatos
-        df_ite_bs = df_ite_bs.head(20)
+        df_ite_bs = df_ite_bs.head(10)
 
         # Actualizo con assess
         logger.warning("Tengo en cuenta tanto 'test' como 'assess' para seleccionar modelo...")
@@ -172,7 +172,7 @@ def main(
             country=country, 
             iteration_date=iteration_date, 
             concat_with_test=True,
-            export=True
+            export=False
         )       
 
         df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
@@ -194,8 +194,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 77, 148]
-    assess = False
+    assess = True
 
     d_countries = {
         -1: ['all', '2025-04-22'],
