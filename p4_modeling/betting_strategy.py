@@ -47,7 +47,7 @@ class BettingStrategy:
         """
         list_dp = [None, -1, -0.75, -0.5, -0.25] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
         list_m = list(range(val_min, val_max + 1, step_m))
-        list_k = [1] if strategy in ['kelly', 'kelly_linear'] else [1]
+        list_k = [1, 3, 5] if strategy in ['kelly', 'kelly_linear'] else [1]
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -678,11 +678,12 @@ def determine_bs_for_model(
         df_pred_test, bs_per_res: bool = True, roi_weight: int = 1, 
         vary_dp: bool = False, strategy: str = 'kelly',
         val_min: int = 10, val_max: int = 200, step_m: int = 10, 
-        verbose: int = 0
+        verbose: int = 0,
+        rescale: bool = False
         ):
     
     bs = BettingStrategy(verbose=0)
-    val1, val2 = 10, 100
+    val1, val2 = 10, 11
 
     # Imprimo prob_result_to_bet promedio
     if verbose >= 1:
@@ -701,7 +702,7 @@ def determine_bs_for_model(
     df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
     
     # Reescalo m (para reducir amplitud y evitar overfitting)
-    if bs_per_res:
+    if bs_per_res and rescale:
         # Reescalar valores de m
         df_strat.rename(columns={'m': 'm_old'}, inplace=True)
         for idx, row in df_strat.iterrows():
@@ -713,9 +714,8 @@ def determine_bs_for_model(
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148] 
-    l_countries = [55] 
     one_model = True
-    assess, date_assess = True, '2025-04-27'
+    assess, date_assess = False, '2025-04-27'
     roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
 
     d_countries = {
