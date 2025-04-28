@@ -201,31 +201,26 @@ if __name__ == "__main__":
 
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    
-    # Defino hiper
-    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score', 'comb_roi', 'f1_score_draw', 'test_accuracy'][7] # Una combinacion de roi y ex_roi?
-    l_metrics_test = [
-        "roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", 
-        'accuracy_home', 'accuracy_draw', 'accuracy_away',
-        'f1_score_home', 'f1_score_draw', 'f1_score_away',  # 'gp_home', 'gp_draw', 'gp_away', 
-        "expected_f1_score", 'expected_f1_score_home', 'expected_f1_score_draw', 'expected_f1_score_away'
-        ]
     saved_metrics = True
     assess = False
     method = ['corr', 'fs', 'mean'][0]
+    corr_col = ['roi', 'expected_roi', 'error', 'expected_error', 'f1_score', 'f1_score_draw', 'test_accuracy'][4] # Una combinacion de roi y ex_roi?
 
+    # Defino hiper
+    l_metrics_test = [
+        "roi", "expected_roi", "error", "expected_error", "test_accuracy", "f1_score", 
+        # 'accuracy_home', 'accuracy_draw', 'accuracy_away',
+        'f1_score_home', 'f1_score_draw', 'f1_score_away',  # 'gp_home', 'gp_draw', 'gp_away', 
+        "expected_f1_score", 'expected_f1_score_home', 'expected_f1_score_draw', 'expected_f1_score_away'
+        ]
+  
     d_countries = {
         # train nuevos
-        # 48: ["england", '2025-03-23'],
-        # 55: ["france", '2025-03-23'], 
-        # 59: ["germany", '2025-03-23'],
-        # 77: ["italy", '2025-03-23'],
-        # 148: ["spain", '2025-03-24']
-        48: ["england", '2025-04-08'],
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'],
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08']
+        48: ["england", '2025-04-22'],
+        55: ["france", '2025-04-23'], 
+        59: ["germany", '2025-04-23'],
+        77: ["italy", '2025-04-23'],
+        148: ["spain", '2025-04-23']
         }
         
     # 1. Definir metrica a optimizar en produccion
@@ -245,6 +240,7 @@ if __name__ == "__main__":
 
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1  # Convierto error a negativo
         df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
+        # df_ite['comb_f1_score'] = (df_ite['f1_score'] + df_ite['expected_f1_score']) / 2
 
         # 3. Por modelo: division en "test" y "prod" + Calculo metricas
         # 3.1. Divido en "test" y "prod" y 3.2. recalculo metricas

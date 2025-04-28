@@ -206,7 +206,8 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    l_metrics = ['roi', 'expected_roi'] # --> deberia tener mas en cuenta expected pues tiene mayor corr con resultados futuros?
+    # l_metrics = ['roi', 'expected_roi'] # --> deberia tener mas en cuenta expected pues tiene mayor corr con resultados futuros?
+    l_metrics = ['f1_score', 'expected_f1_score'] # Por cuotas (?). Capaz el expected marca 2 y la cuota es altisima pero perdio 4-1 como MAR-BRE.
     l_weights = [0.5, 0.5] 
 
     for id_country in l_countries:
