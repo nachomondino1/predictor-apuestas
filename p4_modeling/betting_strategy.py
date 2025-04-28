@@ -45,7 +45,7 @@ class BettingStrategy:
         Mejoras:
             - lista de estrategias (e.g. kelly, linear, etc)
         """
-        list_dp = [None, -0.5, -0.25, 0] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
+        list_dp = [None, -1, -0.75, -0.5, -0.25, 0] if vary_dp else [None]  # no uso kelly > -0.5 pues sino en dp no es robusto, lo basa en 3 partidos...
         list_m = list(range(val_min, val_max + 1, step_m))
         list_k = [1, 3, 5] if strategy in ['kelly', 'kelly_linear'] else [1]
         
@@ -667,7 +667,7 @@ def read_predictions(country, iteration_date, n_model, model_name, assess: bool 
 
     if assess:
         logger.warning("Debe ser test + assess concatenado")
-        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_predicciones_met.xlsx"  # Debe ser test + assess concatenado
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date_assess}/{n_model}__{model_name}_test_assess_.xlsx"  # Debe ser test + assess concatenado
     else:
         path = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
 
@@ -692,6 +692,8 @@ def determine_bs_for_model(
     # Dropeo old metrics (sino calcula mal las nuevas)
     roi_sin_ea = determine_roi(df_pred_test) * 100
     xroi_sin_ea = determine_roi(df_pred_test, var_resp='expected_result') * 100
+    mean_stake_sin_ea = df_pred_test['stake_to_bet'].mean()
+
     df_pred = drop_old_metrics(df_pred_test)
 
     d_params = bs.define_hiperparameters(strategy=strategy, val_min=val_min, val_max=val_max, step_m=step_m, vary_dp=vary_dp) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
@@ -703,11 +705,16 @@ def determine_bs_for_model(
         func = bs.define_model_betting_strategy
     df_strat, df_pred_with_stra = func(df_pred, d_params=d_params, roi_weight=roi_weight, verbose=verbose)
     
-    # Calculo multiplicador
+    # Calculo multiplicador y metricas
     df_strat['roi_sin_ea'] = roi_sin_ea
     df_strat['x_roi_sin_ea'] = xroi_sin_ea
-    df_strat['mult'] = df_strat['roi'] / roi_sin_ea  # Puede ser menor a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi...
-    df_strat['xmult'] = df_strat['expected_roi'] / xroi_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
+    df_strat['mean_stake_sin_ea'] = mean_stake_sin_ea
+    df_strat['mult_roi'] = df_strat['roi'] / roi_sin_ea  # Puede ser menor a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi...
+    df_strat['mult_x_roi'] = df_strat['expected_roi'] / xroi_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
+    df_strat['mult_stake'] = df_pred_with_stra['stake_to_bet'].mean() / mean_stake_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
+    df_strat['mean_stake_1'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 1]['stake_to_bet'].mean()
+    df_strat['mean_stake_0'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 0]['stake_to_bet'].mean()
+    df_strat['mean_stake_2'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 2]['stake_to_bet'].mean()
 
     # Reescalo m (para reducir amplitud y evitar overfitting)
     if bs_per_res and rescale:
@@ -725,7 +732,7 @@ if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148] 
     one_model = True
-    assess, date_assess = False, '2025-04-27'
+    assess, date_assess = True, '2025-04-27'
     roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
 
     d_countries = {

@@ -83,6 +83,8 @@ def assess_models_in_prod(
         if export:
             df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones_met.xlsx", index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
+        else:
+            df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_test_assess_.xlsx", index=True)
     
     return df_ite_bs
 
