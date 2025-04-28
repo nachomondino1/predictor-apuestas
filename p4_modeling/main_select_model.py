@@ -154,7 +154,7 @@ def main(
     metric = 'metric_test_assess'
 
     ## 1. Calculo metrica combinada
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=True)
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=False)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
@@ -206,9 +206,8 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    # l_metrics = ['roi', 'expected_roi'] # --> deberia tener mas en cuenta expected pues tiene mayor corr con resultados futuros?
-    l_metrics = ['f1_score', 'expected_f1_score'] # Por cuotas (?). Capaz el expected marca 2 y la cuota es altisima pero perdio 4-1 como MAR-BRE.
-    l_weights = [0.5, 0.5] 
+    l_metrics = ['f1_score', 'expected_f1_score', 'error', 'expected_error'] 
+    l_weights = [0.25, 0.25, 0.25, 0.25]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
