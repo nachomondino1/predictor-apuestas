@@ -44,17 +44,6 @@ def calculate_metrics(
             'precision_away': precision_score(y_test, y_pred, labels=[2], average="micro", zero_division=0) * 100
         })
 
-    # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
-    if bet_metrics:
-        # Determino probas de bookie y predicted_result
-        df = calculate_result_probabilities_by_bookmaker(df_match_odds=df)
-        df = determine_result_by_bookmaker(df=df, col_name='bookmaker_result')
-
-        # Calculo metricas
-        d_metrics_bm = calculate_bookie_metrics(df)
-        d_metrics.update(d_metrics_bm)
-        d_metrics.update({'%_match_bm': (df['predicted_result'] == df['bookmaker_result']).mean() * 100})
-
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
         d_metrics.update(calculate_gp_by_result(df, var_resp=var_resp))
@@ -74,9 +63,23 @@ def calculate_metrics(
         'n_home': n_home, 'n_draw': n_draw, 'n_away': n_away,
         'n_home_r': n_home_r, 'n_draw_r': n_draw_r, 'n_away_r': n_away_r,
         'dif_home': dif_home, 'dif_draw': dif_draw, 'dif_away': dif_away,
-        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3
+        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3,
+        'aciertos_home': n_home * d_metrics['precision_home'] / 100,
+        'aciertos_draw': n_draw * d_metrics['precision_draw'] / 100,
+        'aciertos_away': n_away * d_metrics['precision_away'] / 100
         }
     )
+
+    # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
+    if bet_metrics:
+        # Determino probas de bookie y predicted_result
+        df = calculate_result_probabilities_by_bookmaker(df_match_odds=df)
+        df = determine_result_by_bookmaker(df=df, col_name='bookmaker_result')
+
+        # Calculo metricas
+        d_metrics_bm = calculate_bookie_metrics(df)
+        d_metrics.update(d_metrics_bm)
+        d_metrics.update({'%_match_bm': (df['predicted_result'] == df['bookmaker_result']).mean() * 100})
 
     if prefix or suffix:
         d_metrics = rename_dict_keys(d_metrics, prefix=prefix, suffix=suffix)
