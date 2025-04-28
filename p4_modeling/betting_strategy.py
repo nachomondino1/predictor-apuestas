@@ -763,7 +763,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=False, val_min=10, val_max=11, strategy='kelly_linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=False, val_min=15, val_max=16, strategy='kelly_linear', vary_dp=True, roi_weight=roi_weight, verbose=1)
                 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
