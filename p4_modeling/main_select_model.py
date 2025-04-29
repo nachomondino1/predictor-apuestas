@@ -206,8 +206,8 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    l_metrics = ['f1_score', 'expected_f1_score', 'error', 'expected_error'] 
-    l_weights = [0.25, 0.25, 0.25, 0.25]
+    l_metrics = ['f1_score', 'expected_f1_score', 'error', 'expected_error', 'f1_score_draw'] # o aciertos de empate
+    l_weights = [0.125, 0.125, 0.125, 0.125, 0.5]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -220,6 +220,7 @@ if __name__ == "__main__":
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
         df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
         # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
+        df_ite['aciertos_draw'] = df_ite['n_draw'] * df_ite['precision_draw'] / 100
 
         main(
             df_ite=df_ite,
