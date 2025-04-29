@@ -44,14 +44,15 @@ def main(
 
         # 📌 Aplicar estrategia "sin_ea"
         d_params = bs.define_hiperparameters(strategy='train')  
-        df_pred_met, _ = bs.calculate_roi_in_combination(df_pred, d_params)
+        # d_params = {'prob_dp': None, 'curva': 'kelly', 'm': 10, 'b': 0, 'k': 1}
+        df_pred_met, d_metrics = bs.calculate_roi_in_combination(df_pred, d_params)
 
         # Calculo metricas
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
         d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
 
         # Guardo datos
-        new_row = {'n_model': n_model, 'model_name': model_name, **d_metric_sin_ea, **d_metric_sin_ea_ex}
+        new_row = {'n_model': n_model, 'model_name': model_name, **d_metrics, **d_metric_sin_ea, **d_metric_sin_ea_ex}
         rows.append(new_row)
         df_ite_bs = pd.DataFrame(data=rows)
 
@@ -78,15 +79,14 @@ def concat_dfs(df_ite, df_ite_train, df_ite_new_test):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55]
 
     d_countries = {
         # Train nuevos
-        48: ["england", '2025-04-20'],
-        55: ["france", '2025-04-21'], 
-        59: ["germany", '2025-04-21'],
-        77: ["italy", '2025-04-20'],
-        148: ["spain", '2025-04-21'], 
+        48: ["england", '2025-04-22'],
+        55: ["france", '2025-04-23'], 
+        59: ["germany", '2025-04-23'],
+        77: ["italy", '2025-04-23'],
+        148: ["spain", '2025-04-23'], 
         }
 
     for id_country in l_countries:

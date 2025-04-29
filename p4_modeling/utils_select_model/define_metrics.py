@@ -27,8 +27,9 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
     # Itero sobre cada modelo
     for idx, row in df_ite.iterrows():
 
-        col_name = 'model_name' if 'model_name' in df_ite.columns else 'model_name_x'
-        n_model, model_name = row['n_iteration'], row[col_name]
+        col1 = 'n_iteration' if 'n_iteration' in df_ite.columns else 'n_model'
+        col2 = 'model_name' if 'model_name' in df_ite.columns else 'model_name_x'
+        n_model, model_name = row[col1], row[col2]
         # print(n_model)
 
         # Filtrar columnas que contienen 'cv_' o '_train'
@@ -66,8 +67,9 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         df_first_matches = asses_model.drop_old_metrics(df_first_matches)
         df_last_matches = asses_model.drop_old_metrics(df_last_matches)
 
-        # Aplico estrategia
+        # Aplico estrategia "sin_ea"
         d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
+        # d_params_sin_ea = {'prob_dp': None, 'curva': 'kelly', 'm': 10, 'b': 0, 'k': 1}
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
@@ -198,7 +200,6 @@ if __name__ == "__main__":
         
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    saved_metrics = True
     assess = False
     method = ['corr', 'fs', 'mean'][0]
     l_cols = ['roi', 'expected_roi', 'error', 'expected_error',  "recall", 'f1_score', 'f1_score_draw', 'test_accuracy', 'expected_f1_score']
@@ -221,7 +222,6 @@ if __name__ == "__main__":
         148: ["spain", '2025-04-23']
         }
         
-
     # Por metrica de prod
     for corr_col in l_cols:
 
@@ -250,12 +250,12 @@ if __name__ == "__main__":
 
             # 3. Por modelo: division en "test" y "prod" + Calculo metricas
             # 3.1. Divido en "test" y "prod" y 3.2. recalculo metricas
-            if saved_metrics:
+            try:
                 df_ite_test = pd.read_excel(f"{path_save}/df_ite_test.xlsx", index_col=0)
                 df_ite_prod = pd.read_excel(f"{path_save}/df_ite_prod.xlsx", index_col=0)
                 print(df_ite_test)
                 print(df_ite_prod)
-            else:
+            except FileNotFoundError:
                 df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75, assess=assess)
                 df_ite_test.to_excel(f'{path_save}/df_ite_test.xlsx', index=True)
                 df_ite_prod.to_excel(f'{path_save}/df_ite_prod.xlsx', index=True)
