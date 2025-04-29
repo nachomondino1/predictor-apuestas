@@ -706,7 +706,14 @@ class MissingData:
             logger.info('Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
 
         except FileNotFoundError:
-            logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+            
+            user_input = input("No se encontraron los dfs con missing concatenados. Quiere levantar los dataframes de partidos viejos?.')").strip().lower() 
+            if user_input == "y":
+                df_match = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match.xlsx', index_col=0) 
+                df_match_player = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_player.xlsx', index_col=0) 
+                df_match_odds = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0) 
+            else:
+                raise SystemExit("⛔ Predicción cancelada por el usuario.")
         
         logger.info(f"Shapes: \t df_match: {df_match.shape} \t df_match_player:{df_match_player.shape} \t df_match_odds: {df_match_odds.shape}")
         return df_match, df_match_player, df_match_odds
@@ -763,7 +770,7 @@ class MissingData:
 
             warning_msg = f"No se pudo levantar el df_integrated_missing. Esto es correcto solo si nunca se ha integrado missing. Desea inicializar crear el dataframe? (y/n)"
             user_input = input(warning_msg).strip().lower() 
-            if user_input != "y":
+            if user_input == "y":
                 df_integrated_missing_all = pd.DataFrame()  # Es importante para que se guarde por primera vez df_integrated_missing en /all 
             else: 
                 raise SystemExit("⛔ Predicción cancelada por el usuario.")
