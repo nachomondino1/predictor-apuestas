@@ -93,7 +93,6 @@ class BettingStrategy:
 
             # Si el riesgo-beneficio es malo (ver si funciona bien con kelly_crit) --> creo que esta ok
             if thr_prob_min is not None and row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
-            # if row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
                 if self.verbose >= 1:
                     logger.warning(f"Aplicamos doble oportunidad por kelly_crit = {kelly_crit} < {thr_prob_min}. ")
 
@@ -102,7 +101,7 @@ class BettingStrategy:
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
                 strategy = f"kelly_crit < {thr_prob_min}"
-                kelly_crit =  ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # Lo recalculo pues ahora apuesto a otro rdo
+                kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # Lo recalculo pues ahora apuesto a otro rdo
 
             # Si el riesgo-beneficio es alto
             else:
@@ -115,7 +114,7 @@ class BettingStrategy:
             df.loc[id_match, 'prob_result_to_bet'] = prob_result_to_bet
             df.loc[id_match, 'odd_to_bet'] = odd_to_bet
             df.loc[id_match, 'strategy'] = strategy
-            df.loc[id_match, 'kelly_criterion'] = kelly_crit
+            df.loc[id_match, 'kelly_criterion'] = kelly_crit # Podria calcular kelly_crit por rdo...
 
         return df
 
