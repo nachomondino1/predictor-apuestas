@@ -32,7 +32,8 @@ def assess_models_in_prod(
 
     # Por modelo
     for idx, row in df_ite.iterrows():
-        n_model, model_name = row['n_iteration'], row['model_name'] #model_name_x
+        col1 = 'n_model' if 'n_model' in df_ite.columns else 'n_iteration'
+        n_model, model_name = row[col1], row['model_name'] #model_name_x
         logger.info(f'{n_model} {model_name}')
         
         if predict_missing:
