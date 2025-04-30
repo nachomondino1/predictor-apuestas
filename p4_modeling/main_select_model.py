@@ -206,9 +206,6 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    # l_metrics = ['f1_score', 'expected_f1_score', 'error', 'expected_error', 'f1_score_draw'] # o aciertos de empate
-    # l_weights = [0.125, 0.125, 0.125, 0.125, 0.5]
-    # l_metrics = ['f1_score', 'error', 'f1_score_draw'] # o aciertos de empate
     l_metrics = ['test_accuracy', 'error']
     l_weights = [0.5, 0.5]
 
