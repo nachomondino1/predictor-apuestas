@@ -1250,9 +1250,7 @@ def main(
         # Aplico reduccion a stake
         if porc_m is not None and not predict_missing:
             df['stake_to_bet'] = df['stake_to_bet'] * porc_m
-            df = asses_model.determine_confidence_margin(df) # Determino confidence margin
-            df.loc[(df['confidence_margin'] < 0.015) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.2 # Reducir stake si confidence_margin < threshold
-
+  
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
 
