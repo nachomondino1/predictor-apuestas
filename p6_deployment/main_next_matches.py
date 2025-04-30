@@ -706,7 +706,14 @@ class MissingData:
             logger.info('Se levantó el dataframe de partidos viejos concatenado con algunos partidos missing concatenados.')
 
         except FileNotFoundError:
-            logger.warning('Se levantó el dataframe de partidos viejos puesto que no se encontró con missing concatenados.')
+            
+            user_input = input("No se encontraron los dfs con missing concatenados. Quiere levantar los dataframes de partidos viejos?.')").strip().lower() 
+            if user_input == "y":
+                df_match = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match.xlsx', index_col=0) 
+                df_match_player = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_player.xlsx', index_col=0) 
+                df_match_odds = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0) 
+            else:
+                raise SystemExit("⛔ Predicción cancelada por el usuario.")
         
         logger.info(f"Shapes: \t df_match: {df_match.shape} \t df_match_player:{df_match_player.shape} \t df_match_odds: {df_match_odds.shape}")
         return df_match, df_match_player, df_match_odds
@@ -763,7 +770,7 @@ class MissingData:
 
             warning_msg = f"No se pudo levantar el df_integrated_missing. Esto es correcto solo si nunca se ha integrado missing. Desea inicializar crear el dataframe? (y/n)"
             user_input = input(warning_msg).strip().lower() 
-            if user_input != "y":
+            if user_input == "y":
                 df_integrated_missing_all = pd.DataFrame()  # Es importante para que se guarde por primera vez df_integrated_missing en /all 
             else: 
                 raise SystemExit("⛔ Predicción cancelada por el usuario.")
@@ -1243,9 +1250,7 @@ def main(
         # Aplico reduccion a stake
         if porc_m is not None and not predict_missing:
             df['stake_to_bet'] = df['stake_to_bet'] * porc_m
-            df = asses_model.determine_confidence_margin(df) # Determino confidence margin
-            df.loc[(df['confidence_margin'] < 0.015) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.2 # Reducir stake si confidence_margin < threshold
-
+  
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
 
@@ -1270,22 +1275,22 @@ if __name__ == "__main__":
     # Defino country
     d_countries = {
         -1: ["all", '2025-04-22'],
-        48: ["england", '2025-04-20'], 
-        55: ["france", '2025-04-21'], 
-        59: ["germany", '2025-04-21'], 
-        77: ["italy", '2025-04-20'],
-        148: ["spain", '2025-04-21'], 
+        48: ["england", '2025-04-22'], 
+        55: ["france", '2025-04-23'], 
+        59: ["germany", '2025-04-23'], 
+        77: ["italy", '2025-04-23'],
+        148: ["spain", '2025-04-23'], 
         }
 
-    id_country = -1
+    id_country = 77
     key, value = 'predict', 'next_matches'
-    data_unders = True
+    data_unders = False
     n_days = 1
 
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
+    d_model = {'n_model': 235, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
 
     if key == 'missing':
         

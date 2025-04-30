@@ -44,17 +44,6 @@ def calculate_metrics(
             'precision_away': precision_score(y_test, y_pred, labels=[2], average="micro", zero_division=0) * 100
         })
 
-    # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
-    if bet_metrics:
-        # Determino probas de bookie y predicted_result
-        df = calculate_result_probabilities_by_bookmaker(df_match_odds=df)
-        df = determine_result_by_bookmaker(df=df, col_name='bookmaker_result')
-
-        # Calculo metricas
-        d_metrics_bm = calculate_bookie_metrics(df)
-        d_metrics.update(d_metrics_bm)
-        d_metrics.update({'%_match_bm': (df['predicted_result'] == df['bookmaker_result']).mean() * 100})
-
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
         d_metrics.update(calculate_gp_by_result(df, var_resp=var_resp))
@@ -74,9 +63,23 @@ def calculate_metrics(
         'n_home': n_home, 'n_draw': n_draw, 'n_away': n_away,
         'n_home_r': n_home_r, 'n_draw_r': n_draw_r, 'n_away_r': n_away_r,
         'dif_home': dif_home, 'dif_draw': dif_draw, 'dif_away': dif_away,
-        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3
+        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3,
+        'aciertos_home': n_home * d_metrics['precision_home'] / 100,
+        'aciertos_draw': n_draw * d_metrics['precision_draw'] / 100,
+        'aciertos_away': n_away * d_metrics['precision_away'] / 100
         }
     )
+
+    # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
+    if bet_metrics:
+        # Determino probas de bookie y predicted_result
+        df = calculate_result_probabilities_by_bookmaker(df_match_odds=df)
+        df = determine_result_by_bookmaker(df=df, col_name='bookmaker_result')
+
+        # Calculo metricas
+        d_metrics_bm = calculate_bookie_metrics(df)
+        d_metrics.update(d_metrics_bm)
+        d_metrics.update({'%_match_bm': (df['predicted_result'] == df['bookmaker_result']).mean() * 100})
 
     if prefix or suffix:
         d_metrics = rename_dict_keys(d_metrics, prefix=prefix, suffix=suffix)
@@ -461,12 +464,16 @@ def calculate_perc_gp(gp, gp_total):
         return 0
 
 # METRICA COMBINADA
-def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric'):
+def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name: str = 'metric', penalize_std: bool = False, std_weight: float = 0.1):
     """
     Calcula una métrica combinada según las columnas de 'l_metrics' y los pesos de 'l_weights'.
-    Normaliza las columnas en 'l_metrics' antes del cálculo y agrega el resultado como una nueva columna.
+    Incluye la opción de penalizar alta variabilidad en las métricas normalizadas.
+
+    # Parameters:
+        penalize_variance: Permite decidir si deseas aplicar o no el castigo por alta variabilidad.
+        variance_weight: Controla la magnitud del castigo. Valores más altos dan mayor importancia a reducir el desvio. (float)
     """
-    # Validar que el número de métricas y pesos coincida
+        # Validar que el número de métricas y pesos coincida
     if len(l_metrics) != len(l_weights):
         raise ValueError("El número de métricas debe coincidir con el número de pesos.")
     
@@ -479,13 +486,18 @@ def calculate_combined_metric(df, l_metrics: list, l_weights: list, metric_name:
     
     # Definir función para calcular la métrica por fila
     def calculate_row_metric(row):
-        return sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
+        base_metric = sum(row[norm_metric] * weight for norm_metric, weight in zip(norm_metrics, l_weights))
+        if penalize_std:
+            # Penalizar alta variabilidad usando el desvío estándar
+            std_penalty = std_weight * np.std([row[norm_metric] for norm_metric in norm_metrics])
+            return base_metric - std_penalty  # Resta el castigo basado en el desvío estándar
+        return base_metric
     
     # Aplicar la función fila por fila
     df[metric_name] = df.apply(calculate_row_metric, axis=1)
     
-    # Calcular la varianza de las métricas normalizadas por fila
-    df['var'] = np.var(df[norm_metrics].values, axis=1)
+    # Calcular el desvío estándar de las métricas normalizadas por fila
+    df['std'] = np.std(df[norm_metrics].values, axis=1)
     return df
 
 def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):

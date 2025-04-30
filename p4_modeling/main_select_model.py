@@ -154,7 +154,7 @@ def main(
     metric = 'metric_test_assess'
 
     ## 1. Calculo metrica combinada
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=False)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
@@ -162,7 +162,7 @@ def main(
     # Si assesss
     if assess:
         # Selecciono candidatos
-        df_ite_bs = df_ite_bs.head(20)
+        df_ite_bs = df_ite_bs.head(10)
 
         # Actualizo con assess
         logger.warning("Tengo en cuenta tanto 'test' como 'assess' para seleccionar modelo...")
@@ -172,7 +172,7 @@ def main(
             country=country, 
             iteration_date=iteration_date, 
             concat_with_test=True,
-            export=True
+            export=False
         )       
 
         df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
@@ -194,8 +194,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [77]
-    assess = False
+    assess = True
 
     d_countries = {
         -1: ['all', '2025-04-22'],
@@ -207,8 +206,9 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    l_metrics = ['roi', 'expected_roi'] # --> deberia tener mas en cuenta expected pues tiene mayor corr con resultados futuros?
-    l_weights = [0.5, 0.5] 
+    l_metrics = ['test_accuracy', 'error']
+    l_weights = [0.5, 0.5]
+
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -221,6 +221,7 @@ if __name__ == "__main__":
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
         df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
         # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
+        df_ite['aciertos_draw'] = df_ite['n_draw'] * df_ite['precision_draw'] / 100
 
         main(
             df_ite=df_ite,

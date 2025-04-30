@@ -32,7 +32,8 @@ def assess_models_in_prod(
 
     # Por modelo
     for idx, row in df_ite.iterrows():
-        n_model, model_name = row['n_iteration'], row['model_name'] #model_name_x
+        col1 = 'n_model' if 'n_model' in df_ite.columns else 'n_iteration'
+        n_model, model_name = row[col1], row['model_name'] #model_name_x
         logger.info(f'{n_model} {model_name}')
         
         if predict_missing:
@@ -83,6 +84,8 @@ def assess_models_in_prod(
         if export:
             df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_predicciones_met.xlsx", index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
+        else:
+            df_pred_met.to_excel(f"{path}/{n_model}__{model_name}_test_assess_.xlsx", index=True)
     
     return df_ite_bs
 
@@ -100,20 +103,15 @@ if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
     one_model, n_model = False, 328
-    n_models = 20
+    n_models = 10
     concat_with_test = False
 
     d_countries = {
-        # 48: ["england", '2025-03-23'],
-        # 55: ["france", '2025-03-23'], 
-        # 59: ["germany", '2025-03-23'],
-        # 77: ["italy", '2025-03-23'],
-        # 148: ["spain", '2025-03-24']
-        48: ["england", '2025-04-08'],
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'],
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08']
+        48: ["england", '2025-04-22'],
+        55: ["france", '2025-04-23'], 
+        59: ["germany", '2025-04-23'],
+        77: ["italy", '2025-04-23'],
+        148: ["spain", '2025-04-23']
         }
     
     for id_country in l_countries:
@@ -143,7 +141,7 @@ if __name__ == "__main__":
             df_ite = df_ite.head(n_models)
             print(df_ite)
 
-            df_ite_bs, _ = assess_models_in_prod(
+            df_ite_bs = assess_models_in_prod(
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 
