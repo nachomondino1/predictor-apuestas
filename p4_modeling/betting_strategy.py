@@ -49,7 +49,7 @@ class BettingStrategy:
         list_m = list(range(val_min, val_max + 1, step_m))
         list_strat = [strategy] # 'kelly_linear', 'linear'
         list_b = [0]
-        list_k = [1, 3] 
+        list_k = [1, 3, 5] 
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -772,9 +772,14 @@ if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148] 
     one_model = True
-    assess, date_assess = True, '2025-04-29' # datetime.datetime.now().date() 
+    assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
+
+    # Defino hiperparametros de apuesta
+    bs_per_res = True
+    strat = 'kelly_linear' # 'linear' # 'kelly_linear'
+    vary_dp = False # Doble oportunidad
+    space_m = [10, 11]
     roi_weight = 1 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
-    vary_dp = True # Doble oportunidad
 
     d_countries = {
         48: ["england"],
@@ -804,7 +809,7 @@ if __name__ == "__main__":
             logger.info(df_pred_test.shape)
 
             # Calculo estrategia
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=False, val_min=10, val_max=11, strategy='kelly', vary_dp=vary_dp, roi_weight=roi_weight, verbose=1)
+            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=bs_per_res, val_min=space_m[0], val_max=space_m[1], strategy=strat, vary_dp=vary_dp, roi_weight=roi_weight, verbose=1)
             df_strat = strategy_metrics(df_strat, df_pred_test, df_pred_with_stra, dp_met=vary_dp)
 
             # Exporto datos
