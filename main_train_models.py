@@ -19,7 +19,7 @@ from p3_data_preparation.select_data import determine_country_competitions
 from p6_deployment import main_next_matches
 import utils.directories as directories
 from itertools import product
-from main import DataPreparation, Modeling
+from main import DataUnderstanding, DataPreparation, Modeling
 import joblib
 import time
 
@@ -85,7 +85,7 @@ def comprehensive_search(
     cont_iter = 0
     df_iteration, df_ite_train, df_ite_test = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     rows_ite_list, rows_train_list, rows_test_list = [], [], []
-    dp, mo = DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
+    du, dp, mo = DataUnderstanding(id_country=id_country, country=country), DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
     n_iter = define_n_iterations(d_params)
@@ -117,6 +117,10 @@ def comprehensive_search(
         df_match_odds.to_excel(f'{BASE_DIR_du}/df_match_odds.xlsx', index=True)
         df_player_sofifa.to_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index=True)
         df_player_fifa_sofifa.to_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index=True)
+
+        # Desbribe data
+        if verbose >= 1:
+            du.describe_data(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa)
     
     else:
         df_match = pd.read_excel(f'{BASE_DIR_du}/df_match.xlsx', index_col=0)
@@ -489,18 +493,18 @@ def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), SVC()] # GradientBoostingClassifier() # SVC()# SVC(), RandomForestClassifier(),  DecisionTreeClassifier(), XGBClassifier()
- 
+    l_modelos = [LogisticRegression(), SVC(), DecisionTreeClassifier(), RandomForestClassifier(), XGBClassifier()] # GradientBoostingClassifier() # SVC()# SVC(),,  DecisionTreeClassifier(),
+
     # 1728 iteraciones
     d_params = {  
         'clean_data_3': {
-            'competencies_to_select': [d_comps['comp_sin_cups'], d_comps['all_comp']], # d_comps['comp_solo_liga'],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
+            'competencies_to_select': [d_comps['all_comp']] #d_comps['comp_sin_cups'], # d_comps['comp_solo_liga'],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
         },
         'construct': {
             'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
-            'segun_localia': [False, True],
-            'calculate_dif': [False, True],  # Ahora manejo si calculo las dif entre mean_home y mean_away o no...      # de antes:  True --> ya no tiene sentido pues calculo dif desde construct... "against" tampoco porque tambien lo hago desde construct.
+            'segun_localia': [True, False], 
+            'calculate_dif': [False, True],
             'decay_rate': [0, 0.1], # ya 0.1 es alto
         },
         'clean_data_2': {
@@ -508,7 +512,7 @@ def define_params_space(id_country):
             'fill_na': [None, "0"],
         },
         'select': {
-            'thr_corr': [0.7, None], # 0.85
+            'thr_corr': [None, 0.7], # 0.85
             'thr_fs': [0.1, 0.25], # None
         },
         'modeling': {
@@ -527,13 +531,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 77, 148]
     # l_countries = [-1]
 
-    data_unders = False  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
+    data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = False
+    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
