@@ -197,7 +197,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     - Índice del mejor modelo según la métrica correspondiente.
     """
     metrics = {
-        'categorical': 'mean_test_cross_entropy_loss', # --> no hay tanta dif entre f1_score y error pues estan corr.
+        'categorical': 'mean_test_f1_score', #cross_entropy_loss # --> no hay tanta dif entre f1_score y error pues estan corr.
         'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
     }
 
