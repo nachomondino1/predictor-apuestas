@@ -269,7 +269,7 @@ def calculate_nan_values(df, columna):
     porcentaje_nan = (cantidad_nan / len(df)) * 100
     print(f"Porcentaje de NaN en {columna}: {porcentaje_nan:.2f}%")
     
-def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int = 0): 
+def fill_nan_values(X, l_columns_to_fill: list = None, fill_type: str = "mode", verbose: int = 0): 
     """
     Relleno NaN values en las columnas especificas del Dataframe.
 
@@ -291,6 +291,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
     # Defino variables
     default_model = RandomForestRegressor()
     X_filled = X.copy()
+    l_columns_to_fill = l_columns_to_fill if l_columns_to_fill is not None else X.columns.tolist()  # Si no se especifica, se rellenan todas las columnas
 
     # Progress bar
     if verbose >= 0:
