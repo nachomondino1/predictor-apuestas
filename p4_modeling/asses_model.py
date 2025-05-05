@@ -422,6 +422,8 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
     Calcula el G/P por resultado (local, empate, visitante).
     """
     var_pred = 'predicted_result'
+
+    # Defino la columna de G/P a usar
     if var_resp == 'result':
         col_gp = 'G/P_sin_bank'
     elif var_resp == 'expected_result':
@@ -438,9 +440,9 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
     gp_away = df_pred_away[col_gp].sum()
     gp_total = gp_home + gp_draw + gp_away
 
-    perc_gp_home = calculate_perc_gp(gp_home, gp_total)
-    perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
-    perc_gp_away = calculate_perc_gp(gp_away, gp_total)
+    # perc_gp_home = calculate_perc_gp(gp_home, gp_total)
+    # perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
+    # perc_gp_away = calculate_perc_gp(gp_away, gp_total)
 
     # Crear el diccionario de resultados
     d = {
@@ -449,9 +451,9 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
         f'gp_draw': gp_draw,
         f'gp_away': gp_away,
         f'gp_total': gp_total,
-        f'%_gp_home': perc_gp_home,
-        f'%_gp_draw': perc_gp_draw,
-        f'%_gp_away': perc_gp_away,
+        # f'%_gp_home': perc_gp_home,
+        # f'%_gp_draw': perc_gp_draw,
+        # f'%_gp_away': perc_gp_away,
     }
     return d
 
