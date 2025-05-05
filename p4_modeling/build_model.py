@@ -10,6 +10,7 @@ from sklearn.metrics import log_loss, make_scorer, f1_score, accuracy_score
 from skopt import BayesSearchCV
 from skopt.space import Real, Integer, Categorical
 
+
 def select_best_hiperparameters(
         model, X_train: pd.DataFrame, y_train:  pd.DataFrame, X_val:  pd.DataFrame, y_val: pd.DataFrame, 
         k: int, params: dict = None, bayes: bool = True, n_iter: int = None, 
@@ -87,8 +88,7 @@ def select_best_hiperparameters(
             logger.info(f"Seleccion de hiperparametros optimos con Bayes en {(end_bayes - start_bayes) / 60:.1f} minutos")
 
     # GridSearch
-    else:
-        
+    else:    
         if verbose >= 1: 
             logger.warning("GridSearchCV...")
 
@@ -114,31 +114,27 @@ def select_best_hiperparameters(
         if verbose >= 1: 
             logger.info(f"Seleccion de hiperparametros optimos con Grid en {(end_grid - start_grid) / 60:.1f} minutos")
 
-    # Obtengo el mejor modelo (ya entrenado), los mejores hiper, la mejor metrica y los resultados de todas las combinaciones de hiper
-    best_model = best_search.best_estimator_ 
+    best_model = best_search.best_estimator_
     best_params = best_search.best_params_
-    best_indice = best_search.best_index_ # Metricas de la mejor combinacion
-    results = pd.DataFrame(data=best_search.cv_results_)  # Metricas de cada combinacion de params
-
+    best_index = best_search.best_index_ # Metricas de la mejor combinacion
+    results = pd.DataFrame(best_search.cv_results_)
+    
     if var_resp == 'categorical':
         d_metrics = {
-            'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_indice],
-            'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_indice],
-            'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_indice],
-            'cv_f1_score_draw': best_search.cv_results_['mean_test_f1_score_draw'][best_indice],
-            'cv_f1_combo': best_search.cv_results_['mean_test_f1_combo'][best_indice],
-            'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_indice]  # Negar porque invertimos el log_loss
+            'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_index],
+            'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_index],
+            'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_index],
+            'cv_f1_score_draw': best_search.cv_results_['mean_test_f1_score_draw'][best_index],
+            'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_index]  # Negar porque invertimos el log_loss
             # Agregar medidas de desviacion estandar. --> Solo mirar el promedio de la validación cruzada puede ocultar problemas de inconsistencia entre pliegues. Incluye siempre la desviación estándar.
         }
     else:
         d_metrics = {
-            'mean_test_neg_mean_squared_error':  best_search.cv_results_['mean_test_score'][best_indice]
+            'mean_test_neg_mean_squared_error': best_search.cv_results_['mean_test_score'][best_index]
         }
 
     # Mejores hiperparámetros
     if verbose >= 0:
-        # print("Índice seleccionado por GridSearchCV:", best_search.best_index_)
-        # print("Mejor pérdida de entropía cruzada encontrada:", best_search.cv_results_['mean_test_cross_entropy_loss'][grid_search.best_index_])
         logger.info(f"Mejor combinación de parameters: {best_params} \n Metricas de la mejor comb (scoring): {d_metrics} ")
 
     return best_model, best_params, d_metrics, results
@@ -163,10 +159,7 @@ def default_scoring(target_type: str, verbose: int = 0):
             'f1_score_wei': make_scorer(f1_score, average='weighted'),
             'f1_score_draw': make_scorer(f1_score_class_0),
             'cross_entropy_loss': make_scorer(log_loss, greater_is_better=False, response_method="predict_proba"),
-            'f1_combo': make_scorer(
-                lambda y_true, y_pred: 0.6 * f1_score(y_true, y_pred, average='macro') + 
-                                    0.4 * f1_score(y_true, y_pred, labels=[0], average="micro") # 0.3 + 0.7 genera modelos que predicen solo 0.
-            ),
+            'f1_logloss_combo': combined_scorer(alpha=0.7),
         }
 
     elif target_type == 'continuous':
@@ -184,6 +177,37 @@ def default_scoring(target_type: str, verbose: int = 0):
 def f1_score_class_0(y_true, y_pred):
     return f1_score(y_true, y_pred, labels=[0], average="micro")  # 'micro' cuenta solo los positivos en la clase 0
 
+def combined_f1_logloss(y_true, y_pred, y_proba, alpha=0.7):
+    """
+    alpha: peso del f1_score (entre 0 y 1). El complemento se asigna a log_loss.
+    """
+    f1 = f1_score(y_true, y_pred, average='macro')
+
+    # Evitar log_loss infinita
+    eps = 1e-15
+    y_proba = np.clip(y_proba, eps, 1 - eps)
+
+    # Log loss normalizada (0 = perfecta, 1 = pésima o baseline)
+    ll = log_loss(y_true, y_proba)
+    
+    # Normalización: asumimos que el máximo log_loss posible ≈ log(n_classes)
+    n_classes = y_proba.shape[1]
+    max_ll = np.log(n_classes)
+    ll_normalized = ll / max_ll
+
+    # Convertimos log_loss a score (mayor es mejor)
+    log_score = np.clip(1 - ll_normalized, 0, 1)
+
+    # Combinamos ambos
+    return alpha * f1 + (1 - alpha) * log_score
+
+def combined_scorer(alpha=0.7):
+    def score_func(estimator, X, y):
+        y_pred = estimator.predict(X)
+        y_proba = estimator.predict_proba(X)
+        return combined_f1_logloss(y, y_pred, y_proba, alpha=alpha)
+    return score_func
+
 def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     """
     Selecciona el mejor modelo según la métrica adecuada. La metrica de las de "scoring" que usaremos para seleccionar
@@ -197,7 +221,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     - Índice del mejor modelo según la métrica correspondiente.
     """
     metrics = {
-        'categorical': 'mean_test_f1_score', #cross_entropy_loss # --> no hay tanta dif entre f1_score y error pues estan corr.
+        'categorical': 'mean_test_f1_logloss_combo',
         'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
     }
 
