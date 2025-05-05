@@ -49,7 +49,7 @@ class BettingStrategy:
         list_m = list(range(val_min, val_max + 1, step_m))
         list_strat = [strategy] # 'kelly_linear', 'linear'
         list_b = [0]
-        list_k = [1, 3, 5] 
+        list_k = [1, 3, 5, 10] 
         
         if strategy == "train": # "Sin estrategia"
             dic = {
@@ -716,61 +716,72 @@ def determine_bs_for_model(
  
     return df_strat, df_pred_with_stra
 
-def strategy_metrics(df_strat, df_pred_test, df_pred_with_stra, gp_met: bool = True, stake_met: bool = True, dp_met: bool = True):
+def strategy_metrics(df_pred_test, df_pred_with_stra, gp_met: bool = True, stake_met: bool = True, dp_met: bool = True):
 
-    # Dropeo old metrics (sino calcula mal las nuevas)
+    d = {}
+
+    # Determino metricas basicas
+    roi = determine_roi(df_pred_with_stra) * 100
+    xroi = determine_roi(df_pred_with_stra, var_resp='expected_result') * 100
+    mean_stake = df_pred_with_stra['stake_to_bet'].mean()
     roi_sin_ea = determine_roi(df_pred_test) * 100
     xroi_sin_ea = determine_roi(df_pred_test, var_resp='expected_result') * 100
     mean_stake_sin_ea = df_pred_test['stake_to_bet'].mean()
-
-    # Calculo multiplicador y metricas
-    ## Sin ea
-    df_strat['roi_sin_ea'] = roi_sin_ea
-    df_strat['ex_roi_sin_ea'] = xroi_sin_ea
-    df_strat['mean_stake_sin_ea'] = mean_stake_sin_ea
+    
+    d['roi'] = roi
+    d['xroi'] = xroi
+    d['mean_stake'] = mean_stake
+    d['roi_sin_ea'] = roi_sin_ea
+    d['ex_roi_sin_ea'] = xroi_sin_ea
+    d['mean_stake_sin_ea'] = mean_stake_sin_ea
 
     ## Multiplicadores
-    df_strat['X_roi'] = df_strat['roi'] / roi_sin_ea  # Puede ser menor a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi...
-    df_strat['X_ex_roi'] = df_strat['expected_roi'] / xroi_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
-    df_strat['X_stake'] =  df_strat['mean_stake'] / mean_stake_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
-    
+    d['X_roi'] = roi / roi_sin_ea  # Puede ser menor a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi...
+    d['X_ex_roi'] = xroi / xroi_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
+    d['X_stake'] =  mean_stake / mean_stake_sin_ea  # Puede ser menor por 1) a 1, si roi_weight ≠ 1. Pues prioriza expected y puede perjudicar roi 2) Stake. Max roi / stake mejor (capaz ambos mult son menores a 1 pero maximiza roi/stake)
+    print(d)
+
     # Probas segun acierto
-    df_strat['prob_mean_acerte'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 1]['prob_result_to_bet'].mean()
-    df_strat['prob_mean_falle'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 0]['prob_result_to_bet'].mean()
-    df_strat['kc_acerte'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 1]['kelly_criterion'].mean()
-    df_strat['kc_mean_falle'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 0]['kelly_criterion'].mean()
+    d['mean_prob_acerte'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 1]['prob_result_to_bet'].mean()
+    d['mean_prob_falle'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 0]['prob_result_to_bet'].mean()
+    d['mean_kc_acerte'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 1]['kelly_criterion'].mean()
+    d['mean_kc_falle'] =  df_pred_with_stra[df_pred_with_stra['acerte'] == 0]['kelly_criterion'].mean()
+    print(d)
 
     # Ganancias
     if gp_met:
-        df_strat['gp_min'] =  df_pred_with_stra['G/P_sin_bank'].min()
-        df_strat['gp_median'] =  df_pred_with_stra['G/P_sin_bank'].median()
-        df_strat['gp_mean'] =  df_pred_with_stra['G/P_sin_bank'].mean()
-        df_strat['gp_max'] =  df_pred_with_stra['G/P_sin_bank'].max()
-        df_strat['gp_std'] =  df_pred_with_stra['G/P_sin_bank'].std()
+        d['gp_min'] =  df_pred_with_stra['G/P_sin_bank'].min()
+        d['gp_median'] =  df_pred_with_stra['G/P_sin_bank'].median()
+        d['gp_mean'] =  df_pred_with_stra['G/P_sin_bank'].mean()
+        d['gp_max'] =  df_pred_with_stra['G/P_sin_bank'].max()
+        d['gp_std'] =  df_pred_with_stra['G/P_sin_bank'].std()
 
     ## Stake con ea
     if stake_met:
-        df_strat['stake_min'] =  df_pred_with_stra['stake_to_bet'].min()
-        df_strat['stake_median'] =  df_pred_with_stra['stake_to_bet'].median()
-        df_strat['stake_max'] =  df_pred_with_stra['stake_to_bet'].max()
-        df_strat['stake_std'] =  df_pred_with_stra['stake_to_bet'].std()
-        df_strat['stake_mean_1'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 1]['stake_to_bet'].mean()
-        df_strat['stake_mean_0'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 0]['stake_to_bet'].mean()
-        df_strat['stake_mean_2'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 2]['stake_to_bet'].mean()
+        d['stake_min'] =  df_pred_with_stra['stake_to_bet'].min()
+        d['stake_median'] =  df_pred_with_stra['stake_to_bet'].median()
+        d['stake_max'] =  df_pred_with_stra['stake_to_bet'].max()
+        d['stake_std'] =  df_pred_with_stra['stake_to_bet'].std()
+        d['stake_mean_1'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 1]['stake_to_bet'].mean()
+        d['stake_mean_0'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 0]['stake_to_bet'].mean()
+        d['stake_mean_2'] =  df_pred_with_stra[df_pred_with_stra['predicted_result'] == 2]['stake_to_bet'].mean()
     
     ## Doble oportunidad
     if dp_met:
-        df_strat['dp_'] = len(df_pred_with_stra[df_pred_with_stra['result_to_bet'].isin([-1, -2])])
-        df_strat['dp_precision'] = df_pred_with_stra[df_pred_with_stra['result_to_bet'].isin([-1, -2])]['acerte'].mean() * 100
-        df_strat['dp_gp'] = df_pred_with_stra[df_pred_with_stra['result_to_bet'].isin([-1, -2])]['G/P_sin_bank'].sum()
+        d['dp_'] = len(df_pred_with_stra[df_pred_with_stra['result_to_bet'].isin([-1, -2])])
+        d['dp_precision'] = df_pred_with_stra[df_pred_with_stra['result_to_bet'].isin([-1, -2])]['acerte'].mean() * 100
+        d['dp_gp'] = df_pred_with_stra[df_pred_with_stra['result_to_bet'].isin([-1, -2])]['G/P_sin_bank'].sum()
     
-    return df_strat
+    # Convertir el diccionario en un DataFrame
+    df = pd.DataFrame.from_dict(d, orient='index', columns=['Value'])
+    return df
 
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
     l_countries = [48, 55, 59, 77, 148] 
+    l_countries = [48, 55] 
     one_model = True
     assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
 
@@ -810,11 +821,12 @@ if __name__ == "__main__":
 
             # Calculo estrategia
             df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, bs_per_res=bs_per_res, val_min=space_m[0], val_max=space_m[1], strategy=strat, vary_dp=vary_dp, roi_weight=roi_weight, verbose=1)
-            df_strat = strategy_metrics(df_strat, df_pred_test, df_pred_with_stra, dp_met=vary_dp)
+            df_metrics_strat = strategy_metrics(df_pred_test, df_pred_with_stra, dp_met=vary_dp)
 
             # Exporto datos
             path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
             df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+            df_metrics_strat.to_excel(f"{path}/strat_metrics_{n_model}_{model_name}.xlsx", index=True)
             df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
 
         else:
