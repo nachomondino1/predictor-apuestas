@@ -68,23 +68,18 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         df_last_matches = asses_model.drop_old_metrics(df_last_matches)
 
         # Aplico estrategia "sin_ea"
-        d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
-        # d_params_sin_ea = {'prob_dp': None, 'curva': 'kelly', 'm': 10, 'b': 0, 'k': 1}
+        d_params_sin_ea = bs.define_hiperparameters(strategy='train')  # {'prob_dp': None, 'curva': 'kelly', 'm': 10, 'b': 0, 'k': 1}
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
         df_test, d_rois = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
         d_metrics_test_sin_ea = asses_model.calculate_metrics(df_test)
-        d_metrics_test_sin_ea.update(asses_model.calculate_gp_by_result(df_test))
         d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_')
-        d_rois.update({'comb_roi': d_rois['roi'] + d_rois['expected_roi']}) # Calculo roi + ex_roi
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
         d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_prod, suffix='_prod')
         d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_prod, var_resp='expected_result', prefix='expected_', suffix='_prod')
-        d_metrics_prod_sin_ea.update(asses_model.calculate_gp_by_result(df_prod))
-        d_rois_prod.update({'comb_roi': d_rois_prod['roi'] + d_rois_prod['expected_roi']}) # Calculo roi + ex_roi
 
         # Renombro metricas para evitar sobreescribirlas
         d_rois_prod = asses_model.rename_dict_keys(d_rois_prod, suffix='_prod')
@@ -200,19 +195,6 @@ if __name__ == "__main__":
         
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    assess = False
-    method = ['corr', 'fs', 'mean'][0]
-    l_cols = ['roi', 'expected_roi', 'error', 'expected_error',  "recall", 'f1_score', 'f1_score_draw', 'test_accuracy', 'expected_f1_score']
-
-    # Defino hiper
-    l_metrics_test = [
-        "roi", "expected_roi", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score", 
-        # 'accuracy_home', 'accuracy_draw', 'accuracy_away',
-        # 'f1_score_home', 'f1_score_draw', 'f1_score_away', 
-        # 'gp_home', 'gp_draw', 'gp_away', 
-        # 'expected_f1_score_home', 'expected_f1_score_draw', 'expected_f1_score_away'
-        ]
-  
     d_countries = {
         # train nuevos
         48: ["england", '2025-04-22'],
@@ -221,9 +203,22 @@ if __name__ == "__main__":
         77: ["italy", '2025-04-23'],
         148: ["spain", '2025-04-23']
         }
-        
+    
+    # Condiciones        
+    assess = False
+    method = ['corr', 'fs', 'mean'][0]
+    l_metrics_test = [
+        "roi", "expected_roi", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score", 
+        'f1_score_home', 
+        'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw',
+        'f1_score_away'
+        ]
+    l_metrics_prod = ['roi', 'expected_roi', 'error', 'expected_error',  "recall", 'f1_score', 'test_accuracy', 'expected_f1_score',
+              'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw'
+              ]
+
     # Por metrica de prod
-    for corr_col in l_cols:
+    for corr_col in l_metrics_prod:
 
         # Definir metrica a optimizar en produccion
         corr_metric = f'{corr_col}_prod'
@@ -246,7 +241,6 @@ if __name__ == "__main__":
 
             df_ite.loc[df_ite['error'] > 0, 'error'] *= -1  # Convierto error a negativo
             df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
-            # df_ite['comb_f1_score'] = (df_ite['f1_score'] + df_ite['expected_f1_score']) / 2
 
             # 3. Por modelo: division en "test" y "prod" + Calculo metricas
             # 3.1. Divido en "test" y "prod" y 3.2. recalculo metricas
