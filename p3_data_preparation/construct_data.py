@@ -178,12 +178,13 @@ def assign_elo_before_match(df, k=30, base_rating=1500):
     elo_away_list = []
 
     df = df.sort_values('date')  # si tenés una columna de fecha
+    df['elo_result'] = df['result'].map({1: 1.0, 0: 0.5, 2: 0.0})
 
     # Por partido
     for idx, row in df.iterrows():
         team_home = row['id_team_home']
         team_away = row['id_team_away']
-        result = row['result']
+        result = row['elo_result']
 
         r_home = ratings.get(team_home, base_rating)
         r_away = ratings.get(team_away, base_rating)
@@ -203,6 +204,7 @@ def assign_elo_before_match(df, k=30, base_rating=1500):
     # Agregar columnas al DataFrame
     df['ELO_home'] = elo_home_list
     df['ELO_away'] = elo_away_list
+    df = df.drop(columns=['elo_result'])
 
     return df
 
@@ -213,11 +215,12 @@ def assign_elo_home_away(df, k=30, base_rating=1500):
     elo_away_list = []
 
     df = df.sort_values('date')  # Ordenar por fecha
+    df['elo_result'] = df['result'].map({1: 1.0, 0: 0.5, 2: 0.0})
 
     for idx, row in df.iterrows():
         team_home = row['id_team_home']
         team_away = row['id_team_away']
-        result = row['result']
+        result = row['elo_result']
 
         r_home = ratings_local.get(team_home, base_rating)
         r_away = ratings_away.get(team_away, base_rating)
@@ -235,8 +238,9 @@ def assign_elo_home_away(df, k=30, base_rating=1500):
         ratings_away[team_away] = r_away + k * ((1 - result) - expected_away)
 
     # Agregar columnas al DataFrame
-    df['ELO_de_local'] = elo_home_list
-    df['ELO_de_vis'] = elo_away_list
+    df['ELO_localia_home'] = elo_home_list
+    df['ELO_localia_away'] = elo_away_list
+    df = df.drop(columns=['elo_result'])
 
     return df
 
