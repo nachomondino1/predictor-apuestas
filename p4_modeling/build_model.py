@@ -265,7 +265,7 @@ def space_params(model_name, bayes, verbose: int = 0):
     # Return
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
-    # Arboles de decision
+    # Defino hiperparametros de arboles de decision
     l_n_estimators = [5, 11, 21, 41]
     l_learning_rate = [0.001, 0.01, 0.1]
     l_max_depth = [3, 5, 7, 10, None] # None
@@ -274,7 +274,7 @@ def space_params(model_name, bayes, verbose: int = 0):
     l_max_features = ["sqrt", None] # "log2",  # None juega sobreotdo cdo quedan pocas variables predictoras...
     l_bootstrap = [True]
 
-    # Logistic
+    # Defino hiperparametros de LogisticRegression
     l_max_it = [10000] # aumentar max_iter no causa overfitting en LogisticRegression()
     param_c = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]
     l_tol = [1e-4, 1e-3, 1e-2]
@@ -372,6 +372,16 @@ def space_params(model_name, bayes, verbose: int = 0):
                 'warm_start': Categorical([True, False]) if bayes else [True, False]
                 }
         ],
+        'Lasso': {
+            'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
+            'fit_intercept': [True, False],  # Indica si se debe ajustar un intercepto (término independiente) en el modelo.
+            'precompute': [True, False],  # Indica si se deben precalcular las matrices de productos internos para acelerar el ajuste del modelo.
+            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para converger durante el ajuste del modelo.
+            'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
+            'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
+        },
+
+        # Otros / Hibridos
         'SVC': {
             'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3], # Controls strictness of the missclassifications. +, + over
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'], # Tipo de plano separador de clases.
@@ -380,6 +390,14 @@ def space_params(model_name, bayes, verbose: int = 0):
             'shrinking': Categorical([True, False]) if bayes else [True, False],
             'probability': Categorical([True]) if bayes else [True],
             'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
+        },
+        'PCA': {
+            'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
+            'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
+            'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
+            'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
+            'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
+            'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
         },
 
         # REDES NEURONALES
@@ -395,23 +413,6 @@ def space_params(model_name, bayes, verbose: int = 0):
             'early_stopping': Categorical([True, False]) if bayes else [True]
         },
 
-        # OTROS 2
-        'PCA': {
-            'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
-            'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
-            'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
-            'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
-            'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
-            'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
-        },
-        'Lasso': {
-            'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
-            'fit_intercept': [True, False],  # Indica si se debe ajustar un intercepto (término independiente) en el modelo.
-            'precompute': [True, False],  # Indica si se deben precalcular las matrices de productos internos para acelerar el ajuste del modelo.
-            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para converger durante el ajuste del modelo.
-            'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
-            'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
-        },
     }
 
     # Busco hiperpamateros default a probar
