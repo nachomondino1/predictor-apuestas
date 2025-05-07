@@ -268,10 +268,10 @@ def space_params(model_name, bayes, verbose: int = 0):
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
     # Defino hiperparametros de arboles de decision
-    l_n_estimators = [5, 11, 21, 41]
+    l_n_estimators = [31, 51, 101]
     l_learning_rate = [0.001, 0.01, 0.1]
     l_max_depth = [3, 5, 7] # None, 10
-    l_min_samples_leaf = [11, 21, 51] # [21, 51]
+    l_min_samples_leaf = [21, 51] # [21, 51]
     l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
     l_max_features = ["sqrt", None] # "log2",  # None juega sobreotdo cdo quedan pocas variables predictoras...
     l_bootstrap = [True]
@@ -311,17 +311,17 @@ def space_params(model_name, bayes, verbose: int = 0):
         },
         'XGBClassifier': {
             'booster': Categorical(['gbtree']) if bayes else ['gbtree'], # 'gbtree', 'dart'
-            'n_estimators': Integer(10, 30) if bayes else l_n_estimators,  # Suele ganar con 100
+            'n_estimators': Integer(10, 30) if bayes else [10, 20, 30],  # Suele ganar con 100
             'max_depth': Integer(3, 6) if bayes else l_max_depth, # 3, 
             'learning_rate': Real(0.01, 0.1, prior="log-uniform") if bayes else l_learning_rate,
-            'min_child_weight': Integer(3, 10) if bayes else [1, 5], #5
+            'min_child_weight': Integer(3, 10) if bayes else [3, 10], #5
             'grow_policy': Categorical(['lossguide']) if bayes else ['depthwise', 'lossguide'], # 'depthwise'
-            'subsample': Real(0.6, 0.9),
-            'colsample_bytree': Real(0.6, 0.9),
+            'subsample': Real(0.6, 0.9) if bayes else [0.6, 0.9],
+            'colsample_bytree': Real(0.6, 0.9) if bayes else [0.6, 0.9],
             # Regularizacion. --> Demasiada regularizacion puede llevar a predicciones uniformes 33-33-33.
-            'gamma': Real(0.3, 1.0) if bayes else [0, 0.5],
-            'alpha': Real(0.5, 2.0, prior="log-uniform") if bayes else [0.001],
-            'lambda': Real(1.0, 5.0, prior="log-uniform")if bayes else [0.001],
+            'gamma': Real(0.3, 1.0) if bayes else [0.3, 0.65, 1],
+            'alpha': Real(0.5, 2.0, prior="log-uniform") if bayes else [0.5, 2.0],
+            'lambda': Real(1.0, 5.0, prior="log-uniform")if bayes else [1.0, 5.0]
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
         },
         'GradientBoostingClassifier': { # Tarda muchisimo en entrenar
