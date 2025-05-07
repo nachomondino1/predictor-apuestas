@@ -168,11 +168,13 @@ class DataPreparation:
             f'{self.base_path}/describe_integrate_data',
             f'{self.base_path}/construct_data',
             f'{self.base_path}/clean_post_construct',
+            f'{self.base_path}/tag',
             f'{self.base_path}/clean_post_select',
             f'{self.base_path}/select_data',
         ]  
         directories.make_directories(l_directorios=l_directorios)
 
+    # Format and clean
     def format_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, reformat: bool = True, prod: bool = False, export: bool = True):
         """
         Arreglo el data data_type de algunas variables.
@@ -249,7 +251,6 @@ class DataPreparation:
 
         return df_match, df_match_player, df_match_odds, df_player_fifa_sofifa
 
-    # Limpieza de datos 1
     def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
         """
         Limpieza inicial de los dataframes
@@ -427,8 +428,7 @@ class DataPreparation:
             df_nan_col.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_col.xlsx', index=True)
             df_nan_by_competition.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_competition.xlsx', index=True)
 
-    # Limpieza de datos 2
-    def clean_post_integrate(self, df: pd.DataFrame, n_years_to_select: int, competencies_to_select: list = None):
+    def clean_post_integrate(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, prod: bool = False):
         """
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
         """
@@ -437,8 +437,9 @@ class DataPreparation:
         # Ordeno valores por fecha y separo X e y
         df = df.sort_values(by='date', ascending=False)
 
-        # (1) Eliminacion de filas (+1 para construir bien los registros)
-        df = self.filter_rows(df, n_years_to_select=n_years_to_select+1, competencies_to_select=competencies_to_select)
+        # (1) Filtrado de filas 
+        n_years = None if n_years_to_select is None else n_years_to_select+1
+        df = self.filter_rows(df, n_years_to_select=n_years, competencies_to_select=competencies_to_select)
 
         # (2) Eliminacion de columnas
         ## constantes
@@ -454,13 +455,14 @@ class DataPreparation:
         logger.warning(f"Columnas eliminadas x ser constantes o por ruido: {cols_to_drop}")
         logger.warning(df.shape)
 
-        # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
-        ## Columnas
-        df['red_cards_home'] = df['red_cards_home'].fillna(0) # Relleno con 0 las red cards para construir bien
-        df['red_cards_away'] = df['red_cards_away'].fillna(0)
-        df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Eliminacion basica x mucho nan...
-        ## Filas
-        df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) # elimino filas con todo nan. Dsp de eliminar cols con puro nan.
+        if not prod:
+            # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
+            ## Columnas
+            df['red_cards_home'] = df['red_cards_home'].fillna(0) # Relleno con 0 las red cards para construir bien
+            df['red_cards_away'] = df['red_cards_away'].fillna(0)
+            df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Eliminacion basica x mucho nan...
+            ## Filas
+            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) # elimino filas con todo nan. Dsp de eliminar cols con puro nan.
    
         # Exporto datos
         if self.verbose >= 1:
@@ -468,6 +470,7 @@ class DataPreparation:
         return df
 
     def filter_rows(self, df, n_years_to_select: int, competencies_to_select: list = None):
+
         # (1) Eliminacion de filas
         ## Para evitar ciertas competencias (podria eliminar competencias segun nan values? competencias con mucho nan, afuera.)
         if competencies_to_select is not None:
@@ -647,19 +650,20 @@ class DataPreparation:
 
         return df
 
-    def tag_string_data_to_integer(self, df: pd.DataFrame, export: bool = True):
+    def tag_string_data_to_integer(self, df: pd.DataFrame, df_etiquetas: pd.DataFrame = None, prod: bool = False):
         """
         Conversion de columnas tipo "object" a "integer"
         """        
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df, df_etiquetas = format_data.convert_columns_to_int(df, verbose=self.verbose)
+        df, df_etiquetas = format_data.convert_columns_to_int(df, df_etiquetas=df_etiquetas, verbose=self.verbose, prod=prod)
 
         if self.verbose >= 1:
             df_etiquetas.to_excel(f'{self.base_path}/df_etiquetas.xlsx', index=False)
             df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
+
         return df, df_etiquetas
     
-    def clean_post_construct(self, df: pd.DataFrame, n_years_to_select: int, col_nan_max: float = 0.35):
+    def clean_post_construct(self, df: pd.DataFrame, n_years_to_select: int = None, col_nan_max: float = 0.35, prod: bool = False):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -669,18 +673,19 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
-        logger.info("\nCleaning data...")
+        logger.info("\nCleaning data post construct...")
 
         # Reemplazo infinitos (generados en la construccion de variables porcentage)
         df = clean_data.replace_infinite(df)
 
-        # Elimino los partidos del +1 que hice en el filter de clean_data_post_integrate (usados para construir bien las var historicas)
-        df = self.filter_rows(df, n_years_to_select=n_years_to_select, competencies_to_select=None)
+        if not prod:
+            # Elimino los partidos del +1 que hice en el filter de clean_data_post_integrate (usados para construir bien las var historicas)
+            df = self.filter_rows(df, n_years_to_select=n_years_to_select, competencies_to_select=None)
 
-        # (2) Eliminacion de columns 
-        # Elimino cols con alto porcentaje de nan values
-        df = self.treat_nan_in_cols(df, porc_nan_max=col_nan_max)
-      
+            # (2) Eliminacion de columns 
+            # Elimino cols con alto porcentaje de nan values
+            df = self.treat_nan_in_cols(df, porc_nan_max=col_nan_max)
+        
         # Eliminacion de columnas usadas para construir
         cols_not_constructed = df.filter(regex='(_home|_away)$').columns.tolist()  # Eliminar toda stat "..._home" y "..._away" --> para eliminar stats no construidas como "attacks_home", "dang_attacks_home", 'goalkeeper_saves', etc.
         cols_data_leakage = ['season', 'date', 'expected_result']
@@ -689,7 +694,11 @@ class DataPreparation:
         cols_set = set(cols_data_leakage + self.stats_to_derive + cols_not_constructed + cols_noise)
         cols_to_drop = [col for col in df.columns if col in cols_set]
         df.drop(columns=cols_to_drop, inplace=True)
-        logger.warning(f"Columnas eliminadas: {cols_to_drop}")
+
+        # Mensaje de warning
+        logger.warning(f"\nColumnas eliminadas x data leakage : \n{cols_data_leakage}")
+        logger.warning(f"\nColumnas eliminadas x ruido : \n{cols_noise}")
+        logger.warning(f"\nColumnas eliminadas x no usarse para construir : \n{cols_not_constructed}")
 
         return df
 
@@ -785,26 +794,24 @@ class DataPreparation:
 
         return df_aux
     
-    def clean_post_select(self, df: pd.DataFrame, fill_na: str = None, scale_data: bool = True, path_save: str = None):
+    def clean_post_select(self, df: pd.DataFrame, fill_na: str = None, scaler_loaded = None, path_save: str = None, prod: bool = False):
         """
         Limpieza de datos 4 (drop nan en rows + escalado)
         """
         # Tratamiento de nan values 
-        df = self.treat_nan_in_rows(df, fill_na=fill_na)  # Elimino registros con al menos un NaN value
+        df = self.treat_nan_in_rows(df, fill_na=fill_na, prod=prod)  # Elimino registros con al menos un NaN value
 
         # Escalado de datos para eliminar diferencias x escala
-        if scale_data:
-            df, scaler = self.scale_data(df)  # Escalado de datos para eliminar diferencias x escala
-            joblib.dump((scaler, df.columns), path_save)
+        df = self.scale_data(df, scaler_loaded=scaler_loaded, path_save=path_save, prod=prod)  # Escalado de datos para eliminar diferencias x escala
 
         if self.verbose >= 1:
             df.to_excel(f'{self.base_path}/clean_post_select/df_sel_cleaned.xlsx', index=True)
 
         return df
 
-    def treat_nan_in_rows(self, df, fill_na: str = None):
+    def treat_nan_in_rows(self, df, fill_na: str = None, prod: bool = False):
         # Solo de las columnas importantes
-        if fill_na is not None:
+        if fill_na is not None or prod:
             df_filled = clean_data.fill_nan_values(df, fill_type=fill_na)
         else:
             # Elimino registros con al menos un NaN 
@@ -813,23 +820,44 @@ class DataPreparation:
     
         return df_filled
     
-    def scale_data(self, df: pd.DataFrame):
+    def scale_data(self, df: pd.DataFrame, scaler_loaded = None, path_save:str = None, prod: bool = False):
 
         print("\nEscalado de datos...")
-        scaler = StandardScaler()
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
+
+        if not prod:
+            # Separo X e y
+            X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  
         
-        # Paso 1: Ajusta el StandardScaler a tus datos
-        scaler.fit(X) 
+            # Paso 1: Ajusta el StandardScaler a tus datos
+            scaler = StandardScaler()
+            scaler.fit(X) 
+
+            # Exporto scaler entrenado (para usar en prod)
+            joblib.dump((scaler, df.columns), path_save)
+
+        else:
+            X = df.copy()
+            scaler = scaler_loaded
 
         # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
-        X_scaled = scaler.transform(X) 
-        X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
+        try:
+            X_scaled = scaler.transform(X) 
+            X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
+        
+            if self.verbose >= 1:
+                logger.critical("El escalado fue un exito!")
+                
+        except ValueError as e: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
+            logger.error(f"El escalado tuvo un error: {e}")
+            raise ValueError
 
-        # Concateno X e y
-        df = pd.concat([X_scaled_df, y], axis=1)
+        if not prod:
+            # Concateno X e y
+            df = pd.concat([X_scaled_df, y], axis=1)
+        else:
+            df = X_scaled_df.copy()
 
-        return df, scaler
+        return df
         
 
 class Modeling:
@@ -913,7 +941,7 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = True, export: bool = True):
+                    bayes: bool = False, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         
@@ -980,7 +1008,9 @@ class Modeling:
                 print("Distribución promedio de probabilidades por clase:", class_distribution)
                 
         except AttributeError: # AttributeError: 'Sequential' object has no attribute 'predict_proba'
-            y_pred_prob = model.predict(X_test)
+            # y_pred_prob = model.predict(X_test)
+            logger.error("Se necesitan las probabilidades de cada clase.")
+            raise ValueError
 
         y_pred = self.map_classes_test_and_pred(model, y_pred_prob)
         return y_pred_prob, y_pred
