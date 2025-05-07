@@ -35,7 +35,7 @@ def comprehensive_search(
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
-    checkpoint: int = 10, 
+    checkpoint: int = 50, 
     export: bool = True
 ):
     """
@@ -175,29 +175,22 @@ def comprehensive_search(
     logger.info(f"N_REG_TEST: {n_reg_test}")
     index_test_set = determine_rows_for_test_set(df_match=df_match, n_reg_test=n_reg_test)  # Usar n_reg_test.
 
-     # Clean data 3
-    for zz, param_values_00 in enumerate(product(*d_params['clean_data_3'].values()), start=1):
+    # Clean post integrate
+    for zz, param_values_00 in enumerate(product(*d_params['clean_post_integrate'].values()), start=1):
+        comp_to_select, n_years_to_select =  param_values_00[0], param_values_00[1]
 
-        comp_to_select =  param_values_00[0]
-
-        path_clean = f'{comp_to_select}'
-        path_clean_data = f'{BASE_DIR_dp}/clean_data_3/df_clean_data_3_{path_clean}.xlsx'
-        if verbose >= 0:
-            logger.info(f" Iteracion clean_data 3".center(120, "#"))
-            print(f"Hiper clean_data_3 --> comp_to_select: {comp_to_select}")            
-
-        df_int_clean = dp.clean_data_3(df=df_integrated, competencies_to_select=comp_to_select, export=True)
-        if verbose >= 2:
-            df_int_clean.to_excel(path_clean_data, index=True)
+        logger.info(f" Iteracion clean_data post integrate".center(120, "#"))
+        print(f"Hiper clean_post_construct --> comp_to_select: {comp_to_select} ; n_years_to_select: {n_years_to_select}")            
+        path_clean = f'{comp_to_select}_{n_years_to_select}'
+        df_int_clean = dp.clean_post_integrate(df_integrated, n_years_to_select=n_years_to_select, competencies_to_select=comp_to_select)
 
         # Construct_data
         for i, param_values_2 in enumerate(product(*d_params['construct'].values()), start=1):
 
             # Asigno valor a cada hiperpametro
             n_last_matches, n_years_h2h, segun_localia, calculate_dif, decay_rate = param_values_2
-            if verbose >= 0:
-                logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
-                print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; calculate_dif:{calculate_dif}')
+            logger.info(f" Iteracion Construct Nº {i} ".center(120, "#"))
+            print(f'Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h}; segun_localia: {segun_localia} ; calculate_dif:{calculate_dif}')
 
             # Construyo datos
             path_cons = f"{path_clean}__{n_last_matches}_{n_years_h2h}_{segun_localia}_{calculate_dif}_{decay_rate}"
@@ -206,118 +199,103 @@ def comprehensive_search(
             if export:
                 df_constructed.to_excel(path_construct, index=True)
 
+            # Clean post construct
+            df_cons_etiquetado = dp.clean_post_construct(df_constructed, n_years_to_select=n_years_to_select, col_nan_max=0.4)
+
             # Etiqueto df_constructed
-            df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_constructed, export=True)
+            df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_cons_etiquetado)
             path_etiqueta = f'{BASE_DIR_dp}/tag/df_etiquetas_{path_cons}.xlsx'
             if export:
                 df_etiquetas.to_excel(path_etiqueta, index=True)
 
-            # Clean data 2 (Treat nan + Escalado)
-            for zz, param_values_00 in enumerate(product(*d_params['clean_data_2'].values()), start=1):
+            # Select data
+            for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
 
-                n_years_to_select, fill_na = param_values_00[0], param_values_00[1]
-                path_clean_2 = f'{path_cons}__{n_years_to_select}_{fill_na}'
-                path_clean_data = f'{BASE_DIR_dp}/clean_data_2/df_clean_data_2_{path_clean_2}.xlsx'
-                if verbose >= 0:
-                    logger.info(f" Iteracion clean_data 2 Nº {i}.{zz} ".center(120, "#"))
-                    print(f"Hiper clean_data_2 --> n_years_to_select: {n_years_to_select} ; fill_na: {fill_na}")            
+                # Asigno valor a cada hiperpametro
+                thr_corr, thr_fs, fill_na = param_values_4[0], param_values_4[1], param_values_4[2]
 
-                df_cons_clean, scaler, columns_used, df_filled_columns = dp.clean_data_2(df=df_cons_etiquetado, n_years_to_select=n_years_to_select, fill_na=fill_na, index_test_set=index_test_set, export=True)
-                joblib.dump((scaler, columns_used), f'{BASE_DIR_dp}/clean_data_2/scaler_model_{path_clean_2}.pkl')
+                logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
+                print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
+                path_sel = f'{path_clean}__{thr_corr}_{thr_fs}_{fill_na}'
 
+                df_sel = dp.select_data(df_cons_etiquetado, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
                 if verbose >= 2:
-                    df_cons_clean.to_excel(path_clean_data, index=True)
-
-                # Select data
-                for j, param_values_4 in enumerate(product(*d_params['select'].values()), start=1):
-
-                    # Asigno valor a cada hiperpametro
-                    thr_corr, thr_fs = param_values_4[0], param_values_4[1]
-                    path_sel = f'{path_clean_2}__{thr_corr}_{thr_fs}'
-                    if verbose >= 0:
-                        logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
-                        print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
-
-                    # Selecciono datos
                     path_select = f'{BASE_DIR_dp}/select_data/df_selected_{path_sel}.xlsx'
-                    try:
-                        df_sel = pd.read_excel(path_select, index_col=0)
-                    except FileNotFoundError:
-                        df_sel = dp.select_data(df_cons_clean, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
+                    df_sel.to_excel(path_select, index=True)
+    
+                # Clean post select
+                df_sel = dp.clean_post_select(df=df_sel, fill_na=fill_na, scale_data=True, path_save=f'{BASE_DIR_dp}/clean_post_select/scaler_model_{path_sel}.pkl')
 
-                        if verbose >= 2:
-                            df_sel.to_excel(path_select, index=True)
-            
-                    ####################################################################### MODELING #######################################################################
-                    for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-                        
-                        # Asigno valor a cada hiperparametro
-                        val_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2]
-                        if verbose >= 0:
-                            cont_iter += 1
-                            logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                            print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_data_2 n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
-                            logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
-
-                            # Generar el diseño de la prueba
-                            X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
-
-                            # Entreno y evaluo modelos
-                            rows_train, rows_test = mo.train_and_assess_models(
-                                X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
-                                l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
-                                df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled_columns,
-                                  k=k)
-                        
-                        if len(rows_test) > 0:
-                            # Guardo datos en dataframe
-                            rows_ite = {
-                                'n_iteration': cont_iter, 
-                                'comp_to_select': comp_to_select,
-                                'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif, 'decay_rate': decay_rate,
-                                'thr_corr': thr_corr, 'thr_fs': thr_fs,
-                                'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
-                                'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
-                                'k': k
-                                }
-                            
-                            # Acumular filas en listas
-                            rows_train_list.extend(rows_train)  # Agregar todos los elementos de rows_train (si es una lista de diccionarios)
-                            rows_test_list.extend(rows_test)    # Agregar todos los elementos de rows_test (si es una lista de diccionarios)
-                            rows_ite_list.append(rows_ite)
-
-                            if cont_iter % checkpoint == 0 and export:
-                                logger.critical("Checkpoint. Guardado de datos")
+                ####################################################################### MODELING #######################################################################
+                for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                     
-                                # Concatenar todas las filas acumuladas en DataFrames
-                                df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
-                                df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
-                                df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+                    # Asigno valor a cada hiperparametro
+                    val_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2]
+                    if verbose >= 0:
+                        cont_iter += 1
+                        logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
+                        print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_post_construct n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
+                        logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                                # Exportar
-                                df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
-                                df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
-                                df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
+                        # Generar el diseño de la prueba
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
 
-                                # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-                                df_temp = pd.merge(df_ite_train, df_ite_test, on=['n_iteration', 'model_name'], how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
-                                df_iteration_comp = pd.merge(df_iteration, df_temp, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
-                                df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
+                        # Entreno y evaluo modelos
+                        rows_train, rows_test = mo.train_and_assess_models(
+                            X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
+                            l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
+                            df_match=df_match, df_match_odds=df_match_odds, 
+                                k=k)
+                    
+                    if len(rows_test) > 0:
+                        # Guardo datos en dataframe
+                        rows_ite = {
+                            'n_iteration': cont_iter, 
+                            'comp_to_select': comp_to_select,
+                            'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif, 'decay_rate': decay_rate,
+                            'thr_corr': thr_corr, 'thr_fs': thr_fs,
+                            'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
+                            'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
+                            'k': k
+                            }
+                        
+                        # Acumular filas en listas
+                        rows_train_list.extend(rows_train)  # Agregar todos los elementos de rows_train (si es una lista de diccionarios)
+                        rows_test_list.extend(rows_test)    # Agregar todos los elementos de rows_test (si es una lista de diccionarios)
+                        rows_ite_list.append(rows_ite)
 
-                                # Limpiar listas después de exportar
-                                rows_ite_list.clear()
-                                rows_train_list.clear()
-                                rows_test_list.clear()
+                        if cont_iter % checkpoint == 0 and export:
+                            logger.critical("Checkpoint. Guardado de datos")
+                
+                            # Concatenar todas las filas acumuladas en DataFrames
+                            df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
+                            df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
+                            df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
 
-                                if verbose >= 0:
-                                    current_train = time.time()
-                                    ritmo = cont_iter / ((current_train - start_train) / 3600)  # iteraciones por hora
-                                    horas_restantes = (n_iter - cont_iter) / ritmo
-                                    horas_train = n_iter / ritmo
+                            # Exportar
+                            df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
+                            df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
+                            df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
 
-                                    logger.info(f"Ritmo: {ritmo:.1f} iteraciones/hora (ideal >60). Quedan {n_iter - cont_iter} iteraciones.")
-                                    logger.info(f"Tiempo estimado para finalizar: {horas_restantes:.1f} horas (~{horas_restantes * 60:.1f} minutos).")
-                                    logger.info(f"Tiempo total proyectado de entrenamiento: {horas_train:.1f} horas.")
+                            # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                            df_temp = pd.merge(df_ite_train, df_ite_test, on=['n_iteration', 'model_name'], how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+                            df_iteration_comp = pd.merge(df_iteration, df_temp, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
+                            df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
+
+                            # Limpiar listas después de exportar
+                            rows_ite_list.clear()
+                            rows_train_list.clear()
+                            rows_test_list.clear()
+
+                            if verbose >= 0:
+                                current_train = time.time()
+                                ritmo = cont_iter / ((current_train - start_train) / 3600)  # iteraciones por hora
+                                horas_restantes = (n_iter - cont_iter) / ritmo
+                                horas_train = n_iter / ritmo
+
+                                logger.info(f"Ritmo: {ritmo:.1f} iteraciones/hora (ideal >60). Quedan {n_iter - cont_iter} iteraciones.")
+                                logger.info(f"Tiempo estimado para finalizar: {horas_restantes:.1f} horas (~{horas_restantes * 60:.1f} minutos).")
+                                logger.info(f"Tiempo total proyectado de entrenamiento: {horas_train:.1f} horas.")
 
     logger.critical("Guardado final. Exportando datos acumulados restantes.")
     if rows_train_list or rows_test_list or rows_ite_list:  # Verificar si hay filas acumuladas pendientes
@@ -493,33 +471,32 @@ def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), SVC(), DecisionTreeClassifier(), RandomForestClassifier(), XGBClassifier()] # GradientBoostingClassifier() # SVC()# SVC(),,  DecisionTreeClassifier(),
+    l_modelos = [RandomForestClassifier(), XGBClassifier()] # DecisionTreeClassifier(),  # SVC() (x tiempo),  GradientBoostingClassifier()
 
     # 1728 iteraciones
     d_params = {  
-        'clean_data_3': {
-            'competencies_to_select': [d_comps['all_comp']] #d_comps['comp_sin_cups'], # d_comps['comp_solo_liga'],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
+        'clean_post_integrate': {
+            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_cups'], # d_comps['comp_solo_liga'],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
+            'n_years_to_select': [3, 10], # 5
         },
         'construct': {
-            'n_last_matches': [[120], [30, 180]], # Variables historicas en ultimos n partidos,
+            'n_last_matches': [[120], [60, 180]], # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
             'segun_localia': [True, False], 
             'calculate_dif': [False, True],
-            'decay_rate': [0, 0.1], # ya 0.1 es alto
-        },
-        'clean_data_2': {
-            'n_years_to_select': [3, 5, 10],
-            'fill_na': [None, "0"],
+            'decay_rate': [0, 0.2],
         },
         'select': {
-            'thr_corr': [None, 0.7], # 0.85
-            'thr_fs': [0.1, 0.25], # None
+            'thr_corr': [0.7, None],
+            'thr_fs': [0.1, 0.25], # 0.9 para ver metricas con la variable mas importante. Si no le gano a eso, es porque las otras variables son una verga.
+            'fill_na': [None, "0"] # en realidad es clean_post_select
         },
         'modeling': {
             'val_size': [0.125],
-            'n_reg_test': [100], # 25 es muy poco para selec el modelo
-            'bal_type': ['under'], # None
-            'k': [10]
+            'n_reg_test': [100],
+            'bal_type': ['under', None], 
+            'k': [10],
+            # 'refit': ['mean_test_cross_entropy_loss', 'mean_test_f1_score'] # A futuro...
         }
     }
 
@@ -531,7 +508,6 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    # l_countries = [-1]
 
     data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False

@@ -17,7 +17,6 @@ import joblib
 from sklearn.metrics import log_loss
 from p4_modeling import generate_test_design, build_model, asses_model, betting_strategy
 ### Generate test design
-from random import randint
 from sklearn.model_selection import train_test_split
 ### Build model
 from sklearn.decomposition import PCA
@@ -165,11 +164,11 @@ class DataPreparation:
             f'{self.base_path}/format_data',
             f'{self.base_path}/clean_data',
             f'{self.base_path}/integrate_data',
-            # f'{self.base_path}/fill_data',
+            f'{self.base_path}/clean_post_integrate',
+            f'{self.base_path}/describe_integrate_data',
             f'{self.base_path}/construct_data',
-            f'{self.base_path}/clean_data_2',
-            f'{self.base_path}/treat_nan',
-            f'{self.base_path}/tag',
+            f'{self.base_path}/clean_post_construct',
+            f'{self.base_path}/clean_post_select',
             f'{self.base_path}/select_data',
         ]  
         directories.make_directories(l_directorios=l_directorios)
@@ -227,6 +226,13 @@ class DataPreparation:
         ## Market value
         df_player_fifa_sofifa = format_data.convert_value_to_int(df_player_fifa_sofifa)
 
+        # Dataframe con dtypes de cada columna
+        df_match_dtype = pd.DataFrame({'Variable': df_match.columns, 'Dtype': df_match.dtypes.astype(str)})
+        df_match_player_dtype = pd.DataFrame({'Variable': df_match_player.columns, 'Dtype': df_match_player.dtypes.astype(str)})
+        df_match_odds_dtype = pd.DataFrame({'Variable': df_match_odds.columns, 'Dtype': df_match_odds.dtypes.astype(str)})
+        # df_player_sofifa_dtype = pd.DataFrame({'Variable': df_player_fifa_sofifa.columns, 'Dtype': df_player_fifa_sofifa.dtypes.astype(str)})
+        df_player_fifa_sofifa_dtype = pd.DataFrame({'Variable': df_player_fifa_sofifa.columns, 'Dtype': df_player_fifa_sofifa.dtypes.astype(str)})
+
         end = time.time()
         print(f"Formateo de datos en {(end - start)/60:.1f} minutos")
 
@@ -235,14 +241,22 @@ class DataPreparation:
             df_match_player.to_excel(f'{self.base_path}/format_data/df_match_player_formated.xlsx', index=True)
             df_player_fifa_sofifa.to_excel(f'{self.base_path}/format_data/df_player_fifa_sofifa_formated.xlsx', index=True)
 
+            # Exporto dtypes de columnas de cada df
+            df_match_dtype.to_excel(f'{self.base_path}/format_data/df_match_dtype.xlsx', index=True)
+            df_match_player_dtype.to_excel(f'{self.base_path}/format_data/df_match_player_dtype.xlsx', index=True)
+            df_match_odds_dtype.to_excel(f'{self.base_path}/format_data/df_match_player_dtype.xlsx', index=True)
+            df_player_fifa_sofifa_dtype.to_excel(f'{self.base_path}/format_data/df_player_fifa_sofifa_dtype.xlsx', index=True)
+
         return df_match, df_match_player, df_match_odds, df_player_fifa_sofifa
 
+    # Limpieza de datos 1
     def clean_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, export: bool = True):
         """
         Limpieza inicial de los dataframes
         """
         start = time.time()
         logger.info("\nCleanning data...")
+
         # Elimino partidos viejos sin estadisticas y sin datos de jugadores
         n_rows_inic = len(df_match)
         df_match['date'] = pd.to_datetime(df_match['date'])  # Asegurarte de que la columna 'date' sea de tipo datetime (si no lo es ya)
@@ -317,6 +331,7 @@ class DataPreparation:
         df_player_fifa_sofifa = format_data.format_df_player_fifa_sofifa(df_player_fifa_sofifa)
         return df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa
 
+    # Integracion de fuentes de datos (Flashscore y Sofifa)
     def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False, export: bool = True):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
@@ -337,7 +352,6 @@ class DataPreparation:
         export = False if prod else export  # No exporto datos en produccion para no sobreescribir los de train y poder reutilizarlos.
 
         # (Temporalmente) Obtengo el listado de equipos unicos de Flashscore
-        # if export:
         df_teams = integrate_sofifa_to_flashscore.create_df_teams(df_match)
         if not prod:
             df_teams.to_excel(f"{self.base_path}/integrate_data/df_teams.xlsx", index=True)
@@ -375,57 +389,109 @@ class DataPreparation:
 
         return df
 
-    def clean_data_3(self, df: pd.DataFrame, competencies_to_select: list = None, export: bool = True):
+    def describe_integrate_data(self, df):
+        """
+        Describo los datos una vez integradas todas las fuentes
+        """
+        df_copy = df.copy()
+
+        # Data types
+        df_dtype = pd.DataFrame({'Variable': df_copy.columns, 'Dtype': df_copy.dtypes.astype(str)})
+
+        # Nan Values
+        ## COLUMNAS
+        df_nan_col = df_copy.isna().mean()
+        df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
+        if self.verbose >= 1:
+            logger.warning("Las 10 variables con más valores NaN:")
+            logger.warning(df_nan_col_sorted.head(10))  
+
+        ## FILAS
+        ## % nan mean x fila
+        nan_mean_total = df_copy.isnull().mean().mean()  # Promedio sobre todas las filas y columnas
+        logger.info(f"Promedio sobre todas las filas y columnas: {nan_mean_total}")
+    
+        ## % nan mean x competicion
+        # Calcular el porcentaje de NaN por fila
+        df_copy['nan_percent_per_row'] = df_copy.isnull().sum(axis=1) / df_copy.shape[1] * 100  # En porcentaje
+
+        # Agrupar por competición y obtener la media del porcentaje de NaN
+        df_nan_by_competition = df_copy.groupby('id_competition')['nan_percent_per_row'].mean().reset_index()
+
+        # Renombrar columnas para claridad
+        df_nan_by_competition.columns = ['id_competition', 'mean_nan_percent']
+        print(df_nan_by_competition)
+        
+        if self.verbose >= 0:
+            df_dtype.to_excel(f'{self.base_path}/describe_integrate_data/dtypes.xlsx', index=True)
+            df_nan_col.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_col.xlsx', index=True)
+            df_nan_by_competition.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_competition.xlsx', index=True)
+
+    # Limpieza de datos 2
+    def clean_post_integrate(self, df: pd.DataFrame, n_years_to_select: int, competencies_to_select: list = None):
         """
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
         """
+        self.describe_integrate_data(df)
+        
         # Ordeno valores por fecha y separo X e y
         df = df.sort_values(by='date', ascending=False)
 
-        # (1) Relleno con 0 las red cards
-        df['red_cards_home'] = df['red_cards_home'].fillna(0)
-        df['red_cards_away'] = df['red_cards_away'].fillna(0)
+        # (1) Eliminacion de filas (+1 para construir bien los registros)
+        df = self.filter_rows(df, n_years_to_select=n_years_to_select+1, competencies_to_select=competencies_to_select)
 
-        # (1) Eliminacion de filas 
-        ## Para evitar ciertas competencias
+        # (2) Eliminacion de columnas
+        ## constantes
+        cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
+        ## ruido
+        cols_basics_noise = ['attendance', 'capacity', 'referee']   # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
+        strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
+        col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
+
+        cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
+        df.drop(columns=cols_to_drop, inplace=True)
+        logger.warning("Eliminación de columnas...")
+        logger.warning(f"Columnas eliminadas x ser constantes o por ruido: {cols_to_drop}")
+        logger.warning(df.shape)
+
+        # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
+        ## Columnas
+        df['red_cards_home'] = df['red_cards_home'].fillna(0) # Relleno con 0 las red cards para construir bien
+        df['red_cards_away'] = df['red_cards_away'].fillna(0)
+        df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Eliminacion basica x mucho nan...
+        ## Filas
+        df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) # elimino filas con todo nan. Dsp de eliminar cols con puro nan.
+   
+        # Exporto datos
+        if self.verbose >= 1:
+            df.to_excel(f'{self.base_path}/clean_post_integrate/df_cleaned.xlsx', index=True)
+        return df
+
+    def filter_rows(self, df, n_years_to_select: int, competencies_to_select: list = None):
+        # (1) Eliminacion de filas
+        ## Para evitar ciertas competencias (podria eliminar competencias segun nan values? competencias con mucho nan, afuera.)
         if competencies_to_select is not None:
             n_reg_inic = len(df)
             df = df[df['id_competition'].isin(competencies_to_select)]
+            logger.warning(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic} --> {len(df)}")
 
-            if self.verbose >= 0:
-                print("Eliminacion de filas...")
-                print(f"Eliminacion por competencias. Cantidad de filas: {n_reg_inic} --> {len(df)}")
-
-        # (2) Eliminacion de columnas         
-        ## usadas solo para construir y constantes
-        cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
-        cols_basics_noise = ['attendance', 'capacity', 'venue'] # 'referee'  # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
-        # strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
-        # col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
-        cols_to_drop = cols_constants + cols_basics_noise #+ col_players_noise
-        df.drop(columns=cols_to_drop, inplace=True)
-        if self.verbose >= 0:
-            print("Eliminación de columnas...")
-            print(f"Columnas constantes eliminadas: {cols_constants}")
-            print(f"Columnas eliminadas x posible ruido: {cols_to_drop}")
-            print(df.shape)
-
-        ## Elimino stats irrelevantes
-        # Determino cuales son las variables stats automaticamente
-        stats_columns = construct_data.determine_stats_columns(df)
-        relevant_stats = self.determine_stats_to_use()
-        df = clean_data.delete_not_relevant_stats(df, stats_columns=stats_columns, relevant_stats_columns=relevant_stats)
-        print(df.shape)
+        ## Para evitar partidos muy viejos
+        if n_years_to_select is not None:
+            n_reg_inic = len(df)
+            fecha_limite = df.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
+            df = df[df['date'] >= fecha_limite] 
+            logger.warning(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(df)}")
 
         return df
-    
+
+    # Construccion de nuevos datos a partir de los datos existentes
     def determine_stats_to_use(self):
         """
         Es necesaria para usarla desde prod.
         Mejoras: Garantizar que esten en df.columns...
         """
-        self.stats_to_derive = ['offsides', 'fouls', 'tackles', 'interceptions', 'yellow_cards', 'red_cards', 'clearances_total', 'blocked_shots', 'throw-ins', 'corner_kicks', 'free_kicks']
-
+        self.stats_to_derive = ['offsides', 'fouls', 'tackles', 'interceptions', 'yellow_cards', 'red_cards', 
+                                'clearances_total', 'blocked_shots', 'throw-ins', 'corner_kicks', 'free_kicks']
         self.stats_to_construct = [
             # (1) Ofensive
             'goals', 'points', 'expected_goals_(xg)', 'expected_points',
@@ -433,14 +499,16 @@ class DataPreparation:
             'dead_balls', 'O2S',
             'ball_possession', 'total_passes', 'attacking_efficiency',
             # (2) Defensive ("against")
-            'defensive_actions', "KGP", "x_KGP", "FPC",
+            'defensive_actions', "KGP", "x_KGP", "cards",
             'PPDA', 'clean_sheet', 'defensive_efficiency',  # "efficiency" 
+            'ELO', 'expected_ELO'
         ]
-        return self.stats_to_derive + self.stats_to_construct
+        cols = self.stats_to_derive + self.stats_to_construct
+        return cols
 
     def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, export: bool = True):
         """
-        Construye nuevos datos a partir de un dataframe existente.
+        Construye nuevos datos a partir de un dataframe existente.c
 
         :param df: Dataframe con datos de partidos incluyendo datos de players. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param N_ULT_PART: Número de últimos partidos a considerar para el cálculo de variables. (int)
@@ -451,7 +519,14 @@ class DataPreparation:
          - Evitar argumentos 'with_historic' y 'with_h2h'. Casi no los uso.
         """
         start = time.time()
-        logger.info("Constructing data...")
+        logger.info("Constructing data...")        
+        self.determine_stats_to_use()
+
+        # Separar date en month y day
+        df['date'] = pd.to_datetime(df['date'])  # Asegurarse de que sea datetime
+        df['month'] = df['date'].dt.month
+        df['weekday'] = df['date'].dt.dayofweek + 1  # Lunes=0 → Lunes=1, Domingo=6 → Domingo=7
+        df['hour'] = df['date'].dt.hour
 
         # Si quiero construir variables historicas
         if with_historic:
@@ -461,82 +536,81 @@ class DataPreparation:
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
-            # Expected Result and  Expected Points (xPts)
-            df = construct_data.determine_expected_result(df, verbose=0)
-            df = construct_data.determine_points(df, suffix='expected_') 
-
             ## (1) OFENSIVE
-            ## Shots on goal --> Shots
-            df = construct_data.construct_percentaje_column(df, col_num='shots_on_goal', col_den="goal_attempts", laplace=True,  column_name="SOG2S") # Precision al arco
-
-            ## Tiros por gol
-            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="goals", laplace=True,  column_name="S2G") # Tiros por gol
-            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="expected_goals_(xg)", laplace=True,  column_name="xS2G") # Tiros por x_gol
-
-            # Pases por gol
-            df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # Passes por tiro # home = home + home
- 
-            # Dead balls
-            df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") #  # home = home + home
-
-            # Concentracion
-            df = construct_data.construct_percentaje_column(df, col_num='offsides', col_den="goal_attempts", laplace=True, column_name="O2S") # O solo offsides como intensidad ofensiva
-
-            # Attacking efficiency (goals vs x_goals)
-            df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="expected_goals_(xg)", laplace=True,  column_name="attacking_efficiency") # Goles por x_goals
+            df = construct_data.construct_percentaje_column(df, col_num='shots_on_goal', col_den="goal_attempts", laplace=True, column_name="SOG2S") # Shots on goal --> Shots
+            df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="goals", laplace=True, column_name="S2G") # Tiros por gol
+            df = construct_data.construct_sum_columns(df, l_columns=['throw-ins', 'corner_kicks', 'free_kicks'], column_name="dead_balls") # Dead balls
+            df = construct_data.construct_percentaje_column(df, col_num='offsides', col_den="goal_attempts", laplace=True, column_name="O2S") # Concentracion
 
             ## (2) DEFENSIVE  --> es como tener en cuenta against ya desde la construccion misma
             ## Passess per defensive action (PPDA) --> (no es solamente en el 60% de la cancha pues no tengo ese dato)
             df = construct_data.construct_sum_columns(df, l_columns=['fouls', 'tackles', 'interceptions', 'clearances_total', 'blocked_shots'], column_name="defensive_actions") # Calculo defesive actions  # home = home + home
-            df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
-            df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
-
+  
             # Tiros recibidos por gol concedido (Keep goals prevented)
             df['KGP_home'] = np.where(df['goal_attempts_away'].notna(), df['goal_attempts_away'] / (df['goals_away'] + 1), None) 
             df['KGP_away'] = np.where(df['goal_attempts_home'].notna(), df['goal_attempts_home'] / (df['goals_home'] + 1),  None)
-            df['x_KGP_home'] = np.where(df['goal_attempts_away'].notna(), df['goal_attempts_away'] / (df['expected_goals_(xg)_away'] + 1), None)
-            df['x_KGP_away'] = np.where(df['goal_attempts_home'].notna(), df['goal_attempts_home'] / (df['expected_goals_(xg)_home'] + 1),  None)
-
-            # Disciplina
-            df['cards_home'] = df['yellow_cards_home'] + 2 * df['red_cards_home']
-            df['cards_away'] = df['yellow_cards_away'] + 2 * df['red_cards_away']
-            df = construct_data.construct_percentaje_column(df, col_num='fouls', col_den="cards", laplace=True,  column_name="FPC") # Faltas por tarjeta
+                 
+            # Disciplina (sumar falta tmb?)
+            df['cards_home'] = df['yellow_cards_home'] + 5 * df['red_cards_home']
+            df['cards_away'] = df['yellow_cards_away'] + 5 * df['red_cards_away']
 
             # Clean Sheets
             df['clean_sheet_home'] = (df['goals_away'] == 0).astype(int)
             df['clean_sheet_away'] = (df['goals_home'] == 0).astype(int)
 
-            # Defensive efficiency (goals vs x_goals)
-            df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['goals_away'] - df['expected_goals_(xg)_away'], None)
-            df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
+            # Si esta la columna pases
+            if 'total_passes_home' in df.columns:
+                # Pases por gol
+                df = construct_data.construct_percentaje_column(df, col_num='total_passes', col_den="goal_attempts", laplace=True,  column_name="PPS")  # Passes por tiro # home = home + home
+                
+                # Passes per defensive action
+                df['PPDA_home'] = np.where(df['defensive_actions_home'].notna(),  df['total_passes_away'] / df['defensive_actions_home'], None)
+                df['PPDA_away'] = np.where(df['defensive_actions_away'].notna(), df['total_passes_home'] / df['defensive_actions_away'],  None)
 
-            # (3) GENERAL: ELO o ranking fifa
-            # df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500)
-            # df = construct_data.assign_elo_home_away(df, k=30, base_rating=1500)
+            # # Si esta la expected goals
+            if 'expected_goals_(xg)_home' in df.columns:
+                df = construct_data.determine_expected_result(df, verbose=0)
+                df = construct_data.determine_points(df, suffix='expected_') 
+
+                df = construct_data.construct_percentaje_column(df, col_num='goal_attempts', col_den="expected_goals_(xg)", laplace=True,  column_name="xS2G") # Tiros por x_gol
+                df = construct_data.construct_percentaje_column(df, col_num='goals', col_den="expected_goals_(xg)", laplace=True,  column_name="attacking_efficiency") # Goles por x_goals
+
+                df['x_KGP_home'] = np.where(df['goal_attempts_away'].notna(), df['goal_attempts_away'] / (df['expected_goals_(xg)_away'] + 1), None)
+                df['x_KGP_away'] = np.where(df['goal_attempts_home'].notna(), df['goal_attempts_home'] / (df['expected_goals_(xg)_home'] + 1),  None)
+
+                df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['goals_away'] - df['expected_goals_(xg)_away'], None)
+                df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
+
+                df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500, expected=True) 
+
+            # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses?
+            df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500) # df = construct_data.assign_elo_home_away(df, k=30, base_rating=1500)
             df.to_excel(f'{self.base_path}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
 
             # VARIABLES HISTORICAS
-            ## 1) EN PARTIDOS EN ULTIMOS N DAYS
+            ## 1) EN ULTIMOS N PARTIDOS
+            for n_matches in [15]:
+               n_matches_loc = int(n_matches / 2)
+
+               # Result
+               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False)
+               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True)
+
+               # Expected Result
+               if 'expected_result' in df.columns:
+                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
+                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.               
+
+            ## 2) EN PARTIDOS EN ULTIMOS N DAYS
             if not prod:
                 df = construct_data.h2h_by_date(df, n_years=n_years_h2h) # no mas por localia por alto nan.
-
             for n_days in n_last_matches:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
-            ## 2) EN ULTIMOS N PARTIDOS
-            for n_matches in [10, 25]:
-
-                # Result
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False)
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True)
-
-                # Expected Result
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.                
-
             # Por stat (e.g. shots_on_goal)
-            logger.info(f"Stats a promediar en ultimos partidos: {self.stats_to_construct}")
-            for var in self.stats_to_construct:
+            stats = [col for col in self.stats_to_construct if f'{col}_home' in df.columns]
+            logger.info(f"Stats a promediar en ultimos partidos: {stats}")
+            for var in stats:
                 logger.info(f"Estadística a promediar: {var}")
                 
                 cols_to_drop = []
@@ -565,13 +639,10 @@ class DataPreparation:
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
 
-        # Elimino expected result. si no lo borras, hay fuga de informacion
-        df = df.drop(['expected_result'], axis=1) 
-
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         
-        if export:
+        if self.verbose >= 1:
             df.to_excel(f'{self.base_path}/df_constructed.xlsx', index=True)
 
         return df
@@ -579,19 +650,16 @@ class DataPreparation:
     def tag_string_data_to_integer(self, df: pd.DataFrame, export: bool = True):
         """
         Conversion de columnas tipo "object" a "integer"
-        """
-        # Elimino columna 'season'
-        df = df.drop(['season'], axis=1)  # Arroja error TypeError porque tiene tanto str como int en los valores originales y el label solo puede recibir un tipo (str o int). Season tiene valores como "2021" y "2020_2021", los primeros los entiende como int y los segundos como str.
-        
+        """        
         # Codifico variables categoricas a numericas (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
         df, df_etiquetas = format_data.convert_columns_to_int(df, verbose=self.verbose)
 
-        if export:
+        if self.verbose >= 1:
             df_etiquetas.to_excel(f'{self.base_path}/df_etiquetas.xlsx', index=False)
             df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
         return df, df_etiquetas
     
-    def clean_data_2(self, df: pd.DataFrame, n_years_to_select: int = None, fill_na: str = None, index_test_set: list = None, export: bool = True):
+    def clean_post_construct(self, df: pd.DataFrame, n_years_to_select: int, col_nan_max: float = 0.35):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -601,73 +669,38 @@ class DataPreparation:
         # Returns:
             df: Dataframe pasado como parametro sin filas y columnas con mucho NaN y con datos escalados.
         """
-        start = time.time()
-        logger.info("\nSelecting data...")
+        logger.info("\nCleaning data...")
 
-        # Reemplazo infinitos
+        # Reemplazo infinitos (generados en la construccion de variables porcentage)
         df = clean_data.replace_infinite(df)
 
-        # Ordeno valores por fecha y separo X e y
-        df = df.sort_values(by='date', ascending=False)
-        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
+        # Elimino los partidos del +1 que hice en el filter de clean_data_post_integrate (usados para construir bien las var historicas)
+        df = self.filter_rows(df, n_years_to_select=n_years_to_select, competencies_to_select=None)
 
-        # (1) Eliminacion de filas 
-        ## Para evitar partidos muy viejos
-        if n_years_to_select is not None:
-            n_reg_inic = len(X)
-            fecha_limite = X.iloc[0]['date'] - datetime.timedelta(days=n_years_to_select*365)
-            X = X[X['date'] >= fecha_limite] 
+        # (2) Eliminacion de columns 
+        # Elimino cols con alto porcentaje de nan values
+        df = self.treat_nan_in_cols(df, porc_nan_max=col_nan_max)
+      
+        # Eliminacion de columnas usadas para construir
+        cols_not_constructed = df.filter(regex='(_home|_away)$').columns.tolist()  # Eliminar toda stat "..._home" y "..._away" --> para eliminar stats no construidas como "attacks_home", "dang_attacks_home", 'goalkeeper_saves', etc.
+        cols_data_leakage = ['season', 'date', 'expected_result']
+        cols_noise = ['id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
+        
+        cols_set = set(cols_data_leakage + self.stats_to_derive + cols_not_constructed + cols_noise)
+        cols_to_drop = [col for col in df.columns if col in cols_set]
+        df.drop(columns=cols_to_drop, inplace=True)
+        logger.warning(f"Columnas eliminadas: {cols_to_drop}")
 
-            if self.verbose >= 0:
-                print("Eliminacion de filas...")
-                print(f"Eliminacion por fecha. Cantidad de filas: {n_reg_inic} --> {len(X)}")
+        return df
 
-        # (2) Eliminacion de columnas usadas para construir
-        cols_for_construct = ['date', 'id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
-        cols_to_derive_others = [col for col in X.columns if any(stat in col for stat in self.stats_to_derive)]
-        cols_to_drop = cols_for_construct + cols_to_derive_others
-        X.drop(columns=cols_to_drop, inplace=True)
-        logger.warning(f"Columnas eliminadas: {cols_for_construct}")
-        logger.warning(f"Columnas eliminadas (solo usadas para derivar otras): {cols_to_derive_others}") # Cuidado en que se eliminen todas las stats usadas para derivar.
-
-        # (2) Tratamiento de NaN values
-        shape_inicial = X.shape
-        X, df_filled_columns = self.treat_nan_values(X=X, fill_na=fill_na, index_test_set=index_test_set)
-        if self.verbose >= 1:
-            print(f"Tras fill_na={fill_na}. Shape X_sin_col_mucho_nan: {shape_inicial} --> {X.shape}")
-
-        # (3) Escalado de datos
-        if self.verbose >= 1:
-            print("\nEscalado de datos...")
-        scaler = StandardScaler()
-        scaler.fit(X) # Paso 1: Ajusta el StandardScaler a tus datos
-        X_scaled = scaler.transform(X) # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
-        X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
-
-        # Concateno X e y
-        y_sin_nan = y[y.index.isin(X.index)] # Dado que elimine filas de X
-        df = pd.concat([X_scaled_df, y_sin_nan], axis=1)
-
-        end = time.time()
-        logger.info(f"Clean data 2 en {(end - start)/60:.1f} minutos")
-
-        if export: 
-            joblib.dump((scaler, X.columns), f"{self.base_path}/scaler_model.pkl")       
-            df.to_excel(f'{self.base_path}/df_constructed_clean.xlsx', index=True)
-
-        return df, scaler, X.columns, df_filled_columns
-    
-    def treat_nan_values(self, X: pd.DataFrame , fill_na: str = None, index_test_set: list = None, porc_nan_max: float = 0.4, percentil_nan: int = 75, export: bool = True):
+    def treat_nan_in_cols(self, df: pd.DataFrame, porc_nan_max: float, export: bool = True):
         """
         Tratamiento de nan values
-
-        # Para ENG y SPA usé porc_min_no_nan = 0.5. Pero para FRA tengo que usar 0.8 porque sino X_test queda vacio.
-        Tan alto puede tirar error porque elimina todas las columnas.
 
         # Parameters
             df: Dataframe a tratar nan values. (DataFrame)
             fill_na: Tipo de rellenado de NaN values.
-            porc_nan_max: Porcentaje de NaN values maximo tolerado (tanto en filas como columnas) (float)
+            porc_nan_max: Porcentaje de NaN values maximo tolerado en columnas. (float)
             percentil_nan: Percentil para definir que columnas son consideradas con mucho nan y cuales con poco nan. Solo cuando haces fillna.
             export: 
             _print:
@@ -676,173 +709,25 @@ class DataPreparation:
             Dataframe sin NaN values
         """ 
         start = time.time()
-        print("\nTreating NaN values to avoid input=NaN in Modeling...")
+        print("\nTreating NaN values in cols...")
 
-        # Separo test y train/val
-        df_test = X[X.index.isin(index_test_set)]
-        df_train_val = X[~X.index.isin(index_test_set)]
-        logger.info(f"{X.shape} --> {df_train_val.shape} {df_test.shape}")
+        # Calcula la proporción de NaN en cada columna
+        X_sin_col_mucho_nan = df.copy()
 
-        # (1) Eliminacion de filas con mucho NaN (filas sin estadisticas ni formaciones)
-        n_reg_inic = len(df_train_val)
-        df_train_val = clean_data.delete_rows_nan(df_train_val, porc_nan_max=porc_nan_max) # no mas del 50% de nan 
-        if len(df_train_val) == 0:
-            logger.error(f"Se eliminó el 100% de las filas de df_train_val por al menos {porc_nan_max}% de nan values.")
-            raise ValueError
-
-        if self.verbose >= 0:
-            print(f"(1) Eliminaccion por mucho NaN. Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
-            logger.warning(f"Cantidad de filas: {n_reg_inic} --> {len(df_train_val)}")
-
-        # (2) Eliminacion de columnas con mucho NaN --> Elimino columnas con alto porcentaje de NaN values (de manera que tras el dropna quedarian menos de n_reg_min)
-        X_sin_col_mucho_nan = df_train_val.copy()
-        df_train_val = clean_data.delete_columns_nan(df_train_val, porc_nan_max=porc_nan_max)
-        l_col_eliminated = list(X_sin_col_mucho_nan.columns.difference(df_train_val.columns))
-        if self.verbose >= 0 and len(df_train_val.columns) != len(X_sin_col_mucho_nan.columns):
-            logger.warning(f"(2) Eliminacion de columnas con mucho Nan. Se eliminaron {len(X_sin_col_mucho_nan.columns) - len(df_train_val.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} por tener mas de {porc_nan_max*100:.0f}% de NaN values. Columnas eliminadas: {l_col_eliminated}")
-            logger.info(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {df_train_val.shape} ")
-
-        # (3) Eliminacion de todo NaN ya sea drop o fill_na
-        ## Reemplazo NaN en TRAIN y VALIDATION 
-        if fill_na is not None:
-            
-            # Determino las columns con mucho NaN (mas de nan_threshold%)
-            l_columns_poco_nan, l_columns_mucho_nan = clean_data.determine_columns_to_fill(df_train_val, percentil_nan=percentil_nan) 
-
-            # Elimino registros con al menos un NaN 
-            largo_inic = len(df_train_val)
-            df_train_val = df_train_val.dropna(subset=l_columns_poco_nan)
-            if self.verbose >= 1:
-                print(f"De las {largo_inic} filas, se han eliminado {largo_inic-len(df_train_val)} por tener al menos un Nan value. Quedan {len(df_train_val)} filas. Shape final: {df_train_val.shape}") 
-
-            # Determino que filas relleno y cuales no (antes de fill porque despues de rellenar no puedo diferenciar que filas rellene y cuales no)
-            df_rellenado = pd.DataFrame(index=df_train_val.index)
-            df_rellenado['rellenado'] = df_train_val[l_columns_mucho_nan].isnull().any(axis=1)
-            df_rellenado.to_excel(f'{self.base_path}/treat_nan/df_rellenado.xlsx', index=True)
-
-            # Relleno nan de las columnas con mucho NaN
-            df_train_val_filled = clean_data.fill_nan_values(df_train_val, l_columns_mucho_nan, fill_type=fill_na)  # Relleno NaN values en las columnas seleccionadas. Tener cuidado de no introducir sesgo en el modelo, las accuracyes casi siempre seran mayores que dropna() en train y test, lo que cuenta es la accuracy en next_matches o en un dataset que no haya sido filleado...
-            if self.verbose >= 1:
-                print(f"Columnas consideradas con mucho nan (a las cuales rellenar): {l_columns_mucho_nan}")
-                print(f"\tSe realizó el rellenado de NaN values. Shape X luego de rellenado: {df_train_val_filled.shape}")
-
-        else:
-            # Elimino registros con al menos un NaN 
-            df_train_val_filled = df_train_val.dropna(subset=df_train_val.columns)
-
-        # Tratamiento de nan values para test
-        ## Eliminar columnas que se eliminaron x nan
-        columns_to_drop = [col for col in l_col_eliminated if col in df_test.columns]
-        df_test_filt = df_test.drop(columns=columns_to_drop)
-        logger.info(f"{df_test.shape} --> {df_test_filt.shape}")
-        ## Reemplazo NaN en TEST por 0
-        df_test_filled, df_filled_columns = self.emergency_fill_for_test(df_test_filt)
-
-        # Concateno df_test y df_train_val ya rellenados
-        X = pd.concat([df_train_val_filled, df_test_filled], axis=0)
-
-        # Imprimo cantidad de registros que quedan en test
-        if self.verbose >= 0:        
-            n_rows = generate_test_design.n_rows_to_test(X, df_test_filled)
-
-            if n_rows != len(index_test_set):
-                logger.warning(f" Se han eliminado registros de df_test por tener NaN values cuando no deberia borrarse ninguno.")
-
-        logger.info(f"(3) Tras eliminar todo NaN con drop o fill_na: {df_train_val_filled.shape} {df_test_filled.shape} --> {X.shape}")
+        # Elimino cols
+        df = clean_data.delete_columns_nan(df, porc_nan_max=porc_nan_max)
+        if self.verbose >= 1:
+            logger.info(f"Shape X_sin_col_mucho_nan: {X_sin_col_mucho_nan.shape} --> {df.shape} ")
 
         end = time.time()
         print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
 
-        if export:
-            X.to_excel(f'{self.base_path}/df_selected_nan.xlsx', index=True)
-
-        return X, df_filled_columns
-        
-    def emergency_fill_for_test(self, df, export: bool = True):
-        """
-        Remoción de valores NaN en df_test
-
-        # Parameters:
-            df: Dataframe al cual remover NaN values. (DataFrame)
-            columns_selected: Listado de columnas seleccioandas para usar en produccion. (list)
-        
-        # Returns:
-            df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
-        """
-        logger.info("Treating NaN values in df_test...")
-        df_filled_columns = pd.DataFrame(0, index=df.index, columns=['emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled']) # Inicializo el df
-
-        # Rellenar NaN en algunas columnas espeecificas
-        columns_to_fill = [col for col in df.columns if df[col].isna().any()]  # En teoria, solo rellena las variables historicas que son nan.
         if self.verbose >= 1:
-            logger.info(f'Nº columnas a rellenar: {len(columns_to_fill)}')
+            df.to_excel(f'{self.base_path}/clean_post_construct/df_treat_nan.xlsx', index=True)
 
-        if columns_to_fill:
-            # Crear una copia del DataFrame y rellenar los NaN
-            df_copy = df.copy()
-            df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
-
-            # Identificar filas donde se rellenaron NaN
-            filled_rows = (df[columns_to_fill].isna() & (df_copy[columns_to_fill] == 0)).any(axis=1)
-
-            # Crear DataFrame con las columnas rellenadas y `emergency_fill`
-            df_filled_columns = df_copy.loc[filled_rows, columns_to_fill]
-            df_filled_columns['emergency_fill'] = 1
-
-            # Crear una columna con el listado de columnas rellenadas por cada registro
-            df_filled_columns['l_col_filled'] = df[columns_to_fill].apply(
-                lambda row: [col for col in columns_to_fill if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
-            )
-
-            # Columna con valor 0 o 1 según si se rellenaron columnas con "player_start" o "player_sub"
-            player_columns = [col for col in columns_to_fill if "player_start" in col or "player_sub" in col]  # Esta bien missing tmb?
-            columns_to_fill_sin_player = [col for col in columns_to_fill if col not in player_columns]
-            df_filled_columns['player_emergency_fill'] = (
-                (df[player_columns].isna() & (df_copy[player_columns] == 0)).any(axis=1).astype(int)
-            )
-
-            # Calcular cuántas columnas se rellenaron de emergencia para cada fila
-            df_filled_columns['n_col_filled'] = (
-                (df[columns_to_fill].isna() & (df_copy[columns_to_fill] == 0)).sum(axis=1)
-            )
-
-            # Calcular cuántas columnas se rellenaron de emergencia para cada fila
-            df_filled_columns['n_col_filled_sin_player'] = (
-                (df[columns_to_fill_sin_player].isna() & (df_copy[columns_to_fill_sin_player] == 0)).sum(axis=1)
-            )
-            
-            # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
-            df_filled_columns['perc_col_filled'] = (
-                df_filled_columns['n_col_filled'] / len(columns_to_fill) * 100
-            )
-
-            # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
-            df_filled_columns['perc_col_filled_sin_player'] = (
-                df_filled_columns['n_col_filled_sin_player'] / len(columns_to_fill) * 100
-            )
-            
-            if self.verbose >= 0:
-                # Calcular y mostrar el porcentaje de NaN por cada columna
-                for col in columns_to_fill:
-                    nan_percentage = df[col].isna().mean() * 100
-
-                    if self.verbose >= 1:
-                        logger.warning(f"Columna '{col}' tiene {nan_percentage:.1f}% de valores NaN.")
-
-            # Actualizar el DataFrame original
-            df = df_copy
-
-        # Elimino partidos con al menos un NaN value --> Tal vez lo deberia poner al ppio para imprimir warning de cuantos partidos eliminaria...
-        df_sin_dup = df.dropna()
-        if self.verbose >= 1 and (len(df) != len(df_sin_dup)):
-            logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
-
-        if export:
-            df_sin_dup.to_excel(f'{self.base_path}/treat_nan/df_treat_nan.xlsx', index=True)
-            df_filled_columns.to_excel(f'{self.base_path}/treat_nan/df_filled_columns.xlsx', index=True)
-
-        return df_sin_dup, df_filled_columns
-        
+        return df
+    
+    # Seleccion de variables
     def select_data(self, df: pd.DataFrame, thr_corr: float = None, thr_fs: float = None, export: bool = True):
         """
         Selecciona las variables relevantes del dataframe.
@@ -854,16 +739,21 @@ class DataPreparation:
         start = time.time()
         logger.info("Selecting data...")
 
+        # Determino variables seleccionadas con el df pero sin nan values (pues no puede recibir ni uno)
+        df_aux = df.copy()
+        df = df.dropna(axis=0, how='any')  # Puede construir y generar col con nan por ej cdo no hay ultimos partidos
+        logger.warning(f"\tSe eliminaron registros con al menos un NaN value para seleccionar. {df_aux.shape} --> {df.shape}")
+
         # Elimino variables altamente correlacionadas
         if thr_corr is not None:
             l_columnas_a_eliminar, df_corr_tri_X = select_data.delete_correlated_columns(df, self.var_resp, thr_corr)
             df = df.drop(l_columnas_a_eliminar, axis=1)
 
-            if self.verbose >= 1:
+            if self.verbose >= 0:
                 print('\n Eliminando columnas correlacionadas...')
                 print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
 
-            if export:
+            if self.verbose >= 0:
                 df_corr_tri_X.to_excel(f'{self.base_path}/select_data/df_correlation.xlsx', index=True)
 
         # Elimino variables menos importantes (feature selection)
@@ -873,24 +763,74 @@ class DataPreparation:
             l_col_eliminated = list(df.columns.difference(l_important_features))
             df = df.loc[:, l_important_features + [self.var_resp]]
 
-            if self.verbose >= 1:
+            if self.verbose >= 0:
                 print('\n Feature Selection...')
                 print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas eliminadas: {l_col_eliminated}")
 
-            if export:
+            if self.verbose >= 0:
                 df_normalized.to_excel(f'{self.base_path}/select_data/df_fs.xlsx', index=True)
 
-        if self.verbose >= 1:
+        if self.verbose >= 0:
             print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
         
         end = time.time()
         logger.info(f"Seleccion de datos en {(end - start)/60:.1f} minutos")
 
-        if export:
-            df.to_excel(f'{self.base_path}/df_selected.xlsx', index=True)
+        # Selecciono variables seleccionadas (trataré nan values en proximo paso)
+        df_aux = df_aux.loc[:, df.columns]  # Selecciono las columnas que quedaron en el df
+        logger.critical(f"Shape df_aux: {df_aux.shape}")
+
+        if self.verbose >= 1:
+            df_aux.to_excel(f'{self.base_path}/df_selected.xlsx', index=True)
+
+        return df_aux
+    
+    def clean_post_select(self, df: pd.DataFrame, fill_na: str = None, scale_data: bool = True, path_save: str = None):
+        """
+        Limpieza de datos 4 (drop nan en rows + escalado)
+        """
+        # Tratamiento de nan values 
+        df = self.treat_nan_in_rows(df, fill_na=fill_na)  # Elimino registros con al menos un NaN value
+
+        # Escalado de datos para eliminar diferencias x escala
+        if scale_data:
+            df, scaler = self.scale_data(df)  # Escalado de datos para eliminar diferencias x escala
+            joblib.dump((scaler, df.columns), path_save)
+
+        if self.verbose >= 1:
+            df.to_excel(f'{self.base_path}/clean_post_select/df_sel_cleaned.xlsx', index=True)
 
         return df
+
+    def treat_nan_in_rows(self, df, fill_na: str = None):
+        # Solo de las columnas importantes
+        if fill_na is not None:
+            df_filled = clean_data.fill_nan_values(df, fill_type=fill_na)
+        else:
+            # Elimino registros con al menos un NaN 
+            df_filled = df.dropna(axis=0, how='any')  # Elimino registros con al menos un NaN value
+        logger.warning(f"\tSe eliminaron registros con al menos un NaN value. Shape X luego de dropna: {df.shape} --> {df_filled.shape}")
     
+        return df_filled
+    
+    def scale_data(self, df: pd.DataFrame):
+
+        print("\nEscalado de datos...")
+        scaler = StandardScaler()
+        X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  # Separo X e y
+        
+        # Paso 1: Ajusta el StandardScaler a tus datos
+        scaler.fit(X) 
+
+        # Paso 2: Transforma tus datos utilizando el StandardScaler ajustado
+        X_scaled = scaler.transform(X) 
+        X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
+
+        # Concateno X e y
+        df = pd.concat([X_scaled_df, y], axis=1)
+
+        return df, scaler
+        
 
 class Modeling:
 
@@ -953,7 +893,7 @@ class Modeling:
         val_size_ratio = val_size / (1 - test_size_ratio) 
 
         # Separo en train y validation (A futuro, estaria bueno evitar partidos de copa en val porque no hay 0 y es falso)
-        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=randint(1, 1000), shuffle=True)
+        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=42, shuffle=True)
 
         # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
         if bal_type is not None:
@@ -973,7 +913,7 @@ class Modeling:
         return X_train, X_val, X_test, y_train, y_val, y_test
 
     def build_model(self, default_model, X_val: pd.DataFrame, y_val: pd.DataFrame, X_train: pd.DataFrame, y_train, k: int, params: dict = None, 
-                    bayes: bool = False, export: bool = True):
+                    bayes: bool = True, export: bool = True):
         """
         Selecciona el mejor modelo a partir de la accuracy.
         
@@ -1110,12 +1050,12 @@ class Modeling:
         d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix, bet_metrics=False, gp_result=False) 
         return df_pred_proba, d_metrics
 
-    def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, df_filled, expected_metrics: bool = True, export: bool = True):
+    def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, expected_metrics: bool = False):
         """
         Aplico estrategia de apuesta y calculo ROI
         """
         # Concateno dfs
-        df_predicciones = self.prepare_dataframe_to_assess_with_roi(df_pred_proba, df_match, df_match_odds, df_filled)
+        df_predicciones = self.prepare_dataframe_to_assess_with_roi(df_pred_proba, df_match, df_match_odds)
 
         # Aplico estrategia "sin ea" para tener bank, stakes y rois 
         bs = betting_strategy.BettingStrategy()
@@ -1131,15 +1071,12 @@ class Modeling:
 
         # Calculo metricas "Expected" --> necesita df_match por expected_goals 
         if expected_metrics:
-
             # Construyo 'expected_result'
             df_predicciones = construct_data.determine_expected_result(df_predicciones, verbose=0)  # Durante la prep la elimino x fuga de info.
-            
             # Eliminar partidos sin expected_goals (puede no estar)
             df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
-
             # Calculo metricas
-            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_')
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_', metrics_by_result=False, bet_metrics=False, gp_result=False)
             d_metrics_roi.update(d_metric_sin_ea_ex)
 
         return df_predicciones, d_metrics_roi
@@ -1148,8 +1085,7 @@ class Modeling:
             self,
             df_pred_proba: pd.DataFrame,
             df_match: pd.DataFrame,
-            df_match_odds: pd.DataFrame,
-            df_filled: pd.DataFrame = None,
+            df_match_odds: pd.DataFrame
             ):      
         # Selecciono los registros de df_pred_proba
         df_match = df_match[df_match.index.isin(df_pred_proba.index)]
@@ -1163,57 +1099,14 @@ class Modeling:
         df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
         df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
 
-        # Concatenación
-        if df_filled is not None:
-            df_filled = df_filled[df_filled.index.isin(df_pred_proba.index)]
-            l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-            df_filled = df_filled[l_cols_fill]        
-            
         # Concatenar todos alineados por index
         df_predicciones = pd.concat([
             df_match,
             df_match_odds,
             df_pred_proba,
-            df_filled if df_filled is not None else pd.DataFrame(index=df_pred_proba.index)  # opcional si no querés if
         ], axis=1)
 
         # Reformateo id_teams de id a nombre
-        df_predicciones = self.reformat_pred(df_predicciones)
-        
-        return df_predicciones
-    
-    def prepare_dataframe_to_assess_with_roi_new( # ver si funciona
-            self,
-            df_pred_proba: pd.DataFrame,
-            df_match: pd.DataFrame,
-            df_match_odds: pd.DataFrame,
-            df_filled: pd.DataFrame = None,
-            ):        
-        # Selecciono columnas de df_match
-        l_cols_match = [col for col in ['date', 'id_team_home', 'id_team_away', 'id_country', 'id_competition', 'country', 'competition', 'goals_home', 'goals_away',  'expected_goals_(xg)_home', 'expected_goals_(xg)_away'] if col in df_match.columns]
-        df_match = df_match[l_cols_match]
-
-        # Asegurar orden y coincidencia de índices
-        df_match = df_match.reindex(df_pred_proba.index)
-        df_match_odds = df_match_odds.reindex(df_pred_proba.index)
-
-        # Calculo 'bookmaker_result" y sus probas
-        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
-        df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
-
-        if df_filled is not None:
-            df_filled = df_filled.reindex(df_pred_proba.index)
-            l_cols_fill = [col for col in ['copiado_formaciones','emergency_fill', 'player_emergency_fill', 'n_col_filled_sin_player', 'n_col_filled', 'perc_col_filled', 'l_col_filled'] if col in df_filled.columns]
-            df_filled = df_filled[l_cols_fill]
-
-        # Concatenar todos alineados por index
-        df_predicciones = pd.concat([
-            df_match,
-            df_match_odds,
-            df_pred_proba,
-            df_filled if df_filled is not None else pd.DataFrame(index=df_pred_proba.index)  # opcional si no querés if
-        ], axis=1)
-
         df_predicciones = self.reformat_pred(df_predicciones)
         
         return df_predicciones
@@ -1224,7 +1117,7 @@ class Modeling:
         df = format_data.map_teams(df,df_teams=df_teams)
         return df
 
-    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, df_filled: pd.DataFrame, k: int = 5, verbose: int = 0):
+    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, k: int = 5, verbose: int = 0):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
@@ -1254,15 +1147,23 @@ class Modeling:
                     
                     # Evaluo modelo en test
                     df_pred_proba, d_metrics_test = self.assess_model(model, X_test, y_test)
-                    df_predicciones, d_metrics_roi = self.assess_model_with_roi(df_pred_proba, df_match, df_match_odds, df_filled, export=True)
+                    df_predicciones, d_metrics_roi = self.assess_model_with_roi(df_pred_proba, df_match, df_match_odds)
                     d_metrics_test.update(d_metrics_roi)
+
+                    # Evaluar overfitting
+                    f1_score_train = d_metrics_train['f1_score_train']
+                    f1_score_test = d_metrics_test['f1_score']
+                    var = (f1_score_test - f1_score_train) / f1_score_train # (50% - 60%)/60% = -16%
+                    d_metrics_test['var_f1_score'] = var
+                    logger.info(f'f1_score_train = {f1_score_train:.1f}% --> f1_score_test = {f1_score_test:.1f}% ({var*100:.0f})%')
+                    if var <= -0.10:
+                        logger.warning(f"Posible OVERFITTING. Caida del f1 score de {var*100:.0f}%")
 
                     # Hiperparametros del modelo y Metricas en testeo y train
                     new_row = {'n_iteration': cont_iter, 'model_name': model_name, 'model_hiper': params, 'X_train': X_train.shape, 
                                'X_val': X_val.shape, 'X_test': X_test.shape, "X_columns": list(X_train.columns),
                                **d_metrics_train}
                     new_row_test = {'n_iteration': cont_iter, 'model_name': model_name, **d_metrics_test}
-
                     train_rows.append(new_row)
                     test_rows.append(new_row_test)
                     
@@ -1342,7 +1243,7 @@ def main(id_country, d_run, d_params, modelo, export: bool = True):
             df = dp.construct_data(df, l_days=d_par.l_days, n_years_h2h=d_par.n_years_h2h, segun_localia=d_par.segun_localia, dif_con_against=d_par.dif_con_against, export=export)
             # df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_constructed.xlsx', index_col=0)
             df, df_etiquetas = dp.tag_string_data_to_integer(df, export=export)
-            df, scaler, columns_used = dp.clean_data_2(df, d_par.n_years_to_select, d_par.comp_to_select, export=export)
+            df, scaler, columns_used = dp.clean_post_construct(df, d_par.n_years_to_select, d_par.comp_to_select, export=export)
             df = dp.select_data(df, thr_corr=d_par.thr_corr, thr_fs=d_par.thr_fs, export=export)
             df = dp.treat_nan_values(df, fill_na=d_par.fill_na, export=export)
         
