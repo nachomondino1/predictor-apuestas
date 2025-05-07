@@ -172,13 +172,15 @@ def determine_expected_result_ml(df):
     return df
 
 # ELO
-def assign_elo_before_match(df, k=30, base_rating=1500):
+def assign_elo_before_match(df, k=30, base_rating=1500, expected: bool = False):
     ratings = {}  # ELO actual de cada equipo
     elo_home_list = []
     elo_away_list = []
+    var_resp = 'expected_result' if expected else 'result'
+    prefix = 'expected_' if expected else ''
 
     df = df.sort_values('date')  # si tenés una columna de fecha
-    df['elo_result'] = df['result'].map({1: 1.0, 0: 0.5, 2: 0.0})
+    df['elo_result'] = df[var_resp].map({1: 1.0, 0: 0.5, 2: 0.0})
 
     # Por partido
     for idx, row in df.iterrows():
@@ -202,8 +204,8 @@ def assign_elo_before_match(df, k=30, base_rating=1500):
         ratings[team_away] = r_away + k * ((1 - result) - expected_away)
 
     # Agregar columnas al DataFrame
-    df['ELO_home'] = elo_home_list
-    df['ELO_away'] = elo_away_list
+    df[f'{prefix}ELO_home'] = elo_home_list
+    df[f'{prefix}ELO_away'] = elo_away_list
     df = df.drop(columns=['elo_result'])
 
     return df
