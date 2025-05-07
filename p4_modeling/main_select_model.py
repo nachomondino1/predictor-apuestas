@@ -194,21 +194,20 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    assess = True
+    l_countries = [48]
+    assess = False
 
     d_countries = {
-        -1: ['all', '2025-04-22'],
-        48: ["england", '2025-04-22'],
-        55: ["france", '2025-04-23'], 
-        59: ["germany", '2025-04-23'],
-        77: ["italy", '2025-04-23'],
-        148: ["spain", '2025-04-23']
+        48: ["england", '2025-05-07'],
+        55: ["france", '2025-05-07'], 
+        59: ["germany", '2025-05-07'],
+        77: ["italy", '2025-05-07'],
+        148: ["spain", '2025-05-07'],
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    l_metrics = ['test_accuracy', 'error']
-    l_weights = [0.5, 0.5]
-
+    l_metrics = ['f1_score', 'n_draw'] # aciertos_draw, n_draw # error pq ya no max error en selec hiper # Seguir experimento. El tema de n_draw es que tira abajo mal las otras metricas como f1_score..
+    l_weights = [0.7, 0.3]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -219,9 +218,9 @@ if __name__ == "__main__":
 
         # Para maximizar error en metrica
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
-        df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
+        # df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
         # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
-        df_ite['aciertos_draw'] = df_ite['n_draw'] * df_ite['precision_draw'] / 100
+        # df_ite['aciertos_draw'] = df_ite['n_draw'] * df_ite['precision_draw'] / 100
 
         main(
             df_ite=df_ite,

@@ -33,7 +33,8 @@ def assess_models_in_prod(
     # Por modelo
     for idx, row in df_ite.iterrows():
         col1 = 'n_model' if 'n_model' in df_ite.columns else 'n_iteration'
-        n_model, model_name = row[col1], row['model_name'] #model_name_x
+        col2 = 'model_name' if 'model_name' in df_ite.columns else 'model_name_x'
+        n_model, model_name = row[col1], row[col2]
         logger.info(f'{n_model} {model_name}')
         
         if predict_missing:
@@ -93,25 +94,33 @@ def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
     """
     Assess de un modelo en especifico
     """
+    # Parameters
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
     d_model = {'n_model': n_model, 'model_name': model_name}
+
+    # Obtengo predicciones en partidos "missing"
     df_pred_missing = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False) 
             
+    if len(df_pred_missing) == 0:
+        logger.error("No hay partidos missing que predecir. Entrenaste con los ultimos missing.")
+        raise ValueError
+    
     return df_pred_missing
 
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
     one_model, n_model = False, 328
     n_models = 10
     concat_with_test = False
 
     d_countries = {
-        48: ["england", '2025-04-22'],
-        55: ["france", '2025-04-23'], 
-        59: ["germany", '2025-04-23'],
-        77: ["italy", '2025-04-23'],
-        148: ["spain", '2025-04-23']
+        48: ["england", '2025-05-07'],
+        55: ["france", '2025-05-07'], 
+        59: ["germany", '2025-05-07'],
+        77: ["italy", '2025-05-07'],
+        148: ["spain", '2025-05-07']
         }
     
     for id_country in l_countries:
