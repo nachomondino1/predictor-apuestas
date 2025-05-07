@@ -66,7 +66,7 @@ def select_best_hiperparameters(
 
         if n_iter is None:
             # Calcular iteraciones basadas en el tamaño del dataset
-            n_iter = 50 # Puedo usar estimate_bayes_iterations_2 o estimate_bayes_iterations 
+            n_iter = 30 # Puedo usar estimate_bayes_iterations_2 o estimate_bayes_iterations 
             
         # Crear el objeto BayesSearchCV
         bayes_search = BayesSearchCV(
@@ -75,7 +75,7 @@ def select_best_hiperparameters(
             cv=pds, 
             n_iter=n_iter, 
             scoring=scoring,
-            refit="cross_entropy_loss" if var_resp == 'categorical' else 'neg_mean_squared_error',  # O la métrica que prefieras
+            refit="f1_score" if var_resp == 'categorical' else 'neg_mean_squared_error',  # cross_entropy_loss # O la métrica que prefieras
             n_jobs=-1
             )
 
@@ -139,6 +139,7 @@ def select_best_hiperparameters(
 
     return best_model, best_params, d_metrics, results
 
+# Metricas a calcular y maximizar para selec hiper
 def default_scoring(target_type: str, verbose: int = 0):
     """
     Asigna un valor default a scoring según la variable respuesta. Metricas a medir en GridSeachCV.
@@ -235,6 +236,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
 
     return cv_results[key].argmax() # # Mayor valor negativo (menor pérdida real) # CUIDADO con la metrica que uses para ver si usar argmax() o argmin()
 
+# Espacio de hiperparametros
 def check_best_params_limits(best_params, space):
     for param, value in best_params.items():
         # Obtiene el rango del parámetro desde el espacio
@@ -268,8 +270,8 @@ def space_params(model_name, bayes, verbose: int = 0):
     # Defino hiperparametros de arboles de decision
     l_n_estimators = [5, 11, 21, 41]
     l_learning_rate = [0.001, 0.01, 0.1]
-    l_max_depth = [3, 5, 7, 10, None] # None
-    l_min_samples_leaf = [2, 11, 21, 51] # [21, 51]
+    l_max_depth = [3, 5, 7] # None, 10
+    l_min_samples_leaf = [11, 21, 51] # [21, 51]
     l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
     l_max_features = ["sqrt", None] # "log2",  # None juega sobreotdo cdo quedan pocas variables predictoras...
     l_bootstrap = [True]
@@ -290,11 +292,11 @@ def space_params(model_name, bayes, verbose: int = 0):
             'max_features': Categorical(l_max_features) if bayes else l_max_features, # Real(0.1, 1.0)
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(10, 200) if bayes else l_n_estimators,
+            'n_estimators': Integer(100, 200) if bayes else l_n_estimators,
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'max_depth': Categorical(l_max_depth) if bayes else l_max_depth,
-            'min_samples_split': Integer(10, 51) if bayes else l_min_samples_split, # Mayor o igual a 2
-            'min_samples_leaf': Integer(10, 51) if bayes else l_min_samples_leaf,
+            'min_samples_split': Integer(30, 51) if bayes else l_min_samples_split, # Mayor o igual a 2
+            'min_samples_leaf': Integer(20, 51) if bayes else l_min_samples_leaf,
             'max_features': Categorical(l_max_features) if bayes else l_max_features, # Real(0.1, 1.0)
             'bootstrap': Categorical(l_bootstrap) if bayes else l_bootstrap # False
         },
@@ -308,23 +310,19 @@ def space_params(model_name, bayes, verbose: int = 0):
             # 'verbose': Categorical([0]) if bayes else [0]
         },
         'XGBClassifier': {
-            'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
-            'n_estimators': Integer(5, 120) if bayes else l_n_estimators,  # Suele ganar con 100
-            'max_depth': Categorical(l_max_depth) if bayes else l_max_depth, # 3, 
-            'learning_rate': Real(0.001, 1) if bayes else l_learning_rate,
-            # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
-            'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
+            'booster': Categorical(['gbtree']) if bayes else ['gbtree'], # 'gbtree', 'dart'
+            'n_estimators': Integer(10, 30) if bayes else l_n_estimators,  # Suele ganar con 100
+            'max_depth': Integer(3, 6) if bayes else l_max_depth, # 3, 
+            'learning_rate': Real(0.01, 0.1, prior="log-uniform") if bayes else l_learning_rate,
+            'min_child_weight': Integer(3, 10) if bayes else [1, 5], #5
+            'grow_policy': Categorical(['lossguide']) if bayes else ['depthwise', 'lossguide'], # 'depthwise'
+            'subsample': Real(0.6, 0.9),
+            'colsample_bytree': Real(0.6, 0.9),
+            # Regularizacion. --> Demasiada regularizacion puede llevar a predicciones uniformes 33-33-33.
+            'gamma': Real(0.3, 1.0) if bayes else [0, 0.5],
+            'alpha': Real(0.5, 2.0, prior="log-uniform") if bayes else [0.001],
+            'lambda': Real(1.0, 5.0, prior="log-uniform")if bayes else [0.001],
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
-
-            # Evitar si los datos ya estan balanceados
-            # 'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
-            # 'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
-            # 'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
-
-            # Demasiada regularizacion puede llevar a predicciones uniformes 33-33-33.
-            'gamma': Real(0, 1) if bayes else [0],
-            'alpha': Real(0.001, 1) if bayes else [0.001],
-            'lambda': Real(0.001, 1) if bayes else [0.001],
         },
         'GradientBoostingClassifier': { # Tarda muchisimo en entrenar
             'n_estimators': Integer(100, 300) if bayes else l_n_estimators, 
@@ -423,6 +421,7 @@ def space_params(model_name, bayes, verbose: int = 0):
 
     return params
 
+# Iteraciones de BayesSearchCV
 def estimate_bayes_iterations(param_space, scaling_factor=0.01, min_iters=10, max_iters=500):
     """
     Estima el número óptimo de iteraciones para BayesSearchCV en función del espacio de búsqueda.
@@ -471,6 +470,7 @@ def estimate_bayes_iterations_2(num_samples, num_hyperparameters, mult_iter: flo
 
     return min(max(n_iter, min_iter), max_iter) # Asegurarse de que n_iter sea al menos 50
 
+# Cross validation manual
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
     """
     Realiza cross validation para evaluar el rendimiento del modelo entrenado.
