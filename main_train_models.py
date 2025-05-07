@@ -216,7 +216,7 @@ def comprehensive_search(
 
                 logger.info(f" Iteracion Select Nº {i}.{zz}.{j} ".center(120, "#"))
                 print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
-                path_sel = f'{path_clean}__{thr_corr}_{thr_fs}_{fill_na}'
+                path_sel = f'{path_cons}__{thr_corr}_{thr_fs}_{fill_na}'
 
                 df_sel = dp.select_data(df_cons_etiquetado, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
                 if verbose >= 2:
@@ -224,7 +224,7 @@ def comprehensive_search(
                     df_sel.to_excel(path_select, index=True)
     
                 # Clean post select
-                df_sel = dp.clean_post_select(df=df_sel, fill_na=fill_na, scale_data=True, path_save=f'{BASE_DIR_dp}/clean_post_select/scaler_model_{path_sel}.pkl')
+                df_sel = dp.clean_post_select(df=df_sel, fill_na=fill_na, path_save=f'{BASE_DIR_dp}/clean_post_select/scaler_model_{path_sel}.pkl')
 
                 ####################################################################### MODELING #######################################################################
                 for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
@@ -494,7 +494,7 @@ def define_params_space(id_country):
         'modeling': {
             'val_size': [0.125],
             'n_reg_test': [100],
-            'bal_type': ['under', None], 
+            'bal_type': ['under'], # None
             'k': [10],
             # 'refit': ['mean_test_cross_entropy_loss', 'mean_test_f1_score'] # A futuro...
         }
@@ -508,11 +508,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48, 55]
 
-    data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
+    data_unders = False  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = True
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
