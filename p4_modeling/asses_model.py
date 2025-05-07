@@ -39,10 +39,11 @@ def calculate_metrics(
             'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
             'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
             'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100,
-            'precision_home': precision_score(y_test, y_pred, labels=[1], average="micro", zero_division=0) * 100,
-            'precision_draw': precision_score(y_test, y_pred, labels=[0], average="micro", zero_division=0) * 100,
-            'precision_away': precision_score(y_test, y_pred, labels=[2], average="micro", zero_division=0) * 100
         })
+
+        precision_all = precision_score(y_test, y_pred, average=None, labels=[0, 1, 2], zero_division=0)
+        for label, name in zip([0, 1, 2], ['draw', 'home', 'away']):
+            d_metrics[f'precision_{name}'] = precision_all[label] * 100
 
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
