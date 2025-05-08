@@ -194,14 +194,13 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
     assess = False
 
     d_countries = {
         48: ["england", '2025-05-07'],
         55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-07'],
-        77: ["italy", '2025-05-07'],
+        59: ["germany", '2025-05-08'],
+        77: ["italy", '2025-05-08'],
         148: ["spain", '2025-05-07'],
         }
     

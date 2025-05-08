@@ -771,7 +771,8 @@ def main(
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
         porc_m: float = None, d_model: dict = None,                                                     # Modeling
-        verbose: int = 1, export: bool = True, country: str = None
+        verbose: int = 1, export: bool = True, country: str = None,
+        date_missing = None
         ):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -906,11 +907,12 @@ def main(
             # Levanto df_integrated de cuando entrené modelos (tmb los que use en test...)
             df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0) 
             
-            # Podria volver a predecir como prox partido un partido de test (con el que entrené) ? 
-            len_inic = len(df_integrated_train)
-            date_missing = pd.to_datetime('2025-04-18')
-            df_integrated_train = df_integrated_train[df_integrated_train['date'] <= date_missing]
-            logger.info(f'Tras seleccionar partidos anteriores a {date_missing}: {len_inic} --> {len(df_integrated_train)}')
+            # Podria volver a predecir como prox partido un partido de test (con el que entrené) ? --> Para comparar probas del = partido en test y prod. Son muy similares :)
+            if date_missing is not None:
+                len_inic = len(df_integrated_train)
+                date_missing = pd.to_datetime()
+                df_integrated_train = df_integrated_train[df_integrated_train['date'] <= date_missing]
+                logger.info(f'Tras seleccionar partidos anteriores a {date_missing}: {len_inic} --> {len(df_integrated_train)}')
 
             # Selecciono los missing con los que no se entrenó
             df_match = df_match[~df_match.index.isin(df_integrated_train.index)]

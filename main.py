@@ -458,11 +458,11 @@ class DataPreparation:
         if not prod:
             # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
             ## Columnas
-            df['red_cards_home'] = df['red_cards_home'].fillna(0) # Relleno con 0 las red cards para construir bien
+            df['red_cards_home'] = df['red_cards_home'].fillna(0)
             df['red_cards_away'] = df['red_cards_away'].fillna(0)
-            df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Eliminacion basica x mucho nan...
+            df = self.treat_nan_in_cols(df, porc_nan_max=0.8)
             ## Filas
-            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) # elimino filas con todo nan. Dsp de eliminar cols con puro nan.
+            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) 
    
         # Exporto datos
         if self.verbose >= 1:

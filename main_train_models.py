@@ -508,12 +508,11 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55]
 
-    data_unders = False  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
+    data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = False
+    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
