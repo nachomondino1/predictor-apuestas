@@ -24,6 +24,7 @@ desuso/
 *.pkl
 data_seg/
 old/
+images/
 
 # Ignorar todo el contenido de la carpeta data
 data/*
