@@ -16,7 +16,11 @@ from sklearn.ensemble import RandomForestClassifier  # Random forest
 from sklearn.preprocessing import scale
 import plotly.graph_objects as go
 import numpy as np
-
+from sklearn.tree import plot_tree
+import matplotlib.pyplot as plt
+from sklearn.tree import export_graphviz
+import graphviz
+from sklearn.tree import DecisionTreeClassifier
 
 def select_league_matches(df, verbose: int = 0):
     """
@@ -139,8 +143,11 @@ class FeatureSelection():
         l_features, l_scores = [], []
 
         # Divido variables predictoras en categoricas (string) y numericas (int o float)
-        numeric_vars = X.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        numeric_vars = X.select_dtypes(include='number').columns.tolist()
         categorical_vars = X.select_dtypes(include='object').columns.tolist()
+        if self.verbose >= 2:
+            print(f"Variables numericas: {numeric_vars}")
+            print(f"Variables categoricas: {categorical_vars}")
 
         # Seleccionar pruebas estadísticas según el tipo de variable respuesta (clasificación o regresión)
         if pd.api.types.is_integer_dtype(y):  # Clasificación
@@ -187,7 +194,7 @@ class FeatureSelection():
 
         # Entreno modelo con los mejores hiperparámetros
         model, params, best_metric, results  = select_best_hiperparameters(
-            RandomForestClassifier(), 
+            DecisionTreeClassifier(), # RandomForestClassifier(), 
             X_train=X_train, 
             y_train=y_train, 
             X_val=X_val, 
@@ -203,6 +210,7 @@ class FeatureSelection():
 
         # Grafico variables y su importancia
         if self.graficar_cada_metodo:
+            visualize_tree(model, X_train)
             self.graficar_importancia_atrib(X=df_importance['random_forest'], y=df_importance.index)
 
         return df_importance
@@ -337,6 +345,40 @@ class FeatureSelection():
         df_importance['suma_de_imp_norm'] = df_importance[norm_columns].mean(axis=1)
         return df_importance
 
+def visualize_tree(model_best_params, X_train):
+    
+    # Verificá que best_model sea un DecisionTreeClassifier
+    if isinstance(model_best_params, DecisionTreeClassifier):
+        plt.figure(figsize=(20, 10))
+        plot_tree(
+            model_best_params, 
+            feature_names=X_train.columns, 
+            class_names=[str(c) for c in model_best_params.classes_], 
+            filled=True,
+            rounded=True,
+            # max_depth=3  # Opcional: limita la profundidad visualizada
+        )
+        plt.title("Árbol de Decisión - Mejor Modelo")
+        plt.show()
+    else:
+        print("El mejor modelo no es un DecisionTreeClassifier")
+    
+    '''
+    dot_data = export_graphviz(
+        model_best_params, 
+        out_file=None, 
+        feature_names=X_train.columns,
+        class_names=[str(c) for c in model_best_params.classes_],
+        filled=True,
+        rounded=True,
+        special_characters=True
+    )
+    graph = graphviz.Source(dot_data)
+    graph.render("mejor_arbol", format='png', cleanup=True)
+    graph.view()  # Muestra el árbol en una ventana emergente
+    graph.save('images/mejor_arbol.png')  # Guarda el árbol como imagen PNG
+    '''
+
 def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_type: str = None, graf: bool = False):
     """
     Selecciona las variables mas importantes para un Dataframe.
@@ -380,6 +422,9 @@ def select_best_features(df: pd.DataFrame, var_resp: str, thr_fs: float, thr_typ
         percentile_value = df_normalized['suma_de_imp_norm'].quantile(thr_fs)
         logger.info(f"El valor del percentil {thr_fs * 100}% es {percentile_value}")  # Loggear el valor del percentil
         l_important_features = df_normalized.loc[df_normalized['suma_de_imp_norm'] >= percentile_value].index.tolist()
+    else:
+        logger.error("El tipo de threshold no existe.")
+        raise ValueError
 
     # Imprimir importancias por pantalla
     df_top_10 = df_normalized.sort_values(by='suma_de_imp_norm', ascending=False).head(10)    # Ordenar y seleccionar las 10 variables más importantes

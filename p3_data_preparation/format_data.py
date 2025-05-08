@@ -214,7 +214,7 @@ def convert_columns_to_float(df: pd.DataFrame, verbose: int = 0):
             pass
     return df
 
-def convert_columns_to_int(df, verbose:int = 0):
+def convert_columns_to_int(df, df_etiquetas: pd.DataFrame = None, prod: bool = False, verbose:int = 0):
     """
     Convierte las variables string a numéricas.
 
@@ -226,69 +226,63 @@ def convert_columns_to_int(df, verbose:int = 0):
     # Returns:
     DataFrame con las variables convertidas y un DataFrame adicional con las etiquetas originales y enteros correspondientes.
     """
-    # Definicion de variables
-    df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
-    le = LabelEncoder()
-    l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
-    if verbose >= 1:
-        print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
 
-    # Por variable string
-    for col in l_columnas_a_codificar:
+    if not prod:
 
-        # Obtengo valores a codificar evitando "NaN"
-        valores_a_codificar = df[col].dropna().unique()
-       
-        # Mapeo valor str con valor int
-        le.fit(valores_a_codificar)
-        d_mapeo = dict(zip(le.classes_, le.transform(le.classes_)))
-
-        # Reemplazo valor str por valor integer en DataFrame
-        df[col] = df[col].map(d_mapeo)
-
-        # Guardo string y su equivalente numerico
-        df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': list(d_mapeo.keys()), 'int_value': list(d_mapeo.values())})
-        df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
-
-    return df, df_etiquetas
-
-# main_next_matches.py
-def convert_columns_to_int_already_tagged(df, df_etiquetas, l_col_a_codificar: list = None, verbose: int = 0):
-    """
-    Etiquetado usando un df_etiquetas ya creado. Es para main_next_matches. Tengo en cuenta posibles nuevas etiquetas y las agrego a df_etiquetas
-    """
-    # Determino columnas a codificar de string a integer
-    if l_col_a_codificar is None:
-        l_col_a_codificar = df_etiquetas['variable'].unique()
-
-    if verbose >= 0:
-        print("Columnas a codificar: ", l_col_a_codificar)
-    
-    # Por columna a codificar
-    for columna in l_col_a_codificar:
-        
-        # Obtengo etiquetas de la columna
-        df_etiquetas_columna = df_etiquetas[df_etiquetas['variable']==columna]        
-        d_mapeo = dict(zip(df_etiquetas_columna['str_value'], df_etiquetas_columna['int_value']))
+        # Definicion de variables
+        df_etiquetas = pd.DataFrame(columns=['variable', 'str_value', 'int_value'])
+        le = LabelEncoder()
+        l_columnas_a_codificar = list(df.select_dtypes(include=['object']).columns)  # Obtener columnas de tipo objeto
 
         if verbose >= 1:
-            print(f"Columna: {columna}, DF etiqeutas shape columna: {df_etiquetas_columna.shape}") 
+            print(f"Columnas str a convertir a int: {l_columnas_a_codificar}")
 
-        # Por partido
-        for i, row in df.iterrows():
-                    
-            # Si la etiqueta no existe en el mapeo
-            if row[columna] not in d_mapeo.keys():
-                logger.error(f"No se encontró etiqueta para {row[columna]} en la fila {i}. Se rellena con 0.")
-                valor = 0
+        # Por variable string
+        for col in l_columnas_a_codificar:
 
-            # Si la etiqueta existe
-            else:
-                # Reemplazo el valor
-                valor = d_mapeo[row[columna]]
-            
-            # Actualizo el DataFrame
-            df.loc[i, columna] = valor
+            # Obtengo valores a codificar evitando "NaN"
+            valores_a_codificar = df[col].dropna().unique()
+        
+            # Mapeo valor str con valor int
+            le.fit(valores_a_codificar)
+            d_mapeo = dict(zip(le.classes_, le.transform(le.classes_)))
+
+            # Reemplazo valor str por valor integer en DataFrame
+            df[col] = df[col].map(d_mapeo)
+
+            # Guardo string y su equivalente numerico
+            df_etiquetas_col = pd.DataFrame({'variable': col, 'str_value': list(d_mapeo.keys()), 'int_value': list(d_mapeo.values())})
+            df_etiquetas = pd.concat([df_etiquetas, df_etiquetas_col], axis=0)
+
+    else:
+        if df_etiquetas is None:
+            raise ValueError("Si prod=True, debés pasar df_etiquetas.")
+
+        l_columnas_a_codificar = df_etiquetas['variable'].unique()
+        l_columnas_a_codificar = [col for col in l_columnas_a_codificar if col in df.columns] 
+
+        if verbose >= 0:
+            print("[PROD] Columnas a codificar: ", l_columnas_a_codificar)
+
+        # Por columna a codificar
+        for col in l_columnas_a_codificar:
+
+            # Obtengo etiquetas de la columna
+            etiquetas_col = df_etiquetas[df_etiquetas['variable'] == col]
+            d_mapeo = dict(zip(etiquetas_col['str_value'], etiquetas_col['int_value']))
+
+            # Por partido
+            for i, val in df[col].items():
+
+                 # Si la etiqueta no existe en el mapeo
+                if val not in d_mapeo:
+                    if verbose >= 1:
+                        print(f"[PROD] Valor desconocido '{val}' en fila {i}. Se reemplaza con 0.")
+                    df.loc[i, col] = 0
+                
+                # Si la etiqueta existe
+                else:
+                    df.loc[i, col] = d_mapeo[val]
 
     return df, df_etiquetas
 

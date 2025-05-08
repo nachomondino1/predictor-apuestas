@@ -1,6 +1,9 @@
 # Importo librerias
 import pandas as pd
 from utils.set_up_logging import logger
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 
 def getting_to_know_data(df, verbose: int = 1):
     """
@@ -42,6 +45,11 @@ def verificar_unicidad_registros(df):
         logger.warning(f"\t El índice tiene valores duplicados.") # Indices duplicados: {list(indices_duplicados)}")
     # else:
     #     logger.info("\tEl índice no tiene valores duplicados.")
+
+def scatter_plot(df: pd.DataFrame, name: str):
+    sns.pairplot(df, diag_kind='kde')
+    plt.savefig(f"images/{name}.png")
+    plt.close()
 
 def check_ids_in_both_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, column: str = None) -> None:
     """

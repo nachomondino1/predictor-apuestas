@@ -171,6 +171,81 @@ def determine_expected_result_ml(df):
     df.loc[X.index, 'expected_result'] = y_pred  # Guardar y_pred como 'expected_result'
     return df
 
+# ELO
+def assign_elo_before_match(df, k=30, base_rating=1500, expected: bool = False):
+    ratings = {}  # ELO actual de cada equipo
+    elo_home_list = []
+    elo_away_list = []
+    var_resp = 'expected_result' if expected else 'result'
+    prefix = 'expected_' if expected else ''
+
+    df = df.sort_values('date')  # si tenés una columna de fecha
+    df['elo_result'] = df[var_resp].map({1: 1.0, 0: 0.5, 2: 0.0})
+
+    # Por partido
+    for idx, row in df.iterrows():
+        team_home = row['id_team_home']
+        team_away = row['id_team_away']
+        result = row['elo_result']
+
+        r_home = ratings.get(team_home, base_rating)
+        r_away = ratings.get(team_away, base_rating)
+
+        # Guardar ELO antes del partido
+        elo_home_list.append(r_home)
+        elo_away_list.append(r_away)
+
+        # Calcular resultado esperado
+        expected_home = 1 / (1 + 10 ** ((r_away - r_home) / 400))
+        expected_away = 1 - expected_home
+
+        # Actualizar ELO después del partido
+        ratings[team_home] = r_home + k * (result - expected_home)
+        ratings[team_away] = r_away + k * ((1 - result) - expected_away)
+
+    # Agregar columnas al DataFrame
+    df[f'{prefix}ELO_home'] = elo_home_list
+    df[f'{prefix}ELO_away'] = elo_away_list
+    df = df.drop(columns=['elo_result'])
+
+    return df
+
+def assign_elo_home_away(df, k=30, base_rating=1500):
+    ratings_local = {}  # ELO como local
+    ratings_away = {}  # ELO como visitante
+    elo_home_list = []
+    elo_away_list = []
+
+    df = df.sort_values('date')  # Ordenar por fecha
+    df['elo_result'] = df['result'].map({1: 1.0, 0: 0.5, 2: 0.0})
+
+    for idx, row in df.iterrows():
+        team_home = row['id_team_home']
+        team_away = row['id_team_away']
+        result = row['elo_result']
+
+        r_home = ratings_local.get(team_home, base_rating)
+        r_away = ratings_away.get(team_away, base_rating)
+
+        # Guardar ELO antes del partido
+        elo_home_list.append(r_home)
+        elo_away_list.append(r_away)
+
+        # Calcular resultado esperado
+        expected_home = 1 / (1 + 10 ** ((r_away - r_home) / 400))
+        expected_away = 1 - expected_home
+
+        # Actualizar ELO según el resultado
+        ratings_local[team_home] = r_home + k * (result - expected_home)
+        ratings_away[team_away] = r_away + k * ((1 - result) - expected_away)
+
+    # Agregar columnas al DataFrame
+    df['ELO_localia_home'] = elo_home_list
+    df['ELO_localia_away'] = elo_away_list
+    df = df.drop(columns=['elo_result'])
+
+    return df
+
 def determine_number_matches_last_days(df: pd.DataFrame, n_days): # Ver si funciona
     """
     Determinar numero de partidos jugados en los ultimos dias. 
@@ -532,35 +607,46 @@ def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = 
     
     return df
 
-def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name:str = None, laplace: bool = False):
+def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name: str = None, laplace: bool = False):
     """
-    Nueva columna siendo el porcentaje resultante de la division de otras dos columnas.
+    Nueva columna que representa el porcentaje resultante de la división de dos columnas.
     """
 
     col_name = f'perc_{col_num}_of_{col_den}' if column_name is None else column_name
 
-    num1 = df[f'{col_num}_home'] + 1 if laplace else df[f'{col_num}_home']
-    num2 = df[f'{col_num}_away'] + 1 if laplace else df[f'{col_num}_away']
+    num_home = df[f'{col_num}_home'] + 1 if laplace else df[f'{col_num}_home']
+    num_away = df[f'{col_num}_away'] + 1 if laplace else df[f'{col_num}_away']
+
+    den_home = df[f'{col_den}_home'] + 1 if laplace else df[f'{col_den}_home']
+    den_away = df[f'{col_den}_away'] + 1 if laplace else df[f'{col_den}_away']
+
+    # Evitar división por 0
+    den_home = np.where(den_home == 0, 1, den_home)
+    den_away = np.where(den_away == 0, 1, den_away)
 
     # Home
-    df[f'{col_name}_home'] = np.where(
-        df[f'{col_den}_home'].notna(), 
-        num1 / df[f'{col_den}_home'], 
-        None 
-    )
+    df[f'{col_name}_home'] = num_home / den_home
 
     # Away
-    df[f'{col_name}_away'] = np.where(
-        df[f'{col_den}_away'].notna(),  
-        num2 - df[f'{col_den}_away'], 
-        None  
-    )
+    df[f'{col_name}_away'] = num_away / den_away
 
     return df
 
 def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True):
     """
-    Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). Usa diferencia previa antes del promedio.
+    Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). 
+    Usa diferencia previa antes del promedio.
+    
+    # Parameters:
+        df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
+        n_days: Integer. Número de días a tener en cuenta para determinar la media.
+        variable: String. Nombre de la variable a promediar (e.g. goals).
+        segun_localia: Boolean. Si True, calcula la media según localía.
+        decay_rate: Float. Tasa de decaimiento para el promedio ponderado.
+        diff: Boolean. Si True, calcula dif entre home y away del promedio en last matches.
+
+    # Returns:
+        DataFrame con nuevas columnas que contienen la media de los últimos partidos.
     """
     df = df.sort_values(by='date', ascending=False)
     team_matches = {}
@@ -627,10 +713,19 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
 
 def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True): 
     """
-    Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). No usa diferencia previa.
+    Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). 
+    No usa diferencia previa.
 
-    Mejoras:
-        - Revisar calculo de dif_con_against. Lo implemente rapido mirando como lo tenia antes. Pero por las. 
+    # Parameters:
+        df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
+        n_days: Integer. Número de días a tener en cuenta para determinar la media.
+        variable: String. Nombre de la variable a promediar (e.g. goals).
+        segun_localia: Boolean. Si True, calcula la media según localía.
+        decay_rate: Float. Tasa de decaimiento para el promedio ponderado.
+        diff: Boolean. Si True, calcula dif entre home y away del promedio en last matches.
+
+    # Returns:
+        DataFrame con nuevas columnas que contienen la media de los últimos partidos.
     """
    # Ordeno por fecha descendente para iterar correctamente sobre los partidos
     df = df.sort_values(by='date', ascending=False)

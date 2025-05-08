@@ -7,17 +7,16 @@ import datetime
 from utils.set_up_logging import logger
 from utils import directories
 import os
-from dotenv import load_dotenv
 ## Data understanding
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
 from main import DataPreparation, Modeling
-from p3_data_preparation import format_data, clean_data, construct_data
+from p3_data_preparation import clean_data, construct_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 from p3_data_preparation.select_data import determine_country_competitions
 # Modeling
-from p4_modeling import asses_model, betting_strategy
+from p4_modeling import betting_strategy
 import pickle
 import joblib
 
@@ -191,6 +190,7 @@ class DataPreparationNew(DataPreparation):
                     # Si no existe, crear el directorio
                     os.makedirs(directorio)
 
+    # Rellenado de datos necesarios para predecir
     def fill_data_not_available_yet(self, df_next_matches: pd.DataFrame, df_last_old_matches: pd.DataFrame, verbose: int = 0):
         """
         Relleno datos aun no disponibles debido a que aun falta mas de 30 min para el partido. Asi, poder predecir a pesar de tener datos aun no 
@@ -208,7 +208,10 @@ class DataPreparationNew(DataPreparation):
         # En caso que aun no se cuente con las formaciones, asigno promedio en ultimos partidos
         l_player_cols  = [col for col in df_last_old_matches.columns if ('player_start' in col) or ('player_sub' in col)]  # Selecciono las variables que corresponden a jugadores
         df_next_matches, df_copiado_formaciones = clean_data.fillna_with_mean_in_last_matches_with_df(df_to_fill=df_next_matches, df=df_last_old_matches, cols_to_fill=l_player_cols)            
-
+        
+        # A futuro: Reduccion de medias segun cantidad de lesionados
+        # df_next_matches = self.reduce_mean_by_missing_players(df_next_matches, df_last_old_matches)
+        
         # Copio valores en ultimos partidos (deberia copiar solo referee y coaches)
         miss_player_columns = [col for col in df_last_old_matches.columns if ('player_miss' in col)]  # --> ojo porque no se si las rellena ok... es complejo el rellenado.
         l_var_to_copy = miss_player_columns + ['id_coach_home', 'id_coach_away']  # Es clave copiar coaches porque no suele estar hasta que esten las formaciones..
@@ -219,6 +222,25 @@ class DataPreparationNew(DataPreparation):
             df_next_matches.to_excel(f"{self.BASE_DIR}/df_filled.xlsx", index=True)
 
         return df_next_matches, df_copiado_formaciones, df_copiado
+    
+    def reduce_mean_by_missing_players(self, df_next_matches, df_last_old_matches, threshold_injury_increase = 0.2):
+        # 20% más lesionados se considera significativo
+
+        ## Calcular variacion de missing del partido actual respecto de la media en los ultimos partidos
+        df_last_old_matches['sum_rat_player_miss_home_avg'] = df_last_old_matches.groupby('id_team_home')['sum_rat_player_miss_home'].transform('mean')
+        df_last_old_matches['sum_rat_player_miss_away_avg'] = df_last_old_matches.groupby('id_team_away')['sum_rat_player_miss_away'].transform('mean')
+        
+        df_next_matches['variation_miss_home']  = (df_next_matches['sum_rat_player_miss_home'] - df_last_old_matches['sum_rat_player_miss_home_avg']) / df_last_old_matches['sum_rat_player_miss_home_avg']
+        df_next_matches['variation_miss_away'] = (df_next_matches['sum_rat_player_miss_away'] - df_last_old_matches['sum_rat_player_miss_away_avg']) / df_last_old_matches['sum_rat_player_miss_away_avg']
+
+        ## Si hay mas missing en este partido, perjudicar la media de los ultimos partidos copiada para START y SUB.
+        df_next_matches.loc[df_next_matches['variation_miss_home'] > threshold_injury_increase, ['mean_rat_player_start_home', 'mean_rat_player_sub_home']] *= 0.9
+        df_next_matches.loc[df_next_matches['variation_miss_away'] > threshold_injury_increase, ['mean_rat_player_start_away', 'mean_rat_player_sub_away']] *= 0.9
+
+        df_next_matches.to_excel("ruta.xlsx", index=True)
+        df_last_old_matches.to_excel("ruta2.xlsx", index=True)
+
+        return df_next_matches
     
     def fillna_with_last_match_value(self, df_new: pd.DataFrame, df: pd.DataFrame, cols_to_fill: list):
         """
@@ -259,17 +281,7 @@ class DataPreparationNew(DataPreparation):
 
         return df_new, df_copiado
     
-    def clean_data_3_new(self, df, competencies_to_select = None):
-        """
-        Es clave para que no prediga todas las comp?
-        """
-        n_reg_inic = len(df)
-        df = df[df['id_competition'].isin(competencies_to_select)]
-        
-        if self.verbose >= 1:
-            logger.info(f"Filas luego de filtrar x competencia: {n_reg_inic} --> {len(df)}")
-        return df
-    
+    # Construccion de datos
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
                            n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, decay_rate: float,
                            columns_used: list, verbose: int = 0):
@@ -288,7 +300,6 @@ class DataPreparationNew(DataPreparation):
             Dataframe con proximos partidos construido utilizando los partidos ya jugados. (DataFrame)
         """
         logger.info("Constructing new data...")
-        start = time.time()
 
         # 1) Construyo historial entre si  (podria evitar construirlas si no estan en columns_used...)
         df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)  # usar with_h2h=False para no reemplazarlo.
@@ -321,9 +332,6 @@ class DataPreparationNew(DataPreparation):
                 if columna not in df_next_matches.columns:
                     df_next_matches[columna] = np.nan  # no le des valor 0 porque sino las predicciones son 33-33-33.
 
-        end = time.time()
-        print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
-        
         if self.export:
             df_last_old_matches.to_excel(f'{self.BASE_DIR}/construct_data/df_matches_to_construct_historic_values.xlsx', index=True)
             df_next_matches.to_excel(f'{self.BASE_DIR}/df_constructed.xlsx', index=True)
@@ -350,187 +358,40 @@ class DataPreparationNew(DataPreparation):
         df = df[columnas_deseadas]
         df_next_matches = df[df.index.isin(df_next_matches.index)]
         return df_next_matches
-        
-    def tag_string_data_to_integer_new(self, df: pd.DataFrame, df_etiquetas_loaded, columns_scaled, verbose: int = 0):
+
+    # Limpieza post select     
+    def clean_post_select_new(self, df: pd.DataFrame, scaler_loaded):
+
+        # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
+        df_filled = self.add_emergency_fill_flags(df)
+
+        # Tratamiento de nan values 
+        df = self.treat_nan_in_rows(df, fill_na="0", prod=True) # no puedo eliminar registros a predecir
+
+        # Escalado de datos para eliminar diferencias x escala
+        df = self.scale_data(df, scaler_loaded, prod=True)
+
+        df_filled.to_excel(f'{self.BASE_DIR}/df_filled.xlsx', index=True)
+        return df
+
+    def add_emergency_fill_flags(self, df):
         """
-        Utilizando las mismas etiquetas que cuando se entreno el modelo para el pais, convierto columnas string a integer
-
-        # Parameters
-            df: Dataframe con algunas columnas string las cuales necesitamos convertir a integer
-            df_etiquetas_loaded: Conversion de valores string a integer (usada en el entrenamiento).
-            columns_selected: Para determinar las columnas a codificar 
-
-        # Return
-            df: Dataframe pasado como parametro habiendo convertido sus columnas string a integer tal como en el entrenamiento.
+        Agrega dos columnas booleanas:
+        - 'emergency_fill': 1 si hay al menos un NaN en la fila (en cualquier columna).
+        - 'player_emergency_fill': 1 si hay al menos un NaN en columnas que contienen 'player' en su nombre.
         """
-        logger.info("Tagging string data to integer..")
+        df_aux = df.copy()
 
-        # Determino columnas a codificar
-        l_col_codificadas = df_etiquetas_loaded['variable'].unique()
-        l_col_a_codificar = [col for col in l_col_codificadas if col in columns_scaled]  # Las col selected no puedo porque falla el scaler..
+        # Marca 1 si la fila tiene al menos un NaN en cualquier columna
+        df_aux['emergency_fill'] = df_aux.isna().any(axis=1).astype(int)
 
-        # Codifico variables categoricas a numericas con el mismo sistema que se uso en el dataframe original (es de format_data pero lo hago aca porque sino no puedo calcular la correlacion de las variables no numericas...)
-        df, df_etiquetas = format_data.convert_columns_to_int_already_tagged(df=df, df_etiquetas=df_etiquetas_loaded, l_col_a_codificar=l_col_a_codificar, verbose=2)  # Si o si tengo que devolver df_etiquetas?
+        # Marca 1 si hay al menos un NaN en columnas que contienen 'player' en su nombre
+        player_cols = [col for col in df_aux.columns if 'player' in col]
+        df_aux['player_emergency_fill'] = df_aux[player_cols].isna().any(axis=1).astype(int)
+
+        return df_aux
+
     
-        if self.export:
-            df.to_excel(f'{self.BASE_DIR}/df_tagged.xlsx', index=True) 
-            df_etiquetas.to_excel(f'{self.BASE_DIR}/df_etiquetas_actualizado.xlsx', index=False) 
-        return df
-
-    def clean_data_2_new(self, df: pd.DataFrame, scaler_loaded, columns_scaled, columns_selected, verbose: int = 0):
-        """
-        Filtrado por competencias y escalado de datos.
-        """
-        logger.info("Cleaning data 2...")
-
-        # Reemplazo infinitos
-        df = clean_data.replace_infinite(df)
-
-        # Para evitar ciertas competencias --> Moverlo a clean antes de construir?
-        n_col_inic = len(df.columns)
-
-        # El scaler necesita exactamenete las mismas cols que escaló durante el train (no se por que ger tiene loc_efficiency de mas...)
-        missing_cols = set(columns_scaled) - set(df.columns)
-        extra_cols = set(df.columns) - set(columns_scaled)
-
-        if missing_cols:
-            logger.warning(f"Faltan columnas en los nuevos datos: {missing_cols}")
-            for col in missing_cols:
-                df[col] = 0  # O usa df[col] = df[col].mean() si prefieres
-            
-        if extra_cols:
-            logger.info(f"Se eliminarán columnas extra: {extra_cols}")
-            df = df[columns_scaled]  # Ahora sí seleccionas las columnas correctas
-
-        # Selecciono las mismas caracteristicas con las que entrene el scaler (sino, falla)
-        df = df.loc[:, columns_scaled]
-        if verbose >= 1:
-            logger.info(f"Columnas luego de filtrar x columnas scaled: {n_col_inic} --> {len(df.columns)}")
-        
-        # Tratamiento de NaN values (antes de escalar para que el 0 realmente sea 0.)
-        df, df_emergency_fill = self.treat_nan_values_new(df=df, columns_selected=columns_selected)
-
-        # Transforma los nuevos datos de predicción utilizando el StandardScaler cargado
-        try: 
-            X_scaled = scaler_loaded.transform(df)
-            X_scaled_df = pd.DataFrame(X_scaled, columns=columns_scaled, index=df.index)
-
-            if verbose >= 1:
-                logger.critical("El escalado fue un exito!")
-                
-        except ValueError as e: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
-            logger.error(f"El escalado tuvo un error: {e}")
-            return pd.DataFrame()
-        
-        return X_scaled_df, df_emergency_fill
-
-    def treat_nan_values_new(self, df: pd.DataFrame, columns_selected, verbose: int = 0):
-        """
-        Remoción de valores NaN 
-
-        # Parameters:
-            df: Dataframe al cual remover NaN values. (DataFrame)
-            columns_selected: Listado de columnas seleccioandas para usar en produccion. (list)
-        
-        # Returns:
-            df: Dataframe pasado como parametro sin registros con al menos un NaN value. (DataFrame)
-        """
-        logger.info("Treating NaN values...")
-        df_filled_columns = pd.DataFrame(0, index=df.index, columns=['emergency_fill', 'player_emergency_fill']) # Inicializo el df
-
-        # Rellenar NaN en algunas columnas espeecificas
-        columns_to_fill = [col for col in df.columns if df[col].isna().any()]  # En teoria, solo rellena las variables historicas que son nan.
-
-        # Determino que  variables rellena Y que fueron seleccionadas (podria rellenarla y no ser seleccionada)
-        columns_to_fill_sel =  [col for col in columns_to_fill if col in columns_selected]
-        if self.verbose >= 1:
-            logger.info(f'Nº columnas a rellenar: {len(columns_to_fill)}')
-            logger.info(f'Nº columnas a rellenar (que fueron seleccionadas): {len(columns_to_fill_sel)}')
-            logger.info(f'Nº columnas seleccionadas: {len(columns_selected)}')
-
-        if columns_to_fill:
-            # Crear una copia del DataFrame y rellenar los NaN
-            df_copy = df.copy()
-            df_copy[columns_to_fill] = df_copy[columns_to_fill].fillna(0)
-
-            # Identificar filas donde se rellenaron NaN
-            filled_rows = (df[columns_to_fill_sel].isna() & (df_copy[columns_to_fill_sel] == 0)).any(axis=1)
-
-            # Crear DataFrame con las columnas rellenadas y `emergency_fill`
-            df_filled_columns = df_copy.loc[filled_rows, columns_to_fill_sel]
-            df_filled_columns['emergency_fill'] = 1
-
-            # Columna con valor 0 o 1 según si se rellenaron columnas con "player_start" o "player_sub"
-            player_columns = [col for col in columns_to_fill_sel if "player_start" in col or "player_sub" in col]
-            df_filled_columns['player_emergency_fill'] = (
-                (df[player_columns].isna() & (df_copy[player_columns] == 0)).any(axis=1).astype(int)
-            )
-
-            # Calcular cuántas columnas se rellenaron de emergencia para cada fila
-            df_filled_columns['n_cols_filled'] = (
-                (df[columns_to_fill].isna() & (df_copy[columns_to_fill_sel] == 0)).sum(axis=1)
-            )
-
-            # Calcular el porcentaje de columnas rellenadas de emergencia para cada fila --> es ANTES de seleccionar las columnas... TAl vez ni siquiera usas esas columnas rellenadas.
-            df_filled_columns['perc_cols_filled'] = (
-                df_filled_columns['n_cols_filled'] / len(columns_selected) * 100
-            )
-
-            # Crear una columna con el listado de columnas rellenadas por cada registro
-            try:
-                df_filled_columns['l_col_filled'] = df[columns_to_fill_sel].apply(
-                    lambda row: [col for col in columns_to_fill_sel if pd.isna(row[col]) and df_copy.at[row.name, col] == 0], axis=1
-                )
-            except ValueError: # ValueError: Length of values (0) does not match length of index (12)
-                pass
-                
-            if self.export:
-                df_filled_columns.to_excel(f'{self.BASE_DIR}/df_filled_columns.xlsx', index=True)
-
-            # Calcular y mostrar el porcentaje de NaN por cada columna
-            for col in columns_to_fill:
-                nan_percentage = df[col].isna().mean() * 100
-
-                if verbose >= 1:
-                    logger.warning(f"Columna '{col}' tiene {nan_percentage:.1f}% de valores NaN.")
-
-            # Actualizar el DataFrame original
-            df = df_copy
-
-        # Elimino partidos con al menos un NaN value --> Tal vez lo deberia poner al ppio para imprimir warning de cuantos partidos eliminaria...
-        df_sin_dup = df.dropna()
-        if verbose >= 1 and (len(df) != len(df_sin_dup)):
-            logger.warning(f"De los {len(df)} partidos, no se hará la prediccion para {len(df)-len(df_sin_dup)} partidos puesto que tienen al menos un valor NaN y el modelo no puede tener input NaN.")
-
-        if self.export: 
-            df_sin_dup.to_excel(f'{self.BASE_DIR}/df_selected_nan.xlsx', index=True)
-
-        return df_sin_dup, df_filled_columns
-        
-    def select_data_new(self, df: pd.DataFrame, l_columns: list, verbose: int = 0):
-        """
-        Selecciona las variables que necesita el modelo ya entrenado.
-
-        # Parameters:
-            df: Dataframe con los proximos partidos. (DataFrame)
-            l_columns: Lista de columnas a seleccionar. (list)
-        
-        # Returns
-            Dataframe con las variables seleccionadas. (DataFrame)
-        """
-        logger.info("Selecting data...")
-        
-        # Selecciono las variables que necesita el modelo
-        n_col_inic = len(df.columns)
-        df = df[l_columns]
-
-        if verbose >= 1:
-            logger.info(f"Columnas luego de filtrar x mas importantes: {n_col_inic} --> {len(df.columns)}")
-
-        if self.export:
-            df.to_excel(f'{self.BASE_DIR}/df_selected.xlsx', index=True)
-        return df
-
 class TrainingDataLoader():
     """
     Carga los hiperparametros y ciertos modelos (e.g. scaler) que se usaron durante el entrenamiento para luego poder usarlos en producción.
@@ -553,67 +414,61 @@ class TrainingDataLoader():
         Cargo hiperparametros de DataPreparation()
         """
         d = {}
-
-        # Si se levanta de main_find_best_hyper.py
-        if self.n_model is not None:
             
-            df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")
-   
-            # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
-            try:
-                row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
-            except IndexError:
-                logger.error(f"El modelo {self.n_model} no fue entrenado en el entrenamiento del {self.iteration_date}.")
-                raise IndexError
+        df_iteration = pd.read_excel(f"{self.BASE_DIR_mod}/df_iteration.xlsx")
 
-            ## Levanto columnas utilizadas para entrenar el modelo
-            # selected_columns = eval(row_hiper['X_columns'].values[0])  # eval() para pasar de string a lista
-            selected_columns = eval(row_hiper['X_columns'])  # eval() para pasar de string a lista
-        # Si se levanta de main.py
-        else:
-            row_hiper = pd.read_excel(f'./data/{self.country}/p3_data_preparation/df_hiper_prep.xlsx')
+        # Selecciono la primera. Hay una por modelo entrenado pero los hiper son =.
+        try:
+            row_hiper = df_iteration[df_iteration['n_iteration'] == self.n_model].iloc[0]  
+        except IndexError:
+            logger.error(f"El modelo {self.n_model} no fue entrenado en el entrenamiento del {self.iteration_date}.")
+            raise IndexError
 
-            ## Levanto columnas utilizadas para entrenar el modelo
-            df_selected = pd.read_excel(f'./data/{self.country}/p3_data_preparation/df_selected.xlsx', index_col=0)
-            df_selected = df_selected.drop(['result'], axis=1)
-            selected_columns = list(df_selected.columns)
-            logger.error("Se levantan los hiperparametros de Data Preparation desde de main.py")
-
+        def value_none(value):
+            """
+            Evitar nan y forzar None
+            """
+            if pd.isna(value):  # Verifica si es NaN o None
+                return None
+            else:
+                return value
+            
         # Guardo hiperparametros en diccionario
+        # clean_post_integrate
+        d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
+        d['n_years_to_select'] = value_none(row_hiper['n_years_to_select'])
         ## Construct_data
         d['n_last_matches'] = eval(row_hiper['n_last_matches']) 
         d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
         d['segun_localia'] = row_hiper['segun_localia'] # .values[0]
         d['calculate_dif'] = row_hiper['calculate_dif'] # .values[0]
-        ## Clean_data_2
-        n_years_to_select = row_hiper['n_years_to_select'] # .values[0]
-        d['n_years_to_select'] = None if pd.isna(n_years_to_select) else int(n_years_to_select) # Si n_years_to_select es NaN, lo paso de np.nan a None
-        d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
-        if pd.isna(row_hiper['fill_na']):  # Verifica si es NaN o None
-            d['fill_na'] = row_hiper['fill_na'] = None
-        elif isinstance(row_hiper['fill_na'], float):
-            d['fill_na'] = '0'
-        else:
-            d['fill_na'] = row_hiper['fill_na']
         d['decay_rate'] = 0 if row_hiper['decay_rate'] == 0.0 else row_hiper['decay_rate'] 
         ## Select_data
-        d['selected_columns'] = selected_columns
+        d['thr_corr'] = value_none(row_hiper['thr_corr'])
+        d['thr_fs'] = value_none(row_hiper['thr_fs'])
+        # clean_post_select
+        d['fill_na'] = value_none(row_hiper['fill_na'])
+        if isinstance(d['fill_na'], float):
+            d['fill_na'] = '0'
+        d['selected_columns'] = eval(row_hiper['X_columns'])  # Columnas utilizadas para entrenar el modelo # eval() para pasar de string a lista
 
-        self.path_clean = f'{d['comp_to_select']}'
-        self.path_construct = f'{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['calculate_dif']}_{d['decay_rate']}'
-        self.path_clean_2 = f'{d['n_years_to_select']}_{d['fill_na']}'
+        # Construyo paths para levantar modelos / datos de cuando entrené
+        self.path_clean = f'{d['comp_to_select']}_{d['n_years_to_select']}'
+        self.path_construct = f'{self.path_clean}__{d['n_last_matches']}_{d['n_years_h2h']}_{d['segun_localia']}_{d['calculate_dif']}_{d['decay_rate']}'
+        self.path_sel = f'{self.path_construct}__{d['thr_corr']}_{d['thr_fs']}_{d['fill_na']}'
 
+        # Imprimo hiper levantados
         if self.verbose >= 0:
             logger.info("Hiperparametros cargados:")
             for key, value in d.items():
                 logger.info(f'\t {key}: {value}')
+
         return d
 
     def load_df_etiquetas(self):
 
         logger.info("Levento etiquetas con el que entrené")
-        subpath = f'{self.path_clean}__{self.path_construct}'
-        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{subpath}.xlsx'       
+        path_tag = f'{self.BASE_DIR_dp}/tag/df_etiquetas_{self.path_construct}.xlsx'       
         df_etiquetas = pd.read_excel(path_tag, index_col=0)
 
         if self.verbose >= 1:  
@@ -625,9 +480,7 @@ class TrainingDataLoader():
         """
         Levanto modelo utilizado en entrenamiento para escalar datos
         """
-        subpath = f'{self.path_clean}__{self.path_construct}__{self.path_clean_2}'
-        path_scaler = f'{self.BASE_DIR_dp}/clean_data_2/scaler_model_{subpath}.pkl'
-
+        path_scaler = f'{self.BASE_DIR_dp}/clean_post_select/scaler_model_{self.path_sel}.pkl'
         scaler, columns_scaled = joblib.load(path_scaler)
         return scaler, columns_scaled
 
@@ -910,6 +763,7 @@ def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, holgur
 
     return df_filt
 
+
 ########################################################################## MAIN #######################################################################
 def main(
         d_run: dict, id_country: int, iteration_date: str,
@@ -917,7 +771,8 @@ def main(
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
         porc_m: float = None, d_model: dict = None,                                                     # Modeling
-        verbose: int = 1, export: bool = True, country: str = None
+        verbose: int = 1, export: bool = True, country: str = None,
+        date_missing = None
         ):
     """
     Recoleccion de proximos partidos, preparacion y prediccion
@@ -1033,11 +888,7 @@ def main(
 
         if verbose >= 2:
             du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
-        
-        # SOFIFA
-        df_player_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_sofifa.xlsx", index_col=0)
-        df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_fifa_sofifa.xlsx")
-
+    
         if verbose >= 1:
             print("\n DF MATCH \n", df_match.head(2))
             print("\n DF MATCH PLAYER \n", df_match_player.head(2))
@@ -1048,17 +899,25 @@ def main(
         logger.warning("Se evitó por comando la extraccion de proximos partidos.")
 
         if predict_missing:
+
             logger.info("Uso los partidos df_match MISSING ya extraidos.")
             df_match, df_match_player, df_match_odds = df_match_miss.copy(), df_match_player_miss.copy(), df_match_odds_miss.copy()
             df_match = df_match[df_match['id_competition'].isin(comp_public)]
  
-            # Levanto df_integrated de cuando entrené modelos
-            df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0)
+            # Levanto df_integrated de cuando entrené modelos (tmb los que use en test...)
+            df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0) 
             
+            # Podria volver a predecir como prox partido un partido de test (con el que entrené) ? --> Para comparar probas del = partido en test y prod. Son muy similares :)
+            if date_missing is not None:
+                len_inic = len(df_integrated_train)
+                date_missing = pd.to_datetime()
+                df_integrated_train = df_integrated_train[df_integrated_train['date'] <= date_missing]
+                logger.info(f'Tras seleccionar partidos anteriores a {date_missing}: {len_inic} --> {len(df_integrated_train)}')
+
             # Selecciono los missing con los que no se entrenó
             df_match = df_match[~df_match.index.isin(df_integrated_train.index)]
-            df_match_player = df_match_player[~df_match_player.index.isin(df_integrated_train.index)]
-            df_match_odds = df_match_odds[~df_match_odds.index.isin(df_integrated_train.index)]
+            df_match_player = df_match_player[~df_match_player.index.isin(df_match.index)]
+            df_match_odds = df_match_odds[~df_match_odds.index.isin(df_match.index)]
             print("Shapes df_missing:", df_match.shape, df_match_player.shape, df_match_odds.shape)
 
             # Elimino los partidos missing de df_integrated_updated para evitar duplicated labels
@@ -1083,16 +942,22 @@ def main(
         user_input = str(input("Escribe 'y' para eliminar indices duplicados y seguir la prediccion: "))
 
         if user_input == 'y':
-            # Op1)  Elimino repetidos de proximos partidos a predecir (y no de df_int_updated..)
-            # logger.info(df_match.shape)
-            # df_match = df_match[~df_match.index.isin(rows_rep.index)]
-            # logger.info(df_match.shape)
 
-            # Op2) Elimino repetidos de los partidos viejos para predecir los ya jugados tmb
-            print(df_integrated_updated.shape)
-            df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
-            print(df_integrated_updated.shape)
+            user_input_2 = str(input("Escribe 'y' para predecir solo los proximos partidos: "))
+            if user_input_2 == 'y':
+                # Op1)  Elimino repetidos de proximos partidos a predecir (y no de df_int_updated..) --> no te quedan missing.
+                # No podes usar esto para comparar con assess. La diferencia puede ser grande, sobrotodo si extrajiste varios dias antes del partido.
+                logger.info(df_match.shape)
+                df_match = df_match[~df_match.index.isin(rows_rep.index)]
+                logger.info(df_match.shape)
+            else:
+                # Podria volver a cierta fecha y predecir como si fueran proximos partidos. El unico problema es que levanta partidos con cuotas desactualizadas. no se si algo mas...
+                # Op2) Elimino repetidos de los partidos viejos para predecir los ya jugados tmb
+                print(df_integrated_updated.shape)
+                df_integrated_updated = df_integrated_updated[~df_integrated_updated.index.isin(rows_rep.index)]
+                print(df_integrated_updated.shape)
         else:
+            logger.error("Se cortó la prediccion.")
             raise KeyError
         
     # En caso que no haya proximos partidos para predecir, no los preparo.
@@ -1129,7 +994,7 @@ def main(
             df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=False)
             # df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=prod_vf)
             df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
-            df = df[df['id_competition'].isin(d_hiper['comp_to_select'])]  # Clean data antes de construir
+            df = dp.clean_post_integrate(df, competencies_to_select=d_hiper['comp_to_select'], prod=True)
     
             ## Fill data
             ### Selecciono los ultimos partidos de los ya jugados para rellenar
@@ -1140,37 +1005,12 @@ def main(
             df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
 
         else:
-            # Verificacion de assess y test
-            verify_assess_and_test = False # True solo si queres verificar que assess = test. Podes comparar las predicciones de un modelo en test y lo que sale del assess (predice los partidos de test tmb)
-            if verify_assess_and_test:
-                # Format a integrate (usar lo mismo que en df_int_missing)
-                df_match, df_match_player, df_match_odds, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_match_odds, df_player_fifa_sofifa, reformat=False, prod=True, export=False)            
-                df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=False)
-                # df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=prod_vf)
-                df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
-                df = df[df['id_competition'].isin(d_hiper['comp_to_select'])]  # Clean data antes de construir
-
-            else:
-                # Forma 2: desde int_missing 
-                df = df_integrated_missing.copy()
-                print(df.shape)
-                df = df[df.index.isin(df_match.index)]
-                df = df[df['id_competition'].isin(d_hiper['comp_to_select'])] 
-                print(df.shape)
-
-            """
-            # Verificacion de prod y assess sin formaciones...
-            cols_to_replace = [col for col in df.columns if "_player_" in col]
-            df[cols_to_replace] = np.nan
-
-            ## Fill data
-            ### Selecciono los ultimos partidos de los ya jugados para rellenar
-            logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
-            df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
-            df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas.
-            ### Relleno datos
-            df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)     
-            """
+            # Forma 2: desde int_missing 
+            df = df_integrated_missing.copy()
+            print(df.shape)
+            df = df[df.index.isin(df_match.index)]
+            df = dp.clean_post_integrate(df, competencies_to_select=d_hiper['comp_to_select'], prod=True)
+            print(df.shape)
         
         ## Construct
         ### Selecciono los ultimos partidos de los ya jugados para construir
@@ -1185,15 +1025,23 @@ def main(
             columns_used=columns_scaled
             )
         
+        ## Clean data post construct
+        df = dp.clean_post_construct(df=df, prod=True)
+        
         ## Tag
-        df = dp.tag_string_data_to_integer_new(df, df_etiquetas, columns_scaled=columns_scaled)
+        df, _ = dp.tag_string_data_to_integer(df, df_etiquetas, prod=True)
         
-        ## Clean data 2
-        df, df_fill = dp.clean_data_2_new(df=df, scaler_loaded=scaler, columns_scaled=columns_scaled, columns_selected=d_hiper['selected_columns']) # Antes usaba comp_to_select pero me quedaban los partidos de todas las comp en predicciones.xlsx
-        
-        ## Select
-        df = dp.select_data_new(df, d_hiper['selected_columns'])
-        
+        ## Select --> Selecciono las variables que necesita el modelo
+        n_col_inic = len(df.columns)
+        df = df[d_hiper['selected_columns']]
+        if verbose >= 1:
+            logger.info(f"Columnas luego de filtrar x mas importantes: {n_col_inic} --> {len(df.columns)}")
+
+        ## Clean data post select
+        df = dp.clean_post_select_new(df=df, scaler_loaded=scaler)
+        df.to_excel(f"data/{country}/p6_deployment/data_preparation/df_to_predict.xlsx", index=True)
+
+        # Mensajes antes de predecir
         logger.info(f"Shape Dataframe antes de Modeling(): {df.shape}")
         if len(df) == 0:
             logger.warning("Se evitó seguir la preparacion luego de clean_data puesto que no hay partidos para la competencia.")
@@ -1213,28 +1061,32 @@ def main(
             df_match_odds = pd.read_excel(f'./data/{country}/p6_deployment/data_understanding/df_match_next_odds.xlsx', index_col=0)
             df_c1 = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/fill_data/df_copiado_formaciones.xlsx', index_col=0)
             df_c2 = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/fill_data/df_copiado_ref_and_coaches.xlsx', index_col=0)
-            df_fill = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_filled_columns.xlsx', index_col=0)
+            df_fill = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_filled.xlsx', index_col=0)
   
     #_____________________________________________________________ MODELING _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
         logger.critical(f"n_model: {n_model} model_name: {model_name} iteration_date: {iteration_date}")
-        
+        df_fill = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_filled.xlsx', index_col=0)
+
         # Predigo con modelo cargado
         if predict_missing:
             df_filled = df_fill.copy() 
             d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}
-        else:  
+        else:
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
+        print(df)
 
         # Predigo sobre proximos partidos usando modelo cargado
         y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
-        df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
 
-        # Concateno dfs + Reformateo teams
-        df_predicciones = mo.prepare_dataframe_to_assess_with_roi(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds, df_filled=df_filled)         # Concateno todos los dfs en uno solo 
-        # df_predicciones = df_predicciones[df_predicciones['id_competition'].isin(comp_public)] # Filtro partidos para quedarme solo con los de competencias publicas.
+        # Guardo como df
+        df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
+        print(df_pred_proba)
+
+        df_predicciones = mo.prepare_dataframe_to_assess_with_roi(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds)         # Concateno todos los dfs en uno solo 
+        df_predicciones = pd.concat([df_predicciones, df_filled], axis=1)
 
         # Aplico estrategia de apuesta
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
@@ -1274,15 +1126,14 @@ if __name__ == "__main__":
     
     # Defino country
     d_countries = {
-        -1: ["all", '2025-04-22'],
-        48: ["england", '2025-04-22'], 
-        55: ["france", '2025-04-23'], 
-        59: ["germany", '2025-04-23'], 
-        77: ["italy", '2025-04-23'],
-        148: ["spain", '2025-04-23'], 
+        48: ["england", '2025-05-07'], 
+        55: ["france", '2025-05-07'], 
+        59: ["germany", '2025-05-07'], 
+        77: ["italy", '2025-05-07'],
+        148: ["spain", '2025-05-07'], 
         }
 
-    id_country = 77
+    id_country = 48
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 1
@@ -1290,7 +1141,7 @@ if __name__ == "__main__":
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 235, 'model_name': "LogisticRegression"} # SVC, LogisticRegression
+    d_model = {'n_model': 93, 'model_name': "RandomForestClassifier"}
 
     if key == 'missing':
         

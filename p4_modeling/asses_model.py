@@ -39,10 +39,11 @@ def calculate_metrics(
             'f1_score_home': f1_score(y_test, y_pred, labels=[1], average='macro', zero_division=0) * 100,
             'f1_score_draw': f1_score(y_test, y_pred, labels=[0], average='macro', zero_division=0) * 100,
             'f1_score_away': f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0) * 100,
-            'precision_home': precision_score(y_test, y_pred, labels=[1], average="micro", zero_division=0) * 100,
-            'precision_draw': precision_score(y_test, y_pred, labels=[0], average="micro", zero_division=0) * 100,
-            'precision_away': precision_score(y_test, y_pred, labels=[2], average="micro", zero_division=0) * 100
         })
+
+        precision_all = precision_score(y_test, y_pred, average=None, labels=[0, 1, 2], zero_division=0)
+        for label, name in zip([0, 1, 2], ['draw', 'home', 'away']):
+            d_metrics[f'precision_{name}'] = precision_all[label] * 100
 
     # G/P x rdo --> neceseita cuotas y roi
     if gp_result:
@@ -422,6 +423,8 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
     Calcula el G/P por resultado (local, empate, visitante).
     """
     var_pred = 'predicted_result'
+
+    # Defino la columna de G/P a usar
     if var_resp == 'result':
         col_gp = 'G/P_sin_bank'
     elif var_resp == 'expected_result':
@@ -438,9 +441,9 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
     gp_away = df_pred_away[col_gp].sum()
     gp_total = gp_home + gp_draw + gp_away
 
-    perc_gp_home = calculate_perc_gp(gp_home, gp_total)
-    perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
-    perc_gp_away = calculate_perc_gp(gp_away, gp_total)
+    # perc_gp_home = calculate_perc_gp(gp_home, gp_total)
+    # perc_gp_draw = calculate_perc_gp(gp_draw, gp_total)
+    # perc_gp_away = calculate_perc_gp(gp_away, gp_total)
 
     # Crear el diccionario de resultados
     d = {
@@ -449,9 +452,9 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
         f'gp_draw': gp_draw,
         f'gp_away': gp_away,
         f'gp_total': gp_total,
-        f'%_gp_home': perc_gp_home,
-        f'%_gp_draw': perc_gp_draw,
-        f'%_gp_away': perc_gp_away,
+        # f'%_gp_home': perc_gp_home,
+        # f'%_gp_draw': perc_gp_draw,
+        # f'%_gp_away': perc_gp_away,
     }
     return d
 

@@ -153,7 +153,7 @@ def delete_not_relevant_stats(df, stats_columns, relevant_stats_columns):
     return df
 
 # 3) TRATAMIENTO DE NAN VALUES
-def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False):
+def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, verbose: int = 0):
     """
     Elimina las rows de un DataFrame que contienen un percentage alto de valores NaN.
 
@@ -167,7 +167,7 @@ def delete_rows_nan(df: pd.DataFrame, porc_nan_max: float, _print: bool = False)
    
     # Elimino rows segun umbral
     df_filtrado = df.drop(rows_to_delete)  # Elimina las rows con valores NaN
-    if _print:
+    if verbose >= 0:
         logger.warning(f"De las {len(df)} rows, se delete {len(rows_to_delete)/len(df)*100:.0f}%, quedan {len(df) - len(rows_to_delete)} rows.")
     return df_filtrado
 
@@ -187,14 +187,11 @@ def delete_columns_nan(df: pd.DataFrame, porc_nan_max: float, verbose: int = 0):
 
     # Elimina las columns identificadas del DataFrame
     df_sin_nan = df.drop(columns_delete, axis=1)
-
-    if verbose >= 0:
-        df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
-        logger.warning("Las 10 variables con más valores NaN:")
-        logger.warning(df_nan_col_sorted.head(10))
-
-    if verbose >= 1:
+    
+    if verbose >= 0 and len(columns_delete) > 0:
         logger.warning(f"De las {len(df.columns)} columns, se eliminaron {len(list(columns_delete))} por tener un % NaN mayor a thr_nan_col={porc_nan_max*100:.0f}%: {list(columns_delete)}")
+        # logger.warning(f"Eliminacion de columnas con mucho Nan. Se eliminaron {len(X_sin_col_mucho_nan.columns) - len(df.columns) } columnas de {len(X_sin_col_mucho_nan.columns)} por tener mas de {porc_nan_max*100:.0f}% de NaN values. Columnas eliminadas: \n{l_col_eliminated}")
+    
     return df_sin_nan
 
 def determine_columns_to_fill(df, percentil_nan, porc_max_fixed: float = 0.3, verbose: int = 0):
@@ -269,7 +266,7 @@ def calculate_nan_values(df, columna):
     porcentaje_nan = (cantidad_nan / len(df)) * 100
     print(f"Porcentaje de NaN en {columna}: {porcentaje_nan:.2f}%")
     
-def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int = 0): 
+def fill_nan_values(X, l_columns_to_fill: list = None, fill_type: str = "mode", verbose: int = 0): 
     """
     Relleno NaN values en las columnas especificas del Dataframe.
 
@@ -291,6 +288,7 @@ def fill_nan_values(X, l_columns_to_fill, fill_type: str = "mode", verbose: int 
     # Defino variables
     default_model = RandomForestRegressor()
     X_filled = X.copy()
+    l_columns_to_fill = l_columns_to_fill if l_columns_to_fill is not None else X.columns.tolist()  # Si no se especifica, se rellenan todas las columnas
 
     # Progress bar
     if verbose >= 0:

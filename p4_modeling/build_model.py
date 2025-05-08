@@ -10,6 +10,7 @@ from sklearn.metrics import log_loss, make_scorer, f1_score, accuracy_score
 from skopt import BayesSearchCV
 from skopt.space import Real, Integer, Categorical
 
+
 def select_best_hiperparameters(
         model, X_train: pd.DataFrame, y_train:  pd.DataFrame, X_val:  pd.DataFrame, y_val: pd.DataFrame, 
         k: int, params: dict = None, bayes: bool = True, n_iter: int = None, 
@@ -65,7 +66,7 @@ def select_best_hiperparameters(
 
         if n_iter is None:
             # Calcular iteraciones basadas en el tamaño del dataset
-            n_iter = 50 # Puedo usar estimate_bayes_iterations_2 o estimate_bayes_iterations 
+            n_iter = 30 # Puedo usar estimate_bayes_iterations_2 o estimate_bayes_iterations 
             
         # Crear el objeto BayesSearchCV
         bayes_search = BayesSearchCV(
@@ -74,7 +75,7 @@ def select_best_hiperparameters(
             cv=pds, 
             n_iter=n_iter, 
             scoring=scoring,
-            refit="cross_entropy_loss" if var_resp == 'categorical' else 'neg_mean_squared_error',  # O la métrica que prefieras
+            refit="f1_score" if var_resp == 'categorical' else 'neg_mean_squared_error',  # cross_entropy_loss # O la métrica que prefieras
             n_jobs=-1
             )
 
@@ -87,8 +88,7 @@ def select_best_hiperparameters(
             logger.info(f"Seleccion de hiperparametros optimos con Bayes en {(end_bayes - start_bayes) / 60:.1f} minutos")
 
     # GridSearch
-    else:
-        
+    else:    
         if verbose >= 1: 
             logger.warning("GridSearchCV...")
 
@@ -114,35 +114,32 @@ def select_best_hiperparameters(
         if verbose >= 1: 
             logger.info(f"Seleccion de hiperparametros optimos con Grid en {(end_grid - start_grid) / 60:.1f} minutos")
 
-    # Obtengo el mejor modelo (ya entrenado), los mejores hiper, la mejor metrica y los resultados de todas las combinaciones de hiper
-    best_model = best_search.best_estimator_ 
+    best_model = best_search.best_estimator_
     best_params = best_search.best_params_
-    best_indice = best_search.best_index_ # Metricas de la mejor combinacion
-    results = pd.DataFrame(data=best_search.cv_results_)  # Metricas de cada combinacion de params
-
+    best_index = best_search.best_index_ # Metricas de la mejor combinacion
+    results = pd.DataFrame(best_search.cv_results_)
+    
     if var_resp == 'categorical':
         d_metrics = {
-            'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_indice],
-            'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_indice],
-            'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_indice],
-            'cv_f1_score_draw': best_search.cv_results_['mean_test_f1_score_draw'][best_indice],
-            'cv_f1_combo': best_search.cv_results_['mean_test_f1_combo'][best_indice],
-            'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_indice]  # Negar porque invertimos el log_loss
+            'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_index],
+            'cv_f1_score_wei': best_search.cv_results_['mean_test_f1_score_wei'][best_index],
+            'cv_f1_score': best_search.cv_results_['mean_test_f1_score'][best_index],
+            'cv_f1_score_draw': best_search.cv_results_['mean_test_f1_score_draw'][best_index],
+            'cv_cross_entropy_loss': -best_search.cv_results_['mean_test_cross_entropy_loss'][best_index]  # Negar porque invertimos el log_loss
             # Agregar medidas de desviacion estandar. --> Solo mirar el promedio de la validación cruzada puede ocultar problemas de inconsistencia entre pliegues. Incluye siempre la desviación estándar.
         }
     else:
         d_metrics = {
-            'mean_test_neg_mean_squared_error':  best_search.cv_results_['mean_test_score'][best_indice]
+            'mean_test_neg_mean_squared_error': best_search.cv_results_['mean_test_score'][best_index]
         }
 
     # Mejores hiperparámetros
     if verbose >= 0:
-        # print("Índice seleccionado por GridSearchCV:", best_search.best_index_)
-        # print("Mejor pérdida de entropía cruzada encontrada:", best_search.cv_results_['mean_test_cross_entropy_loss'][grid_search.best_index_])
         logger.info(f"Mejor combinación de parameters: {best_params} \n Metricas de la mejor comb (scoring): {d_metrics} ")
 
     return best_model, best_params, d_metrics, results
 
+# Metricas a calcular y maximizar para selec hiper
 def default_scoring(target_type: str, verbose: int = 0):
     """
     Asigna un valor default a scoring según la variable respuesta. Metricas a medir en GridSeachCV.
@@ -163,10 +160,7 @@ def default_scoring(target_type: str, verbose: int = 0):
             'f1_score_wei': make_scorer(f1_score, average='weighted'),
             'f1_score_draw': make_scorer(f1_score_class_0),
             'cross_entropy_loss': make_scorer(log_loss, greater_is_better=False, response_method="predict_proba"),
-            'f1_combo': make_scorer(
-                lambda y_true, y_pred: 0.6 * f1_score(y_true, y_pred, average='macro') + 
-                                    0.4 * f1_score(y_true, y_pred, labels=[0], average="micro") # 0.3 + 0.7 genera modelos que predicen solo 0.
-            ),
+            'f1_logloss_combo': combined_scorer(alpha=0.7),
         }
 
     elif target_type == 'continuous':
@@ -184,6 +178,37 @@ def default_scoring(target_type: str, verbose: int = 0):
 def f1_score_class_0(y_true, y_pred):
     return f1_score(y_true, y_pred, labels=[0], average="micro")  # 'micro' cuenta solo los positivos en la clase 0
 
+def combined_f1_logloss(y_true, y_pred, y_proba, alpha=0.7):
+    """
+    alpha: peso del f1_score (entre 0 y 1). El complemento se asigna a log_loss.
+    """
+    f1 = f1_score(y_true, y_pred, average='macro')
+
+    # Evitar log_loss infinita
+    eps = 1e-15
+    y_proba = np.clip(y_proba, eps, 1 - eps)
+
+    # Log loss normalizada (0 = perfecta, 1 = pésima o baseline)
+    ll = log_loss(y_true, y_proba)
+    
+    # Normalización: asumimos que el máximo log_loss posible ≈ log(n_classes)
+    n_classes = y_proba.shape[1]
+    max_ll = np.log(n_classes)
+    ll_normalized = ll / max_ll
+
+    # Convertimos log_loss a score (mayor es mejor)
+    log_score = np.clip(1 - ll_normalized, 0, 1)
+
+    # Combinamos ambos
+    return alpha * f1 + (1 - alpha) * log_score
+
+def combined_scorer(alpha=0.7):
+    def score_func(estimator, X, y):
+        y_pred = estimator.predict(X)
+        y_proba = estimator.predict_proba(X)
+        return combined_f1_logloss(y, y_pred, y_proba, alpha=alpha)
+    return score_func
+
 def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     """
     Selecciona el mejor modelo según la métrica adecuada. La metrica de las de "scoring" que usaremos para seleccionar
@@ -197,7 +222,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
     - Índice del mejor modelo según la métrica correspondiente.
     """
     metrics = {
-        'categorical': 'mean_test_cross_entropy_loss', # --> no hay tanta dif entre f1_score y error pues estan corr.
+        'categorical': 'mean_test_f1_logloss_combo',
         'continuous': 'mean_test_score'  # En lugar de 'mean_test_neg_mean_squared_error' 
     }
 
@@ -211,6 +236,7 @@ def custom_refit(cv_results, target_type='categorical', verbose: int = 0):
 
     return cv_results[key].argmax() # # Mayor valor negativo (menor pérdida real) # CUIDADO con la metrica que uses para ver si usar argmax() o argmin()
 
+# Espacio de hiperparametros
 def check_best_params_limits(best_params, space):
     for param, value in best_params.items():
         # Obtiene el rango del parámetro desde el espacio
@@ -241,16 +267,16 @@ def space_params(model_name, bayes, verbose: int = 0):
     # Return
         params: Parametros a evaluar para el modelo dado (list o dict)
     """
-    # Arboles de decision
-    l_n_estimators = [5, 11, 21, 41]
+    # Defino hiperparametros de arboles de decision
+    l_n_estimators = [31, 51, 101]
     l_learning_rate = [0.001, 0.01, 0.1]
-    l_max_depth = [3, 5, 7, 10, None] # None
-    l_min_samples_leaf = [2, 11, 21, 51] # [21, 51]
+    l_max_depth = [3, 5, 7] # None, 10
+    l_min_samples_leaf = [21, 51] # [21, 51]
     l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
     l_max_features = ["sqrt", None] # "log2",  # None juega sobreotdo cdo quedan pocas variables predictoras...
     l_bootstrap = [True]
 
-    # Logistic
+    # Defino hiperparametros de LogisticRegression
     l_max_it = [10000] # aumentar max_iter no causa overfitting en LogisticRegression()
     param_c = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]
     l_tol = [1e-4, 1e-3, 1e-2]
@@ -266,11 +292,11 @@ def space_params(model_name, bayes, verbose: int = 0):
             'max_features': Categorical(l_max_features) if bayes else l_max_features, # Real(0.1, 1.0)
         },
         'RandomForestClassifier': {
-            'n_estimators': Integer(10, 200) if bayes else l_n_estimators,
+            'n_estimators': Integer(100, 200) if bayes else l_n_estimators,
             'criterion': Categorical(['entropy', 'gini']) if bayes else ['entropy', 'gini'],
             'max_depth': Categorical(l_max_depth) if bayes else l_max_depth,
-            'min_samples_split': Integer(10, 51) if bayes else l_min_samples_split, # Mayor o igual a 2
-            'min_samples_leaf': Integer(10, 51) if bayes else l_min_samples_leaf,
+            'min_samples_split': Integer(30, 51) if bayes else l_min_samples_split, # Mayor o igual a 2
+            'min_samples_leaf': Integer(20, 51) if bayes else l_min_samples_leaf,
             'max_features': Categorical(l_max_features) if bayes else l_max_features, # Real(0.1, 1.0)
             'bootstrap': Categorical(l_bootstrap) if bayes else l_bootstrap # False
         },
@@ -284,23 +310,19 @@ def space_params(model_name, bayes, verbose: int = 0):
             # 'verbose': Categorical([0]) if bayes else [0]
         },
         'XGBClassifier': {
-            'booster': Categorical(['gbtree', 'dart']) if bayes else ['gbtree'], # 'gbtree',
-            'n_estimators': Integer(5, 120) if bayes else l_n_estimators,  # Suele ganar con 100
-            'max_depth': Categorical(l_max_depth) if bayes else l_max_depth, # 3, 
-            'learning_rate': Real(0.001, 1) if bayes else l_learning_rate,
-            # 'min_child_weight': Integer(1, 10) if bayes else [1, 5], #5
-            'grow_policy': Categorical(['depthwise', 'lossguide']) if bayes else ['depthwise', 'lossguide'],
+            'booster': Categorical(['gbtree']) if bayes else ['gbtree'], # 'gbtree', 'dart'
+            'n_estimators': Integer(10, 30) if bayes else [10, 20, 30],  # Suele ganar con 100
+            'max_depth': Integer(3, 6) if bayes else l_max_depth, # 3, 
+            'learning_rate': Real(0.01, 0.1, prior="log-uniform") if bayes else l_learning_rate,
+            'min_child_weight': Integer(3, 10) if bayes else [3, 10], #5
+            'grow_policy': Categorical(['lossguide']) if bayes else ['depthwise', 'lossguide'], # 'depthwise'
+            'subsample': Real(0.6, 0.9) if bayes else [0.6, 0.9],
+            'colsample_bytree': Real(0.6, 0.9) if bayes else [0.6, 0.9],
+            # Regularizacion. --> Demasiada regularizacion puede llevar a predicciones uniformes 33-33-33.
+            'gamma': Real(0.3, 1.0) if bayes else [0.3, 0.65, 1],
+            'alpha': Real(0.5, 2.0, prior="log-uniform") if bayes else [0.5, 2.0],
+            'lambda': Real(1.0, 5.0, prior="log-uniform")if bayes else [1.0, 5.0]
             # 'verbosity': Categorical([1]) if bayes else [1] # 0 (silent), 1 (warning), 2 (info), and 3 (debug). Por default es 1.
-
-            # Evitar si los datos ya estan balanceados
-            # 'subsample': Real(0.8, 1.0) if bayes else [1.0], #  sample of the training data prior to growing trees
-            # 'colsample_bylevel': Real(0.3, 1.0) if bayes else [1.0],
-            # 'colsample_bytree': Real(0.3, 1.0) if bayes else [1.0],
-
-            # Demasiada regularizacion puede llevar a predicciones uniformes 33-33-33.
-            'gamma': Real(0, 1) if bayes else [0],
-            'alpha': Real(0.001, 1) if bayes else [0.001],
-            'lambda': Real(0.001, 1) if bayes else [0.001],
         },
         'GradientBoostingClassifier': { # Tarda muchisimo en entrenar
             'n_estimators': Integer(100, 300) if bayes else l_n_estimators, 
@@ -348,6 +370,16 @@ def space_params(model_name, bayes, verbose: int = 0):
                 'warm_start': Categorical([True, False]) if bayes else [True, False]
                 }
         ],
+        'Lasso': {
+            'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
+            'fit_intercept': [True, False],  # Indica si se debe ajustar un intercepto (término independiente) en el modelo.
+            'precompute': [True, False],  # Indica si se deben precalcular las matrices de productos internos para acelerar el ajuste del modelo.
+            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para converger durante el ajuste del modelo.
+            'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
+            'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
+        },
+
+        # Otros / Hibridos
         'SVC': {
             'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3], # Controls strictness of the missclassifications. +, + over
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'], # Tipo de plano separador de clases.
@@ -356,6 +388,14 @@ def space_params(model_name, bayes, verbose: int = 0):
             'shrinking': Categorical([True, False]) if bayes else [True, False],
             'probability': Categorical([True]) if bayes else [True],
             'decision_function_shape': Categorical(['ovo', 'ovr']) if bayes else ['ovo', 'ovr']
+        },
+        'PCA': {
+            'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
+            'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
+            'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
+            'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
+            'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
+            'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
         },
 
         # REDES NEURONALES
@@ -371,23 +411,6 @@ def space_params(model_name, bayes, verbose: int = 0):
             'early_stopping': Categorical([True, False]) if bayes else [True]
         },
 
-        # OTROS 2
-        'PCA': {
-            'n_components': [None, 2, 3, 4, 5, 8, 10, 15],  # Si gana None, elimina 1 sola variable... # Número de componentes principales a mantener
-            'whiten': [False, True],  # Indica si aplicar blanqueamiento de los datos
-            'svd_solver': ['auto', 'full', 'arpack', 'randomized'], # Algoritmo de descomposición SVD a utilizar
-            'iterated_power': [0, 1, 2],  # Número de veces que se aplica el método de la potencia iterada
-            'tol': [0.0, 0.001, 0.01],  # Tolerancia para la convergencia del algoritmo
-            'copy': [True, False]  # Copiar los datos de entrada o modificarlos en su lugar
-        },
-        'Lasso': {
-            'alpha': [0.1, 1.0, 10.0],  # Parámetro de regularización que controla la fuerza de la penalización L1. Un valor más alto de alpha produce una mayor regularización y puede conducir a una selección más agresiva de características.
-            'fit_intercept': [True, False],  # Indica si se debe ajustar un intercepto (término independiente) en el modelo.
-            'precompute': [True, False],  # Indica si se deben precalcular las matrices de productos internos para acelerar el ajuste del modelo.
-            'max_iter': [100, 500, 1000],  # Número máximo de iteraciones para converger durante el ajuste del modelo.
-            'positive': [True, False],  # Indica si se deben restringir los coeficientes a ser solo valores no negativos.
-            'selection': ['cyclic', 'random']  # Método de selección de características. 'cyclic' utiliza el orden cíclico de las características para ajustar el modelo, mientras que 'random' selecciona aleatoriamente características en cada iteración.
-        },
     }
 
     # Busco hiperpamateros default a probar
@@ -398,6 +421,7 @@ def space_params(model_name, bayes, verbose: int = 0):
 
     return params
 
+# Iteraciones de BayesSearchCV
 def estimate_bayes_iterations(param_space, scaling_factor=0.01, min_iters=10, max_iters=500):
     """
     Estima el número óptimo de iteraciones para BayesSearchCV en función del espacio de búsqueda.
@@ -446,6 +470,7 @@ def estimate_bayes_iterations_2(num_samples, num_hyperparameters, mult_iter: flo
 
     return min(max(n_iter, min_iter), max_iter) # Asegurarse de que n_iter sea al menos 50
 
+# Cross validation manual
 def manual_cross_validation(model, X_train, y_train, k=5):  # Funciona igual que la libreria (podria utilizar la libreria si quiero o no) # antes recibia X e y --> lo saque para hacer la division en train y test en generate test design
     """
     Realiza cross validation para evaluar el rendimiento del modelo entrenado.
