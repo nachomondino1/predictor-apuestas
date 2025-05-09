@@ -287,6 +287,9 @@ class BettingStrategy:
 
             df['stake_to_bet'] = a * (b ** df['prob_result_to_bet'])
         
+        # Aumento stake en dp (forma manual de usar un stake mas alto en dp)
+        df.loc[df['result_to_bet'].isin([-1, -2]), 'stake_to_bet'] *= 10
+
         # Disminuyo stake por rellenado de emergencia
         df = self.stake_reduction_emergency_fill(df, porc_emergency=porc_emergency)
 
@@ -392,7 +395,9 @@ class BettingStrategy:
             d_metricas[cont] = param_dict
 
         if len(param_combinations) == 1: 
-            d_predic, d_metricas = df_pred_with_metrics, d_metrics
+            d_predic[cont] = df_pred_with_metrics
+            d_metricas[cont] = param_dict
+            # d_predic, d_metricas = df_pred_with_metrics, d_metrics  # Si hay una sola, evitar seleccion y listo pero no cambiar el formato..
 
         return d_predic, d_metricas
 
@@ -522,7 +527,7 @@ class BettingStrategy:
                 # Calculo roi por cada set de hiper de apuesta
                 d_predic, d_metricas = self.calculate_roi_in_combinations(df_result, d_params=d_params_aux)
 
-                # Determinar mejor estrategia para el resultado      
+                # Determinar mejor estrategia para el resultado
                 n_comb = self.select_best_parameters(d_metricas, roi_weight=roi_weight)
                 
                 if pd.isna(n_comb):
@@ -722,7 +727,7 @@ def determine_bs_for_model(
  
     return df_strat, df_pred_with_stra
 
-def strategy_metrics(df_pred_test, df_pred_with_stra, gp_met: bool = True, stake_met: bool = True, metrics_by_res: bool = True, dp_met: bool = True):
+def strategy_metrics(df_pred_test, df_pred_with_stra, dp_met: bool = True):
 
     def calculate_metrics(df_pred, col_name, df_metrics):
         df_metrics.loc['roi', col_name] = determine_roi(df_pred) * 100
@@ -827,145 +832,50 @@ def strategy_negative_roi(df_strat, df_pred_test, d_params):
             
     return df_strat
 
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-
-    l_countries = [48, 55, 59, 77, 148] 
-    one_model = True
-    assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
-
-    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
-
-    # Defino hiperparametros de apuesta
-    bs_per_res = True
-    ## Result to bet
-    vary_dp = False # Doble oportunidad --> te recomendaria que fuerzes dp con curvas linear o kelly_linear (sin kelly) para no inflar su stake desmedidamente
-    ## Stake to bet
-    strat = ['kelly', 'kelly_linear'] # 'linear' no usar linear para que no pueda usar mas stake en 1 o 2 si justo hubo una buena racha como en SPA
-    space_m = [10, 11, 10] # Problema al variar: muev
-    vary_k = True
-    ## Seleccion de bs
-    roi_weight = 1 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
-
-    d_countries = {
-        48: ["england"],
-        55: ["france"], 
-        59: ["germany"],
-        77: ["italy"],
-        148: ["spain"]
-        }
-        
-
-    # (1) Junto el roi_sin_ea por rdo de cada pais
-    df_rois = pd.DataFrame()
-
-    for id_country in l_countries:
-        country = d_countries[id_country][0]
-        
-        row = df_best_models[df_best_models['id_country'] == id_country]
-        iteration_date_dt = row['iteration_date'].values[0]
-        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
-        
-        n_model = int(row['n_model'].values[0])
-        model_name = str(row['model_name'].values[0])
-        print(f"N_model: {n_model} Iteration date: {iteration_date}")
-
-        # Levanto df_test
-        df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
-        logger.info(df_pred_test.shape)
-        
-        # Calculo rois por rdo
-        df_rois.loc[f'{country}_1', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 1]['G/P_sin_bank'].sum()
-        df_rois.loc[f'{country}_0', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 0]['G/P_sin_bank'].sum()
-        df_rois.loc[f'{country}_2', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 2]['G/P_sin_bank'].sum()
-
+def roi_to_m(df, option, m_max):
+    """
     # Traducir roi a m
-    def roi_to_m(df, option, m_max):
+    """
+    # Op1: Escalado lineal
+    if option == 1:
+        p_min, p_max = 0, df['roi'].max() # df_rois['roi'].min()
+        df[f'roi_norm'] = (df['roi'] - p_min) / (p_max - p_min)
 
-        # Op1: Escalado lineal
-        if option == 1:
-            p_min, p_max = 0, df['roi'].max() # df_rois['roi'].min()
-            df[f'roi_norm'] = (df['roi'] - p_min) / (p_max - p_min)
+        # Calcular m por resultado
+        df['m'] = df['roi_norm'] * m_max
 
-            # Calcular m por resultado
-            df['m'] = df['roi_norm'] * m_max
+        # Reemplazo los m negativos por 0
+        df[df['m'] <= 0] = 0
 
-            # Reemplazo los m negativos por 0
-            df[df['m'] <= 0] = 0
+    # Op2: Binning en categorias de stake --> me gusta pq tiene en cuenta dif relativas en roi.
+    elif option == 2:
+        df['m'] = pd.qcut(df['roi'], q=5, labels=range(1, m_max+1))
 
-        # Op2: Binning en categorias de stake --> me gusta pq tiene en cuenta dif relativas en roi.
-        elif option == 2:
-            df['m'] = pd.qcut(df['roi'], q=5, labels=range(1, m_max+1))
+    # Op3: Escalado por percentiles (rank scaling) --> segun el ranking te da el m. No tiene en cuenta dif relativas en roi.
+    elif option == 3:
+        df['percentil'] = df['roi'].rank(pct=True)
+        df['m'] = df['percentil'] * m_max
 
-        # Op3: Escalado por percentiles (rank scaling) --> segun el ranking te da el m. No tiene en cuenta dif relativas en roi.
-        elif option == 3:
-            df['percentil'] = df['roi'].rank(pct=True)
-            df['m'] = df['percentil'] * m_max
+    # Op4: Escalado no lineal (√)
+    elif option == 4:
+        # Transformación (evita ceros)
+        df['roi_sqrt'] = np.sqrt(df['roi'].clip(lower=0.1)) #
 
-        # Op4: Escalado no lineal (√)
-        elif option == 4:
-            # Transformación (evita ceros)
-            df['roi_sqrt'] = np.sqrt(df['roi'].clip(lower=0.1)) #
+        # Luego normalizas y escalas igual que antes
+        df['roi_norm_sqrt'] = df['roi_sqrt'] / df['roi_sqrt'].max()
+        df['m'] = df['roi_norm_sqrt'] * m_max
 
-            # Luego normalizas y escalas igual que antes
-            df['roi_norm_sqrt'] = df['roi_sqrt'] / df['roi_sqrt'].max()
-            df['m'] = df['roi_norm_sqrt'] * m_max
+    # Op4: Escalado no lineal (log) # no me gustó. Stakes altos para todos.
+    elif option == 5:
+        df['roi_log'] = np.log1p(df['roi'].clip(lower=0))
+        df['roi_norm_log'] = df['roi_log'] / df['roi_log'].max()
+        df['m'] = df['roi_norm_log'] * m_max
 
-        # Op4: Escalado no lineal (log) # no me gustó. Stakes altos para todos.
-        elif option == 5:
-            df['roi_log'] = np.log1p(df['roi'].clip(lower=0))
-            df['roi_norm_log'] = df['roi_log'] / df['roi_log'].max()
-            df['m'] = df['roi_norm_log'] * m_max
-
-        return df
-    
-    df_rois = roi_to_m(df_rois, option=4, m_max=20)
-    df_rois.to_excel('/Users/nachomondino/Desktop/aksrgaksr.xlsx')
+    return df
 
 
-    # (2) Aplico bs para definir curva y k (pero no el m)
-    for id_country in l_countries:
-        country = d_countries[id_country][0]
-        
-        row = df_best_models[df_best_models['id_country'] == id_country]
-        iteration_date_dt = row['iteration_date'].values[0]
-        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
-       
-        n_model = int(row['n_model'].values[0])
-        model_name = str(row['model_name'].values[0])
-        print(f"N_model: {n_model} Iteration date: {iteration_date}")
-
-        # Levanto df_test
-        df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
-        logger.info(df_pred_test.shape)
-
-        # Defino estrategia
-        bs = BettingStrategy(verbose=0)
-
-        # Defino parametros a probar y aplico bs
-        d_params = {
-            1: {'prob_dp': [None], 'curva': ['kelly_linear', 'kelly'], 'm': [df_rois.loc[f'{country}_1', 'm']], 'b': [0], 'k': [1, 2, 4, 8]},
-            0: {'prob_dp': [None, 1], 'curva': ['linear'], 'm': [df_rois.loc[f'{country}_0', 'm']], 'b': [0], 'k': [1]}, # Creo que falla si uso solo k =1 porque hay una sola alternativa...
-            2: {'prob_dp': [None], 'curva': ['kelly_linear', 'kelly'], 'm': [df_rois.loc[f'{country}_2', 'm']], 'b': [0], 'k': [1, 2, 4, 8]}
-            }
-        
-        df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred_test, d_params, roi_weight=roi_weight)
-
-        # Aplicar doble oportunidad en resultados con roi negativo
-        if not vary_dp:    
-            df_strat = strategy_negative_roi(df_strat, df_pred_test, d_params)
-
-        # Calculo metricas de estrategia
-        df_metrics_strat = strategy_metrics(df_pred_test, df_pred_with_stra, dp_met=vary_dp)
-
-        # Exporto datos
-        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
-        df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
-        df_metrics_strat.to_excel(f"{path}/strat_metrics_{n_model}_{model_name}.xlsx", index=True)
-        df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
-
-
-    '''
+def main_1():
+     # FORMA 3 DE DEFINIR BS: 1º determino todos los bs al mismo tiempo
     l_countries = [48, 55, 59, 77, 148] 
     one_model = True
     assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
@@ -1013,11 +923,21 @@ if __name__ == "__main__":
             bs = BettingStrategy(verbose=0)
 
             # Defino parametros a probar y aplico bs
-            d_params = bs.define_hiperparameters(strategy=strat, val_min=space_m[0], val_max=space_m[1], step_m=space_m[2], vary_dp=vary_dp, vary_k=vary_k) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
-            df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, d_params=d_params, bs_per_res=bs_per_res, roi_weight=roi_weight, verbose=1)
+            # d_params = bs.define_hiperparameters(strategy=strat, val_min=space_m[0], val_max=space_m[1], step_m=space_m[2], vary_dp=vary_dp, vary_k=vary_k) # Defino hiperparametros de estrategia de apuesta a probar. Con linear no tiene en cuenta cuotas y puede llegar a apostar mucho en cuota baja.
+            # df_strat, df_pred_with_stra = determine_bs_for_model(df_pred_test, d_params=d_params, bs_per_res=bs_per_res, roi_weight=roi_weight, verbose=1)
+
+            # Defino parametros a probar y aplico bs
+            val_min, val_max, step_m = 1, 20, 1
+            d_params = {
+                1: {'prob_dp': [None, -1, -0.75, -0.5, -0.25], 'curva': ['kelly_linear', 'kelly'], 'm': list(range(val_min, val_max + 1, step_m)), 'b': [0], 'k': [1, 2, 4, 8]},
+                0: {'prob_dp': [None, 1], 'curva': ['linear'], 'm': list(range(val_min, val_max + 1, step_m)), 'b': [0], 'k': [1]}, # Creo que falla si uso solo k =1 porque hay una sola alternativa...
+                2: {'prob_dp': [None, -1, -0.75, -0.5, -0.25], 'curva': ['kelly_linear', 'kelly'], 'm': list(range(val_min, val_max + 1, step_m)), 'b': [0], 'k': [1, 2, 4, 8]}
+                }
+            
+            df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred_test, d_params, roi_weight=roi_weight)
 
             # Actualizar bs de resultados que son negativos
-            df_strat = strategy_negative_roi(df_strat, df_pred_test, vary_dp, space_m, vary_k, bs_per_res)
+            # df_strat = strategy_negative_roi(df_strat, df_pred_test, vary_dp, space_m, vary_k, bs_per_res)
 
             # Calculo metricas de estrategia
             df_metrics_strat = strategy_metrics(df_pred_test, df_pred_with_stra, dp_met=vary_dp)
@@ -1036,5 +956,237 @@ if __name__ == "__main__":
             df_result = determine_bs_all_models(df_ite, country, iteration_date, date_assess, roi_weight=roi_weight)
             df_result.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/df_ite_bs.xlsx", index=True)
 
+def main_2(df_best_models, d_countries, assess, date_assess):
+    
+    # FORMA 2 DE DEFINIR BS: 1º determino m con roi_sin_ea. 2º aplico bs con m del paso 1.
+    # Problema: No puedo usar un m mas alto en doble oportunidad pues define el m con el roi sin ea y yo uso el mismo m entre rdo y su dp.
+    # Por ahora no uso dp... Esta forma seria la ideal si logro separar el m de dp y rdo. O meterle un boost al stake del dp.
 
-    '''
+    # (1) Junto el roi_sin_ea por rdo de cada pais
+    df_rois = pd.DataFrame()
+
+    for id_country in l_countries:
+        country = d_countries[id_country][0]
+        
+        row = df_best_models[df_best_models['id_country'] == id_country]
+        iteration_date_dt = row['iteration_date'].values[0]
+        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
+        
+        n_model = int(row['n_model'].values[0])
+        model_name = str(row['model_name'].values[0])
+        print(f"N_model: {n_model} Iteration date: {iteration_date}")
+
+        # Levanto df_test
+        df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
+        logger.info(df_pred_test.shape)
+        
+        # Calculo rois por rdo
+        df_rois.loc[f'{country}_1', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 1]['G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_0', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 0]['G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_2', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 2]['G/P_sin_bank'].sum()
+    
+    df_rois = roi_to_m(df_rois, option=4, m_max=20)
+    df_rois.to_excel('/Users/nachomondino/Desktop/aksrgaksr.xlsx')
+
+
+    # (2) Aplico bs para definir curva y k (pero no el m)
+    for id_country in l_countries:
+        country = d_countries[id_country][0]
+        
+        row = df_best_models[df_best_models['id_country'] == id_country]
+        iteration_date_dt = row['iteration_date'].values[0]
+        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
+       
+        n_model = int(row['n_model'].values[0])
+        model_name = str(row['model_name'].values[0])
+        print(f"N_model: {n_model} Iteration date: {iteration_date}")
+
+        # Levanto df_test
+        df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
+        logger.info(df_pred_test.shape)
+
+        # Defino estrategia
+        bs = BettingStrategy(verbose=0)
+
+        # Defino parametros a probar y aplico bs
+        d_params = {
+            1: {
+                'prob_dp': [None, -0.75, -0.5, -0.25], 
+                'curva': ['kelly_linear', 'kelly'], 
+                'm': [df_rois.loc[f'{country}_1', 'm']], 
+                'b': [0], 
+                'k': [1, 2, 4]
+                },
+            0: {
+                'prob_dp': [None], 
+                'curva': ['linear'], 
+                'm': [df_rois.loc[f'{country}_0', 'm']], 
+                'b': [0], 
+                'k': [1]
+                },
+            2: {
+                'prob_dp': [None, -0.75, -0.5, -0.25], 
+                'curva': ['kelly_linear', 'kelly'], 
+                'm': [df_rois.loc[f'{country}_2', 'm']], 
+                'b': [0], 
+                'k': [1, 2, 4]
+                }
+            }
+        
+        df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred_test, d_params, roi_weight=roi_weight)
+
+        # Calculo metricas de estrategia
+        df_metrics_strat = strategy_metrics(df_pred_test, df_pred_with_stra)
+
+        # Exporto datos
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
+        df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+        df_metrics_strat.to_excel(f"{path}/strat_metrics_{n_model}_{model_name}.xlsx", index=True)
+        df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
+
+
+def main_3():
+    # FORMA 1 DE DEFINIR BS: 1º todos los params con m fijo. 2º determino m con roi_sin_ea o con_ea. 3º calculo metricas con la bs de 1 y 2.
+    # (1) Aplico bs para definir params pero con m fijo
+    # Pensé que el doble oportunidad le iba a sacar mucha mas rentabilidad. No se por que.
+    df_rois = pd.DataFrame()
+    d = {}
+
+    for id_country in l_countries:
+        country = d_countries[id_country][0]
+        
+        row = df_best_models[df_best_models['id_country'] == id_country]
+        iteration_date_dt = row['iteration_date'].values[0]
+        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
+       
+        n_model = int(row['n_model'].values[0])
+        model_name = str(row['model_name'].values[0])
+        print(f"N_model: {n_model} Iteration date: {iteration_date}")
+
+        # Levanto df_test
+        df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
+        logger.info(df_pred_test.shape)
+
+        # Defino estrategia
+        bs = BettingStrategy(verbose=0)
+
+        # Defino parametros a probar y aplico bs
+        d_params = {
+            1: {'prob_dp': [None, -0.75, -0.5, -0.25, -0.1], 'curva': ['kelly_linear', 'kelly'], 'm': [10], 'b': [0], 'k': [1, 2, 4]},
+            0: {'prob_dp': [None], 'curva': ['linear'], 'm': [10], 'b': [0], 'k': [1]}, # Creo que falla si uso solo k =1 porque hay una sola alternativa...
+            2: {'prob_dp': [None, -0.75, -0.5, -0.25, -0.1], 'curva': ['kelly_linear', 'kelly'], 'm': [10], 'b': [0], 'k': [1, 2, 4]}
+            }
+        
+        df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred_test, d_params, roi_weight=roi_weight)
+
+        # Calculo metricas de estrategia
+        # df_metrics_strat = strategy_metrics(df_pred_test, df_pred_with_stra, dp_met=vary_dp)
+
+        # Exporto datos
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
+        d[country] = [df_strat, df_pred_with_stra]
+        # df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+        # df_metrics_strat.to_excel(f"{path}/strat_metrics_{n_model}_{model_name}.xlsx", index=True)
+        # df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
+    
+
+        # Calculo rois por rdo ( con o sin ea????)
+        df_rois.loc[f'{country}_1', 'roi'] = df_pred_with_stra[df_pred_with_stra['predicted_result'] == 1]['G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_0', 'roi'] = df_pred_with_stra[df_pred_with_stra['predicted_result'] == 0]['G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_2', 'roi'] = df_pred_with_stra[df_pred_with_stra['predicted_result'] == 2]['G/P_sin_bank'].sum()
+    
+
+    # (2) Defino el m por rdo
+    df_rois = roi_to_m(df_rois, option=4, m_max=20)
+    df_rois.to_excel('/Users/nachomondino/Desktop/aksrgaksr.xlsx')
+
+
+    # (3) Obtengo bien las metricas con la estrategia usando los params de (1) + el m de (2) 
+    for id_country in l_countries:
+        country = d_countries[id_country][0]
+        
+        row = df_best_models[df_best_models['id_country'] == id_country]
+        iteration_date_dt = row['iteration_date'].values[0]
+        iteration_date = pd.to_datetime(iteration_date_dt, format='%Y-%m-%d').date()
+       
+        n_model = int(row['n_model'].values[0])
+        model_name = str(row['model_name'].values[0])
+        print(f"N_model: {n_model} Iteration date: {iteration_date}")
+
+        # Levanto df_test
+        df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
+        logger.info(df_pred_test.shape)
+
+        # Defino estrategia
+        bs = BettingStrategy(verbose=0)
+
+        # Defino parametros a probar y aplico bs --> deberia usar la df_strat_inicial...
+        df_strat_inic = d[country][0]
+        df_pred_with_stra_inic = d[country][1]
+
+        d_params = {
+            1: {
+                'prob_dp': [df_strat_inic.loc[1, 'prob_dp']], 
+                'curva': [df_strat_inic.loc[1, 'curva']], 
+                'm': [df_rois.loc[f'{country}_1', 'm']], 
+                'b': [0], 
+                'k': [df_strat_inic.loc[1, 'k']], 
+                },
+            0: {
+                'prob_dp': [df_strat_inic.loc[0, 'prob_dp']], # Creo que falla si uso solo k =1 porque hay una sola alternativa...
+                'curva': [df_strat_inic.loc[0, 'curva']],
+                'm': [df_rois.loc[f'{country}_0', 'm']], 
+                'b': [0], 
+                'k': [df_strat_inic.loc[0, 'k']]
+                }, 
+            2: {
+                'prob_dp': [df_strat_inic.loc[2, 'prob_dp']],
+                'curva': [df_strat_inic.loc[2, 'curva']],
+                'm': [df_rois.loc[f'{country}_2', 'm']],
+                'b': [0], 
+                'k': [df_strat_inic.loc[2, 'k']]
+                }
+            }
+        logger.critical(d_params)
+        
+        df_strat, df_pred_with_stra = bs.define_model_betting_strategy_by_result(df_pred_test, d_params, roi_weight=roi_weight)
+
+        # Calculo metricas de estrategia
+        df_metrics_strat = strategy_metrics(df_pred_test, df_pred_with_stra)
+
+        # Exporto datos
+        path = f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy"
+        df_strat.to_excel(f"{path}/df_strategy_{n_model}_{model_name}.xlsx", index=True)
+        df_metrics_strat.to_excel(f"{path}/strat_metrics_{n_model}_{model_name}.xlsx", index=True)
+        df_pred_with_stra.to_excel(f"{path}/predicciones_{n_model}_{model_name}.xlsx", index=True)
+    
+
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+
+    l_countries = [48, 55, 59, 77, 148] 
+    one_model = True
+    assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
+
+    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+
+    # Defino hiperparametros de apuesta
+    bs_per_res = True
+    ## Result to bet
+    vary_dp = False # Doble oportunidad --> te recomendaria que fuerzes dp con curvas linear o kelly_linear (sin kelly) para no inflar su stake desmedidamente
+    ## Stake to bet
+    strat = ['kelly', 'kelly_linear'] # 'linear' no usar linear para que no pueda usar mas stake en 1 o 2 si justo hubo una buena racha como en SPA
+    space_m = [10, 11, 10] # Problema al variar: muev
+    vary_k = True
+    ## Seleccion de bs
+    roi_weight = 1 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
+
+    d_countries = {
+        48: ["england"],
+        55: ["france"], 
+        59: ["germany"],
+        77: ["italy"],
+        148: ["spain"]
+        }
+
+    main_2(df_best_models, d_countries, assess, date_assess)
