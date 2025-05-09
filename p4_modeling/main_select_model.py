@@ -204,9 +204,9 @@ if __name__ == "__main__":
         148: ["spain", '2025-05-07'],
         }
     
-    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
-    l_metrics = ['f1_score', 'n_draw'] # aciertos_draw, n_draw # error pq ya no max error en selec hiper # Seguir experimento. El tema de n_draw es que tira abajo mal las otras metricas como f1_score..
-    l_weights = [0.7, 0.3]
+    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)     
+    l_metrics = ['f1_score_draw','f1_score_away'] #  'error'
+    l_weights = [0.6, 0.4]
 
     for id_country in l_countries:
         country = d_countries[id_country][0]

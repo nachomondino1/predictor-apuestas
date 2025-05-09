@@ -214,7 +214,8 @@ if __name__ == "__main__":
         'f1_score_away'
         ]
     l_metrics_prod = ['roi', 'expected_roi', 'error', 'expected_error',  "recall", 'f1_score', 'test_accuracy', 'expected_f1_score',
-              'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw'
+              'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw',
+              'f1_score_away', 'precision_away', 'n_away', 'aciertos_away', 'gp_away'
               ]
 
     # Por metrica de prod
