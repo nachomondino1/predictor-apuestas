@@ -133,11 +133,12 @@ class FlashscoreCrawler(Crawler):
                 d_row_match.update(self.extract_stats())
 
         ## Si existe la seccion "odds pre-match", extraigo odds de Bet365
-        if super().extract_tag(xpath='.//div[@class="oddsRowContent"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las oddss pero no hay valores...
+        if super().extract_tag(xpath='.//div[@class="odds"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las oddss pero no hay valores...
             d_row_match_odds.update(self.extract_odds())
         
         ## Si tiene hoja "Formations", extraigo campos
-        boton_formations = super().extract_tag(xpath='//a[@data-analytics-alias="lineups"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=True) #  # './/div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]'
+        print_not_next_matches = not next_matches
+        boton_formations = super().extract_tag(xpath='//a[@data-analytics-alias="lineups"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=print_not_next_matches) #  # './/div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]'
         if super().click_boton(boton_formations) is not False:
             ### Alineaciones titulares, suplentes y ausentes
             d_row_match_player.update(self.extract_lineups(next_matches))
@@ -384,7 +385,7 @@ class FlashscoreCrawler(Crawler):
         d_row = {}
 
         # Extraer las oddss en una lista
-        l_odds_elements = super().extract_tags(xpath='.//div[@class="oddsRowContent"]//div[@class="cellWrapper"]//span[@class="oddsValueInner"]', sec_wait=self.SEC_WAIT_MAX, print_fail=True)
+        l_odds_elements = super().extract_tags(xpath='.//div[@class="odds"]//span[@data-testid="wcl-oddsValue"]', sec_wait=self.SEC_WAIT_MAX, print_fail=True)
 
         if len(l_odds_elements) > 0: 
             l_text_odds_elements = [elem.text for elem in l_odds_elements]
