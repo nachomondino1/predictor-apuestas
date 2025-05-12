@@ -70,13 +70,13 @@ def assess_models_in_prod(
         # 📌 Aplicar estrategia "sin_ea"
         d_params = bs.define_hiperparameters(strategy='train')
         df_pred_met, d_rois = bs.calculate_roi_in_combination(df_pred, d_params)
-        
+
         ## Calculo metricas
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
         d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
             
         # Guardo datos
-        new_row = {'n_model': n_model, 'model_name': model_name, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
+        new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg_test': len(df_pred_met), **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
         rows.append(new_row)
         df_ite_bs = pd.DataFrame(data=rows)
 
@@ -85,6 +85,7 @@ def assess_models_in_prod(
             path1 = f"{path}/{n_model}__{model_name}_predicciones_met.xlsx"
             path2 = f"{path}/{n_model}__{model_name}_test_assess_.xlsx"
             path_final = path2 if concat_with_test else path1
+            
             df_pred_met.to_excel(path_final, index=True) # Cuando haces assess
             df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
     
