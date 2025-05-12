@@ -435,6 +435,7 @@ class DataPreparation:
         self.describe_integrate_data(df)
         
         # Ordeno valores por fecha y separo X e y
+        df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         df = df.sort_values(by='date', ascending=False)
 
         # (1) Filtrado de filas 
@@ -459,14 +460,15 @@ class DataPreparation:
             logger.warning(f"Columnas eliminadas x ser constantes o por ruido: {cols_to_drop}")
             logger.warning(df.shape)
 
-        if not prod:
-            # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
-            ## Columnas
+        # Nan en red_cards (en prod: no lo uso para df_next_matches pero si lo uso para df old matches con el cual construir datos)
+        if 'red_cards_home' in df.columns:
             df['red_cards_home'] = df['red_cards_home'].fillna(0)
             df['red_cards_away'] = df['red_cards_away'].fillna(0)
-            df = self.treat_nan_in_cols(df, porc_nan_max=0.8)
-            ## Filas
-            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6)                       
+
+        if not prod:
+            # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
+            df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Columnas
+            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) ## Filas                   
    
         # Exporto datos
         if self.verbose >= 0:
@@ -593,11 +595,7 @@ class DataPreparation:
 
             # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses?
             df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500) # df = construct_data.assign_elo_home_away(df, k=30, base_rating=1500)
-            
-            if not prod:
-                df.to_excel(f'{self.base_path}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
-            else:
-                df.to_excel(f'{path_prod}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
+            df_preconstructed = df.copy()
 
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
@@ -657,12 +655,11 @@ class DataPreparation:
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         
-        if self.verbose >= 1:
-            df.to_excel(f'{self.base_path}/df_constructed.xlsx', index=True)
+        # Exporto datos
+        sp = path_prod if prod else self.base_path 
+        df.to_excel(f'{sp}/df_constructed.xlsx', index=True)
+        df_preconstructed.to_excel(f'{sp}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
         
-        if prod and path_prod:
-            df.to_excel(f'{path_prod}/df_constructed.xlsx', index=True) # Para ver como queda el df
-
         return df
 
     def tag_string_data_to_integer(self, df: pd.DataFrame, df_etiquetas: pd.DataFrame = None, prod: bool = False):
