@@ -425,12 +425,14 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, idxs_to_cons
     df[h2h_col_name] = np.nan  # Inicializo columnas pues en prod a veces no construye el h2h porque no hay --> corres riesgo de tapar error en construccion en prod por inicializar nan
     print(f"Historial a construir: {h2h_col_name} para {n_years}")
 
-    if prod:
-        df_next_matches = df[df.index.isin(idxs_to_construct)]
-        l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
-    else:
+    # Construyo solo para los partidos de idxs_to_construct
+    if idxs_to_construct is None:
         idxs_to_construct = df.index
         l_equipos = determine_most_frequent_teams(df)
+    else:
+        df_next_matches = df[df.index.isin(idxs_to_construct)]
+        l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
+        logger.warning(f"[PROD] Construccion de h2h para {len(df_next_matches)} registros.")
 
     # Por equipo 1
     for i in range(len(l_equipos)):
@@ -643,7 +645,7 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True):
+def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None):
     """
     Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). 
     Usa diferencia previa antes del promedio.
@@ -663,8 +665,16 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
     team_matches = {}
     results = {}
 
+    # Determino equipos a los que construir 
+    if idxs_to_construct is None:
+        df_aux = df.copy()
+    else:
+        df_aux = df[df.index.isin(idxs_to_construct)]
+        logger.warning(f"[PROD] Construccion de variable historica {variable} solo para {len(df_aux)} registros.")
+    l_teams = pd.concat([df_aux['id_team_home'], df_aux['id_team_away']]).unique()
+
     # Construyo df por equipo
-    for team in pd.concat([df['id_team_home'], df['id_team_away']]).unique():
+    for team in l_teams:
         if segun_localia:
             team_matches[f"{team}_local"] = df[df['id_team_home'] == team]
             team_matches[f"{team}_visitante"] = df[df['id_team_away'] == team]
@@ -678,8 +688,14 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
 
         team = team_key.split('_')[0] if segun_localia else team_key
 
+        # Construyo solo para los partidos de idxs_to_construct
+        if idxs_to_construct is None:
+            df_team_to_construct = df_team.copy()
+        else:
+            df_team_to_construct = df_team[df_team.index.isin(idxs_to_construct)]
+
         # Por partido
-        for idx, row in df_team.iterrows():
+        for idx, row in df_team_to_construct.iterrows():
             match_date = row['date']
             home_or_away = 'home' if row['id_team_home'] == team else 'away'
 
@@ -710,19 +726,24 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
     # Convertir a DataFrame y hacer join con el original
     if results:
         df_update = pd.DataFrame.from_dict(results, orient="index")
-        df = df.join(df_update)
+        df = df.join(df_update)       
     
     if diff:
         dif_col = f'dif_{name_ext}mean_last_{n_days}_days_{variable}'
         col1 = f'{name_ext}mean_last_{n_days}_days_{variable}_home'
         col2 = f'{name_ext}mean_last_{n_days}_days_{variable}_away'
         
-        df[dif_col] = df[col1] - df[col2] 
-        df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
+        # Si construyo al menos un registro 
+        if col1 in df.columns and col2 in df.columns:
+            df[dif_col] = df[col1] - df[col2] 
+            df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
+
+        else:
+            df[dif_col] = np.nan
 
     return df
 
-def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None): 
     """
     Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). 
     No usa diferencia previa.
@@ -746,8 +767,15 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
     # Inicializo diccionarios (para evitar Performance Warning)
     name_ext = "loc_" if segun_localia else ""
 
+    # Construyo solo para los partidos de idxs_to_construct
+    if idxs_to_construct is None:
+        df_to_construct = df.copy()
+    else:
+        df_to_construct = df[df.index.isin(idxs_to_construct)]
+        logger.warning(f"[PROD] Construccion de variables historicas solo de {len(df_to_construct)} registros.")
+
     # Por partido
-    for id_match, row in df.iterrows():
+    for id_match, row in df_to_construct.iterrows():
         
         # Obtener los últimos partidos antes de la fecha actual
         match_date = row['date']
@@ -798,8 +826,12 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
         col1 = f'{name_ext}mean_last_{n_days}_days_{variable}_home'
         col2 = f'{name_ext}mean_last_{n_days}_days_{variable}_away'
         
-        df[dif_col] = df[col1] - df[col2] 
-        df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
+        if col1 in df.columns and col2 in df.columns:
+            df[dif_col] = df[col1] - df[col2] 
+            df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
+
+        else:
+            df[dif_col] = np.nan
 
     return df
 

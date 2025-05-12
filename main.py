@@ -465,8 +465,9 @@ class DataPreparation:
             df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) 
    
         # Exporto datos
-        if self.verbose >= 1:
+        if self.verbose >= 0:
             df.to_excel(f'{self.base_path}/clean_post_integrate/df_cleaned.xlsx', index=True)
+
         return df
 
     def filter_rows(self, df, n_years_to_select: int, competencies_to_select: list = None):
@@ -509,9 +510,9 @@ class DataPreparation:
         cols = self.stats_to_derive + self.stats_to_construct
         return cols
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, prod_idxs: list = None, export: bool = True):
         """
-        Construye nuevos datos a partir de un dataframe existente.c
+        Construye nuevos datos a partir de un dataframe existente.
 
         :param df: Dataframe con datos de partidos incluyendo datos de players. Si no se proporciona, se cargará desde un archivo. (DataFrame)
         :param N_ULT_PART: Número de últimos partidos a considerar para el cálculo de variables. (int)
@@ -588,7 +589,9 @@ class DataPreparation:
 
             # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses?
             df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500) # df = construct_data.assign_elo_home_away(df, k=30, base_rating=1500)
-            df.to_excel(f'{self.base_path}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
+            
+            if not prod:
+                df.to_excel(f'{self.base_path}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
 
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
@@ -605,8 +608,8 @@ class DataPreparation:
                    df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.               
 
             ## 2) EN PARTIDOS EN ULTIMOS N DAYS
-            if not prod:
-                df = construct_data.h2h_by_date(df, n_years=n_years_h2h) # no mas por localia por alto nan.
+            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=prod, idxs_to_construct=prod_idxs) # no mas por localia por alto nan.
+            
             for n_days in n_last_matches:
                 df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
@@ -630,14 +633,17 @@ class DataPreparation:
                     func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
 
                     # Calculo promedio en ultimos partidos
-                    df = func(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True)
+                    df = func(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs)
 
                     # Si quiero calcular la diferencia por localia
                     if segun_localia:
-                        df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True)
+                        df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs)
 
                 # Elimino variables utilizadas para construir historicas
                 df.drop(columns=cols_to_drop, inplace=True)
+        
+        else:
+            logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")
 
         # VARIABLE DE JUGADORES
         df = construct_data.calculate_dif_col_players(df)  # Construyo variables de diferencias para las variables promedio de los players
