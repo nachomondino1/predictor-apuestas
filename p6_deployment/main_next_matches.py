@@ -80,8 +80,18 @@ class DataUnderstandingNew():
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
         # Verificaciones
-        for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
-            self.verify_data_quality(df)
+        ## Df_match_player
+        if len(df_match_player_concat.columns) == 0:
+            logger.warning("No se tiene las formaciones de ningun partido a predecir. " \
+            "Si ya esta la seccion 'Will not play', no deberia fallar.")
+
+        ## Df_match_odds
+        if df_match_odds_concat.isna().any().any(): 
+            logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas si falta para algun/os partido/s.")
+
+        if len(df_match_odds_concat.columns) != 3:
+            logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambio el XPATH de Flashscore.")
+            raise ValueError
 
         # Exporto datasets
         if self.export:
@@ -135,19 +145,6 @@ class DataUnderstandingNew():
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat
 
-    def verify_data_quality(self, df, raise_error:bool = False):
-        """
-        Verificacion de que dataframe extraido tiene al menos una fila y columna.
-        """
-        if len(df) == 0:
-            logger.warning("El dataframe no tiene registros")
-            if raise_error:
-                raise ValueError("El dataframe no tiene registros")
-        elif len(df.columns) == 0:
-            logger.warning("El dataframe no tiene columnas")
-            if raise_error:
-                raise ValueError("El dataframe no tiene columnas")
-            
     def describe_data_new(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_match_odds: pd.DataFrame, verbose: int = 1):
         """
         Descripción de dataframes en terminos de dtypes, nan values, registros unicos, etc.
@@ -282,7 +279,7 @@ class DataPreparationNew(DataPreparation):
         return df_new, df_copiado
     
     # Construccion de datos
-    def construct_data_new(self, df_next_matches: pd.DataFrame, df_old_matches, df_last_old_matches,
+    def construct_data_new(self, df_next_matches: pd.DataFrame, df_last_old_matches,
                            n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, decay_rate: float,
                            columns_used: list, verbose: int = 0):
         """
@@ -296,41 +293,46 @@ class DataPreparationNew(DataPreparation):
             n_years_h2h: Numero de años para construir historial entre equipos. (int)
             segun_localia: Construir variables por localia o no. (bool)
         
+        # Usar prod_idxs y prod_cols para agilizar construccion, construyendo solo las columnas necesarias y para los partidos necesarios (next_matches)
         # Returns
             Dataframe con proximos partidos construido utilizando los partidos ya jugados. (DataFrame)
         """
         logger.info("Constructing new data...")
 
-        # 1) Construyo historial entre si  (podria evitar construirlas si no estan en columns_used...)
-        df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)  # usar with_h2h=False para no reemplazarlo.
+        # Construyo historicas solo si hay "ultimos partidos"
+        with_historic = True if len(df_last_old_matches) > 0 else False
 
-        # Si hay "ultimos partidos"
-        if len(df_last_old_matches) > 0:
-            self.determine_stats_to_use()
-            # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
-            df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(
-                df_concat_last, 
-                n_last_matches=n_last_matches,
-                n_years_h2h=n_years_h2h, 
-                segun_localia=segun_localia, 
-                calculate_dif=calculate_dif, 
-                decay_rate=decay_rate, 
-                prod=True, 
-                export=False
-                )
-            df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
+        # En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
+        df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
+        
+        # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
+        df_constructed = self.construct_data(
+            df_concat_last, 
+            n_last_matches=n_last_matches,
+            n_years_h2h=n_years_h2h, 
+            segun_localia=segun_localia, 
+            calculate_dif=calculate_dif, 
+            with_historic=with_historic,
+            decay_rate=decay_rate, 
+            prod=True, 
+            prod_idxs=df_next_matches.index,
+            export=False
+            )
+        
+        # Separo datos construidos entre los proximos partidos y los ya jugados
+        df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]
 
-        # Si no hay "ultimos partidos"
-        else:
-            # evito construir variables historicas
-            logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")
-            df_next_matches = self.construct_data(df_next_matches, n_last_matches, n_years_h2h, segun_localia=segun_localia, with_historic=False, prod=True, verbose=verbose, export=False)
+        # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
+        if not with_historic:
+            logger.warning("")
 
-            # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
-            for columna in columns_used: 
-                if columna not in df_next_matches.columns:
-                    df_next_matches[columna] = np.nan  # no le des valor 0 porque sino las predicciones son 33-33-33.
+            user_input = input("Construir columnas historicas con NaN x falta de 'ultimos partidos?'").strip().lower() 
+            if user_input == "y":
+                for columna in columns_used: 
+                    if columna not in df_next_matches.columns:
+                        df_next_matches[columna] = np.nan  # no le des valor 0 porque sino las predicciones son 33-33-33.
+            else:
+                raise SystemExit("⛔ Predicción cancelada por el usuario.")
 
         if self.export:
             df_last_old_matches.to_excel(f'{self.BASE_DIR}/construct_data/df_matches_to_construct_historic_values.xlsx', index=True)
@@ -338,33 +340,18 @@ class DataPreparationNew(DataPreparation):
 
         return df_next_matches
 
-    def construct_h2h_next_matches(self, df_next_matches, df_old_matches, n_years_h2h, columns_used):
-        """
-        Construccion de variables historiales para proximos partidos.
-        Mejora a hacer: 
-        - podria evitar la construccion de las variables si no estan en columns_used...
-        """
-        # Construyo columna "result" para poder calcular h2h
-        df_old_matches = construct_data.determine_result(df_old_matches, self.var_resp) # Construyo columna resultado en el old para poder calcular historial
-        idxs_to_construct = df_next_matches.index
-
-        ## Construyo historiales
-        df = pd.concat([df_next_matches, df_old_matches], axis=0)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct)
-
-        ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
-        columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
-        df = df[columnas_deseadas]
-        df_next_matches = df[df.index.isin(df_next_matches.index)]
-        return df_next_matches
-
     # Limpieza post select     
     def clean_post_select_new(self, df: pd.DataFrame, scaler_loaded):
+        logger.info("Clean data post select...")
 
         # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
         df_filled = self.add_emergency_fill_flags(df)
 
+        # Imprimo mensaje con variables con mas nan
+        df_nan_col = df_filled.isna().mean()
+        df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
+        df_nan_col_sorted.to_excel(f'{self.BASE_DIR}/df_cols_nan.xlsx', index=True)
+ 
         # Tratamiento de nan values 
         df = self.treat_nan_in_rows(df, fill_na="0", prod=True) # no puedo eliminar registros a predecir
 
@@ -465,6 +452,19 @@ class TrainingDataLoader():
 
         return d
 
+    def load_df_constructed(self):
+        """
+        Para construir los datos tal y como lo hicimos durante el entrenamiento
+        """
+        logger.info("Levento df_constructed con el que entrené")
+        path = f'{self.BASE_DIR_dp}/construct_data/df_constructed_{self.path_construct}.xlsx'       
+        df = pd.read_excel(path, index_col=0)
+
+        if self.verbose >= 1:  
+            print(df.head(3))
+
+        return df
+    
     def load_df_etiquetas(self):
 
         logger.info("Levento etiquetas con el que entrené")
@@ -907,13 +907,13 @@ def main(
             # Levanto df_integrated de cuando entrené modelos (tmb los que use en test...)
             df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0) 
             
-            # Podria volver a predecir como prox partido un partido de test (con el que entrené) ? --> Para comparar probas del = partido en test y prod. Son muy similares :)
+            # Podria volver a predecir como prox partido un partido de test (con el que entrené) ? --> Para comparar probas del = partido en test y prod. Son muy similares :
             if date_missing is not None:
                 len_inic = len(df_integrated_train)
                 date_missing = pd.to_datetime()
                 df_integrated_train = df_integrated_train[df_integrated_train['date'] <= date_missing]
-                logger.info(f'Tras seleccionar partidos anteriores a {date_missing}: {len_inic} --> {len(df_integrated_train)}')
-
+                logger.info(f'Tras seleccionar partidos anteriores a {date_missing}: {len_inic} --> {len(df_integrated_train)}') 
+            
             # Selecciono los missing con los que no se entrenó
             df_match = df_match[~df_match.index.isin(df_integrated_train.index)]
             df_match_player = df_match_player[~df_match_player.index.isin(df_match.index)]
@@ -1013,16 +1013,30 @@ def main(
             print(df.shape)
         
         ## Construct
-        ### Selecciono los ultimos partidos de los ya jugados para construir
-        logger.info("Seleccion de ultimos partidos para construccion de variables...")
-        df_last_old_matches_construct = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=max(d_hiper['n_last_matches'])) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
-        df_last_old_matches_h2h = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=d_hiper['n_years_h2h']*365 + 100) # No sirve de nada hacerlo flex dado que construct_data() de main.py usa n_days
+        # asi levanto los registros con los que construi (de manera de construir el ELO exactamente igual a cuando entrené) 
+        df_constructed_train = lo.load_df_constructed()
+        idxs_construct = df_constructed_train.index
+        print(len(idxs_construct))
+
+        # --> el tema es que borra los missing posteriores....
+        last_date_train = max(df_constructed_train['date'])
+        df_integrated_updated['date'] = pd.to_datetime(df_integrated_updated['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
+        df_int_clean_2 = df_integrated_updated[df_integrated_updated['date'] > last_date_train]  # elimino si lo use para entrenar
+        idxs_missing = df_int_clean_2.index # tiene que ser solo de comp_to_select...
+        print(len(idxs_missing))
+
+        idxs_cons = idxs_construct.union(idxs_missing)
+        print(len(idxs_cons))
+
+        df_integrated_updated_clean = df_int_clean_2[df_int_clean_2.index.isin(idxs_cons)]
+        print(len(df_integrated_updated_clean))
+
         ### Construyo datos
         df = dp.construct_data_new(
-            df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
+            df_next_matches=df, df_last_old_matches=df_integrated_updated_clean,
             n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], 
             calculate_dif=d_hiper['calculate_dif'], decay_rate=d_hiper['decay_rate'],
-            columns_used=columns_scaled
+            columns_used=d_hiper['selected_columns']
             )
         
         ## Clean data post construct
@@ -1128,12 +1142,12 @@ if __name__ == "__main__":
     d_countries = {
         48: ["england", '2025-05-07'], 
         55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-07'], 
-        77: ["italy", '2025-05-07'],
+        59: ["germany", '2025-05-08'], 
+        77: ["italy", '2025-05-08'],
         148: ["spain", '2025-05-07'], 
         }
 
-    id_country = 48
+    id_country = 77
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 1
@@ -1141,7 +1155,7 @@ if __name__ == "__main__":
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 93, 'model_name': "RandomForestClassifier"}
+    d_model = {'n_model': 245, 'model_name': "XGBClassifier"} # RandomForestClassifier
 
     if key == 'missing':
         
