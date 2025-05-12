@@ -133,6 +133,7 @@ def main(
         l_weights: list, 
         assess: bool = False,
         export: bool = True,
+        n_models_cand: int = 10,
         verbose: int = 0
         ):
     """
@@ -153,16 +154,21 @@ def main(
     d_paths = initialize_directories(country, iteration_date)
     metric = 'metric_test_assess'
 
+    # Paso 1: Seleccionar candidatos solo con test
     ## 1. Calculo metrica combinada
     df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=False)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
-    # Si assesss
+    # Exporto datos
+    if export:
+        df_ite_bs.to_excel(f'{d_paths['path_select']}/df_ite_bs.xlsx', index=False)
+
+    # Paso 2: Hacer assess de candidatos
     if assess:
         # Selecciono candidatos
-        df_ite_bs = df_ite_bs.head(10)
+        df_ite_bs = df_ite_bs.head(n_models_cand)
 
         # Actualizo con assess
         logger.warning("Tengo en cuenta tanto 'test' como 'assess' para seleccionar modelo...")
@@ -172,12 +178,13 @@ def main(
             country=country, 
             iteration_date=iteration_date, 
             concat_with_test=True,
-            export=False
+            export=True
         )       
 
         df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
         df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
+    # Paso 3: Seleccionar modelo para prod de los candidatos
     # 3. Seleccion del modelo
     idx_max = df_ite_bs[metric].idxmax() # Pero ahora sin ea realmente. No uso kelly sino linear sin cuotas.
     col_name_1 = 'n_iteration' if 'n_iteration' in df_ite_bs.columns else 'n_model'
@@ -194,7 +201,7 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    assess = False
+    assess = True
 
     d_countries = {
         48: ["england", '2025-05-07'],
@@ -205,8 +212,8 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)     
-    l_metrics = ['f1_score_draw','f1_score_away'] #  'error'
-    l_weights = [0.6, 0.4]
+    l_metrics = ['f1_score_draw','f1_score_away']  # 'var_f1_score' #  'error' # el prorblema no era un posible overfitting sino la dif en test y prod por la construccion.
+    l_weights = [0.6, 0.4] # 0.2
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
