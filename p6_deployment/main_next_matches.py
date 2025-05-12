@@ -302,35 +302,48 @@ class DataPreparationNew(DataPreparation):
         logger.info("Constructing new data...")
 
         # 1) Construyo historial entre si  (podria evitar construirlas si no estan en columns_used...)
-        df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h, columns_used)  # usar with_h2h=False para no reemplazarlo.
-
-        # Si hay "ultimos partidos"
-        if len(df_last_old_matches) > 0:
-            self.determine_stats_to_use()
-            # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
-            df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-            df_constructed = self.construct_data(
-                df_concat_last, 
-                n_last_matches=n_last_matches,
-                n_years_h2h=n_years_h2h, 
-                segun_localia=segun_localia, 
-                calculate_dif=calculate_dif, 
-                decay_rate=decay_rate, 
-                prod=True, 
-                export=False
-                )
-            df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]  # Separo datos construidos entre los proximos partidos y los ya jugados  # En caso que los proximos aprtidos ya esten en df_old_last_matches (o sea, los partidos ya se jugeron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
-
-        # Si no hay "ultimos partidos"
+        h2h_col = f'h2h_{n_years_h2h}'
+        if h2h_col in columns_used:
+            df_next_matches = self.construct_h2h_next_matches(df_next_matches, df_old_matches, n_years_h2h)  # usar with_h2h=False para no reemplazarlo.
         else:
-            # evito construir variables historicas
-            logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")
-            df_next_matches = self.construct_data(df_next_matches, n_last_matches, n_years_h2h, segun_localia=segun_localia, with_historic=False, prod=True, verbose=verbose, export=False)
+            logger.warning("No construyo h2h pues no esta en las columnas seleccionadas del modelo")
 
-            # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
-            for columna in columns_used: 
-                if columna not in df_next_matches.columns:
-                    df_next_matches[columna] = np.nan  # no le des valor 0 porque sino las predicciones son 33-33-33.
+        # Construyo historicas solo si hay "ultimos partidos"
+        with_historic = True if len(df_last_old_matches) > 0 else False
+
+        # Defino stats a construir # A futuro: podria filtrar para construir solo las que estan en columns_used...
+        self.determine_stats_to_use()
+
+        # En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
+        df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
+        
+        # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
+        df_constructed = self.construct_data(
+            df_concat_last, 
+            n_last_matches=n_last_matches,
+            n_years_h2h=n_years_h2h, 
+            segun_localia=segun_localia, 
+            calculate_dif=calculate_dif, 
+            with_historic=with_historic,
+            decay_rate=decay_rate, 
+            prod=True, 
+            export=False
+            )
+        
+        # Separo datos construidos entre los proximos partidos y los ya jugados
+        df_next_matches = df_constructed[df_constructed.index.isin(df_next_matches.index)]
+
+        # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
+        if not with_historic:
+            logger.warning("")
+
+            user_input = input("Construir columnas historicas con NaN x falta de 'ultimos partidos?'").strip().lower() 
+            if user_input == "y":
+                for columna in columns_used: 
+                    if columna not in df_next_matches.columns:
+                        df_next_matches[columna] = np.nan  # no le des valor 0 porque sino las predicciones son 33-33-33.
+            else:
+                raise SystemExit("⛔ Predicción cancelada por el usuario.")
 
         if self.export:
             df_last_old_matches.to_excel(f'{self.BASE_DIR}/construct_data/df_matches_to_construct_historic_values.xlsx', index=True)
@@ -338,7 +351,7 @@ class DataPreparationNew(DataPreparation):
 
         return df_next_matches
 
-    def construct_h2h_next_matches(self, df_next_matches, df_old_matches, n_years_h2h, columns_used):
+    def construct_h2h_next_matches(self, df_next_matches, df_old_matches, n_years_h2h):
         """
         Construccion de variables historiales para proximos partidos.
         Mejora a hacer: 
@@ -350,11 +363,10 @@ class DataPreparationNew(DataPreparation):
 
         ## Construyo historiales
         df = pd.concat([df_next_matches, df_old_matches], axis=0)
-        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct)
-        df = construct_data.h2h_by_date_by_localia(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct)
+        df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=True, idxs_to_construct=idxs_to_construct, verbose=1)
 
         ## Vuelvo a seleccionar df_next_matches pero con historiales construidos
-        columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]  # Reemplazo historiales nan por 0
+        columnas_deseadas = list(df_next_matches.columns) + [col for col in df.columns if 'h2h_' in col]
         df = df[columnas_deseadas]
         df_next_matches = df[df.index.isin(df_next_matches.index)]
         return df_next_matches
@@ -1022,7 +1034,7 @@ def main(
             df_next_matches=df, df_last_old_matches=df_last_old_matches_construct, df_old_matches=df_last_old_matches_h2h, 
             n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], 
             calculate_dif=d_hiper['calculate_dif'], decay_rate=d_hiper['decay_rate'],
-            columns_used=columns_scaled
+            columns_used=d_hiper['selected_columns']
             )
         
         ## Clean data post construct
@@ -1085,6 +1097,11 @@ def main(
         df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
         print(df_pred_proba)
 
+        # Por algun motivo el df_match y df_match_odds que llega aqui, no tiene los partidos missing...
+        if predict_missing:
+            df_match = df_match.copy()
+            df_match_odds = df_match_odds_miss.copy()
+
         df_predicciones = mo.prepare_dataframe_to_assess_with_roi(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds)         # Concateno todos los dfs en uno solo 
         df_predicciones = pd.concat([df_predicciones, df_filled], axis=1)
 
@@ -1128,12 +1145,12 @@ if __name__ == "__main__":
     d_countries = {
         48: ["england", '2025-05-07'], 
         55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-07'], 
-        77: ["italy", '2025-05-07'],
+        59: ["germany", '2025-05-08'], 
+        77: ["italy", '2025-05-08'],
         148: ["spain", '2025-05-07'], 
         }
 
-    id_country = 48
+    id_country = 77
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 1
@@ -1141,7 +1158,7 @@ if __name__ == "__main__":
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 93, 'model_name': "RandomForestClassifier"}
+    d_model = {'n_model': 245, 'model_name': "XGBClassifier"} # RandomForestClassifier
 
     if key == 'missing':
         
