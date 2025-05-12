@@ -1105,6 +1105,10 @@ def main(
         # Predigo sobre proximos partidos usando modelo cargado
         y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
 
+        if predict_missing:
+            df_match = df_match_miss.copy()
+            df_match_odds = df_match_odds_miss.copy()
+
         # Guardo como df
         df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
         print(df_pred_proba)
