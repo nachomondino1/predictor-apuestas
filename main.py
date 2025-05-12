@@ -443,7 +443,10 @@ class DataPreparation:
 
         # (2) Eliminacion de columnas
         ## constantes
-        cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
+        if not prod:
+            cols_constants = list(df.columns[df.nunique() == 1])  # Elimino columnas constantes
+        else:
+            cols_constants = [] # En prod se elimina is_cup pero hay modelos que la usan...
         ## ruido
         cols_basics_noise = ['attendance', 'capacity', 'referee']   # --> generan problemas de convergencia por ser nros altos y ademas su info puede ser importante junta y no separada.        
         strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
@@ -451,9 +454,10 @@ class DataPreparation:
 
         cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
         df.drop(columns=cols_to_drop, inplace=True)
-        logger.warning("Eliminación de columnas...")
-        logger.warning(f"Columnas eliminadas x ser constantes o por ruido: {cols_to_drop}")
-        logger.warning(df.shape)
+        if self.verbose >= 0:
+            logger.warning("Eliminación de columnas...")
+            logger.warning(f"Columnas eliminadas x ser constantes o por ruido: {cols_to_drop}")
+            logger.warning(df.shape)
 
         if not prod:
             # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
@@ -462,7 +466,7 @@ class DataPreparation:
             df['red_cards_away'] = df['red_cards_away'].fillna(0)
             df = self.treat_nan_in_cols(df, porc_nan_max=0.8)
             ## Filas
-            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) 
+            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6)                       
    
         # Exporto datos
         if self.verbose >= 0:
@@ -510,7 +514,7 @@ class DataPreparation:
         cols = self.stats_to_derive + self.stats_to_construct
         return cols
 
-    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, prod_idxs: list = None, export: bool = True):
+    def construct_data(self, df: pd.DataFrame, n_last_matches: list, n_years_h2h: int, segun_localia: bool = True, calculate_dif: bool = False, with_historic: bool = True, prod: bool = False, decay_rate: float = 0, prod_idxs: list = None, path_prod: str = None, export: bool = True):
         """
         Construye nuevos datos a partir de un dataframe existente.
 
@@ -592,8 +596,8 @@ class DataPreparation:
             
             if not prod:
                 df.to_excel(f'{self.base_path}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
-            # else:
-            #     df.to_excel(f'path_prod/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
+            else:
+                df.to_excel(f'{path_prod}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
 
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
@@ -653,9 +657,11 @@ class DataPreparation:
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         
-        # df.to_excel(f'{path_prod}/df_constructed.xlsx', index=True) # Para ver como queda el df
         if self.verbose >= 1:
             df.to_excel(f'{self.base_path}/df_constructed.xlsx', index=True)
+        
+        if prod and path_prod:
+            df.to_excel(f'{path_prod}/df_constructed.xlsx', index=True) # Para ver como queda el df
 
         return df
 

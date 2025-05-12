@@ -326,6 +326,7 @@ class DataPreparationNew(DataPreparation):
             decay_rate=decay_rate, 
             prod=True, 
             prod_idxs=df_next_matches.index,
+            path_prod=f'{self.BASE_DIR}/construct_data',
             export=False
             )
         
@@ -354,14 +355,17 @@ class DataPreparationNew(DataPreparation):
     def clean_post_select_new(self, df: pd.DataFrame, scaler_loaded):
         logger.info("Clean data post select...")
 
-        # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
-        df_filled = self.add_emergency_fill_flags(df)
-
         # Imprimo mensaje con variables con mas nan
-        df_nan_col = df_filled.isna().mean()
+        df_nan_col = df.isna().mean()
         df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
         df_nan_col_sorted.to_excel(f'{self.BASE_DIR}/df_cols_nan.xlsx', index=True)
  
+        # Error si hay mucho nan...
+        # ...
+
+        # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
+        df_filled = self.add_emergency_fill_flags(df)
+
         # Tratamiento de nan values 
         df = self.treat_nan_in_rows(df, fill_na="0", prod=True) # no puedo eliminar registros a predecir
 
@@ -1040,6 +1044,10 @@ def main(
 
         df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(idxs_cons)]
         print(len(df_integrated_updated_clean))
+
+        # Relleno cards con 0 --> como en test.
+        df_integrated_updated_clean['red_cards_home'] = df_integrated_updated_clean['red_cards_home'].fillna(0)
+        df_integrated_updated_clean['red_cards_away'] = df_integrated_updated_clean['red_cards_away'].fillna(0)
 
         ### Construyo datos
         df = dp.construct_data_new(
