@@ -432,7 +432,8 @@ def h2h_by_date(df: pd.DataFrame, n_years: int, prod: bool = False, idxs_to_cons
     else:
         df_next_matches = df[df.index.isin(idxs_to_construct)]
         l_equipos = list(set(df_next_matches['id_team_home']).union(set(df_next_matches['id_team_away'])))
-        logger.warning(f"[PROD] Construccion de h2h para {len(df_next_matches)} registros.")
+        if verbose >= 1:
+            logger.warning(f"[PROD] Construccion de h2h para {len(df_next_matches)} registros.")
 
     # Por equipo 1
     for i in range(len(l_equipos)):
@@ -645,7 +646,7 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None):
+def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None, verbose: int = 0):
     """
     Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). 
     Usa diferencia previa antes del promedio.
@@ -670,7 +671,8 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
         df_aux = df.copy()
     else:
         df_aux = df[df.index.isin(idxs_to_construct)]
-        logger.warning(f"[PROD] Construccion de variable historica {variable} solo para {len(df_aux)} registros.")
+        if verbose >= 1:
+            logger.warning(f"[PROD] Construccion de variable historica {variable} solo para {len(df_aux)} registros.")
     l_teams = pd.concat([df_aux['id_team_home'], df_aux['id_team_away']]).unique()
 
     # Construyo df por equipo
@@ -743,7 +745,7 @@ def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, 
 
     return df
 
-def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None, verbose: int = 0): 
     """
     Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). 
     No usa diferencia previa.
@@ -772,7 +774,8 @@ def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variabl
         df_to_construct = df.copy()
     else:
         df_to_construct = df[df.index.isin(idxs_to_construct)]
-        logger.warning(f"[PROD] Construccion de variables historicas solo de {len(df_to_construct)} registros.")
+        if verbose >= 1:
+            logger.warning(f"[PROD] Construccion de variables historicas solo de {len(df_to_construct)} registros.")
 
     # Por partido
     for id_match, row in df_to_construct.iterrows():

@@ -335,9 +335,8 @@ class DataPreparationNew(DataPreparation):
 
         # Agregar las columnas que faltan ("las que se deberian construir tambien") y rellenar con NaN
         if not with_historic:
-            logger.warning("")
 
-            user_input = input("Construir columnas historicas con NaN x falta de 'ultimos partidos?'").strip().lower() 
+            user_input = input("No hay ultimos partidos. ¿Inicializar columnas historicas con NaN? (Recomendado solo a inicios de temporada o tras baches grandes)'").strip().lower() 
             if user_input == "y":
                 for columna in columns_used: 
                     if columna not in df_next_matches.columns:
@@ -355,13 +354,22 @@ class DataPreparationNew(DataPreparation):
     def clean_post_select_new(self, df: pd.DataFrame, scaler_loaded):
         logger.info("Clean data post select...")
 
-        # Imprimo mensaje con variables con mas nan
+        # Calcular el porcentaje de valores NaN por columna
         df_nan_col = df.isna().mean()
+
+        # Identificar cols con mucho nan
+        full_nan_cols = df_nan_col[df_nan_col == 1].index.tolist()  # Identificar columnas con 100% NaN
+        nan_cols = df_nan_col[df_nan_col > 0].index.tolist()  # Identificar columnas con más del 50% de NaN
+        perc = len(nan_cols) / len(df.columns)
+
+        # Imprimir información y generar un error si se cumplen las condiciones
+        if full_nan_cols or perc > 0.2:
+            msg = f"Error: Exceso de NaN en columnas. Columnas 100% NaN: {full_nan_cols}. Columnas >0% NaN: {nan_cols}."
+            raise ValueError(msg)
+
+        # Guardar datos en Excel para referencia
         df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
         df_nan_col_sorted.to_excel(f'{self.BASE_DIR}/df_cols_nan.xlsx', index=True)
- 
-        # Error si hay mucho nan...
-        # ...
 
         # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
         df_filled = self.add_emergency_fill_flags(df)
@@ -993,9 +1001,6 @@ def main(
         df_etiquetas = lo.load_df_etiquetas()
         scaler, columns_scaled = lo.load_scaler_model()
 
-        # Filtro df_integrated con las competencias seleccionadas
-        df_integrated_updated = df_integrated_updated[df_integrated_updated['id_competition'].isin(d_hiper['comp_to_select'])]  # Filtro partidos por comptencia --> # Para construir como en train, solo las comp que corresponden # Para rellenar solo con los partidos de la misma liga...
-
         # Definir rango de fechas 
         df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         initial_date = df_match['date'].min()  # Obtiene la fecha mínima (para filtrar dfs para rellenar y construir) 
@@ -1026,30 +1031,39 @@ def main(
             df = dp.clean_post_integrate(df, competencies_to_select=d_hiper['comp_to_select'], prod=True)
             print(df.shape)
         
-        ## Construct
-        # asi levanto los registros con los que construi (de manera de construir el ELO exactamente igual a cuando entrené) 
+        ## Pre construct
+        logger.info("Preparing to construct...")
+        # Filtrar df_integrated con las competencias seleccionadas
+        df_integrated_updated = dp.clean_post_integrate(
+            df_integrated_updated, n_years_to_select=None, competencies_to_select=d_hiper['comp_to_select'], prod=True
+        )
+
+        # Cargar los registros con los que se construyó el modelo de entrenamiento (para construir bien vars como ELO que necesitan exactamente los = registros que caundo entrenó)
         df_constructed_train = lo.load_df_constructed()
-        idxs_construct = df_constructed_train.index
-        print(len(idxs_construct))
+        train_indices = df_constructed_train.index
+        print(f"Total registros en entrenamiento: {len(train_indices)}")
 
-        # --> el tema es que borra los missing posteriores....
-        last_date_train = max(df_constructed_train['date'])
-        df_integrated_updated['date'] = pd.to_datetime(df_integrated_updated['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
-        df_int_clean_2 = df_integrated_updated[df_integrated_updated['date'] > last_date_train]  # elimino si lo use para entrenar
-        idxs_missing = df_int_clean_2.index # tiene que ser solo de comp_to_select...
-        print(len(idxs_missing))
+        # Filtrar registros posteriores al entrenamiento
+        last_train_date = df_constructed_train['date'].max()
+        df_new_data = df_integrated_updated[df_integrated_updated['date'] > last_train_date]
 
-        idxs_cons = idxs_construct.union(idxs_missing)
-        print(len(idxs_cons))
+        # Obtener índices de los registros nuevos pero dentro de las competencias seleccionadas
+        missing_indices = df_new_data.index
+        print(f"Total registros nuevos con competencias seleccionadas: {len(missing_indices)}")
 
-        df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(idxs_cons)]
-        print(len(df_integrated_updated_clean))
+        # Combinar índices de entrenamiento y nuevos registros
+        final_indices = train_indices.union(missing_indices)
+        print(f"Total registros después de combinación: {len(final_indices)}")
 
-        # Relleno cards con 0 --> como en test.
-        df_integrated_updated_clean['red_cards_home'] = df_integrated_updated_clean['red_cards_home'].fillna(0)
-        df_integrated_updated_clean['red_cards_away'] = df_integrated_updated_clean['red_cards_away'].fillna(0)
+        # Filtrar el dataframe con los índices determinados
+        df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(final_indices)]
+        print(f"Total registros finales después de limpieza: {len(df_integrated_updated_clean)}")
 
-        ### Construyo datos
+        if not predict_missing and len(df_integrated_updated_clean) != len(final_indices):
+            logger.error("El dataframe utilizado para construir no tiene las filas que deberia.")
+            raise ValueError
+
+        ## Construct
         df = dp.construct_data_new(
             df_next_matches=df, df_last_old_matches=df_integrated_updated_clean,
             n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], 
