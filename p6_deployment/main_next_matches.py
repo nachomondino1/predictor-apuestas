@@ -134,8 +134,18 @@ class DataUnderstandingNew():
             df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds_miss], axis=0)
             
         # Verificaciones
-        for df in [df_match_concat, df_match_player_concat, df_match_odds_concat]:
-            self.verify_data_quality(df)
+        ## Df_match_player
+        if len(df_match_player_concat.columns) == 0:
+            logger.warning("No se tiene las formaciones de ningun partido a predecir. " \
+            "Si ya esta la seccion 'Will not play', no deberia fallar.")
+
+        ## Df_match_odds
+        if df_match_odds_concat.isna().any().any(): 
+            logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas si falta para algun/os partido/s.")
+
+        if len(df_match_odds_concat.columns) != 3:
+            logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambio el XPATH de Flashscore.")
+            raise ValueError
 
         # Exporto datasets
         if self.export:
@@ -304,7 +314,7 @@ class DataPreparationNew(DataPreparation):
 
         # En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
         df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-        
+
         # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
         df_constructed = self.construct_data(
             df_concat_last, 
@@ -1028,7 +1038,7 @@ def main(
         idxs_cons = idxs_construct.union(idxs_missing)
         print(len(idxs_cons))
 
-        df_integrated_updated_clean = df_int_clean_2[df_int_clean_2.index.isin(idxs_cons)]
+        df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(idxs_cons)]
         print(len(df_integrated_updated_clean))
 
         ### Construyo datos

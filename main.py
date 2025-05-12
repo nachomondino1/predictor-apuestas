@@ -592,6 +592,8 @@ class DataPreparation:
             
             if not prod:
                 df.to_excel(f'{self.base_path}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
+            # else:
+            #     df.to_excel(f'path_prod/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
 
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
@@ -651,6 +653,7 @@ class DataPreparation:
         end = time.time()
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         
+        # df.to_excel(f'{path_prod}/df_constructed.xlsx', index=True) # Para ver como queda el df
         if self.verbose >= 1:
             df.to_excel(f'{self.base_path}/df_constructed.xlsx', index=True)
 
