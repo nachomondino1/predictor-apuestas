@@ -361,9 +361,9 @@ class DataPreparation:
 
         # Segun si es train o produccion (en el 1ero hago el mapeo, en el 2do uso el mapeo ya hecho)
         if prod:
-            logger.critical("Integración para produccion")
+            logger.critical("Integración para produccion. No vuelvo a mapear sino que levanto df_map del pais ")
             df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
-            logger.info(f"No vuelvo a mapear sino que levanto df_map del pais (para producción) \n {df_map_players_fs_so.head(3)}")
+            print(df_map_players_fs_so.head(3))
 
         else: 
             logger.critical("Integración para train")
@@ -681,7 +681,7 @@ class DataPreparation:
             total = recent_df[col].shape[0]
             num_nans = recent_df[col].isna().sum()
             if num_nans > total / 2:
-                print(f"⚠️ Warning: La columna '{col}' tiene {num_nans} NaN de {total} registros recientes.")
+                logger.warning(f"⚠️ Warning: La columna '{col}' tiene {num_nans} NaN de {total} registros recientes.")
 
     def tag_string_data_to_integer(self, df: pd.DataFrame, df_etiquetas: pd.DataFrame = None, prod: bool = False):
         """

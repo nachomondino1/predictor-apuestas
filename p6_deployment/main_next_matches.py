@@ -496,9 +496,9 @@ class TrainingDataLoader():
 
         # Imprimo hiper levantados
         if self.verbose >= 0:
-            logger.info("Hiperparametros cargados:")
+            print("Hiperparametros cargados:")
             for key, value in d.items():
-                logger.info(f'\t {key}: {value}')
+                print(f'\t {key}: {value}')
 
         return d
 
@@ -769,7 +769,7 @@ def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
         model_name = str(row_country['model_name'].values[0])
     
     if verbose >= 1:
-        logger.info(f"Model: {n_model} ; Model name: {model_name}")
+        logger.critical(f"Model: {n_model} ; Model name: {model_name}")
 
     return n_model, model_name
 
@@ -849,8 +849,8 @@ def main(
 
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
-        logger.info(f'Competencias: \n {df_comp_country}  \n Competencias publicas: {comp_public}')
-        logger.warning(iteration_date_dt)
+        print(f'Competencias: \n {df_comp_country}  \n Competencias publicas: {comp_public}')
+        logger.info(f"Iteration date: {iteration_date_dt}")
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export=export) # Creo objeto de clase DataUnderstanding
@@ -1013,8 +1013,6 @@ def main(
 
         # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
         n_model, model_name = read_data_of_best_model(id_country, d_model)
-        if verbose >= 0:
-            logger.critical(f"n_model: {n_model} ; model_name: {model_name}")
 
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
         lo = TrainingDataLoader(country=country, n_model=n_model, model_name=model_name, iteration_date=iteration_date_dt)
@@ -1059,6 +1057,7 @@ def main(
 
         # Fill data (si es missing no pues ya deberia tener las formaciones)
         if not predict_missing: 
+            logger.info("Fill data...")
             ### Selecciono los ultimos partidos de los ya jugados para rellenar
             logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
             df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated_clean, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.

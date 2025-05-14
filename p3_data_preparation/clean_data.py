@@ -437,7 +437,7 @@ def fillna_with_mean_in_last_matches(df: pd.DataFrame, cols_to_fill, country:str
     # Returns
         Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
     """
-    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
     df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df.index)
 
     # Por variable mean_player 
@@ -513,7 +513,7 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
     Mejoras:
         - Copiar valores mas bajos para equipos que esten jugando competiciones internacionales (o que hayan jugado hace poco)
     """
-    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
     df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_to_fill.index)
     
     # Por variable mean_player 

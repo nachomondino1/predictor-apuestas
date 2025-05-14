@@ -460,7 +460,7 @@ def format_df_match(df, prod: bool = False):
     Mejora:
         - Podria hacer una sola funcion que reciba un dictionary con el nombre al columna, el rango y el dtype deseado.
     """
-    logger.info("Formatting df_match de Flashscore...")
+    print("Formatting df_match de Flashscore...")
 
     column_specs = {
         'date': {'dtype': 'datetime64[ns]'},
@@ -560,11 +560,11 @@ def format_df_match(df, prod: bool = False):
     return verify_format(df, column_specs)
     
 def format_df_match_player(df, prod: bool = False):
-    logger.info("Formatting df_match_player de Flashscore...")
+    print("Formatting df_match_player de Flashscore...")
     pass
 
 def format_df_match_odds(df):
-    logger.info("Formatting df_match_odds de Flashscore...")
+    print("Formatting df_match_odds de Flashscore...")
 
     column_specs = {
         'odds_home': {'dtype': 'Float64', 'rango': [1, 100]},
@@ -575,7 +575,7 @@ def format_df_match_odds(df):
     return verify_format(df, column_specs)
 
 def format_df_player_sofifa(df):
-    logger.info("Formatting df_player_sofifa de Sofifa...")
+    print("Formatting df_player_sofifa de Sofifa...")
 
     column_specs = {
         'player_name': {'dtype': str},
@@ -593,7 +593,7 @@ def format_df_player_fifa_sofifa(df):
     """
     Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
     """
-    logger.info("Formatting df_player_fifa_sofifa de Sofifa...")
+    print("Formatting df_player_fifa_sofifa de Sofifa...")
     
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
