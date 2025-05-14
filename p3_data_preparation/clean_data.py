@@ -84,7 +84,7 @@ class TextPreparation:
         # return df
         pass
 
-def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None):
+def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None, verbose: int = 0):
     """
     Prepara el texto de las columns que contengan strings.
 
@@ -98,7 +98,9 @@ def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None):
     # Si l_cols_to_process está vacía, procesar todas las columns de texto
     if l_cols_to_process is None:
         l_cols_to_process = df.select_dtypes(include='object').columns.tolist()
-    print("\nColumns tipo object a preparar:", l_cols_to_process)
+    
+    if verbose >= 1:
+        print("\nColumns tipo object a preparar:", l_cols_to_process)
 
     # Creo objeto de la clase
     tp = TextPreparation()
