@@ -9,17 +9,16 @@ def predict_models(n_models_predict: int = 5):
     Para obtener predicciones en prox partidos de los modelos candidatos
     """
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 77, 148]
 
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}         
 
     # Defino country, iteration date y modelo
     d_countries = {
-        48: ["england", '2025-04-20'], 
-        55: ["france", '2025-04-21'], 
-        59: ["germany", '2025-04-21'], 
-        77: ["italy", '2025-04-20'],
-        148: ["spain", '2025-04-21'], 
+        48: ["england", '2025-05-07'], 
+        55: ["france", '2025-05-07'], 
+        59: ["germany", '2025-05-08'], 
+        77: ["italy", '2025-05-08'],
+        148: ["spain", '2025-05-07'], 
         }
     
     # Por pais
@@ -63,4 +62,4 @@ def predict_models(n_models_predict: int = 5):
         df_country.to_excel(f"/Users/nachomondino/Desktop/df_{country}.xlsx")
 
 if __name__ == "__main__":    
-    predict_models()
+    predict_models(n_models_predict=5)

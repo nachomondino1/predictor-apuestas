@@ -84,7 +84,7 @@ class TextPreparation:
         # return df
         pass
 
-def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None):
+def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None, verbose: int = 0):
     """
     Prepara el texto de las columns que contengan strings.
 
@@ -98,7 +98,9 @@ def prepare_text_columns(df: pd.DataFrame, l_cols_to_process: list = None):
     # Si l_cols_to_process está vacía, procesar todas las columns de texto
     if l_cols_to_process is None:
         l_cols_to_process = df.select_dtypes(include='object').columns.tolist()
-    print("\nColumns tipo object a preparar:", l_cols_to_process)
+    
+    if verbose >= 1:
+        print("\nColumns tipo object a preparar:", l_cols_to_process)
 
     # Creo objeto de la clase
     tp = TextPreparation()
@@ -435,7 +437,7 @@ def fillna_with_mean_in_last_matches(df: pd.DataFrame, cols_to_fill, country:str
     # Returns
         Dataframe con los proximos partidos habiendo reemplazado en cols_to_fill NaN por promedio en ultimos partidos.
     """
-    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
     df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df.index)
 
     # Por variable mean_player 
@@ -511,7 +513,7 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
     Mejoras:
         - Copiar valores mas bajos para equipos que esten jugando competiciones internacionales (o que hayan jugado hace poco)
     """
-    logger.info(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
+    print(f"Remplazando NaN por valor promedio en ultimos partidos en {cols_to_fill}...")
     df_copiado_form = pd.DataFrame(columns=["copiado_formaciones"], index=df_to_fill.index)
     
     # Por variable mean_player 

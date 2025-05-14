@@ -55,7 +55,6 @@ def convert_value_to_int(df):
     df['wage'] = df['wage'].apply(convertir_value).astype(float)
     return df
 
-
 def convert_goals_to_int(df):
     """
     Elimina las filas que hacen que goals_home y goals_away no sean integers como deben ser. 
@@ -122,11 +121,11 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
     Returns:
         pd.DataFrame: DataFrame con las columnas formateadas.
     """
-    # column_specs = {
-    #     'accuracy': [0, 100],
-    #     'completed': [0, 3500],
-    #     'total': [0, 3500]
-    # }
+    column_specs = {
+        'accuracy': [0, 100],
+        'completed': [0, 3500],
+        'total': [0, 3500]
+    }
 
     for base_col in base_columns:
         for location in ['home', 'away']:
@@ -165,10 +164,18 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
             # Caso 2: ya está en formato numérico, solo asignás `n_{col_name}`
             df.loc[mask_direct, f'n_{col_name}'] = df.loc[mask_direct, col_name].astype(float) # Por ejemplo, n_tackles es "15" o "61% (22/36)" (no funciona no se por qué)
 
-            # Verificar rangos
-            # for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
-            #     if not df[new_col].between(min_val, max_val).all():
-            #         raise ValueError(f"Valores fuera de rango en {new_col}: {df[new_col].min()} - {df[new_col].max()}")
+            # Verificar rangos # Es molesto pero necesario. Si hay un error en el reformateo tiene que saltar ahora
+            for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
+                
+                # Verificar si la columna tiene el 100% de NaN
+                if df[new_col].isna().all():
+                    logger.error(f"La columna {new_col} tiene el 100% de valores NaN.")
+                    raise ValueError(f"La columna {new_col} está completamente vacía.")
+                    
+                # Verificar si los valores están fuera de rango
+                if not df[new_col].between(min_val, max_val).all():
+                    logger.error(f"Valores fuera de rango en {new_col}: {df[new_col].min()} - {df[new_col].max()}")
+                    raise ValueError
 
             # Eliminar columna original
             df.drop(columns=[col_name], inplace=True)
@@ -312,7 +319,7 @@ def verify_format(df, column_specs, verbose: int = 0):
                     },
                     ...
                 }
-
+            
     Returns:
         pd.DataFrame: DataFrame formateado.
 
@@ -320,14 +327,15 @@ def verify_format(df, column_specs, verbose: int = 0):
         - Verificar numero de valores unicos. 
         - Posibilidad de parsarle valores ejemplo por columna? Tal vez para las varibles que son string... porque con el rango ya esta.
     """
+
     # Warning si no se esta verificando el formato de una columna
     l_cols_missing = [col for col in df.columns if col not in column_specs.keys()]
-    if verbose >= 0:
-        if len(l_cols_missing) > 0: # No tiro error porque en prod no tengo todas las col (las reformat) y cuando reformateo tampoco.
-            logger.warning(f"No se esta verificando el formato de las siguientes columnas: {l_cols_missing}.")
-            logger.warning("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
+    if verbose >= 0 and len(l_cols_missing) > 0: # No tiro error porque en prod no tengo todas las col (las reformat) y cuando reformateo tampoco.
+        logger.warning(f"No se está verificando el formato de las siguientes columnas: {l_cols_missing}.")
+        # logger.warning("Esto podria ser porque Flashscore tiene una nueva variable y habria que ver si es una vieja pero reformateada (como 'total_passes' que paso a ser 'passes')")
 
     for col, specs in column_specs.items():
+
         # Verificar si la columna existe en el DataFrame
         if col not in df.columns: # en prod no existen todas las col de df_match como las stats o goals, etc.
             if verbose >= 1:
@@ -452,7 +460,7 @@ def format_df_match(df, prod: bool = False):
     Mejora:
         - Podria hacer una sola funcion que reciba un dictionary con el nombre al columna, el rango y el dtype deseado.
     """
-    logger.info("Formatting df_match de Flashscore...")
+    print("Formatting df_match de Flashscore...")
 
     column_specs = {
         'date': {'dtype': 'datetime64[ns]'},
@@ -475,9 +483,10 @@ def format_df_match(df, prod: bool = False):
         'coach_away': {'dtype': str},
         }
     
+    # Evito columnas que se conocen post partido
     if not prod:
         column_specs.update({
-            'attendance':  {}, # {'dtype': int, 'rango': [0, 200000]}, 
+            'attendance': {'dtype': int, 'rango': [0, 200000]}, 
             'goals_home': {'dtype': 'Int64', 'rango': [0, 12]},
             'goals_away': {'dtype': 'Int64', 'rango': [0, 12]},
             'expected_goals_(xg)_home': {'dtype': 'Float64', 'rango': [0, 12]},
@@ -547,15 +556,15 @@ def format_df_match(df, prod: bool = False):
             'clearances_total_home': {'dtype': 'Int64', 'rango': [0, 110]},
             'clearances_total_away': {'dtype': 'Int64', 'rango': [0, 110]},
             })
-    
+            
     return verify_format(df, column_specs)
     
-def format_df_match_player(df):
-    logger.info("Formatting df_match_player de Flashscore...")
+def format_df_match_player(df, prod: bool = False):
+    print("Formatting df_match_player de Flashscore...")
     pass
 
 def format_df_match_odds(df):
-    logger.info("Formatting df_match_odds de Flashscore...")
+    print("Formatting df_match_odds de Flashscore...")
 
     column_specs = {
         'odds_home': {'dtype': 'Float64', 'rango': [1, 100]},
@@ -566,7 +575,7 @@ def format_df_match_odds(df):
     return verify_format(df, column_specs)
 
 def format_df_player_sofifa(df):
-    logger.info("Formatting df_player_sofifa de Sofifa...")
+    print("Formatting df_player_sofifa de Sofifa...")
 
     column_specs = {
         'player_name': {'dtype': str},
@@ -584,7 +593,7 @@ def format_df_player_fifa_sofifa(df):
     """
     Debo reformatear campos de sofifa extraidos nuevos. Esta fallando 'age' porque ahora es string en vez de int?
     """
-    logger.info("Formatting df_player_fifa_sofifa de Sofifa...")
+    print("Formatting df_player_fifa_sofifa de Sofifa...")
     
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])

@@ -12,7 +12,7 @@ from p2_data_understanding.collect_initial_data.scraper_flashscore import extrac
 from p2_data_understanding import describe_data
 ## Data preparation
 from main import DataPreparation, Modeling
-from p3_data_preparation import clean_data, construct_data
+from p3_data_preparation import clean_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 from p3_data_preparation.select_data import determine_country_competitions
 # Modeling
@@ -82,15 +82,14 @@ class DataUnderstandingNew():
         # Verificaciones
         ## Df_match_player
         if len(df_match_player_concat.columns) == 0:
-            logger.warning("No se tiene las formaciones de ningun partido a predecir. " \
-            "Si ya esta la seccion 'Will not play', no deberia fallar.")
+            logger.warning("No se tiene las formaciones de ningun partido a predecir. Si ya esta al menos la seccion 'Will not play', no deberia fallar.")
 
         ## Df_match_odds
         if df_match_odds_concat.isna().any().any(): 
-            logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas si falta para algun/os partido/s.")
+            logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas a ciertos partidos para los que falta mucho")
 
         if len(df_match_odds_concat.columns) != 3:
-            logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambio el XPATH de Flashscore.")
+            logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambió el XPATH de Flashscore.")
             raise ValueError
 
         # Exporto datasets
@@ -136,15 +135,16 @@ class DataUnderstandingNew():
         # Verificaciones
         ## Df_match_player
         if len(df_match_player_concat.columns) == 0:
-            logger.warning("No se tiene las formaciones de ningun partido a predecir. " \
-            "Si ya esta la seccion 'Will not play', no deberia fallar.")
+            logger.error("No se tiene las formaciones de ningun partido ya jugado. Esto es correcto solo si realmente no existe el dato de las formaciones para estos partidos.")
+            raise ValueError
 
         ## Df_match_odds
         if df_match_odds_concat.isna().any().any(): 
-            logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas si falta para algun/os partido/s.")
+            logger.error("El DataFrame df_match_odds contiene al menos un valor NaN. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
+            raise ValueError
 
         if len(df_match_odds_concat.columns) != 3:
-            logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambio el XPATH de Flashscore.")
+            logger.error("No se recolectaron todas las odds en df_match_odds. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
             raise ValueError
 
         # Exporto datasets
@@ -160,15 +160,18 @@ class DataUnderstandingNew():
         Descripción de dataframes en terminos de dtypes, nan values, registros unicos, etc.
         """
         logger.info("Describing data... ")
-        logger.info("DF_MATCH")
-        describe_data.getting_to_know_data(df_match, verbose=verbose)
-        describe_data.verificar_unicidad_registros(df_match) # Verifico unicidad de registros segun campos id
 
-        logger.info("DF_MATCH_PLAYER")
-        describe_data.getting_to_know_data(df_match_player, verbose=verbose)
+        d = {'df_match': df_match, 'df_match_player': df_match_player, 'df_match_odds': df_match_odds}
 
-        logger.info("DF_MATCH_ODDS")
-        describe_data.getting_to_know_data(df_match_odds, verbose=verbose)
+        for name, df in d.items():
+            print(name)
+            if verbose >= 0:
+                print(df.shape)
+            elif verbose >= 1:
+                print(df.head(2))
+            elif verbose >= 2:
+                describe_data.getting_to_know_data(df, verbose=verbose)
+                describe_data.verificar_unicidad_registros(df) # Verifico unicidad de registros segun campos id
 
 class DataPreparationNew(DataPreparation):
 
@@ -289,6 +292,39 @@ class DataPreparationNew(DataPreparation):
         return df_new, df_copiado
     
     # Construccion de datos
+    def filter_rows_to_construct(self, df_integrated_updated, df_constructed_train, predict_missing):
+        """
+        Preparar df tal que me aseguro de construir con los mismos datos que cuando entrené (y asi construir bien vars como ELO)
+        """
+        logger.info("Preparing to construct...")
+        # Cargar los registros con los que se construyó el modelo de entrenamiento (para construir bien vars como ELO que necesitan exactamente los = registros que caundo entrenó)
+        train_indices = df_constructed_train.index
+        
+        # Filtrar registros posteriores al entrenamiento
+        last_train_date = df_constructed_train['date'].max()
+        df_new_data = df_integrated_updated[df_integrated_updated['date'] > last_train_date]
+
+        # Obtener índices de los registros nuevos pero dentro de las competencias seleccionadas
+        missing_indices = df_new_data.index
+
+        # Combinar índices de entrenamiento y nuevos registros
+        final_indices = train_indices.union(missing_indices)
+
+        # Filtrar el dataframe con los índices determinados
+        df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(final_indices)]
+
+        if self.verbose >= 0:
+            print(f"Total registros en entrenamiento: {len(train_indices)}")
+            print(f"Total registros nuevos con competencias seleccionadas: {len(missing_indices)}")
+            print(f"Total registros después de combinación: {len(final_indices)}")
+            print(f"Total registros finales después de limpieza: {len(df_integrated_updated_clean)}")
+
+        if not predict_missing and len(df_integrated_updated_clean) != len(final_indices):
+            logger.error("El dataframe utilizado para construir no tiene las filas que deberia.")
+            raise ValueError
+        
+        return df_integrated_updated_clean
+
     def construct_data_new(self, df_next_matches: pd.DataFrame, df_last_old_matches,
                            n_last_matches:list, n_years_h2h: int, segun_localia: bool, calculate_dif: bool, decay_rate: float,
                            columns_used: list, verbose: int = 0):
@@ -307,8 +343,6 @@ class DataPreparationNew(DataPreparation):
         # Returns
             Dataframe con proximos partidos construido utilizando los partidos ya jugados. (DataFrame)
         """
-        logger.info("Constructing new data...")
-
         # Construyo historicas solo si hay "ultimos partidos"
         with_historic = True if len(df_last_old_matches) > 0 else False
 
@@ -351,8 +385,8 @@ class DataPreparationNew(DataPreparation):
         return df_next_matches
 
     # Limpieza post select     
-    def clean_post_select_new(self, df: pd.DataFrame, scaler_loaded):
-        logger.info("Clean data post select...")
+    def describe_and_verify_nan(self, df: pd.DataFrame):
+        logger.info("Describing nan values in prod...")
 
         # Calcular el porcentaje de valores NaN por columna
         df_nan_col = df.isna().mean()
@@ -373,12 +407,6 @@ class DataPreparationNew(DataPreparation):
 
         # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
         df_filled = self.add_emergency_fill_flags(df)
-
-        # Tratamiento de nan values 
-        df = self.treat_nan_in_rows(df, fill_na="0", prod=True) # no puedo eliminar registros a predecir
-
-        # Escalado de datos para eliminar diferencias x escala
-        df = self.scale_data(df, scaler_loaded, prod=True)
 
         df_filled.to_excel(f'{self.BASE_DIR}/df_filled.xlsx', index=True)
         return df
@@ -468,9 +496,9 @@ class TrainingDataLoader():
 
         # Imprimo hiper levantados
         if self.verbose >= 0:
-            logger.info("Hiperparametros cargados:")
+            print("Hiperparametros cargados:")
             for key, value in d.items():
-                logger.info(f'\t {key}: {value}')
+                print(f'\t {key}: {value}')
 
         return d
 
@@ -741,7 +769,7 @@ def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
         model_name = str(row_country['model_name'].values[0])
     
     if verbose >= 1:
-        logger.info(f"Model: {n_model} ; Model name: {model_name}")
+        logger.critical(f"Model: {n_model} ; Model name: {model_name}")
 
     return n_model, model_name
 
@@ -821,8 +849,8 @@ def main(
 
     if verbose >= 0:
         logger.info("\n" + "#"*120 + "\n" + f"COUNTRY: {country.upper()}".center(120) + "\n" + "#"*120 + "\n")
-        logger.info(f'Competencias: \n {df_comp_country}  \n Competencias publicas: {comp_public}')
-        logger.warning(iteration_date_dt)
+        print(f'Competencias: \n {df_comp_country}  \n Competencias publicas: {comp_public}')
+        logger.info(f"Iteration date: {iteration_date_dt}")
 
     # Creo objetos de clases
     du = DataUnderstandingNew(id_country, country, export=export) # Creo objeto de clase DataUnderstanding
@@ -864,7 +892,7 @@ def main(
             # Preparo datos missing            
             df_match_miss_new_f, df_match_player_miss_new_f, df_match_odds_miss_new_f, df_player_fifa_sofifa = dp.format_data(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss_new_f, df_match_player_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, export=False)
-            # df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss, df_match_player_miss, df_match_odds_miss, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
+            df_match_miss_new_vf, df_match_player_miss_new_vf, df_match_odds_miss_new_vf, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss_new_c, df_match_player_miss_new_c, df_match_odds_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
             df_integrated_missing_new = dp.integrate_data(df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
@@ -908,14 +936,7 @@ def main(
             logger.error("No hay próximos partidos para los cuales predecir su resultado.")
             return ValueError
 
-        if verbose >= 2:
-            du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=verbose)
-    
-        if verbose >= 1:
-            print("\n DF MATCH \n", df_match.head(2))
-            print("\n DF MATCH PLAYER \n", df_match_player.head(2))
-            print("\n df_player_sofifa \n", df_player_sofifa.head(2))
-            print("\n df_player_fifa_sofifa \n", df_player_fifa_sofifa.head(2))
+        du.describe_data_new(df_match, df_match_player, df_match_odds, verbose=0)            
 
     else:
         logger.warning("Se evitó por comando la extraccion de proximos partidos.")
@@ -957,8 +978,8 @@ def main(
     
     # Error por intentar predecir al menos un partido que ya se jugó y tenes en missing
     rows_rep = df_match[df_match.index.isin(df_integrated_updated.index)] # df_integrated_udated
-    logger.warning(f"IDXS REPETIDOS: {len(rows_rep)}")
     if len(rows_rep) > 0:
+        logger.warning(f"IDXS REPETIDOS: {len(rows_rep)}")
 
         logger.error("En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)")
         user_input = str(input("Escribe 'y' para eliminar indices duplicados y seguir la prediccion: "))
@@ -992,8 +1013,6 @@ def main(
 
         # Determino n_model, iteration date y nombre --> Lo uso para levantar hiper no solo en modeling sino tmb en data prep.
         n_model, model_name = read_data_of_best_model(id_country, d_model)
-        if verbose >= 0:
-            logger.critical(f"n_model: {n_model} ; model_name: {model_name}")
 
         # Levanto hiperparametros y modelos utilizados en los datos con los que se entreno el modelo
         lo = TrainingDataLoader(country=country, n_model=n_model, model_name=model_name, iteration_date=iteration_date_dt)
@@ -1006,69 +1025,53 @@ def main(
         initial_date = df_match['date'].min()  # Obtiene la fecha mínima (para filtrar dfs para rellenar y construir) 
         logger.info(f"📅 Fecha inicial: {initial_date}.")
 
-        # Preparacion de datos
+        # Preparacion de datos hasta integrate
         if not predict_missing: # En missing ya tengo las formaciones
+
+            # Deberia levantar los datos de sofifa tal como cuando entrené.... ?
+            # ...
+
             # Format a integrate (usar lo mismo que en df_int_missing)
             df_match, df_match_player, df_match_odds, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_match_odds, df_player_fifa_sofifa, reformat=False, prod=True, export=False)            
             df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=False)
-            # df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=prod_vf)
+            df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=True)
             df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
-            df = dp.clean_post_integrate(df, competencies_to_select=d_hiper['comp_to_select'], prod=True)
     
-            ## Fill data
-            ### Selecciono los ultimos partidos de los ya jugados para rellenar
-            logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
-            df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
-            df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas.
-            ### Relleno datos
-            df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
-
         else:
             # Forma 2: desde int_missing 
             df = df_integrated_missing.copy()
-            print(df.shape)
             df = df[df.index.isin(df_match.index)]
-            df = dp.clean_post_integrate(df, competencies_to_select=d_hiper['comp_to_select'], prod=True)
-            print(df.shape)
-        
-        ## Pre construct
-        logger.info("Preparing to construct...")
-        # Filtrar df_integrated con las competencias seleccionadas
+
+        # Clean post integrate
+        ## Next matches
+        df = dp.clean_post_integrate(df, competencies_to_select=d_hiper['comp_to_select'], prod=True)
+
+        ## Old matches (con los cuales construir var historicas) -->         # Filtrar df_integrated con las competencias seleccionadas (ya hago fill solo de las cols players que no elimino por ruido)
         df_integrated_updated = dp.clean_post_integrate(
             df_integrated_updated, n_years_to_select=None, competencies_to_select=d_hiper['comp_to_select'], prod=True
         )
 
-        # Cargar los registros con los que se construyó el modelo de entrenamiento (para construir bien vars como ELO que necesitan exactamente los = registros que caundo entrenó)
+        ### Filter rows to construct
         df_constructed_train = lo.load_df_constructed()
-        train_indices = df_constructed_train.index
-        print(f"Total registros en entrenamiento: {len(train_indices)}")
+        df_integrated_updated_clean = dp.filter_rows_to_construct(df_integrated_updated, df_constructed_train, predict_missing)
 
-        # Filtrar registros posteriores al entrenamiento
-        last_train_date = df_constructed_train['date'].max()
-        df_new_data = df_integrated_updated[df_integrated_updated['date'] > last_train_date]
-
-        # Obtener índices de los registros nuevos pero dentro de las competencias seleccionadas
-        missing_indices = df_new_data.index
-        print(f"Total registros nuevos con competencias seleccionadas: {len(missing_indices)}")
-
-        # Combinar índices de entrenamiento y nuevos registros
-        final_indices = train_indices.union(missing_indices)
-        print(f"Total registros después de combinación: {len(final_indices)}")
-
-        # Filtrar el dataframe con los índices determinados
-        df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(final_indices)]
-        print(f"Total registros finales después de limpieza: {len(df_integrated_updated_clean)}")
-
-        if not predict_missing and len(df_integrated_updated_clean) != len(final_indices):
-            logger.error("El dataframe utilizado para construir no tiene las filas que deberia.")
-            raise ValueError
+        # Fill data (si es missing no pues ya deberia tener las formaciones)
+        if not predict_missing: 
+            logger.info("Fill data...")
+            ### Selecciono los ultimos partidos de los ya jugados para rellenar
+            logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
+            df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated_clean, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
+            df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas.
+            
+            ### Relleno datos
+            df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
 
         ## Construct
         df = dp.construct_data_new(
-            df_next_matches=df, df_last_old_matches=df_integrated_updated_clean,
+            df_next_matches=df, 
+            df_last_old_matches=df_integrated_updated_clean,
             n_last_matches=d_hiper['n_last_matches'], n_years_h2h=d_hiper['n_years_h2h'], segun_localia=d_hiper['segun_localia'], 
-            calculate_dif=d_hiper['calculate_dif'], decay_rate=d_hiper['decay_rate'],
-            columns_used=d_hiper['selected_columns']
+            calculate_dif=d_hiper['calculate_dif'], decay_rate=d_hiper['decay_rate'], columns_used=d_hiper['selected_columns']
             )
         
         ## Clean data post construct
@@ -1084,7 +1087,10 @@ def main(
             logger.info(f"Columnas luego de filtrar x mas importantes: {n_col_inic} --> {len(df.columns)}")
 
         ## Clean data post select
-        df = dp.clean_post_select_new(df=df, scaler_loaded=scaler)
+        df = dp.describe_and_verify_nan(df=df)
+        df = dp.clean_post_select(df, scaler_loaded=scaler, prod=True)
+
+        # Exporto datos
         df.to_excel(f"data/{country}/p6_deployment/data_preparation/df_to_predict.xlsx", index=True)
 
         # Mensajes antes de predecir
@@ -1122,7 +1128,6 @@ def main(
         else:
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
             d_strategy = lo.load_modeling_hyperparameters()
-        print(df)
 
         # Predigo sobre proximos partidos usando modelo cargado
         y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
@@ -1133,8 +1138,6 @@ def main(
 
         # Guardo como df
         df_pred_proba = mo.construct_predictions_dataframe(model=lo.load_model(), X_test=df, y_pred_prob=y_pred_proba, y_pred=y_pred)
-        print(df_pred_proba)
-
         df_predicciones = mo.prepare_dataframe_to_assess_with_roi(df_pred_proba=df_pred_proba, df_match=df_match, df_match_odds=df_match_odds)         # Concateno todos los dfs en uno solo 
         df_predicciones = pd.concat([df_predicciones, df_filled], axis=1)
 

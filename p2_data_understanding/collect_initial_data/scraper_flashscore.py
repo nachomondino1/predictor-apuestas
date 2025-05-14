@@ -115,40 +115,57 @@ class FlashscoreCrawler(Crawler):
         d_row_match = {}
         d_row_match_player = {}
         d_row_match_odds = {}
+        print_not_next_matches = not next_matches
 
-        # EXTRACCION DE CAMPOS
-        ## Extraigo campos de hoja "summary"
-        ### Match information
-        d_row_match.update(self.extract_match_information())
+        # MATCH INFORMATION (de hoja "summary")
+        d_row_match.update(self.extract_match_information(next_matches))
         ### Goals
         if not next_matches:
             d_row_match.update(self.extract_result())
         ### Teams
         d_row_match.update(self.extract_teams())
 
+        # Si es un prox partido, determino cuanto falta para el partido
+        if next_matches:
+            date_dt = pd.to_datetime(d_row_match['date'], format='%d.%m.%Y %H:%M') 
+            date_limit = date_dt - datetime.now()
+            days_diff = date_limit.days
+            hours_diff = date_limit.total_seconds() / 3600  # Convierte segundos a horas
+        else: 
+            hours_diff = None
+
+        # STATS
         ## Si tiene hoja "stats", extraigo campos
         if not next_matches:
             boton_stats = super().extract_tag(xpath='//a[@data-analytics-alias="match-statistics"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=True) # './/div[@class="filterOver filterOver--indent"]//button[text()="Stats"]'
             if super().click_boton(boton_stats) is not False:
                 d_row_match.update(self.extract_stats())
 
+        # ODDS
         ## Si existe la seccion "odds pre-match", extraigo odds de Bet365
         if super().extract_tag(xpath='.//div[@class="odds"]', sec_wait=self.SEC_WAIT_MAX) is not None:  # No sirve en algunos partidos en los que existe la seccion de las oddss pero no hay valores...
             d_row_match_odds.update(self.extract_odds())
-        
-        ## Si tiene hoja "Formations", extraigo campos
-        print_not_next_matches = not next_matches
+
+        # LINE UPS
         boton_formations = super().extract_tag(xpath='//a[@data-analytics-alias="lineups"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=print_not_next_matches) #  # './/div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]'
+        
+        ## Si tiene hoja "Lineups"
         if super().click_boton(boton_formations) is not False:
+
             ### Alineaciones titulares, suplentes y ausentes
-            d_row_match_player.update(self.extract_lineups(next_matches))
+            d_row_match_player.update(self.extract_lineups(next_matches, hours_diff))
             
             ### Coaches
             d_row_match.update(self.extract_coaches())
 
-        # Si no hay boton lineup y es un proximo partido 
+        ## Si no tiene hoja "Lineups" y es un proximo partido 
         elif next_matches:
-            d_row_match_player.update(self.extract_bajas_pre_partido()) # FALTARIA TMB SECCION POSIBLES BAJAS.
+            d_row_match_player.update(self.extract_bajas_pre_partido(days_diff=days_diff))
+            if self.verbose >= 1:
+                logger.info("Aun no existe la hoja 'Lineups', por lo que, no puedo obtener formaciones ni coaches.")
+                
+        else:
+            logger.warning("El partido ya se jugó pero no existe la hoja 'Lineups' de la cual extraer las formaciones")
         
         return d_row_match, d_row_match_player, d_row_match_odds
 
@@ -172,7 +189,7 @@ class FlashscoreCrawler(Crawler):
                 d_row[field] = 1 if value is not None else 0
         pass
 
-    def extract_match_information(self):
+    def extract_match_information(self, next_matches):
         """
         Extrae datos basicos de un match como equipos, fecha, cancha, goals, etc.
         :return: Diccionario.
@@ -184,6 +201,9 @@ class FlashscoreCrawler(Crawler):
             'capacity': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Capacity")]/parent::div/following-sibling::div', 
             'attendance': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Attendance")]/parent::div/following-sibling::div'
         }
+
+        if next_matches:
+            d_field_xpath.pop("attendance", None)  # Elimina "attendance" si existe, evitando errores
 
         # Extraigo el primer campo con espera para evitar extraer sin que haya cargado la pagina
         d_row['date'] = super().extract_tag(xpath='.//div[@class="duelParticipant"]/div[@class="duelParticipant__startTime"]', text=True, sec_wait=self.SEC_WAIT_MED)
@@ -242,7 +262,7 @@ class FlashscoreCrawler(Crawler):
             print(f"Extracting goals: {d_row}")
         return d_row
     
-    def extract_lineups(self, next_matches):
+    def extract_lineups(self, next_matches, hours_diff):
         """
         Extrae de jugadores titulares, suplentes y ausentes de cada equipo.
         :return: Diccionario.
@@ -251,15 +271,43 @@ class FlashscoreCrawler(Crawler):
         d_row = {}
 
         if next_matches:
-            d_formations = {'Predicted starting lineups': 'start', 'Will not play': 'miss'} # "Starting Lineups": "start" --> salvo que falten menos de 30 min
+            # Definir conjuntos de formaciones
+            formations_less_than_one_hour = {
+                "Starting Lineups": "start",
+                "Predicted starting lineups": "start",
+                "Substitutes": "sub",
+                "Will not play": "miss",
+                "Missing Players": "miss"
+            }
+
+            formations_more_than_one_hour = {
+                "Predicted starting lineups": "start",
+                "Will not play": "miss"
+            }
+
+            # Asignar d_formations según el tiempo restante
+            d_formations = formations_less_than_one_hour if hours_diff <= 1 else formations_more_than_one_hour
+
+            if self.verbose >= 1:
+                message = (
+                    "Existe el botón Lineups y falta menos de una hora, por lo que se intentará obtener las formaciones iniciales"
+                    if hours_diff <= 1
+                    else "Existe el botón Lineups pero, dado que falta más de una hora, solo se buscarán 'Predicted starting lineups' y 'Will not play'"
+                )
+                logger.warning(message) if hours_diff <= 1 else logger.info(message)
+
         else:
-            d_formations = {"Starting Lineups": "start", 'Substitutes': 'sub', 'Substituted players': 'sub_enter', 'Missing Players': 'miss'}
+            d_formations = {
+                "Starting Lineups": "start",
+                "Substitutes": "sub",
+                "Substituted players": "sub_enter",
+                "Missing Players": "miss"
+            }
 
         # Por formation ("Formation inicial", "Suplentes" y  "Ausentes")
         for formation, titularidad in d_formations.items():
 
-            SEC_WAIT = self.SEC_WAIT_MAX
-            # SEC_WAIT = self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
+            SEC_WAIT = self.SEC_WAIT_MAX # self.SEC_WAIT_MAX if formation=="Starting Lineups" else self.SEC_WAIT_MIN  # Jugadores ausentes muchas veces no esta. Y suplentes en partidos viejos tampocoEsto agiliza la extraccion.
 
             # Si existe dicha formation
             tag_lineup = super().extract_tag(
@@ -401,9 +449,11 @@ class FlashscoreCrawler(Crawler):
             print(f"Extracting odds: {d_row}")
         return d_row
 
-    def extract_bajas_pre_partido(self):
+    def extract_bajas_pre_partido(self, days_diff, days_thr: int = 2):
         """
         Extrae listado de jugadores ausentes para el proximo partido.
+
+        # FALTARIA TMB SECCION POSIBLES BAJAS, "Questionable"
         """
         d_row = {}
 
@@ -411,9 +461,8 @@ class FlashscoreCrawler(Crawler):
         tag_bajas = super().extract_tag(
             xpath=f'//div[contains(@class, "section")]//*[contains(text(), "Will not play")]/ancestor::div[contains(@class, "wcl-headerSection")]/following-sibling::div',
             sec_wait=self.SEC_WAIT_MIN, 
-            print_fail=True
+            print_fail=False
             )
-        # Tiene que saltar error si no existe el tag_bajas......
 
         if tag_bajas:
 
@@ -452,6 +501,13 @@ class FlashscoreCrawler(Crawler):
 
                 for i, url in enumerate(l_urls_away):
                     d_row.update({f'id_player_miss_away_{i + 1}': l_ids_away[i], f'player_name_miss_away_{i + 1}': l_names_away[i]}) #  "player_url": url
+
+        else:
+            # Tiene que saltar warning solo si no existe el tag_bajas y si faltan menos de 2 dias.
+            if days_diff < days_thr:
+                logger.warning(f"No existe la seccion 'Will not play' y faltan menos de {days_thr} dias para el partido. Es correcto solo si efectivamente no hay bajas pero sino puede ser por cambio de codigo HTML de la seccion.")
+            elif self.verbose >= 1:
+                logger.info(f"No existe la seccion 'Will not play' pero faltan mas de {days_thr} dias para el partido.")
 
         if self.verbose >= 1:
             print(f"Extracting lineups: {d_row}")
@@ -509,7 +565,8 @@ class FlashscoreCrawler(Crawler):
 
                     else:
                         # Dejo de extraer partidos puesto que luego del primer partido que es posterior a fecha_umbral, todos lo son (estan ordenados por fecha en Flashscore)
-                        logger.warning(f"Partido fuera del umbral de fechas!")
+                        if self.verbose >=1:
+                            logger.warning(f"Partido fuera del umbral de fechas!")
                         break
                 except ValueError as e:
                     # Si hay un error en la conversión, imprimo el mensaje de error

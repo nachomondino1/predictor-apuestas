@@ -265,15 +265,14 @@ class DataPreparation:
         start_date = '2015-01-01' # Filtrar por fecha (por ejemplo, para filtrar datos desde una fecha específica)
         df_match = df_match[df_match['date'] >= start_date]
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)] # Es clave para eliminar jugadores y hacer una mejor integracion (tener menos falsos positivos)
-        logger.warning(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
-
+        
         # Elimino columnas de jugadores que son todo NaN (se ve que hay porque las creo y no les guardo nada eso debe ser porque obtengo nombres solo si tiene url)
         non_object_columns = df_match_player.select_dtypes(exclude=['object']).columns
         df_match_player.drop(columns=non_object_columns, inplace=True)
         
+        # Mensajes sobre limpieza de datos de Flashscore
         if self.verbose >= 1:
-            print("Shape df_match_player: ", df_match_player.shape)
-            print("\nPreparacion de columnas string...")
+            logger.warning(f"Partidos jugados antes de {start_date} eliminados. {n_rows_inic} --> {len(df_match)}. {len(df_match_player)}")
 
         # Preparacion de texto
         ## FLASHSCORE
@@ -362,9 +361,9 @@ class DataPreparation:
 
         # Segun si es train o produccion (en el 1ero hago el mapeo, en el 2do uso el mapeo ya hecho)
         if prod:
-            logger.critical("Integración para produccion")
+            logger.critical("Integración para produccion. No vuelvo a mapear sino que levanto df_map del pais ")
             df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
-            logger.info(f"No vuelvo a mapear sino que levanto df_map del pais (para producción) \n {df_map_players_fs_so.head(3)}")
+            print(df_map_players_fs_so.head(3))
 
         else: 
             logger.critical("Integración para train")
@@ -390,7 +389,7 @@ class DataPreparation:
 
         return df
 
-    def describe_integrate_data(self, df):
+    def describe_integrate_data(self, df, prod: bool = False):
         """
         Describo los datos una vez integradas todas las fuentes
         """
@@ -403,14 +402,10 @@ class DataPreparation:
         ## COLUMNAS
         df_nan_col = df_copy.isna().mean()
         df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
-        if self.verbose >= 1:
-            logger.warning("Las 10 variables con más valores NaN:")
-            logger.warning(df_nan_col_sorted.head(10))  
 
         ## FILAS
         ## % nan mean x fila
         nan_mean_total = df_copy.isnull().mean().mean()  # Promedio sobre todas las filas y columnas
-        logger.info(f"Promedio sobre todas las filas y columnas: {nan_mean_total}")
     
         ## % nan mean x competicion
         # Calcular el porcentaje de NaN por fila
@@ -421,9 +416,13 @@ class DataPreparation:
 
         # Renombrar columnas para claridad
         df_nan_by_competition.columns = ['id_competition', 'mean_nan_percent']
-        print(df_nan_by_competition)
         
-        if self.verbose >= 0:
+        if self.verbose >= 2:
+            logger.warning(f"Las 10 variables con más valores NaN: \n {df_nan_col_sorted.head(10)}")
+            logger.info(f"Promedio de NaN values en todas las filas y columnas: {nan_mean_total}")
+            print(df_nan_by_competition)
+        
+        if not prod:
             df_dtype.to_excel(f'{self.base_path}/describe_integrate_data/dtypes.xlsx', index=True)
             df_nan_col.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_col.xlsx', index=True)
             df_nan_by_competition.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_competition.xlsx', index=True)
@@ -432,7 +431,7 @@ class DataPreparation:
         """
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
         """
-        self.describe_integrate_data(df)
+        self.describe_integrate_data(df, prod=prod)
         
         # Ordeno valores por fecha y separo X e y
         df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
@@ -453,11 +452,13 @@ class DataPreparation:
         strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
         col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
 
-        cols_to_drop = cols_constants + cols_basics_noise + col_players_noise
+        cols_to_drop = list(set(cols_constants + cols_basics_noise + col_players_noise))
+        cols_to_drop = [col for col in cols_to_drop if col in df.columns] # En prod falla la elim de "attendance"
+        if self.verbose >= 0:
+            logger.warning(f"Eliminación de {len(cols_to_drop)} de {len(df.columns)} columnas...\n Por ser contantes: {cols_constants} \n Por ruido: {cols_basics_noise + col_players_noise}")
+
         df.drop(columns=cols_to_drop, inplace=True)
         if self.verbose >= 0:
-            logger.warning("Eliminación de columnas...")
-            logger.warning(f"Columnas eliminadas x ser constantes o por ruido: {cols_to_drop}")
             logger.warning(df.shape)
 
         # Nan en red_cards (en prod: no lo uso para df_next_matches pero si lo uso para df old matches con el cual construir datos)
@@ -530,7 +531,10 @@ class DataPreparation:
         """
         start = time.time()
         logger.info("Constructing data...")        
-        self.determine_stats_to_use()
+        cols_to_use = self.determine_stats_to_use()
+
+        # Alerta si dejo de medir alguna variable en los ultimos partidos
+        self.warning_variables_no_longer_measured(df, cols_to_use)
 
         # Separar date en month y day
         df['date'] = pd.to_datetime(df['date'])  # Asegurarse de que sea datetime
@@ -662,6 +666,23 @@ class DataPreparation:
         
         return df
 
+    def warning_variables_no_longer_measured(self, df, cols_to_use):
+
+        # Warning si una columna en particular tiene mayoria de nan en ultimos partidos (indica que flashscore la dejo de medir)
+        recent_df = df.sort_values('date', ascending=False).head(100)
+        logger.info(f"Para identificar si Flashscore dejó de medir alguna variable en el ultimo tiempo (e.g. attacks):")
+
+        cols_to_review = [col for col in recent_df.columns if any(substring in col for substring in cols_to_use)]
+        print(cols_to_review)
+
+        for col in cols_to_review:  # Revisar cada columna (menos la columna de fecha)
+            if col == 'date':
+                continue
+            total = recent_df[col].shape[0]
+            num_nans = recent_df[col].isna().sum()
+            if num_nans > total / 2:
+                logger.warning(f"⚠️ Warning: La columna '{col}' tiene {num_nans} NaN de {total} registros recientes.")
+
     def tag_string_data_to_integer(self, df: pd.DataFrame, df_etiquetas: pd.DataFrame = None, prod: bool = False):
         """
         Conversion de columnas tipo "object" a "integer"
@@ -708,10 +729,7 @@ class DataPreparation:
         df.drop(columns=cols_to_drop, inplace=True)
 
         # Mensaje de warning
-        logger.warning(f"\nColumnas eliminadas x data leakage : \n{cols_data_leakage}")
-        logger.warning(f"\nColumnas eliminadas x ruido : \n{cols_noise}")
-        logger.warning(f"\nColumnas eliminadas x no usarse para construir : \n{cols_not_constructed}")
-
+        logger.warning(f"\nColumnas a eliminar... \n x data leakage: {cols_data_leakage} \n x ruido: {cols_noise} \n x no usarse para construir: {cols_not_constructed}")
         return df
 
     def treat_nan_in_cols(self, df: pd.DataFrame, porc_nan_max: float, export: bool = True):
@@ -811,7 +829,10 @@ class DataPreparation:
         Limpieza de datos 4 (drop nan en rows + escalado)
         """
         # Tratamiento de nan values 
-        df = self.treat_nan_in_rows(df, fill_na=fill_na, prod=prod)  # Elimino registros con al menos un NaN value
+        if prod:
+            df = df.fillna(0)
+        else:
+            df = self.treat_nan_in_rows(df, fill_na=fill_na)  # Elimino registros con al menos un NaN value
 
         # Escalado de datos para eliminar diferencias x escala
         df = self.scale_data(df, scaler_loaded=scaler_loaded, path_save=path_save, prod=prod)  # Escalado de datos para eliminar diferencias x escala
@@ -821,13 +842,16 @@ class DataPreparation:
 
         return df
 
-    def treat_nan_in_rows(self, df, fill_na: str = None, prod: bool = False):
+    def treat_nan_in_rows(self, df, fill_na: str = None):
         # Solo de las columnas importantes
-        if fill_na is not None or prod:
+
+        if fill_na is not None:
             df_filled = clean_data.fill_nan_values(df, fill_type=fill_na)
+
         else:
             # Elimino registros con al menos un NaN 
             df_filled = df.dropna(axis=0, how='any')  # Elimino registros con al menos un NaN value
+
         logger.warning(f"\tSe eliminaron registros con al menos un NaN value. Shape X luego de dropna: {df.shape} --> {df_filled.shape}")
     
         return df_filled
