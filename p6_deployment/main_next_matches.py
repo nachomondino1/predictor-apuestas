@@ -12,6 +12,7 @@ from p2_data_understanding.collect_initial_data.scraper_flashscore import extrac
 from p2_data_understanding import describe_data
 ## Data preparation
 from main import DataPreparation, Modeling
+from p3_data_preparation.format_data import value_nan_to_none
 from p3_data_preparation import clean_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *
 from p3_data_preparation.select_data import determine_country_competitions
@@ -87,6 +88,9 @@ class DataUnderstandingNew():
         ## Df_match_odds
         if df_match_odds_concat.isna().any().any(): 
             logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas a ciertos partidos para los que falta mucho")
+            df_match_odds_concat.dropna(subset=['odds_home'], inplace=True)
+            df_match_concat = df_match_concat[df_match_concat.index.isin(df_match_odds_concat.index)]
+            df_match_player_concat = df_match_player_concat[df_match_player_concat.index.isin(df_match_odds_concat.index)]
 
         if len(df_match_odds_concat.columns) != 3:
             logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambió el XPATH de Flashscore.")
@@ -460,20 +464,11 @@ class TrainingDataLoader():
         except IndexError:
             logger.error(f"El modelo {self.n_model} no fue entrenado en el entrenamiento del {self.iteration_date}.")
             raise IndexError
-
-        def value_none(value):
-            """
-            Evitar nan y forzar None
-            """
-            if pd.isna(value):  # Verifica si es NaN o None
-                return None
-            else:
-                return value
             
         # Guardo hiperparametros en diccionario
         # clean_post_integrate
         d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
-        d['n_years_to_select'] = value_none(row_hiper['n_years_to_select'])
+        d['n_years_to_select'] = value_nan_to_none(row_hiper['n_years_to_select'])
         ## Construct_data
         d['n_last_matches'] = eval(row_hiper['n_last_matches']) 
         d['n_years_h2h'] = int(row_hiper['n_anios_hist']) # .values[0]
@@ -481,10 +476,10 @@ class TrainingDataLoader():
         d['calculate_dif'] = row_hiper['calculate_dif'] # .values[0]
         d['decay_rate'] = 0 if row_hiper['decay_rate'] == 0.0 else row_hiper['decay_rate'] 
         ## Select_data
-        d['thr_corr'] = value_none(row_hiper['thr_corr'])
-        d['thr_fs'] = value_none(row_hiper['thr_fs'])
+        d['thr_corr'] = value_nan_to_none(row_hiper['thr_corr'])
+        d['thr_fs'] = value_nan_to_none(row_hiper['thr_fs'])
         # clean_post_select
-        d['fill_na'] = value_none(row_hiper['fill_na'])
+        d['fill_na'] = value_nan_to_none(row_hiper['fill_na'])
         if isinstance(d['fill_na'], float):
             d['fill_na'] = '0'
         d['selected_columns'] = eval(row_hiper['X_columns'])  # Columnas utilizadas para entrenar el modelo # eval() para pasar de string a lista
@@ -567,10 +562,16 @@ class TrainingDataLoader():
                 logger.critical("Se levantó la estrategia de apuesta por resultado")
             else:
                 logger.warning("Se levanta una estrategia comun a todos los resultados")
-                return {'prob_dp': df_hiper['prob_dp'].values[0], 'curva': df_hiper['curva'].values[0], 'm': df_hiper['m'].values[0], 'b': df_hiper['b'].values[0], 'k': df_hiper['k'].values[0]}
-
+                d = {
+                    'prob_dp': value_nan_to_none(df_hiper['prob_dp'].values[0]), 
+                    'curva': df_hiper['curva'].values[0], 
+                    'm': df_hiper['m'].values[0], 
+                    'b': df_hiper['b'].values[0], 
+                    'k': df_hiper['k'].values[0]
+                    }
+                return d
             if self.verbose >= 0:
-                logger.info("Hiperparametros cargados:")
+                logger.info("Hiperparametros de apuesta cargados:")
                 logger.info(df_hiper)
 
         except FileNotFoundError as e:
@@ -1026,7 +1027,7 @@ def main(
         logger.info(f"📅 Fecha inicial: {initial_date}.")
 
         # Preparacion de datos hasta integrate
-        if not predict_missing: # En missing ya tengo las formaciones
+        if not predict_missing:
 
             # Deberia levantar los datos de sofifa tal como cuando entrené.... ?
             # ...
@@ -1036,7 +1037,7 @@ def main(
             df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=False)
             df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=True)
             df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
-    
+        
         else:
             # Forma 2: desde int_missing 
             df = df_integrated_missing.copy()
@@ -1186,7 +1187,7 @@ if __name__ == "__main__":
         148: ["spain", '2025-05-07'], 
         }
 
-    id_country = 77
+    id_country = 148
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 1
@@ -1194,7 +1195,7 @@ if __name__ == "__main__":
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 245, 'model_name': "XGBClassifier"} # RandomForestClassifier
+    d_model = {'n_model': 46, 'model_name': "XGBClassifier"} # RandomForestClassifier
 
     if key == 'missing':
         
