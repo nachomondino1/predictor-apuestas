@@ -118,7 +118,7 @@ class FlashscoreCrawler(Crawler):
         print_not_next_matches = not next_matches
 
         # MATCH INFORMATION (de hoja "summary")
-        d_row_match.update(self.extract_match_information())
+        d_row_match.update(self.extract_match_information(next_matches))
         ### Goals
         if not next_matches:
             d_row_match.update(self.extract_result())
@@ -189,7 +189,7 @@ class FlashscoreCrawler(Crawler):
                 d_row[field] = 1 if value is not None else 0
         pass
 
-    def extract_match_information(self):
+    def extract_match_information(self, next_matches):
         """
         Extrae datos basicos de un match como equipos, fecha, cancha, goals, etc.
         :return: Diccionario.
@@ -201,6 +201,9 @@ class FlashscoreCrawler(Crawler):
             'capacity': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Capacity")]/parent::div/following-sibling::div', 
             'attendance': './/div[@data-testid="wcl-summaryMatchInformation"]//span[contains(text(), "Attendance")]/parent::div/following-sibling::div'
         }
+
+        if next_matches:
+            d_field_xpath.pop("attendance", None)  # Elimina "attendance" si existe, evitando errores
 
         # Extraigo el primer campo con espera para evitar extraer sin que haya cargado la pagina
         d_row['date'] = super().extract_tag(xpath='.//div[@class="duelParticipant"]/div[@class="duelParticipant__startTime"]', text=True, sec_wait=self.SEC_WAIT_MED)
