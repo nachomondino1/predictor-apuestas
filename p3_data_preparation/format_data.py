@@ -486,7 +486,7 @@ def format_df_match(df, prod: bool = False):
     # Evito columnas que se conocen post partido
     if not prod:
         column_specs.update({
-            'attendance': {'dtype': int, 'rango': [0, 200000]}, 
+            'attendance': {}, # {'dtype': int, 'rango': [0, 200000]}, 
             'goals_home': {'dtype': 'Int64', 'rango': [0, 12]},
             'goals_away': {'dtype': 'Int64', 'rango': [0, 12]},
             'expected_goals_(xg)_home': {'dtype': 'Float64', 'rango': [0, 12]},
@@ -617,6 +617,15 @@ def format_df_player_fifa_sofifa(df):
 
     return verify_format(df, column_specs)
 
+def value_nan_to_none(value):
+    """
+    Evitar nan y forzar None
+    """
+    if pd.isna(value):  # Verifica si es NaN o None
+        return None
+    else:
+        return value
+        
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     import os

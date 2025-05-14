@@ -74,9 +74,13 @@ def assess_models_in_prod(
         ## Calculo metricas
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
         d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
-            
+        
+        # Obtengo metricas de assess
+        df_assess = df_pred_met[df_pred_met.index.isin(df_pred_missing.index)]
+        gp_assess = df_assess['G/P_sin_bank'].sum()
+
         # Guardo datos
-        new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg_test': len(df_pred_met), **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
+        new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg': len(df_pred_met), 'n_reg_assess': len(df_assess), 'gp_assess': gp_assess, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
         rows.append(new_row)
         df_ite_bs = pd.DataFrame(data=rows)
 

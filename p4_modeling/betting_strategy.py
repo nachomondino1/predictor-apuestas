@@ -3,8 +3,9 @@ sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
+from p3_data_preparation.format_data import value_nan_to_none
 from p3_data_preparation.construct_data import determine_expected_result
-from p4_modeling.asses_model import determine_confidence_margin, calculate_roi, determine_roi, drop_old_metrics, normalize_column
+from p4_modeling.asses_model import calculate_roi, determine_roi, drop_old_metrics, normalize_column
 from utils import directories
 import datetime
 from itertools import product
@@ -624,6 +625,8 @@ class BettingStrategy:
             if len(df_pred) > 0:
                 row_pred = df_hiper.loc[pred]
                 prob, curva, m, b, k = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b'], row_pred['k']
+                prob = value_nan_to_none(prob)
+                print("aewfiwejfioqejfiweif: ", prob)
 
                 # Determino result to bet
                 df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
