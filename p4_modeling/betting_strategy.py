@@ -626,7 +626,6 @@ class BettingStrategy:
                 row_pred = df_hiper.loc[pred]
                 prob, curva, m, b, k = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b'], row_pred['k']
                 prob = value_nan_to_none(prob)
-                print("aewfiwejfioqejfiweif: ", prob)
 
                 # Determino result to bet
                 df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)

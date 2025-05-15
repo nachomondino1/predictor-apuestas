@@ -10,7 +10,7 @@ from p3_data_preparation.clean_data import replace_nan_with_zero
 
 # MAIN.PY
 ## Variable respuesta y otras
-def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
+def determine_result(df: pd.DataFrame, var_resp: str = 'result', prod: bool = False):
     """
     Determina el 'result' a partir de los goles que hizo cada equipo.
     
@@ -19,6 +19,9 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result'):
     :return: DataFrame con la nueva columna 'result'.
     """
     df = df.copy()  # Evitar modificar el original
+
+    if prod:
+        df[['goals_home', 'goals_away']] = df[['goals_home', 'goals_away']].fillna(0)
 
     df[var_resp] = df.apply(lambda row: 1 if row['goals_home'] > row['goals_away'] 
                             else 2 if row['goals_home'] < row['goals_away'] 
@@ -625,7 +628,7 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
     """
     Nueva columna que representa el porcentaje resultante de la división de dos columnas.
     """
-
+    df.to_excel("/Users/nachomondino/Desktop/zzzzzzzzz.xlsx")
     col_name = f'perc_{col_num}_of_{col_den}' if column_name is None else column_name
 
     num_home = df[f'{col_num}_home'] + 1 if laplace else df[f'{col_num}_home']
