@@ -303,21 +303,19 @@ class DataPreparationNew(DataPreparation):
         Preparar df tal que me aseguro de construir con los mismos datos que cuando entrené (y asi construir bien vars como ELO)
         """
         logger.info("Preparing to construct...")
-        # Cargar los registros con los que se construyó el modelo de entrenamiento (para construir bien vars como ELO que necesitan exactamente los = registros que caundo entrenó)
-        train_indices = df_constructed_train.index
         
-        # Filtrar registros posteriores al entrenamiento
+        # Obtener los índices de entrenamiento
+        train_indices = df_constructed_train.index
+
+        # Filtrar registros posteriores al entrenamiento y obtener sus índices
         last_train_date = df_constructed_train['date'].max()
-        df_new_data = df_integrated_updated[df_integrated_updated['date'] > last_train_date]
+        missing_indices = df_integrated_updated.loc[df_integrated_updated['date'] > last_train_date].index
 
-        # Obtener índices de los registros nuevos pero dentro de las competencias seleccionadas
-        missing_indices = df_new_data.index
-
-        # Combinar índices de entrenamiento y nuevos registros
+        # Unir los índices de entrenamiento con los nuevos registros
         final_indices = train_indices.union(missing_indices)
 
         # Filtrar el dataframe con los índices determinados
-        df_integrated_updated_clean = df_integrated_updated[df_integrated_updated.index.isin(final_indices)]
+        df_integrated_updated_clean = df_integrated_updated.loc[final_indices]
 
         if self.verbose >= 0:
             print(f"Total registros en entrenamiento: {len(train_indices)}")
@@ -354,7 +352,6 @@ class DataPreparationNew(DataPreparation):
 
         # En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
         df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
-        df_concat_last.to_excel(f"/Users/nachomondino/Desktop/df_concat___.xlsx", index=True)
 
         # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
         df_constructed = self.construct_data(
@@ -1069,8 +1066,6 @@ def main(
             
             ### Relleno datos
             df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
-
-        df.to_excel(f"/Users/nachomondino/Desktop/df_pre_constructed____.xlsx", index=True)
 
         ## Construct
         df = dp.construct_data_new(

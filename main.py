@@ -388,7 +388,7 @@ class DataPreparation:
 
         return df
 
-    def describe_integrate_data(self, df, prod: bool = False):
+    def describe_integrate_data(self, df, export: bool = True):
         """
         Describo los datos una vez integradas todas las fuentes
         """
@@ -421,7 +421,7 @@ class DataPreparation:
             logger.info(f"Promedio de NaN values en todas las filas y columnas: {nan_mean_total}")
             print(df_nan_by_competition)
         
-        if not prod:
+        if export:
             df_dtype.to_excel(f'{self.base_path}/describe_integrate_data/dtypes.xlsx', index=True)
             df_nan_col.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_col.xlsx', index=True)
             df_nan_by_competition.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_competition.xlsx', index=True)
@@ -430,7 +430,8 @@ class DataPreparation:
         """
         CLEAN DATA ANTES DE CONSTRUIR. Eliminacion de columnas
         """
-        self.describe_integrate_data(df, prod=prod)
+        if not prod:
+            self.describe_integrate_data(df)
         
         # Ordeno valores por fecha y separo X e y
         df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
@@ -451,6 +452,7 @@ class DataPreparation:
         strings_to_avoid = ['rep_player', 'hei_player', 'wage_player', 'value_player', 'pot_player']
         col_players_noise = [col for col in df.columns if any(s in col for s in strings_to_avoid)] # Elimino variables jugadores que meten ruido (lo hago aqui antes de que construya mil columnas mas...)
 
+        # Elimino todas las cols al mismo tiempo
         cols_to_drop = list(set(cols_constants + cols_basics_noise + col_players_noise))
         cols_to_drop = [col for col in cols_to_drop if col in df.columns] # En prod falla la elim de "attendance"
         if self.verbose >= 0:
@@ -464,14 +466,14 @@ class DataPreparation:
         if 'red_cards_home' in df.columns:
             df['red_cards_home'] = df['red_cards_home'].fillna(0)
             df['red_cards_away'] = df['red_cards_away'].fillna(0)
-
+        
+        # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
         if not prod:
-            # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
             df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Columnas
             df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) ## Filas                   
    
         # Exporto datos
-        if self.verbose >= 0:
+        if self.verbose >= 0 and not prod:
             df.to_excel(f'{self.base_path}/clean_post_integrate/df_cleaned.xlsx', index=True)
 
         return df
@@ -595,8 +597,8 @@ class DataPreparation:
                 df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
 
                 df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500, expected=True) 
-
-            # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses?
+            
+            # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses? No tarda nada en construirse en prod.
             df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500) # df = construct_data.assign_elo_home_away(df, k=30, base_rating=1500)
             df_preconstructed = df.copy()
 
@@ -606,19 +608,19 @@ class DataPreparation:
                n_matches_loc = int(n_matches / 2)
 
                # Result
-               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False)
-               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True)
+               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, idxs_to_construct=prod_idxs)
+               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, idxs_to_construct=prod_idxs)
 
                # Expected Result
                if 'expected_result' in df.columns:
-                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.
-                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, var_resp='expected_result') # Hay que ver si funciona tanto sin como con localia.               
+                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result', idxs_to_construct=prod_idxs) # Hay que ver si funciona tanto sin como con localia.
+                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, var_resp='expected_result', idxs_to_construct=prod_idxs) # Hay que ver si funciona tanto sin como con localia.               
 
             ## 2) EN PARTIDOS EN ULTIMOS N DAYS
-            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, prod=prod, idxs_to_construct=prod_idxs) # no mas por localia por alto nan.
+            df = construct_data.h2h_by_date(df, n_years=n_years_h2h, idxs_to_construct=prod_idxs) # no mas por localia por alto nan.
             
             for n_days in n_last_matches:
-                df = construct_data.determine_number_matches_last_days(df, n_days=n_days)  # Lo determino aqui para no hacerlo una vez por cada stat 
+                df = construct_data.determine_number_matches_last_days(df, n_days=n_days, idxs_to_construct=prod_idxs)  # Lo determino aqui para no hacerlo una vez por cada stat 
 
             # Por stat (e.g. shots_on_goal)
             stats = [col for col in self.stats_to_construct if f'{col}_home' in df.columns]
