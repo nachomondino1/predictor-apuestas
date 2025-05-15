@@ -10,6 +10,10 @@ fecha_hoy = datetime.datetime.now().date()
 # Obtener el nombre del script que ejecuta el proceso
 script_name = os.path.basename(sys.argv[0]).replace(".py", "")  # Elimina la extensión .py
 
+# Definir el directorio de logs
+log_dir = "/home/runner/work/predictor-apuestas/predictor-apuestas/data/_logs"
+os.makedirs(log_dir, exist_ok=True) # Crear el directorio si no existe --> Para Github action
+
 # Definir el archivo de log con fecha, hora y nombre del script principal
 log_file = f'data/_logs/{fecha_hoy}_{script_name}.csv' # {hora_actual}
 
