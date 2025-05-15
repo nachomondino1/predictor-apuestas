@@ -834,7 +834,7 @@ def roi_to_m(df, option, m_max):
 
     return df
 
-def main_2(df_best_models, d_countries, assess, date_assess):
+def main_2(df_best_models, d_countries, assess, date_assess, roi_weight):
     
     # FORMA 2 DE DEFINIR BS: 1º determino m con roi_sin_ea. 2º aplico bs con m del paso 1.
     # Problema: No puedo usar un m mas alto en doble oportunidad pues define el m con el roi sin ea y yo uso el mismo m entre rdo y su dp.
@@ -858,10 +858,14 @@ def main_2(df_best_models, d_countries, assess, date_assess):
         df_pred_test = read_predictions(country, iteration_date, n_model, model_name, assess=assess, date_assess=date_assess)
         logger.info(df_pred_test.shape)
         
+        df_home = df_pred_test[df_pred_test['predicted_result'] == 1]
+        df_draw = df_pred_test[df_pred_test['predicted_result'] == 0]
+        df_away = df_pred_test[df_pred_test['predicted_result'] == 2]
+
         # Calculo rois por rdo
-        df_rois.loc[f'{country}_1', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 1]['G/P_sin_bank'].sum()
-        df_rois.loc[f'{country}_0', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 0]['G/P_sin_bank'].sum()
-        df_rois.loc[f'{country}_2', 'roi'] = df_pred_test[df_pred_test['predicted_result'] == 2]['G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_1', 'roi'] = roi_weight * df_home['G/P_sin_bank'].sum() + (1-roi_weight) * df_home['expected_G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_0', 'roi'] = roi_weight * df_draw['G/P_sin_bank'].sum() + (1-roi_weight) * df_draw['expected_G/P_sin_bank'].sum()
+        df_rois.loc[f'{country}_2', 'roi'] = roi_weight * df_away['G/P_sin_bank'].sum() + (1-roi_weight) * df_away['expected_G/P_sin_bank'].sum()
     
     df_rois = roi_to_m(df_rois, option=4, m_max=20)
     df_rois.to_excel('/Users/nachomondino/Desktop/aksrgaksr.xlsx')
@@ -951,4 +955,4 @@ if __name__ == "__main__":
         148: ["spain"]
         }
 
-    main_2(df_best_models, d_countries, assess, date_assess)
+    main_2(df_best_models, d_countries, assess, date_assess, roi_weight)
