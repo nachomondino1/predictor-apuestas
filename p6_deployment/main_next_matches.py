@@ -83,7 +83,7 @@ class DataUnderstandingNew():
         # Verificaciones
         ## Df_match_player
         if len(df_match_player_concat.columns) == 0:
-            logger.warning("No se tiene las formaciones de ningun partido a predecir. Si ya esta al menos la seccion 'Will not play', no deberia fallar.")
+            logger.warning(f"No se tiene las formaciones de ninguno de los {len(df_match_player_concat.columns)} partidos a predecir. Si ya esta al menos la seccion 'Will not play', no deberia fallar.")
 
         ## Df_match_odds
         if df_match_odds_concat.isna().any().any(): 
@@ -137,19 +137,21 @@ class DataUnderstandingNew():
             df_match_odds_concat =  pd.concat([df_match_odds_concat, df_match_odds_miss], axis=0)
             
         # Verificaciones
-        ## Df_match_player
-        if len(df_match_player_concat.columns) == 0:
-            logger.error("No se tiene las formaciones de ningun partido ya jugado. Esto es correcto solo si realmente no existe el dato de las formaciones para estos partidos.")
-            raise ValueError
+        if len(df_match_concat) > 0:
 
-        ## Df_match_odds
-        if df_match_odds_concat.isna().any().any(): 
-            logger.error("El DataFrame df_match_odds contiene al menos un valor NaN. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
-            raise ValueError
+            ## Df_match_player
+            if len(df_match_player_concat.columns) == 0:
+                logger.error(f"No se tiene las formaciones de ninguno de los {len(df_match_player_concat.columns)} partido ya jugado. Esto es correcto solo si realmente no existe el dato de las formaciones para estos partidos.")
+                raise ValueError
 
-        if len(df_match_odds_concat.columns) != 3:
-            logger.error("No se recolectaron todas las odds en df_match_odds. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
-            raise ValueError
+            ## Df_match_odds
+            if df_match_odds_concat.isna().any().any(): 
+                logger.error("El DataFrame df_match_odds contiene al menos un valor NaN. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
+                raise ValueError
+
+            if len(df_match_odds_concat.columns) != 3:
+                logger.error("No se recolectaron todas las odds en df_match_odds. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
+                raise ValueError
 
         # Exporto datasets
         if self.export:
@@ -352,6 +354,7 @@ class DataPreparationNew(DataPreparation):
 
         # En caso que los proximos partidos ya esten en df_old_last_matches (o sea, los partidos ya se jugaron y los recolectaste como missing, tirara error al momento de predecir por indice repetido.)
         df_concat_last = pd.concat([df_next_matches, df_last_old_matches], axis=0)
+        df_concat_last.to_excel(f"/Users/nachomondino/Desktop/df_concat___.xlsx", index=True)
 
         # Construyo datos (sin historiales) luego de concatenar proximos partidos (df_next_matches) y los ultimos partidos ya jugados (df_last_old_matches)
         df_constructed = self.construct_data(
@@ -1066,6 +1069,8 @@ def main(
             
             ### Relleno datos
             df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
+
+        df.to_excel(f"/Users/nachomondino/Desktop/df_pre_constructed____.xlsx", index=True)
 
         ## Construct
         df = dp.construct_data_new(

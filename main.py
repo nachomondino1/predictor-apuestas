@@ -373,7 +373,6 @@ class DataPreparation:
 
         # Integro datos de jugadores a df_match usando el mapeo
         df, df_aux = integrate_sofifa_to_flashscore.integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
-        # df_aux.to_excel(f'/Users/nachomondino/Desktop/n_players_integrated_missing.xlsx', index=True)
 
         # Drop de columnas que use para df_teams, df_player, df_coaches, etc..
         cols_to_drop = ['team_home', 'team_away', 'coach_home', 'coach_away', 'fifa_year'] # main_next a veces no tiene coaches.. deeberia copiar antes...
@@ -546,7 +545,7 @@ class DataPreparation:
         if with_historic:
 
             # VARIABLE RESPUESTA (no son historicas estan filtradas)
-            df = construct_data.determine_result(df, self.var_resp)
+            df = construct_data.determine_result(df, self.var_resp, prod=prod)
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
