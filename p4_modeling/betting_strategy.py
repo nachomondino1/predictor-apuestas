@@ -289,7 +289,7 @@ class BettingStrategy:
             df['stake_to_bet'] = a * (b ** df['prob_result_to_bet'])
         
         # Aumento stake en dp (forma manual de usar un stake mas alto en dp)
-        df.loc[df['result_to_bet'].isin([-1, -2]), 'stake_to_bet'] *= 10
+        df.loc[df['result_to_bet'].isin([-1, -2]), 'stake_to_bet'] *= 1
 
         # Disminuyo stake por rellenado de emergencia
         df = self.stake_reduction_emergency_fill(df, porc_emergency=porc_emergency)
