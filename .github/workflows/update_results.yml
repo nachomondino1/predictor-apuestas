@@ -67,7 +67,6 @@ jobs:
             data/df_competencies.xlsx
             data/historial_predicciones.xlsx
             data/predicciones.xlsx
-            data/_logs
             p2_data_understanding/collect_initial_data
             p3_data_preparation/construct_data.py
             p3_data_preparation/clean_data.py
