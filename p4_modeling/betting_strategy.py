@@ -289,7 +289,7 @@ class BettingStrategy:
             df['stake_to_bet'] = a * (b ** df['prob_result_to_bet'])
         
         # Aumento stake en dp (forma manual de usar un stake mas alto en dp)
-        df.loc[df['result_to_bet'].isin([-1, -2]), 'stake_to_bet'] *= 10
+        df.loc[df['result_to_bet'].isin([-1, -2]), 'stake_to_bet'] *= 3
 
         # Disminuyo stake por rellenado de emergencia
         df = self.stake_reduction_emergency_fill(df, porc_emergency=porc_emergency)
@@ -941,7 +941,7 @@ if __name__ == "__main__":
     space_m = [10, 11, 10] # Problema al variar: muev
     vary_k = True
     ## Seleccion de bs
-    roi_weight = 1 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
+    roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
 
     d_countries = {
         48: ["england"],
