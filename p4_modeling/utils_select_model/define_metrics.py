@@ -197,26 +197,35 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
     d_countries = {
         # train nuevos
-        48: ["england", '2025-04-22'],
-        55: ["france", '2025-04-23'], 
-        59: ["germany", '2025-04-23'],
-        77: ["italy", '2025-04-23'],
-        148: ["spain", '2025-04-23']
+        # 48: ["england", '2025-04-22'],
+        # 55: ["france", '2025-04-23'], 
+        # 59: ["germany", '2025-04-23'],
+        # 77: ["italy", '2025-04-23'],
+        # 148: ["spain", '2025-04-23']
+        48: ["england", '2025-05-07'],
+        55: ["france", '2025-05-07'], 
+        59: ["germany", '2025-05-08'],
+        77: ["italy", '2025-05-08'],
+        148: ["spain", '2025-05-07']
         }
     
-    # Condiciones        
+    # Condiciones 
+    perc_matches_test = 0.6    
     assess = False
     method = ['corr', 'fs', 'mean'][0]
     l_metrics_test = [
-        "roi", "expected_roi", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score", 
+        "roi", "error", "expected_roi", "test_accuracy", "recall", "f1_score", 
+        "expected_f1_score", # "expected_error", 
         'f1_score_home', 
         'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw',
         'f1_score_away'
         ]
-    l_metrics_prod = ['roi', 'expected_roi', 'error', 'expected_error',  "recall", 'f1_score', 'test_accuracy', 'expected_f1_score',
-              'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw',
-              'f1_score_away', 'precision_away', 'n_away', 'aciertos_away', 'gp_away'
-              ]
+    l_metrics_prod = [
+        'roi', 'expected_roi', 'error', "recall", 'f1_score', 'test_accuracy',
+        'expected_f1_score', # 'expected_error',
+        'f1_score_draw', 'precision_draw', 'n_draw', 'aciertos_draw', 'gp_draw',
+        'f1_score_away', 'precision_away', 'n_away', 'aciertos_away', 'gp_away'
+        ]
 
     # Por metrica de prod
     for corr_col in l_metrics_prod:
@@ -240,8 +249,10 @@ if __name__ == "__main__":
             # 2. Preseleccionar modelos 
             df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx") # df_iteration esta mal x +1 models? # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx") 
 
+
             df_ite.loc[df_ite['error'] > 0, 'error'] *= -1  # Convierto error a negativo
-            df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
+            if 'expected_error' in df_ite.columns:
+                df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
 
             # 3. Por modelo: division en "test" y "prod" + Calculo metricas
             # 3.1. Divido en "test" y "prod" y 3.2. recalculo metricas
@@ -251,7 +262,7 @@ if __name__ == "__main__":
                 print(df_ite_test)
                 print(df_ite_prod)
             except FileNotFoundError:
-                df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=0.75, assess=assess)
+                df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=perc_matches_test, assess=assess)
                 df_ite_test.to_excel(f'{path_save}/df_ite_test.xlsx', index=True)
                 df_ite_prod.to_excel(f'{path_save}/df_ite_prod.xlsx', index=True)
 
