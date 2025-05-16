@@ -657,26 +657,24 @@ def construct_sum_columns(df: pd.DataFrame, l_columns: list, column_name: str = 
 
 def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, column_name: str = None, laplace: bool = False):
     """
-    Nueva columna que representa el porcentaje resultante de la división de dos columnas.
+    Nueva columna que representa el porcentaje resultante de la división de dos columnas,
+    preservando valores NaN sin reemplazarlos.
     """
-    df.to_excel("/Users/nachomondino/Desktop/zzzzzzzzz.xlsx")
     col_name = f'perc_{col_num}_of_{col_den}' if column_name is None else column_name
 
-    num_home = df[f'{col_num}_home'] + 1 if laplace else df[f'{col_num}_home']
-    num_away = df[f'{col_num}_away'] + 1 if laplace else df[f'{col_num}_away']
+    num_home = df[f'{col_num}_home'] + (1 if laplace else 0)
+    num_away = df[f'{col_num}_away'] + (1 if laplace else 0)
 
-    den_home = df[f'{col_den}_home'] + 1 if laplace else df[f'{col_den}_home']
-    den_away = df[f'{col_den}_away'] + 1 if laplace else df[f'{col_den}_away']
+    den_home = df[f'{col_den}_home'] + (1 if laplace else 0)
+    den_away = df[f'{col_den}_away'] + (1 if laplace else 0)
 
-    # Evitar división por 0
-    den_home = np.where(den_home == 0, 1, den_home)
-    den_away = np.where(den_away == 0, 1, den_away)
+    # Evitar división por cero sin alterar NaN
+    den_home = np.where((den_home == 0) & (~pd.isna(den_home)), 1, den_home)
+    den_away = np.where((den_away == 0) & (~pd.isna(den_away)), 1, den_away)
 
-    # Home
-    df[f'{col_name}_home'] = num_home / den_home
-
-    # Away
-    df[f'{col_name}_away'] = num_away / den_away
+    # Realizar la división manteniendo NaN cuando existan en los datos originales
+    df[f'{col_name}_home'] = np.divide(num_home, den_home, where=~pd.isna(den_home))
+    df[f'{col_name}_away'] = np.divide(num_away, den_away, where=~pd.isna(den_away))
 
     return df
 
