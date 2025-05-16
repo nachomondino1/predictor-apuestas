@@ -200,7 +200,7 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [148, 48, 55, 59, 77]
     assess = True
 
     d_countries = {
@@ -212,8 +212,8 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)     
-    l_metrics = ['f1_score_draw','f1_score_away']  # 'var_f1_score' #  'error' # el prorblema no era un posible overfitting sino la dif en test y prod por la construccion.
-    l_weights = [0.6, 0.4] # 0.2
+    l_metrics = ['f1_score_draw', 'expected_roi']
+    l_weights = [0.5, 0.5] 
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
