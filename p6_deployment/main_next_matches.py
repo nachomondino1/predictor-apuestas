@@ -81,21 +81,23 @@ class DataUnderstandingNew():
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0)
 
         # Verificaciones
-        ## Df_match_player
-        if len(df_match_player_concat.columns) == 0:
-            logger.warning(f"No se tiene las formaciones de ninguno de los {len(df_match_player_concat.columns)} partidos a predecir. Si ya esta al menos la seccion 'Will not play', no deberia fallar.")
+        if len(df_match_concat) > 0:
 
-        ## Df_match_odds
-        if df_match_odds_concat.isna().any().any(): 
-            logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas a ciertos partidos para los que falta mucho")
-            df_match_odds_concat.dropna(subset=['odds_home'], inplace=True)
-            df_match_concat = df_match_concat[df_match_concat.index.isin(df_match_odds_concat.index)]
-            df_match_player_concat = df_match_player_concat[df_match_player_concat.index.isin(df_match_odds_concat.index)]
+            ## Df_match_player
+            if len(df_match_player_concat.columns) == 0:
+                logger.warning(f"No se tiene las formaciones de ninguno de los {len(df_match_concat)} partidos a predecir. Si ya esta al menos la seccion 'Will not play', no deberia fallar.")
 
-        if len(df_match_odds_concat.columns) != 3:
-            logger.error("No se recolectaron todas las odds en df_match_odds. Probablemente cambió el XPATH de Flashscore.")
-            raise ValueError
-
+            ## Df_match_odds
+            if len(df_match_odds_concat.columns) != 3:
+                logger.warning("No se recolectaron las odds en df_match_odds. Probablemente cambió el XPATH de Flashscore.") # Puede que sea un solo partido y falte mucho y aun no tenga cuotas..
+                df_match_concat, df_match_player_concat, df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            
+            elif df_match_odds_concat.isna().any().any(): 
+                logger.warning("El DataFrame df_match_odds contiene al menos un valor NaN. Puede deberse a que BET aun no asigno cuotas a ciertos partidos para los que falta mucho")
+                df_match_odds_concat.dropna(subset=['odds_home'], inplace=True)
+                df_match_concat = df_match_concat[df_match_concat.index.isin(df_match_odds_concat.index)]
+                df_match_player_concat = df_match_player_concat[df_match_player_concat.index.isin(df_match_odds_concat.index)]
+              
         # Exporto datasets
         if self.export:
             df_match_concat.to_excel(f'{self.path_unders}/df_match_next.xlsx', index=True)
@@ -1156,7 +1158,8 @@ def main(
         # Aplico reduccion a stake
         if porc_m is not None and not predict_missing:
             df['stake_to_bet'] = df['stake_to_bet'] * porc_m
-  
+            df.loc[(df['confidence_margin'] < 0.025) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.3 # Reducir stake si confidence_margin < threshold
+
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
 
