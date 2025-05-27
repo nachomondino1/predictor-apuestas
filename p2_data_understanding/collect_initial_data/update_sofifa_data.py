@@ -21,7 +21,7 @@ def get_player_data(id_country, country, df_comp_country, n_seasons_update, path
     for i, row in df_comp_country.iterrows():
         print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
 
-        if id_country == 6 and row['id_competition'] == 62:
+        if row['id_competition'] in [62, 1673]:
             logger.warning(f"Evito extraccion para {row["competition_flashscore"]}")
             continue
 
