@@ -25,6 +25,8 @@ def calculate_metrics(
     # Obtengo numpy arrays
     y_test, y_pred = df[var_resp].values, df[var_pred].values
     y_pred_prob = df[[f'prob_class_{cls}' for cls in [0, 1, 2]]].values
+    if verbose >= 1:
+        print(f"Shape de y_pred_prob: {y_pred_prob.shape}")
 
     # Calculo métricas básicas
     d_metrics = {
@@ -59,17 +61,20 @@ def calculate_metrics(
     dif_home = calculate_variation(end=n_home, ini=n_home_r)
     dif_draw = calculate_variation(end=n_draw, ini=n_draw_r)
     dif_away = calculate_variation(end=n_away, ini=n_away_r)
-
     d_metrics.update({
         'n_home': n_home, 'n_draw': n_draw, 'n_away': n_away,
         'n_home_r': n_home_r, 'n_draw_r': n_draw_r, 'n_away_r': n_away_r,
         'dif_home': dif_home, 'dif_draw': dif_draw, 'dif_away': dif_away,
-        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3,
-        'aciertos_home': n_home * d_metrics['precision_home'] / 100,
-        'aciertos_draw': n_draw * d_metrics['precision_draw'] / 100,
-        'aciertos_away': n_away * d_metrics['precision_away'] / 100
-        }
-    )
+        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3
+        })
+
+    if metrics_by_result and 'precision_home' in d_metrics.keys():
+        d_metrics.update({
+            'aciertos_home': n_home * d_metrics['precision_home'] / 100,
+            'aciertos_draw': n_draw * d_metrics['precision_draw'] / 100,
+            'aciertos_away': n_away * d_metrics['precision_away'] / 100
+            }
+        )
 
     # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
     if bet_metrics:

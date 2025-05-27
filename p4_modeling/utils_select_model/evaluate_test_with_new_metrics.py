@@ -81,14 +81,13 @@ if __name__ == "__main__":
     l_countries = [48, 55, 59, 77, 148]
 
     d_countries = {
-        # Train nuevos
-        48: ["england", '2025-04-22'],
-        55: ["france", '2025-04-23'], 
-        59: ["germany", '2025-04-23'],
-        77: ["italy", '2025-04-23'],
-        148: ["spain", '2025-04-23'], 
+        48: ["england", '2025-05-07'],
+        55: ["france", '2025-05-07'], 
+        59: ["germany", '2025-05-08'],
+        77: ["italy", '2025-05-08'],
+        148: ["spain", '2025-05-07'],
         }
-
+    
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
