@@ -12,6 +12,8 @@ from p4_modeling.utils_select_model import assess_in_prod
 from tqdm import tqdm
 import datetime
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+import itertools
 
 def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test: float = 0.75):
     """
@@ -96,116 +98,119 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
     return df_ite, df_ite_prod
 
 # Metodos para determinar importancia de metricas de test respecto de la metrica a optimizar en prod
-def calculate_correlation(df_ite, metrics, corr_col: str = 'roi_prod', n_models: int = None):
-    """
-    Calculo de correlacion de metricas con roi_prod
-    """
-    # Crear un DataFrame vacío para la correlación
-    df_corr = pd.DataFrame(index=metrics, columns=['corr_roi']) 
+def greedy_backward_elimination(df_ite, l_metrics_test, n_models, corr_col):
 
-   # Por metrica
-    for col in metrics:
+    current_metrics = l_metrics_test.copy()
+    history = []
 
-        # 2.1. Selecciono mejores modelos by metric (para quitar ruido?)
-        if n_models is not None:
-            df_ite_filt = df_ite.sort_values(by=col, ascending=False).head(n_models)
-            df_ite_filt.to_excel(f"{path_save}/input_data/models_{col}.xlsx", index=False)
+    while len(current_metrics) > 1:
+        print(f"\nEvaluando combinación de métricas: {current_metrics}")
+
+        # Calcular promedio de métricas actuales
+        df_ite['mean_score'] = df_ite[current_metrics].mean(axis=1)
+
+        # Seleccionar mejores modelos según promedio
+        top_models = df_ite.sort_values(by='mean_score', ascending=False).head(n_models)
+
+        # Evaluar metrica en prod (ej: precision_prod)
+        current_prod_score = top_models[corr_col].mean()
+        print(f"Precisión en prod actual: {current_prod_score:.4f}")
+
+        history.append({
+            'kept_metrics': current_metrics.copy(),
+            f'mean_{corr_col}': current_prod_score
+        })
+
+        # Evaluar impacto de eliminar cada métrica individualmente
+        best_new_score = -np.inf
+        worst_metric = None
+
+        for metric in current_metrics:
+            test_metrics = [m for m in current_metrics if m != metric]
+            df_ite['mean_temp'] = df_ite[test_metrics].mean(axis=1)
+            top_temp = df_ite.sort_values(by='mean_temp', ascending=False).head(n_models)
+            temp_score = top_temp[corr_col].mean()
+            print(f"  Sin {metric}: {temp_score:.4f}")
+
+            if temp_score > best_new_score:
+                best_new_score = temp_score
+                worst_metric = metric
+
+        if best_new_score >= current_prod_score:
+            print(f"Eliminando métrica: {worst_metric}")
+            current_metrics.remove(worst_metric)
         else:
-            df_ite_filt = df_ite.copy()
+            # No mejora quitando ninguna → salimos
+            print("No mejora quitando ninguna métrica, detenemos el proceso.")
+            break
 
-        # Calculo correlación entre métricas de init y prod con los ROIs
-        try:
-            df_corr.loc[col, 'corr_roi'] = df_ite_filt[col].corr(df_ite_filt[corr_col])
-            # df_corr.loc[col, 'corr_ex_roi'] = df_ite[col].corr(df_ite[ex_roi_col])
-        except ValueError:
-            print(f"Falló el calculo de corr de {col}")
-            # Elimino metricas que no son float
-            # df_ite_test_with_metric = df_ite_test_with_metric.select_dtypes(include=['float64'])
-            # print(f"B: {len(df_ite.columns)}", df_ite.columns)
-            
-    # Ordeno por correlación con ROI
-    df_corr = df_corr.sort_values(by='corr_roi', ascending=False)
-    return df_corr
-        
-def weightened_average(df_ite, metrics, path_save, n_models: int = 100):
-    """
-    Calculo de promedio ponderado entre metricas de test y metrica de prox a optimizar. Ponderado pues + peso 
-    en donde mejor es la metrica de test. 
+    return pd.DataFrame(history)
 
-    # Parameters:
-    df_ite: Dataframe con metricas de testeo y metrica de prod. (DataFrame)
-    metrics: Metricas de testeo a evaluar. (list)
-    """
-    rows = {}
-    df_prod_only = df_ite[[col for col in df_ite.columns if '_prod' in col]]
-    prod_cols = df_prod_only.select_dtypes(include=["number"]).columns
+def exhaustive_metric_combination_search(df, l_metrics_test, n_models, corr_col, max_comb_size=None, verbose=True):
+    best_score = -float("inf")
+    best_combination = None
+    history = []
 
-    # Por metrica
-    for metric in metrics:
+    max_comb_size = max_comb_size or len(l_metrics_test)
 
-        # 2.1. Selecciono mejores modelos by metric (para quitar ruido?)
-        if n_models is not None:
-            df_ite_filt = df_ite.sort_values(by=metric, ascending=False).head(n_models)
-            df_ite_filt.to_excel(f"{path_save}/input_data/models_{metric}.xlsx", index=False)
-        else:
-            df_ite_filt = df_ite.copy()
+    for r in range(1, max_comb_size + 1):
+        for combo in itertools.combinations(l_metrics_test, r):
+            df["combined_metric"] = df[list(combo)].mean(axis=1)
 
-        # Crear pesos para los registros (mayor peso a las primeras filas) --> Normalizando metrica entre 0 y 1
-        metric_values = df_ite_filt[metric].values
-        min_val, max_val = metric_values.min(), metric_values.max()
+            # Selecciono los mejores n modelos
+            df_top = df.sort_values("combined_metric", ascending=False).head(n_models)
+            mean_corr = df_top[corr_col].mean()
+            std_corr = df_top[corr_col].std()
 
-        if min_val == max_val:
-            weights = np.ones_like(metric_values)
-        else:
-            weights = (metric_values - min_val) / (max_val - min_val)
+            history.append((combo, mean_corr, std_corr))
 
-        weights /= weights.sum()  # Normalizar pesos para que sumen 1
-        
-        # Calcular media ponderada para cada columna numérica
-        weighted_means = {
-            f"weighted_mean_{col}": np.average(df_ite_filt[col], weights=weights)
-            for col in prod_cols
-        }
-        
-        # Agregar las medias ponderadas al diccionario con la métrica como clave
-        rows[metric] = weighted_means
+            if verbose:
+                print(f"Probando combinación {combo}: {mean_corr:.4f} en {corr_col}")
 
-    # Convertir el diccionario en un DataFrame para almacenar todo organizado
-    df_results = pd.DataFrame.from_dict(rows, orient="index")
-    return df_results
+            if mean_corr > best_score:
+                best_score = mean_corr
+                best_combination = combo
+
+    logger.critical(f"\nMejor combinación: {best_combination} con score {best_score:.4f} en {corr_col}")
+    # return pd.DataFrame(history)
+    return pd.DataFrame(history, columns=["metrics", f"mean_{corr_col}", f"std_{corr_col}"]).set_index("metrics")
 
 if __name__ == "__main__":
 
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 55, 148]
+    # l_countries = [48, 55, 148]
 
     d_countries = {
         # train nuevos
-        # 48: ["england", '2025-04-22'],
-        # 55: ["france", '2025-04-23'], 
-        # 59: ["germany", '2025-04-23'],
-        # 77: ["italy", '2025-04-23'],
-        # 148: ["spain", '2025-04-23'],
+        48: ["england", '2025-04-22'],
+        55: ["france", '2025-04-23'], 
+        59: ["germany", '2025-04-23'],
+        77: ["italy", '2025-04-23'],
+        148: ["spain", '2025-04-23'],
+
+        # train viejos
         # 48: ["england", '2025-05-07'],
         # 55: ["france", '2025-05-07'], 
         # 59: ["germany", '2025-05-08'],
         # 77: ["italy", '2025-05-08'],
         # 148: ["spain", '2025-05-07']
-        48: ["england", '2025-05-28'],
-        55: ["france", '2025-05-28'], 
-        59: ["germany", '2025-05-28'],
-        77: ["italy", '2025-05-28'],
-        148: ["spain", '2025-05-28']
+
+        # new train
+        # 48: ["england", '2025-05-28'],
+        # 55: ["france", '2025-05-28'], 
+        # 59: ["germany", '2025-05-29'],
+        # 77: ["italy", '2025-05-29'],
+        # 148: ["spain", '2025-05-28']
         }
     
     # Condiciones 
     perc_matches_test = 0.6
-    n_models = 10
+    n_models = 20
     method = ['corr', 'fs', 'mean', 'select_best_model'][3] # deberia tener un fs que considere metricas juntas... tal vez ese que va eliminando variables de a una.
     l_metrics_test = ["roi", "error", "expected_roi", "test_accuracy", "recall", "f1_score",  "expected_f1_score", 
                       "cv_accuracy", "cv_f1_score_wei", "cv_f1_score", "cv_f1_score_draw", "cv_cross_entropy_loss"]
-    l_metrics_prod = ['test_accuracy'] # El maldito roi es demasiado volatil? ['roi', 'expected_roi', 'error', "recall", 'f1_score', 'test_accuracy', 'expected_f1_score'] # 'expected_error',
+    l_metrics_prod = ['roi'] # El maldito roi es demasiado volatil? ['roi', 'expected_roi', 'error', "recall", 'f1_score', 'test_accuracy', 'expected_f1_score'] # 'expected_error',
     
     # Por metrica de prod
     for corr_col in l_metrics_prod:
@@ -249,78 +254,38 @@ if __name__ == "__main__":
                 df_ite_test.to_excel(f'{path_save}/input_data/df_ite_test_{perc_matches_test}.xlsx', index=True)
                 df_ite_prod.to_excel(f'{path_save}/input_data/df_ite_prod_{1-perc_matches_test}.xlsx', index=True)
 
-            # calcular correlacion entre metricas de test
-            df_correlacion = df_ite_test.select_dtypes(exclude=['object']).corr().abs()
-            df_correlacion.to_excel(f'{path_save}/input_data/df_corr.xlsx', index=True)
-
             # Concateno "test" y "prod" en un solo df    
-            df_ite = pd.merge(
-                df_ite_test,
-                df_ite_prod,
-                on=['n_model', 'model_name'],
-                how='outer'
-            )        
+            df_ite = pd.merge(df_ite_test, df_ite_prod, on=['n_model', 'model_name'], how='outer')        
             df_ite.to_excel(f'{path_save}/input_data/df_iteration_{perc_matches_test}.xlsx', index=False)
 
-            # 5. Metodo estadistico para definir importancias de metricas test respecto de la metrica a opt de prod
-            ## Op 1: Calculo correlacion de metricas test con la metrica de prod 
-            if method == 'corr':
-                df = calculate_correlation(df_ite=df_ite, metrics=l_metrics_test, corr_col=corr_metric, n_models=n_models)
-                df.rename(columns={'corr_roi': country}, inplace=True)
 
-            # Op nueva
-            elif method == 'select_best_model':
+            # Normalizo las metricas de test
+            df_ite_scaled = df_ite.copy()
+            scaler = MinMaxScaler()
+            # Invertir las métricas donde menor es mejor
+            # invertir = ['logloss_test', 'mae_test']  # si aplica
+            # for col in invertir:
+            #     df_ite_scaled[col] = -df_ite_scaled[col]
+            df_ite_scaled[l_metrics_test] = scaler.fit_transform(df_ite_scaled[l_metrics_test])
+            df_ite_scaled.to_excel(f"{path_save}/results/{iteration_date}/df_scaled.xlsx", index=True)
 
-                df = pd.DataFrame()
-
-                # Por metrica
-                for metric in l_metrics_test:
-
-                    # seleccionar el mejor modelo (o n mejores modelos)
-                    df_ite_aux = df_ite.sort_values(by=metric, ascending=False).head(n_models)
-                    print(df_ite_aux)
-
-                    # Obtener metrica de prod para ese mpdelo
-                    mean_metric = df_ite_aux[corr_metric].mean()
-                    print(f"Media de {corr_col} en prod de los modelos con mejor {metric} en test: {mean_metric}")
-
-                    df.loc[metric, f'mean_{corr_col}'] = mean_metric
-
-            elif method == 'fs':
-                ## Op 2: Feature selection # Usar df_ite en vez de df_ite_test para poder calcular los promedios ponderados de todas las metricas de prod... (asi no tengo que definirlo de antemano.)
-                l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
-                df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
-
-            elif method == 'mean':
-                # Op 3: Prom ponderado
-                df = weightened_average(
-                    df_ite=df_ite, 
-                    metrics=l_metrics_test,
-                    path_save=path_save,
-                    n_models=n_models
-                )
-                df = df.loc[:, f'weighted_mean_{corr_metric}'] 
-            
-            else:
-                logger.error(f"El method {method} no es un metodo disponible. Revisar.")
-                raise ValueError
-
-            df.to_excel(f"{path_save}/results/{iteration_date}/df_{corr_col}_country.xlsx", index=True)
+            # Defino mejor combinacion de metricas de test en metrica de produccion
+            df = exhaustive_metric_combination_search(df_ite_scaled, l_metrics_test=l_metrics_test, n_models=n_models, corr_col=corr_metric, verbose=True)
+            # df = greedy_backward_elimination(df_ite_scaled, l_metrics_test=l_metrics_test, n_models=n_models, corr_col=corr_metric)
+            df.to_excel(f"{path_save}/results/{iteration_date}/df_{corr_col}_{country}.xlsx", index=True)
 
             # Guardo resultados del pais
             df_ct = pd.concat([df_ct, df], axis=1) # weighted_mean_roi_prod
             print(df_ct.shape)
 
         # Calculo media de todos los paises
-        desv = df_ct.std(axis=1) # para evitar mean
-        if method == 'mean':
-            col_name = 'sum'
-            df_ct["sum"] = df_ct.sum(axis=1)
-        else:
-            col_name = 'mean'
-            df_ct["mean"] = df_ct.mean(axis=1)
-        
-        df_ct["std"] = desv
-        df_ct = df_ct.sort_values(by=col_name, ascending=False)
+        df_ct["mean"] = df_ct.filter(like="mean_").mean(axis=1)
+        df_ct["std"] = df_ct.filter(like="std_").std(axis=1)
+
+        # Seleccionar la combinacion que maximiza la suma pero minimiza el desvio.
+        df_ct["score"] = df_ct["mean"] - 3 * df_ct["std"]  # Maximizar sum, minimizar std
+        df_ct = df_ct.sort_values(by='score', ascending=False)
+
+        # Exportar resultados finales
         df_ct.to_excel(f"data/_metrics/results/{method}/{corr_col}_{iteration_date}.xlsx")
 
