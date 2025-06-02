@@ -5,7 +5,6 @@ from utils.set_up_logging import logger
 import pandas as pd
 import numpy as np
 import datetime
-import itertools
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier  # XGBoost
 from sklearn.linear_model import LogisticRegression  # Regresion Logistica
@@ -20,7 +19,6 @@ from p6_deployment import main_next_matches
 import utils.directories as directories
 from itertools import product
 from main import DataUnderstanding, DataPreparation, Modeling
-import joblib
 import time
 
 
@@ -35,7 +33,7 @@ def comprehensive_search(
     update_sofifa: bool = True,
     retrain: bool = True, 
     verbose: int = 0, 
-    checkpoint: int = 50, 
+    checkpoint: int = 5, 
     export: bool = True
 ):
     """
@@ -168,12 +166,15 @@ def comprehensive_search(
         
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
     # Determino registros a usar en test_set
+    n_reg_val = d_params['modeling'].pop('n_reg_val', None)
     n_reg_test = d_params['modeling'].pop('n_reg_test', None)     # Obtener el valor de 'n_reg_test' y eliminarlo del diccionario
     if n_reg_test is not None:
         n_reg_test = n_reg_test[0]  # Si es una lista, obtenemos el primer elemento
+        n_reg_val = n_reg_val[0]  # Si es una lista, obtenemos el primer elemento
+        
     logger.info(d_params['modeling'].values())
-    logger.info(f"N_REG_TEST: {n_reg_test}")
-    index_test_set = determine_rows_for_test_set(df_match=df_match, n_reg_test=n_reg_test)  # Usar n_reg_test.
+    logger.info(f"N_REG_VAL: {n_reg_val} y N_REG_TEST: {n_reg_test}")
+    index_val, index_test = determine_rows_for_test_set(df_match=df_match, n_reg_val=n_reg_val, n_reg_test=n_reg_test)  # Usar n_reg_test.
 
     # Clean post integrate
     for zz, param_values_00 in enumerate(product(*d_params['clean_post_integrate'].values()), start=1):
@@ -230,15 +231,15 @@ def comprehensive_search(
                 for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
                     
                     # Asigno valor a cada hiperparametro
-                    val_size, bal_type, k = param_values_5[0], param_values_5[1], param_values_5[2]
+                    bal_type, k = param_values_5[0], param_values_5[1]
                     if verbose >= 0:
                         cont_iter += 1
                         logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                        print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_post_construct n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> val_size: {val_size} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
+                        print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_post_construct n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> n_reg_val: {n_reg_val} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                         logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
                         # Generar el diseño de la prueba
-                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, val_size=val_size, index_test_set=index_test_set, export=False)
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, index_val=index_val, index_test_set=index_test, export=False)
 
                         # Entreno y evaluo modelos
                         rows_train, rows_test = mo.train_and_assess_models(
@@ -255,7 +256,7 @@ def comprehensive_search(
                             'n_last_matches': n_last_matches, 'n_anios_hist': n_years_h2h, 'segun_localia': segun_localia, 'calculate_dif': calculate_dif, 'decay_rate': decay_rate,
                             'thr_corr': thr_corr, 'thr_fs': thr_fs,
                             'n_years_to_select': n_years_to_select, 'fill_na': fill_na, 
-                            'bal_type': bal_type,'val_size': val_size, 'n_reg_test': n_reg_test, 
+                            'bal_type': bal_type,'n_reg_val': n_reg_val, 'n_reg_test': n_reg_test, 
                             'k': k
                             }
                         
@@ -264,23 +265,23 @@ def comprehensive_search(
                         rows_test_list.extend(rows_test)    # Agregar todos los elementos de rows_test (si es una lista de diccionarios)
                         rows_ite_list.append(rows_ite)
 
-                        if cont_iter % checkpoint == 0 and export:
+                        if ((cont_iter % checkpoint == 0) or (cont_iter == n_iter) )and export: # n_iter o n_iter -1 ????
                             logger.critical("Checkpoint. Guardado de datos")
                 
                             # Concatenar todas las filas acumuladas en DataFrames
                             df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
                             df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
-                            df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+                            df_params_ite = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
+
+                            # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+                            df_temp = pd.merge(df_ite_train, df_ite_test, on=['n_iteration', 'model_name'], how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
+                            df_iteration = pd.merge(df_params_ite, df_temp, on=['n_iteration'], how='outer')
 
                             # Exportar
                             df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
                             df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
-                            df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
-
-                            # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-                            df_temp = pd.merge(df_ite_train, df_ite_test, on=['n_iteration', 'model_name'], how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
-                            df_iteration_comp = pd.merge(df_iteration, df_temp, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
-                            df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
+                            df_params_ite.to_excel(f'{BASE_DIR_mod}/df_params_ite.xlsx', index=False)
+                            df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
                             # Limpiar listas después de exportar
                             rows_ite_list.clear()
@@ -297,27 +298,12 @@ def comprehensive_search(
                                 logger.info(f"Tiempo estimado para finalizar: {horas_restantes:.1f} horas (~{horas_restantes * 60:.1f} minutos).")
                                 logger.info(f"Tiempo total proyectado de entrenamiento: {horas_train:.1f} horas.")
 
-    logger.critical("Guardado final. Exportando datos acumulados restantes.")
-    if rows_train_list or rows_test_list or rows_ite_list:  # Verificar si hay filas acumuladas pendientes
-        df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
-        df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
-        df_iteration = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
-
-        # Exportar datos restantes a disco
-        df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
-        df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
-        df_iteration.to_excel(f'{BASE_DIR_mod}/df_ite.xlsx', index=False)
-
-    # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-    df_temp = pd.merge(df_iteration, df_ite_train, on='n_iteration', how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
-    df_iteration_comp = pd.merge(df_temp, df_ite_test, on='n_iteration', how='outer') # Luego combinamos el resultado con df_ite_test
-    df_iteration_comp.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
     if verbose >= 0:
         end_train = time.time()
         logger.info(f"Tiempo total de entrenamiento: {(end_train - start_train) / 60:.1f} minutos")
 
-    return df_iteration_comp
+    return df_iteration
 
 def define_n_iterations(d_params):
     """
@@ -403,7 +389,7 @@ def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, n_seasons_update: i
 
     return df_player_sofifa, df_player_fifa_sofifa
 
-def determine_rows_for_test_set(df_match, n_reg_test: int = 100, verbose : int = 0):
+def determine_rows_for_test_set(df_match, n_reg_val: int = 100, n_reg_test: int = 100, verbose : int = 0):
     """
     Determina qué registros pueden ser utilizados en el test
     Requisitos para el test
@@ -425,76 +411,54 @@ def determine_rows_for_test_set(df_match, n_reg_test: int = 100, verbose : int =
     if verbose >= 2:
         logger.info(df_match['date'].head(10))
     
-    # Requisito 1: id competition.   # En df_match obtengo id_competition por match y determino posibles id_matches
+    # Requisito 1: id competition
     df1 = select_league_matches(df_match)
     index_comp = df1.index
-
-    if verbose >= 2:
-        df_filt_1 = df[df.index.isin(index_comp)]
-        logger.info(f"Registros que pasan el requisito 1 (solo competencia publica): {len(df_filt_1)}")
-    
-    # Requisito 2: Last matches 
     df_match_comp = df_match[df_match.index.isin(index_comp)]  # Dejo solo las ligas / comp publicas
-    df2 = df_match_comp.head(n_reg_test)
-    index_last_matches = df2.index
 
-    # Imprimo rango de fechas de df_test
-    if verbose >= 1:
-        date_hoy = datetime.datetime.now().date()
-        col_index = df_match_comp.columns.get_loc('date')  # Índice de la columna "date"
-        date_final = df_match_comp.iloc[0, col_index]
-        date_inic = df_match_comp.iloc[100, col_index]
+    # Paso 2: Selecciono últimos partidos para test (ya hecho)
+    df_test = df_match_comp.head(n_reg_test)
+    index_test = df_test.index
+    df_match_comp_filt = df_match_comp[~df_match_comp.index.isin(index_test)]
 
-        # Los convierto a datetime
-        date_final = pd.to_datetime(date_final, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
-        date_inic =  pd.to_datetime(date_inic, format='%d.%m.%Y %H:%M').date()   # Convierto fecha de object a datetime
+    # Paso 3: Selecciono los siguientes 100 partidos para validation
+    df_val = df_match_comp_filt.head(n_reg_val)
+    index_val = df_val.index
 
-        logger.info(f"Date hoy: {date_hoy}. Dates en df_test: {date_inic} --> {date_final}")
-
-        dif_dias = date_hoy - date_final
-        dif_dias_max = 20
-
-        # Si no hay partidos de los ultimos x dias en df_test
-        if dif_dias.days >= dif_dias_max:
-            logger.warning(f"No hay registros de los ultimos {dif_dias.days} dias en df_test. Puede haber fallado algo en la extraccion de missing o en la seleccion del df_test.")
-
-    if verbose >= 2:
-        df_filt_2 = df[df.index.isin(index_last_matches)]
-        logger.info(f"Registros que pasan el requisito 2 (solo last matches): {len(df_filt_2)}")
-    
-        # Selecciono registros que cumplen los requisitos
-
-    logger.info(f"Index test set: {len(index_last_matches)}")
-    return index_last_matches
+    logger.info(f"Index val set: {len(index_val)} y Index test set: {len(index_test)}")
+    return index_val, index_test
 
 def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [RandomForestClassifier(), XGBClassifier()] # DecisionTreeClassifier(),  # SVC() (x tiempo),  GradientBoostingClassifier()
+    l_modelos = [LogisticRegression(), SVC(), XGBClassifier()]
 
-    # 1728 iteraciones
+    l_comp = [d_comps['all_comp'], d_comps['comp_sin_cups']] 
+    l_comp_sin_duplicados = list(map(list, set(map(tuple, l_comp)))) # l_comp = [[1671], [1671]]
+    print(l_comp_sin_duplicados)
+
     d_params = {  
         'clean_post_integrate': {
-            'competencies_to_select': [d_comps['all_comp']], # d_comps['comp_sin_cups'], # d_comps['comp_solo_liga'],  # Sin copas pues meten ruido en historicas pues no se tienen part ant de esos equipos + problema de fs no da empate en copas.
+            'competencies_to_select': l_comp_sin_duplicados, 
             'n_years_to_select': [3, 10], # 5
         },
         'construct': {
-            'n_last_matches': [[120], [60, 180]], # Variables historicas en ultimos n partidos,
+            'n_last_matches': [[120]], # [60, 180] # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
             'segun_localia': [True, False], 
-            'calculate_dif': [False, True],
-            'decay_rate': [0, 0.2],
+            'calculate_dif': [True], # False
+            'decay_rate': [0.1, 0.3],
         },
         'select': {
-            'thr_corr': [0.7, None],
-            'thr_fs': [0.1, 0.25], # 0.9 para ver metricas con la variable mas importante. Si no le gano a eso, es porque las otras variables son una verga.
+            'thr_corr': [0.7, 0.85, None],
+            'thr_fs': [None, 0.1, 0.25], # 0.9 para ver metricas con la variable mas importante. Si no le gano a eso, es porque las otras variables son una verga.
             'fill_na': [None, "0"] # en realidad es clean_post_select
         },
         'modeling': {
-            'val_size': [0.125],
-            'n_reg_test': [100],
-            'bal_type': ['under'], # None
+            'n_reg_val': [200],
+            'n_reg_test': [200],
+            'bal_type': ['under'], 
             'k': [10],
             # 'refit': ['mean_test_cross_entropy_loss', 'mean_test_f1_score'] # A futuro...
         }
@@ -508,11 +472,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [167]
 
-    data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
+    data_unders = False  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = True
+    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
