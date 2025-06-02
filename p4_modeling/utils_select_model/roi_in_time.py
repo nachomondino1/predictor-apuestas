@@ -15,33 +15,34 @@ def main(df_ite, country, iteration_date, graf_all_models: bool = False):
     all_bet_numbers = []
     all_rois = []
     cont = 0
+    var_to_graf = 'roi_'
 
     # Iterar sobre los modelos
     for idx, row in df_ite.iterrows():
         n_model, model_name = row['n_iteration'], row['model_name'] # n_model
-        logger.info(f'{n_model} {model_name}')
+        # logger.info(f'{n_model} {model_name}')
         
-        # Levanto predicciones del modelo --> no assess.
+        # Levanto predicciones del modelo (no assess y ya con metricas)
         try:
             df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
-            print(df_pred.shape)
+            # print(df_pred.shape)
         except FileNotFoundError:
             continue
 
         # Calculo el ROI por fila
-        df_pred['roi_'] = (df_pred['bank_final'] - 100) / 100  # 100 es el bank inicial
+        df_pred['roi_'] = ((df_pred['bank_final'] - 100) / 100) * 100  # 100 es el bank inicial (x 100 por porcentaje)
+        df_pred['roi_pp'] = df_pred['roi_'] / (df_pred.index + 1)
 
         # Crear columna de número de apuesta (1, 2, 3, ...)
         df_pred['bet_number'] = range(1, len(df_pred) + 1)
 
         # Graficar evolución del ROI en el mismo gráfico
         if cont <= 10:
-            plt.plot(df_pred['bet_number'], df_pred['roi_'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
-        # plt.plot(df_pred['bet_number'], df_pred['recall'], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
-
+            plt.plot(df_pred['bet_number'], df_pred[var_to_graf], marker='o', linestyle='-', label=f'Modelo {n_model} - {model_name}')
+    
         # Guardar datos combinados
         all_bet_numbers.extend(df_pred['bet_number'])
-        all_rois.extend(df_pred['roi_'])
+        all_rois.extend(df_pred[var_to_graf])
         cont += 1
 
     # Calcular una única línea de tendencia para todos los modelos
@@ -62,14 +63,16 @@ def main(df_ite, country, iteration_date, graf_all_models: bool = False):
 
 def roi_in_time_one_model(n_model, model_name):
 
-    logger.info(f'{n_model} {model_name}')
+    # logger.info(f'{n_model} {model_name}')
     
     # Levanto predicciones del modelo (test o test + assess)
     df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
+    df_pred = df_pred.sort_values(by='date', ascending=False)
+    print(df_pred.head())
 
     # Calculo el ROI por fila
     df_pred['roi'] = (df_pred['bank_final'] - 100) / 100 # 100 es el bank inicial
-
+    
     # Crear columna de número de apuesta (1, 2, 3, ...)
     df_pred['bet_number'] = range(1, len(df_pred) + 1)
 
@@ -94,11 +97,11 @@ if __name__ == "__main__":
     l_countries = [48]
 
     d_countries = {
-        48: ["england", '2025-04-08'],
-        55: ["france", '2025-04-08'], 
-        59: ["germany", '2025-04-08'],
-        77: ["italy", '2025-04-08'],
-        148: ["spain", '2025-04-08']
+        48: ["england", '2025-05-28'],
+        55: ["france", '2025-05-28'], 
+        59: ["germany", '2025-05-29'],
+        77: ["italy", '2025-05-29'],
+        148: ["spain", '2025-05-28']
         }
 
     for id_country in l_countries:
@@ -107,10 +110,6 @@ if __name__ == "__main__":
 
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         df_ite = df_ite.sort_values(by='roi', ascending=False)
-
-        # df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/1_filter_models/df_filt_by_metric_cand.xlsx')
-        # df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx')
-        # df_ite = df_ite.head(10)
         print(df_ite)
 
         main(
