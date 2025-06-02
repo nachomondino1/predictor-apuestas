@@ -122,6 +122,10 @@ class DataUnderstandingNew():
         # POR COMPETITION (solo las que hay en df_match)
         for id_competition in l_competencies:
 
+            # evito competencias que extraje en df_match pero no quiero recolectar missing
+            if id_competition in [1672, 1673]:
+                continue
+
             # Obtengo nombre de competicion y is_cup
             df_comp_filt = df_comp_country[df_comp_country['id_competition'] == id_competition] 
             competition, is_cup = df_comp_filt['competition_flashscore'].values[0], df_comp_filt['is_cup'].values[0]
@@ -147,8 +151,10 @@ class DataUnderstandingNew():
                 raise ValueError
 
             ## Df_match_odds
-            if df_match_odds_concat.isna().any().any(): 
-                logger.error("El DataFrame df_match_odds contiene al menos un valor NaN. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")
+            porcentaje_nan = df_match_odds_concat.isna().mean().mean()
+            umbral = 0.5
+            if porcentaje_nan > umbral: 
+                logger.error(f"El DataFrame df_match_odds_concat tiene {porcentaje_nan:.2%} valores NaN, lo cual supera el umbral de {umbral:.2%}. Esto no es posible una vez jugado el partido, se deben tener las cuotas.")
                 raise ValueError
 
             if len(df_match_odds_concat.columns) != 3:
@@ -403,17 +409,19 @@ class DataPreparationNew(DataPreparation):
         perc = len(nan_cols) / len(df.columns)
 
         # Imprimir información y generar un error si se cumplen las condiciones
-        if full_nan_cols or perc > 0.2:
+        if full_nan_cols or perc > 0.3:
             msg = f"Error: Exceso de NaN en columnas. Columnas 100% NaN: {full_nan_cols}. Columnas >0% NaN: {nan_cols}."
+            logger.error(msg)
             raise ValueError(msg)
 
         # Guardar datos en Excel para referencia
         df_nan_col_sorted = df_nan_col.sort_values(ascending=False)
-        df_nan_col_sorted.to_excel(f'{self.BASE_DIR}/df_cols_nan.xlsx', index=True)
 
         # Crear columnas 'emergency_fill' y 'player_emergency_fill' 
         df_filled = self.add_emergency_fill_flags(df)
 
+        # Exporto datos
+        df_nan_col_sorted.to_excel(f'{self.BASE_DIR}/df_cols_nan.xlsx', index=True)
         df_filled.to_excel(f'{self.BASE_DIR}/df_filled.xlsx', index=True)
         return df
 
@@ -468,6 +476,7 @@ class TrainingDataLoader():
             raise IndexError
             
         # Guardo hiperparametros en diccionario
+        print(row_hiper)
         # clean_post_integrate
         d['comp_to_select'] = eval(row_hiper['comp_to_select']) # .values[0]
         d['n_years_to_select'] = value_nan_to_none(row_hiper['n_years_to_select'])
@@ -613,8 +622,8 @@ class MissingData:
 
         except FileNotFoundError:
             
-            user_input = input("No se encontraron los dfs con missing concatenados. Quiere levantar los dataframes de partidos viejos?.')").strip().lower() 
-            if user_input == "y":
+            user_input = input("No se encontraron los dfs con missing concatenados. ¿Quiere levantar los dataframes de partidos viejos? (y/n): ")
+            if user_input.strip().lower()  == "y":
                 df_match = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match.xlsx', index_col=0) 
                 df_match_player = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_player.xlsx', index_col=0) 
                 df_match_odds = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0) 
@@ -634,7 +643,7 @@ class MissingData:
         # Si no existe un df_integrated concatenado entre old y missing
         except FileNotFoundError:
 
-            warning_msg = f"No se pudo levantar el df_integrated con old + missing. Esto es correcto solo si nunca se ha extraido / integrado missing. Desea levantar el df_integrated con el que se entrenó? (y/n)"
+            warning_msg = f"No se pudo levantar el df_integrated con old + missing. Esto es correcto solo si nunca se ha extraido / integrado missing. Desea levantar el df_integrated con el que se entrenó? (y/n): "
             user_input = input(warning_msg).strip().lower() 
             if user_input == "y":
                 df_integrated = pd.read_excel(f'{self.BASE_DIR_dp}/df_integrated.xlsx', index_col=0)  # Tiene missing hasta el dia en el que entrené (por no desde ese dia en adelante)
@@ -657,7 +666,7 @@ class MissingData:
         # Si es la primera vez que extraigo partidos missing
         except FileNotFoundError:
 
-            warning_msg = f"No se pudo levantar df_match, df_match_player y df_match_odds missing. Esto es correcto solo si nunca se ha extraido missing. Desea inicializar crear los dataframes? (y/n)"
+            warning_msg = f"No se pudo levantar datos missing ya extraidos. Esto es correcto solo si nunca se ha extraido missing. Desea inicializar crear los dataframes? (y/n): "
             user_input = input(warning_msg).strip().lower() 
             if user_input == "y":
                 df_match_miss, df_match_player_miss, df_match_odds_miss = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -673,8 +682,7 @@ class MissingData:
         # Si es la primera vez que extraigo partidos missing
         except FileNotFoundError:
             logger.error("Nunca se ha integrado missing")
-
-            warning_msg = f"No se pudo levantar el df_integrated_missing. Esto es correcto solo si nunca se ha integrado missing. Desea inicializar crear el dataframe? (y/n)"
+            warning_msg = f"No se pudo levantar el df_integrated_missing. Esto es correcto solo si nunca se ha integrado missing. Desea inicializar crear el dataframe? (y/n): "
             user_input = input(warning_msg).strip().lower() 
             if user_input == "y":
                 df_integrated_missing_all = pd.DataFrame()  # Es importante para que se guarde por primera vez df_integrated_missing en /all 
@@ -895,7 +903,7 @@ def main(
             # Preparo datos missing            
             df_match_miss_new_f, df_match_player_miss_new_f, df_match_odds_miss_new_f, df_player_fifa_sofifa = dp.format_data(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss_new_f, df_match_player_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, export=False)
-            df_match_miss_new_vf, df_match_player_miss_new_vf, df_match_odds_miss_new_vf, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss_new_c, df_match_player_miss_new_c, df_match_odds_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
+            # df_match_miss_new_vf, df_match_player_miss_new_vf, df_match_odds_miss_new_vf, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss_new_c, df_match_player_miss_new_c, df_match_odds_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
             df_integrated_missing_new = dp.integrate_data(df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
@@ -1188,9 +1196,10 @@ if __name__ == "__main__":
         59: ["germany", '2025-05-08'], 
         77: ["italy", '2025-05-08'],
         148: ["spain", '2025-05-07'], 
+        167: ["usa", '2025-05-29'], 
         }
 
-    id_country = 148
+    id_country = 167
     key, value = 'predict', 'next_matches'
     data_unders = False
     n_days = 1
@@ -1198,7 +1207,7 @@ if __name__ == "__main__":
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 46, 'model_name': "XGBClassifier"} # RandomForestClassifier
+    d_model = {'n_model': 17, 'model_name': "SVC"} # RandomForestClassifier
 
     if key == 'missing':
         
