@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import re
 from utils.set_up_logging import logger
 from time import sleep
+import random
 
 class FlashscoreCrawler(Crawler):
     """
@@ -87,22 +88,22 @@ class FlashscoreCrawler(Crawler):
         l_ids_clean = clean_id(l_ids)
         return l_ids_clean
     
-    def extract_id_next_matches(self, n_days):
+    def extract_id_next_matches(self, n_days, verbose: int = 1):
             
         # Extraigo partidos (items) y sus ids --> NO PUDE EXTRAER LOS SVG.. PERO SI EL DIV DE EVENT_TIME... VER 
         l_items = super().extract_tags(xpath='.//div[@id="live-table"]//div[@class="sportName soccer"]//div[contains(@class, "event__match--scheduled")]', sec_wait=self.SEC_WAIT_MAX)
-        if self.verbose >= 1:
+        if self.verbose >= verbose:
             print(f"Cantidad de proximos partidos en total: {len(l_items)}")
 
         # Filtro partidos por fecha
         l_items_filt = self.select_items_by_date(l_items, n_days)
-        if self.verbose >= 1:
+        if self.verbose >= verbose:
             print(f"Cantidad de proximos partidos dentro de {n_days}: {len(l_items_filt)}")
 
         # Obtengo ids
         l_ids = [item.get_attribute('id') for item in l_items_filt]
         l_ids_clean = clean_id(l_ids)
-        if self.verbose >= 1:
+        if self.verbose >= verbose:
             print(f"Cantidad de ids extraidos dentro de {n_days}: {len(l_ids_clean)}")
 
         return l_ids_clean
@@ -147,8 +148,8 @@ class FlashscoreCrawler(Crawler):
             d_row_match_odds.update(self.extract_odds())
 
         # LINE UPS
-        boton_formations = super().extract_tag(xpath='//a[@data-analytics-alias="lineups"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=print_not_next_matches) #  # './/div[@class="filterOver filterOver--indent"]//button[text()="Lineups"]'
-        
+        boton_formations = super().extract_tag(xpath='//a[@href="#/match-summary/lineups"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=print_not_next_matches)
+
         ## Si tiene hoja "Lineups"
         if super().click_boton(boton_formations) is not False:
 
@@ -767,11 +768,13 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
 
     # Ingreso a pagina
     crawler.driver.get(url)  # hasta que no se carga toda la pagina, no sigue...
+    sleep(random.uniform(2, 4))
 
     # Accept cookies (a veces no llega a cargar, igual creo que no afecta)
     crawler.accept_cookies()  
     season_year = crawler.extract_season_year() 
     print(f" {season_year} ".center(120, "-"))
+    sleep(random.uniform(2, 4))
 
     # Extraigo partidos
     l_ids = crawler.extract_id_next_matches(n_days)

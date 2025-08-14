@@ -43,7 +43,7 @@ class SofifaCrawler(Crawler):
         print("\tNº de posibles leagues:", len(l_posibles_leagues))
 
         # Diccionario en donde difiere los nombres de paises en Flashscore y Sofifa 
-        d_country_name = {'USA': 'United States'}
+        d_country_name = {'usa': 'United States'}
 
         ## Por posible league
         for tag_league in l_posibles_leagues:
@@ -53,7 +53,7 @@ class SofifaCrawler(Crawler):
             print("\tCountry de posible league: ", country_posible_league)
 
             # Determino el nombre del country a comparar
-            country_to_compare = country.lower() if country not in d_country_name.keys() else d_country_name[country].lower()
+            country_to_compare = d_country_name[country].lower() if country.lower() in d_country_name.keys() else country.lower() 
 
             # Si es el country que estoy buscando
             if country_posible_league.lower() == country_to_compare:  # Podria agregarle coincidencia del 90% por si cambia algun caracter. O bien el tema idioma.

@@ -119,6 +119,7 @@ def select_best_hiperparameters(
     best_index = best_search.best_index_ # Metricas de la mejor combinacion
     results = pd.DataFrame(best_search.cv_results_)
     
+    # Metricas de validacion
     if var_resp == 'categorical':
         d_metrics = {
             'cv_accuracy': best_search.cv_results_['mean_test_accuracy'][best_index],
@@ -270,7 +271,7 @@ def space_params(model_name, bayes, verbose: int = 0):
     # Defino hiperparametros de arboles de decision
     l_n_estimators = [31, 51, 101]
     l_learning_rate = [0.001, 0.01, 0.1]
-    l_max_depth = [3, 5, 7] # None, 10
+    l_max_depth = [2, 3, 5] # None, 10
     l_min_samples_leaf = [21, 51] # [21, 51]
     l_min_samples_split = [(elem * 2) + 1 for elem in l_min_samples_leaf] # min_samples_split≥2×min_samples_leaf. P
     l_max_features = ["sqrt", None] # "log2",  # None juega sobreotdo cdo quedan pocas variables predictoras...
@@ -381,7 +382,7 @@ def space_params(model_name, bayes, verbose: int = 0):
 
         # Otros / Hibridos
         'SVC': {
-            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1, 3], # Controls strictness of the missclassifications. +, + over
+            'C': Real(0.01, 3) if bayes else [0.1, 0.5, 1], # C=3 genera overf # Controls strictness of the missclassifications. +, + over
             'kernel': Categorical(['rbf', 'sigmoid']) if bayes else ['rbf', 'sigmoid'], # Tipo de plano separador de clases.
             'gamma': Categorical(['scale', 'auto']) if bayes else ['scale', 'auto'], # Controls the influence of a single training point. +, + over
             'coef0': Real(0, 1) if bayes else [0.0, 0.5],

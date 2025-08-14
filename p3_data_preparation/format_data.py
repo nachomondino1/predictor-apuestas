@@ -133,53 +133,63 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
             if col_name not in df.columns:
                 continue  # Si no existe la columna, la salteamos
 
-            # Paso 1: normalizar solo valores no nulos
-            df[col_name] = df[col_name].where(df[col_name].isna(), df[col_name].str.replace(r'\s+', ' ', regex=True).str.strip()) 
+            # Verificar si la columna contiene valores tipo string antes de aplicar .str
+            if df[col_name].dtype == "object" or df[col_name].dtype.name == "string":
+   
+                # Paso 1: normalizar solo valores no nulos
+                df[col_name] = df[col_name].where(df[col_name].isna(), df[col_name].str.replace(r'\s+', ' ', regex=True).str.strip()) 
 
-            # Paso 2: crear columnas vacías para luego completar según cada caso
-            df[f'accuracy_{col_name}'] = np.nan
-            df[f'n_correct_{base_col}_{location}'] = np.nan
-            df[f'n_{col_name}'] = np.nan
+                # Paso 2: crear columnas vacías para luego completar según cada caso
+                df[f'accuracy_{col_name}'] = np.nan
+                df[f'n_correct_{base_col}_{location}'] = np.nan
+                df[f'n_{col_name}'] = np.nan
 
-            # Paso 3: máscaras para los distintos casos
-            mask_extracted = df[col_name].notna() & df[col_name].str.contains(r'\d+%\s*\(\d+/\d+\)', na=False)
-            mask_direct = df[col_name].notna() & df[col_name].str.match(r'^\d+$')  # solo números
+                # Paso 3: máscaras para los distintos casos
+                mask_extracted = df[col_name].notna() & df[col_name].str.contains(r'\d+%\s*\(\d+/\d+\)', na=False)
+                mask_direct = df[col_name].notna() & df[col_name].str.match(r'^\d+$')  # solo números
 
-            # Caso 1: extracción con regex
-            extracted = df.loc[mask_extracted, col_name].str.extract(r'(\d+)%\s*\((\d+)/(\d+)\)')
-            if verbose >= 1:
-                print(f"Extracted: \n {extracted}")
+                # Caso 1: extracción con regex
+                extracted = df.loc[mask_extracted, col_name].str.extract(r'(\d+)%\s*\((\d+)/(\d+)\)')
+                if verbose >= 1:
+                    print(f"Extracted: \n {extracted}")
 
-            if extracted.isnull().any().any():
-                raise ValueError(f"Error al extraer datos en la columna {col_name}")
+                if extracted.isnull().any().any():
+                    raise ValueError(f"Error al extraer datos en la columna {col_name}")
 
-            extracted = extracted.apply(pd.to_numeric, errors='coerce')
-            if extracted.isnull().any().any():
-                raise ValueError(f"Valores no convertibles a números en {col_name}")
+                extracted = extracted.apply(pd.to_numeric, errors='coerce')
+                if extracted.isnull().any().any():
+                    raise ValueError(f"Valores no convertibles a números en {col_name}")
 
-            df.loc[mask_extracted, f'accuracy_{col_name}'] = extracted[0].values # # warning de Try using .loc[row_indexer,col_indexer] = value instead
-            df.loc[mask_extracted, f'n_correct_{base_col}_{location}'] = extracted[1].values
-            df.loc[mask_extracted, f'n_{col_name}'] = extracted[2].values
+                df.loc[mask_extracted, f'accuracy_{col_name}'] = extracted[0].values # # warning de Try using .loc[row_indexer,col_indexer] = value instead
+                df.loc[mask_extracted, f'n_correct_{base_col}_{location}'] = extracted[1].values
+                df.loc[mask_extracted, f'n_{col_name}'] = extracted[2].values
 
-            # Caso 2: ya está en formato numérico, solo asignás `n_{col_name}`
-            df.loc[mask_direct, f'n_{col_name}'] = df.loc[mask_direct, col_name].astype(float) # Por ejemplo, n_tackles es "15" o "61% (22/36)" (no funciona no se por qué)
+                # Caso 2: ya está en formato numérico, solo asignás `n_{col_name}`
+                df.loc[mask_direct, f'n_{col_name}'] = df.loc[mask_direct, col_name].astype(float) # Por ejemplo, n_tackles es "15" o "61% (22/36)" (no funciona no se por qué)
 
-            # Verificar rangos # Es molesto pero necesario. Si hay un error en el reformateo tiene que saltar ahora
-            for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
-                
-                # Verificar si la columna tiene el 100% de NaN
-                if df[new_col].isna().all():
-                    logger.error(f"La columna {new_col} tiene el 100% de valores NaN.")
-                    raise ValueError(f"La columna {new_col} está completamente vacía.")
+                # Verificar rangos # Es molesto pero necesario. Si hay un error en el reformateo tiene que saltar ahora
+                for new_col, (min_val, max_val) in zip([f'accuracy_{col_name}', f'n_correct_{base_col}_{location}', f'n_{col_name}'], column_specs.values()):
                     
-                # Verificar si los valores están fuera de rango
-                if not df[new_col].between(min_val, max_val).all():
-                    logger.error(f"Valores fuera de rango en {new_col}: {df[new_col].min()} - {df[new_col].max()}")
-                    raise ValueError
+                    # Verificar si la columna tiene el 100% de NaN
+                    if df[new_col].isna().all():
+                        logger.error(f"La columna {new_col} tiene el 100% de valores NaN.")
+                        raise ValueError(f"La columna {new_col} está completamente vacía.")
 
-            # Eliminar columna original
-            df.drop(columns=[col_name], inplace=True)
+                    # Filtrar NaN antes de verificar el rango (sino falla el rango a pesar de estar en el rango)
+                    df_no_nan = df[new_col].dropna()
 
+                    if not df_no_nan.between(min_val, max_val).all():
+                        out_of_range = df_no_nan[~df_no_nan.between(min_val, max_val)]
+                        logger.warning(f"Valores fuera del rango en {new_col}: {out_of_range.tolist()}") # no hago raise error, porque puede suceder que fs mida mal y prefiero borrarlo en clean_data()
+                        logger.warning(f"Valores fuera de rango en {new_col}: {df_no_nan.min()} - {df_no_nan.max()} (esperado: {min_val} - {max_val})")
+
+                # Eliminar columna original
+                df.drop(columns=[col_name], inplace=True)
+            
+            else:
+                logger.error(f"Falló el reformateo de {col_name}. Verifica que sea de tipo string o object.")
+                print(df[col_name].dtype)
+                print(df[col_name].head())
     return df
 
 

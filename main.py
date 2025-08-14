@@ -302,10 +302,13 @@ class DataPreparation:
         end = time.time()
         print(f"Clean data in {(end - start) / 60:.1f} minutes")
 
-        # Eliminacion de outliers... 
-        ## (hay total passess con valor ridiculo...)
-        ## (hay muchas stats que Flashscore les da valor 0 en vez de nan. Fijate en attacks y essas
-
+        # Eliminacion de outliers...
+        if export: # en prod no (pues no hay accuracy aun)
+            # Filtrar columnas con "accuracy" en su nombre y reemplazar valores fuera de rango
+            accuracy_cols = [col for col in df_match.columns if 'accuracy' in col]
+            df_match[accuracy_cols] = df_match[accuracy_cols].apply(lambda col: col.map(lambda x: x if 0 <= x <= 100 else np.nan))
+            ## (hay total passess con valor ridiculo...)
+            ## (hay muchas stats que Flashscore les da valor 0 en vez de nan. Fijate en attacks y essas
 
         if export:
             df_match.to_excel(f'{self.base_path}/clean_data/df_match_cleaned.xlsx', index=True)
@@ -537,12 +540,6 @@ class DataPreparation:
         # Alerta si dejo de medir alguna variable en los ultimos partidos
         self.warning_variables_no_longer_measured(df, cols_to_use)
 
-        # Separar date en month y day
-        df['date'] = pd.to_datetime(df['date'])  # Asegurarse de que sea datetime
-        df['month'] = df['date'].dt.month
-        df['weekday'] = df['date'].dt.dayofweek + 1  # Lunes=0 → Lunes=1, Domingo=6 → Domingo=7
-        df['hour'] = df['date'].dt.hour
-
         # Si quiero construir variables historicas
         if with_historic:
 
@@ -596,26 +593,26 @@ class DataPreparation:
                 df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['goals_away'] - df['expected_goals_(xg)_away'], None)
                 df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
 
-                df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500, expected=True) 
+                # df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500, expected=True) 
             
             # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses? No tarda nada en construirse en prod.
-            df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500) # df = construct_data.assign_elo_home_away(df, k=30, base_rating=1500)
+            df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500)
             df_preconstructed = df.copy()
 
             # VARIABLES HISTORICAS
             ## 1) EN ULTIMOS N PARTIDOS
             for n_matches in [15]:
-               n_matches_loc = int(n_matches / 2)
+                n_matches_loc = int(n_matches / 2)
+                
+                # Result
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, idxs_to_construct=prod_idxs)
+                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, idxs_to_construct=prod_idxs)
 
-               # Result
-               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, idxs_to_construct=prod_idxs)
-               df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, idxs_to_construct=prod_idxs)
-
-               # Expected Result
-               if 'expected_result' in df.columns:
+                # Expected Result
+                if 'expected_result' in df.columns:
                    df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result', idxs_to_construct=prod_idxs) # Hay que ver si funciona tanto sin como con localia.
                    df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, var_resp='expected_result', idxs_to_construct=prod_idxs) # Hay que ver si funciona tanto sin como con localia.               
-
+               
             ## 2) EN PARTIDOS EN ULTIMOS N DAYS
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, idxs_to_construct=prod_idxs) # no mas por localia por alto nan.
             
@@ -883,9 +880,10 @@ class DataPreparation:
         
             if self.verbose >= 1:
                 logger.critical("El escalado fue un exito!")
-                
+                    
         except ValueError as e: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
             logger.error(f"El escalado tuvo un error: {e}")
+            
             raise ValueError
 
         if not prod:
@@ -925,10 +923,7 @@ class Modeling:
         self.base_path = path
         self.base_path_dp = path_dp
 
-        # Levanto df_teams (lo hago 1 vez para todas las veces que use el reformateo)
-        # self.df_teams = pd.read_excel(f'{self.base_path_dp}/integrate_data/df_teams.xlsx', index_col=0)
-
-    def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, val_size: float = 0.15, index_test_set: list = None, export: bool = True):
+    def generate_test_design(self, df: pd.DataFrame, bal_type: str = None, index_val: list = None, index_test_set: list = None, export: bool = True):
         """
         Separa conjuntos de datos en train, validacion y test, balancea las clases del dataset y elimina los NaN values.
 
@@ -945,20 +940,19 @@ class Modeling:
         if self.verbose >= 0:
             print("\nSeparating data in train, val and test...")
 
-        # Selecciono test set
+        # Separo en test, val y train
+        ## Selecciono test set
         df_test = df[df.index.isin(index_test_set)]
         X_test, y_test = df_test.drop(self.var_resp, axis=1), df_test[self.var_resp]
-
-        # Separo validation y train (dejo de tener en cuenta si lo rellene o no)
         df_train_val = df[~df.index.isin(X_test.index)]
-        X_train_val, y_train_val = df_train_val.drop(self.var_resp, axis=1), df_train_val[self.var_resp]
 
-        # Calcula el tamaño relativo del conjunto de validación
-        test_size_ratio = len(X_test) / len(df)  # Calcula el tamaño relativo del conjunto de prueba
-        val_size_ratio = val_size / (1 - test_size_ratio) 
+        ## Selecciono val set
+        df_val = df_train_val[df_train_val.index.isin(index_val)]
+        X_val, y_val = df_val.drop(self.var_resp, axis=1), df_val[self.var_resp]
+        df_train = df_train_val[~df_train_val.index.isin(X_val.index)]
 
-        # Separo en train y validation (A futuro, estaria bueno evitar partidos de copa en val porque no hay 0 y es falso)
-        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_size_ratio, random_state=42, shuffle=True)
+        ## seleccion train set
+        X_train, y_train = df_train.drop(self.var_resp, axis=1), df_train[self.var_resp]
 
         # Balanceo el dataset de entrenamiento (No se debe balancear el de validacion)
         if bal_type is not None:
@@ -1140,10 +1134,12 @@ class Modeling:
         if expected_metrics:
             # Construyo 'expected_result'
             df_predicciones = construct_data.determine_expected_result(df_predicciones, verbose=0)  # Durante la prep la elimino x fuga de info.
+
             # Eliminar partidos sin expected_goals (puede no estar)
             df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
+            
             # Calculo metricas
-            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_', metrics_by_result=False, bet_metrics=False, gp_result=False)
+            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_', bet_metrics=False, gp_result=False)
             d_metrics_roi.update(d_metric_sin_ea_ex)
 
         return df_predicciones, d_metrics_roi
@@ -1214,7 +1210,7 @@ class Modeling:
                     
                     # Evaluo modelo en test
                     df_pred_proba, d_metrics_test = self.assess_model(model, X_test, y_test)
-                    df_predicciones, d_metrics_roi = self.assess_model_with_roi(df_pred_proba, df_match, df_match_odds)
+                    df_predicciones, d_metrics_roi = self.assess_model_with_roi(df_pred_proba, df_match, df_match_odds, expected_metrics=True)
                     d_metrics_test.update(d_metrics_roi)
 
                     # Evaluar overfitting

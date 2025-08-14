@@ -181,7 +181,7 @@ def main(
             export=True
         )       
 
-        df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric)
+        df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric) # cv y esas metricas de test deberia agregarlas al assess...
         df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
     # Paso 3: Seleccionar modelo para prod de los candidatos
@@ -200,33 +200,36 @@ def main(
 
 if __name__ == "__main__":
     # Defino parametros
-    l_countries = [148, 48, 55, 59, 77]
-    assess = True
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [148]
+    assess = False # Para usar True, cv y esas metricas de test deberia agregarlas al assess...
 
     d_countries = {
-        48: ["england", '2025-05-07'],
-        55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-08'],
-        77: ["italy", '2025-05-08'],
-        148: ["spain", '2025-05-07'],
+        48: ["england", '2025-08-14'],
+        55: ["france", '2025-08-14'], 
+        59: ["germany", '2025-08-14'],
+        77: ["italy", '2025-08-14'],
+        148: ["spain", '2025-08-14'],
+        167: ["usa", '2025-08-14'],
         }
     
-    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)     
-    l_metrics = ['f1_score_draw', 'expected_roi']
-    l_weights = [0.5, 0.5] 
+    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
+    l_metrics = ['roi_por_partido'] # benchmark
+    l_metrics = ['roi_por_partido', 'error']
+
+    l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_ite_test.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         print(df_ite)
+        print(df_ite.shape)
 
         # Para maximizar error en metrica
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
-        # df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
-        # df_ite['cv_cross_entropy_loss'] = df_ite['cv_cross_entropy_loss'] * (-1)
-        # df_ite['aciertos_draw'] = df_ite['n_draw'] * df_ite['precision_draw'] / 100
+        # df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1
 
         main(
             df_ite=df_ite,

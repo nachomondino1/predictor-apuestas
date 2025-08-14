@@ -17,6 +17,7 @@ def assess_models_in_prod(
         update_missing: bool = False,
         predict_missing: bool = True,
         concat_with_test: bool = True,
+        xlsx_name: str = 'df_ite_bs.xlsx',
         export: bool = True
 ):
     date = datetime.datetime.now().date()
@@ -91,7 +92,7 @@ def assess_models_in_prod(
             path_final = path2 if concat_with_test else path1
             
             df_pred_met.to_excel(path_final, index=True) # Cuando haces assess
-            df_ite_bs.to_excel(f'{path}/df_ite_bs.xlsx', index=False)
+            df_ite_bs.to_excel(f'{path}/{xlsx_name}.xlsx', index=False)
     
     return df_ite_bs
 
@@ -114,18 +115,27 @@ def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
 
 if __name__ == "__main__":
     # Defino parametros
-    l_countries = [148, 48, 55, 59, 77]
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [167]
 
+    xlsx_name = 'expected_f1_score'
     one_model, n_model = False, 328
     n_models = 10
     concat_with_test = False
 
     d_countries = {
-        48: ["england", '2025-05-07'],
-        55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-08'],
-        77: ["italy", '2025-05-08'],
-        148: ["spain", '2025-05-07']
+        # 48: ["england", '2025-05-07'],
+        # 55: ["france", '2025-05-07'], 
+        # 59: ["germany", '2025-05-08'],
+        # 77: ["italy", '2025-05-08'],
+        # 148: ["spain", '2025-05-07']
+        
+        48: ["england", '2025-05-28'],
+        55: ["france", '2025-05-28'], 
+        59: ["germany", '2025-05-29'],
+        77: ["italy", '2025-05-29'],
+        148: ["spain", '2025-05-28'],
+        167: ["usa", '2025-05-29'],
         }
     
     for id_country in l_countries:
@@ -161,6 +171,7 @@ if __name__ == "__main__":
                 country=country, 
                 iteration_date=iteration_date, 
                 concat_with_test=concat_with_test,
+                xlsx_name=xlsx_name
                 )
     
-            df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/df_ite_bs.xlsx")
+            df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{xlsx_name}.xlsx")
