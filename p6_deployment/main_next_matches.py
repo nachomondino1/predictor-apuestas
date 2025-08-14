@@ -404,13 +404,19 @@ class DataPreparationNew(DataPreparation):
         df_nan_col = df.isna().mean()
 
         # Identificar cols con mucho nan
+        nan_min = 0.5  # Umbral del 50% de NaN para considerar una columna como problemática
         full_nan_cols = df_nan_col[df_nan_col == 1].index.tolist()  # Identificar columnas con 100% NaN
-        nan_cols = df_nan_col[df_nan_col > 0].index.tolist()  # Identificar columnas con más del 50% de NaN
+        nan_cols = df_nan_col[df_nan_col > nan_min].index.tolist()  # Identificar columnas con más del x% de NaN
         perc = len(nan_cols) / len(df.columns)
 
         # Imprimir información y generar un error si se cumplen las condiciones
-        if full_nan_cols: # or perc > 0.3
-            msg = f"Error: Exceso de NaN en columnas. Columnas 100% NaN: {full_nan_cols}. Columnas >0% NaN: {nan_cols}."
+        if full_nan_cols:
+            msg = f"Error: Hay {len(full_nan_cols)} columnas que tienen 100% de NaN values. Columnas 100% NaN: {full_nan_cols}."
+            logger.error(msg)
+            raise ValueError(msg)
+
+        elif perc > 0.5:
+            msg = f"Error: Hay {len(nan_cols)} columnas con mucho NaN value. Columnas > {nan_min*100:.0f}% NaN: {nan_cols}."
             logger.error(msg)
             raise ValueError(msg)
 
@@ -1135,10 +1141,8 @@ def main(
         # Predigo con modelo cargado
         if predict_missing:
             df_filled = df_fill.copy() 
-            d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}
         else:
             df_filled = pd.concat([df_c1['copiado_formaciones'], df_fill.loc[:, ['player_emergency_fill', 'emergency_fill']]], axis=1) 
-            d_strategy = lo.load_modeling_hyperparameters()
 
         # Predigo sobre proximos partidos usando modelo cargado
         y_pred_proba, y_pred = mo.predict_model(model=lo.load_model(), X_test=df)
@@ -1156,17 +1160,27 @@ def main(
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
-        if  isinstance(d_strategy, dict):
+        d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}
+        if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
             df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
+
+
         else:
             logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
 
-        # Aplico reduccion a stake
-        if porc_m is not None and not predict_missing:
-            df['stake_to_bet'] = df['stake_to_bet'] * porc_m
+        # Aplico reducciones a stake
+        if not predict_missing:
+
+            # No apostamos en local
+            df.loc[df['result_to_bet'] == 1, 'stake_to_bet'] *= 0
+
+            # Confidence margin
             df.loc[(df['confidence_margin'] < 0.025) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.3 # Reducir stake si confidence_margin < threshold
+
+            # Disminuyo stake por rellenado de emergencia
+            df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= 0
 
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
