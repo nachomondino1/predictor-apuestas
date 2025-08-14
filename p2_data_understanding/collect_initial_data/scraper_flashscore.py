@@ -758,7 +758,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     """
     # Definicion de variables
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    crawler = FlashscoreCrawler(headless=False)
+    crawler = FlashscoreCrawler(headless=True)
 
     # Formateo variables para construir url
     country_form = country.lower().replace(' ', "-")
