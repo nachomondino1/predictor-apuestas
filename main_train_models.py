@@ -81,7 +81,7 @@ def comprehensive_search(
     """
     # Definicion de variables
     cont_iter = 0
-    df_iteration, df_ite_train, df_ite_test = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    df_ite_train, df_ite_test, df_params_ite = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     rows_ite_list, rows_train_list, rows_test_list = [], [], []
     du, dp, mo = DataUnderstanding(id_country=id_country, country=country), DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
 
@@ -271,17 +271,12 @@ def comprehensive_search(
                             # Concatenar todas las filas acumuladas en DataFrames
                             df_ite_train = pd.concat([df_ite_train, pd.DataFrame(rows_train_list)], ignore_index=True)
                             df_ite_test = pd.concat([df_ite_test, pd.DataFrame(rows_test_list)], ignore_index=True)
-                            df_params_ite = pd.concat([df_iteration, pd.DataFrame(rows_ite_list)], ignore_index=True)
-
-                            # Realizamos un merge por 'n_iteration' para combinar los DataFrames
-                            df_temp = pd.merge(df_ite_train, df_ite_test, on=['n_iteration', 'model_name'], how='outer')     # Primero hacemos merge entre df_iteration y df_ite_train
-                            df_iteration = pd.merge(df_params_ite, df_temp, on=['n_iteration'], how='outer')
+                            df_params_ite = pd.concat([df_params_ite, pd.DataFrame(rows_ite_list)], ignore_index=True)
 
                             # Exportar
                             df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
                             df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
                             df_params_ite.to_excel(f'{BASE_DIR_mod}/df_params_ite.xlsx', index=False)
-                            df_iteration.to_excel(f'{BASE_DIR_mod}/df_iteration.xlsx', index=False)
 
                             # Limpiar listas después de exportar
                             rows_ite_list.clear()
@@ -303,7 +298,7 @@ def comprehensive_search(
         end_train = time.time()
         logger.info(f"Tiempo total de entrenamiento: {(end_train - start_train) / 60:.1f} minutos")
 
-    return df_iteration
+    return df_params_ite, df_ite_train, df_ite_test
 
 def define_n_iterations(d_params):
     """
@@ -428,36 +423,55 @@ def determine_rows_for_test_set(df_match, n_reg_val: int = 100, n_reg_test: int 
     logger.info(f"Index val set: {len(index_val)} y Index test set: {len(index_test)}")
     return index_val, index_test
 
+def concat_dataframes_on_iteration(df_params_ite, df_ite_train, df_ite_test):
+    # Realizamos un merge por 'n_iteration' para combinar los DataFrames
+    df_temp = pd.merge(
+        df_ite_train,
+        df_ite_test,
+        on=['n_iteration', 'model_name'],
+        how='outer',
+        suffixes=('_train', '_test')  # Evita conflictos de columnas duplicadas
+    )
+
+    # df_iteration = pd.merge(df_params_ite, df_temp, on=['n_iteration'], how='outer')
+    df_iteration = pd.merge(
+        df_temp,
+        df_params_ite,
+        on='n_iteration',
+        how='left'  # LEFT asegura que se repita la info de params sin perder filas
+    )
+    return df_iteration
+
 def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), SVC(), XGBClassifier()]
+    l_modelos = [LogisticRegression(), SVC()] #  XGBClassifier()
 
-    l_comp = [d_comps['all_comp'], d_comps['comp_sin_cups']] 
+    l_comp = [d_comps['all_comp']] #  d_comps['comp_sin_cups'] 
     l_comp_sin_duplicados = list(map(list, set(map(tuple, l_comp)))) # l_comp = [[1671], [1671]]
     print(l_comp_sin_duplicados)
 
     d_params = {  
         'clean_post_integrate': {
             'competencies_to_select': l_comp_sin_duplicados, 
-            'n_years_to_select': [3, 10], # 5
+            'n_years_to_select': [5, 10], #3 
         },
         'construct': {
             'n_last_matches': [[120]], # [60, 180] # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
             'segun_localia': [True, False], 
             'calculate_dif': [True], # False
-            'decay_rate': [0.1, 0.3],
+            'decay_rate': [0.1], # 0.3
         },
         'select': {
-            'thr_corr': [0.7, 0.85, None],
+            'thr_corr': [0.7, None], #  0.85
             'thr_fs': [None, 0.1, 0.25], # 0.9 para ver metricas con la variable mas importante. Si no le gano a eso, es porque las otras variables son una verga.
             'fill_na': [None, "0"] # en realidad es clean_post_select
         },
         'modeling': {
-            'n_reg_val': [200],
-            'n_reg_test': [200],
+            'n_reg_val': [100],
+            'n_reg_test': [100],
             'bal_type': ['under'], 
             'k': [10],
             # 'refit': ['mean_test_cross_entropy_loss', 'mean_test_f1_score'] # A futuro...
@@ -472,12 +486,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [167]
+    l_countries = [148]
 
-    data_unders = False  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
+    data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
     update_sofifa = False if data_unders else False
-    data_prep_int = False # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
-    data_prep_int_miss = False
+    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 
@@ -487,7 +501,7 @@ if __name__ == "__main__":
 
         # Determino date  
         date = datetime.datetime.now().date() # Si queres usar fecha en especifico: datetime.datetime.strptime('2025-03-16', '%Y-%m-%d').date()
-        logger.info(f"Country: {country} Date: {date}")
+        logger.info(f"Country: {country} Date: {date}".center(120, "#"))
         
         # Defino hiperparametros a probar
         d_params, l_modelos = define_params_space(id_country)
@@ -499,11 +513,17 @@ if __name__ == "__main__":
         )
 
         # Preparo y entreno modelos para todas las combinaciones de hiper posibles 
-        df_iteration_comp = comprehensive_search(
+        df_params_ite, df_ite_train, df_ite_test = comprehensive_search(
             country=country, date=date, 
             data_unders=data_unders, update_sofifa=update_sofifa, 
             data_prep_int=data_prep_int, data_prep_int_miss=data_prep_int_miss,
             d_params=d_params, l_modelos=l_modelos
             )
+        
+        # concatenar y hacer un df_iteration
+        df_iteration = concat_dataframes_on_iteration(df_params_ite, df_ite_train, df_ite_test)
 
+        # Exportar resultados
         df_params.to_csv(f'data/{country}/p4_modeling/{date}/hyperparameters.csv')
+        df_iteration.to_excel(f'./data/{country}/p4_modeling/{date}/df_iteration.xlsx', index=False)
+
