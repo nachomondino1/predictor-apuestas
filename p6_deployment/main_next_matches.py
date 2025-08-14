@@ -409,7 +409,7 @@ class DataPreparationNew(DataPreparation):
         perc = len(nan_cols) / len(df.columns)
 
         # Imprimir información y generar un error si se cumplen las condiciones
-        if full_nan_cols or perc > 0.3:
+        if full_nan_cols: # or perc > 0.3
             msg = f"Error: Exceso de NaN en columnas. Columnas 100% NaN: {full_nan_cols}. Columnas >0% NaN: {nan_cols}."
             logger.error(msg)
             raise ValueError(msg)
@@ -423,7 +423,6 @@ class DataPreparationNew(DataPreparation):
         # Exporto datos
         df_nan_col_sorted.to_excel(f'{self.BASE_DIR}/df_cols_nan.xlsx', index=True)
         df_filled.to_excel(f'{self.BASE_DIR}/df_filled.xlsx', index=True)
-        return df
 
     def add_emergency_fill_flags(self, df):
         """
@@ -870,12 +869,12 @@ def main(
     mis = MissingData(country=country, iteration_date=iteration_date_dt)
 
     # Read data usada en mas de una seccion (para levantarla 1 sola vez)
-    # Missing data
+    ## Missing data
     if d_run['run_missing'] or predict_missing:
         df_match_miss, df_match_player_miss, df_match_odds_miss = mis.read_last_missing_data()
         df_integrated_missing = mis.read_last_integrate_missing_data()
     df_integrated_upd = mis.read_last_integrate_data() # Last df_integrated con missing + old    
-    # SOFIFA
+    ## SOFIFA
     df_player_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_sofifa.xlsx", index_col=0)
     df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_fifa_sofifa.xlsx")  
 
@@ -1070,7 +1069,7 @@ def main(
         if not predict_missing: 
             logger.info("Fill data...")
             ### Selecciono los ultimos partidos de los ya jugados para rellenar
-            logger.info("Seleccion de ultimos partidos para rellenar formaciones...")
+            logger.info(f"Seleccion de ultimos partidos (last {n_days_fill_data} dias) para rellenar formaciones...")
             df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated_clean, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
             df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas.
             
@@ -1093,12 +1092,13 @@ def main(
         
         ## Select --> Selecciono las variables que necesita el modelo
         n_col_inic = len(df.columns)
-        df = df[d_hiper['selected_columns']]
+        df = df[columns_scaled] # Es igual a d_hiper['selected_columns'] + "result" --> pero necesito el mismo orden de las cols exacto que cuando entrené el scaler...
+        df = df.drop(columns=['result'])
         if verbose >= 1:
             logger.info(f"Columnas luego de filtrar x mas importantes: {n_col_inic} --> {len(df.columns)}")
 
-        ## Clean data post select
-        df = dp.describe_and_verify_nan(df=df)
+        ## Clean data post select'
+        dp.describe_and_verify_nan(df=df)
         df = dp.clean_post_select(df, scaler_loaded=scaler, prod=True)
 
         # Exporto datos
@@ -1191,7 +1191,7 @@ if __name__ == "__main__":
     
     # Defino country
     d_countries = {
-        48: ["england", '2025-05-07'], 
+        48: ["england", '2025-08-14'], 
         55: ["france", '2025-05-07'], 
         59: ["germany", '2025-05-08'], 
         77: ["italy", '2025-05-08'],
@@ -1199,28 +1199,28 @@ if __name__ == "__main__":
         167: ["usa", '2025-05-29'], 
         }
 
-    id_country = 167
+    id_country = 48
     key, value = 'predict', 'next_matches'
-    data_unders = False
-    n_days = 1
+    n_days = 7
 
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 17, 'model_name': "SVC"} # RandomForestClassifier
+    d_model = {'n_model': 1, 'model_name': "SVC"} # RandomForestClassifier
+    n_days_fill_data = 120 if datetime.datetime.now().month in [8] else 30 
+    print(f"n_days_fill_data: {n_days_fill_data}")
 
     if key == 'missing':
-        
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
         logger.warning("Extract and prepare missing matches")
         df = main(d_run, id_country, iteration_date=iteration_date, export=d_run['export'], country=country) 
 
     elif key == 'predict':
-        d_run = {'run_missing': False, 'data_unders': data_unders, 'data_prep': True, 'modeling': True, 'export': False} 
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
             
         if value == "next_matches":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=False, country=country) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, n_days_fill_data=n_days_fill_data, export=True, country=country) 
 
         elif value == 'missing':
             df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False, country=country) 
