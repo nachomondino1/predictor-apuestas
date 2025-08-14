@@ -201,28 +201,21 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [167]
+    l_countries = [148]
     assess = False # Para usar True, cv y esas metricas de test deberia agregarlas al assess...
 
     d_countries = {
-        # 48: ["england", '2025-05-07'],
-        # 55: ["france", '2025-05-07'], 
-        # 59: ["germany", '2025-05-08'],
-        # 77: ["italy", '2025-05-08'],
-        # 148: ["spain", '2025-05-07'],
-
-        48: ["england", '2025-05-28'],
-        55: ["france", '2025-05-28'], 
-        59: ["germany", '2025-05-29'],
-        77: ["italy", '2025-05-29'],
-        148: ["spain", '2025-05-28'],
-        167: ["usa", '2025-05-29'],
+        48: ["england", '2025-08-14'],
+        55: ["france", '2025-08-14'], 
+        59: ["germany", '2025-08-14'],
+        77: ["italy", '2025-08-14'],
+        148: ["spain", '2025-08-14'],
+        167: ["usa", '2025-08-14'],
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
-    # l_metrics = ['expected_error', 'recall']
-    l_metrics = ['roi_por_partido', 'expected_error']
+    l_metrics = ['roi_por_partido', 'error']
 
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 

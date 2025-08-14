@@ -880,9 +880,10 @@ class DataPreparation:
         
             if self.verbose >= 1:
                 logger.critical("El escalado fue un exito!")
-                
+                    
         except ValueError as e: # Found array with 0 sample(s) (shape=(0, 47)) while a minimum of 1 is required by StandardScaler.
             logger.error(f"El escalado tuvo un error: {e}")
+            
             raise ValueError
 
         if not prod:
