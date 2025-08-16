@@ -12,7 +12,7 @@ El objetivo es concatenar los df_map de todos los paises para tener un mapeo cen
 Incluso, la integracion podria ser mas robusta
 """
 
-def concat_integrate_data_by_country(l_countries: list, verbose: int = 0):
+def concat_integrate_data_by_country(d_countries: dict, d_dates: dict, verbose: int = 0):
     """
     Concatenacion de df_map_players de varios paises.
 
@@ -23,13 +23,15 @@ def concat_integrate_data_by_country(l_countries: list, verbose: int = 0):
     df_map, df_player_sofifa, df_player_fifa_sofifa = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     # Por pais
-    for country in l_countries:
-        logger.info(f"Country: {country}")
+    for id_country in d_countries.keys():
+        country = d_countries[id_country]
+        date = d_dates[id_country]
+        logger.info(f"Country: {country} Date: {date}")
 
         # Levanto su df_map
-        df_player_sofifa_p = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
-        df_player_fifa_sofifa_p = pd.read_excel(f'data/{country}/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
-        df_map_p = pd.read_excel(f'data/{country}/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
+        df_player_sofifa_p = pd.read_excel(f'data/{country}/p3_data_preparation/{date}/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
+        df_player_fifa_sofifa_p = pd.read_excel(f'data/{country}/p3_data_preparation/{date}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+        df_map_p = pd.read_excel(f'data/{country}/p3_data_preparation/{date}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
         
         if 'Unnamed: 0' in df_player_fifa_sofifa_p.columns:
             df_player_fifa_sofifa_p = df_player_fifa_sofifa_p.drop(columns=['Unnamed: 0'])
@@ -117,15 +119,16 @@ def integrate_with_new_map(l_countries):
 if __name__ == "__main__":
 
     # Definicion de parametros
-    d_countries = {6: 'argentina', 48: 'england', 55: 'france', 59: 'germany', 77: 'italy', 148: 'spain', 167: 'usa'}
+    d_countries = {48: 'england', 55: 'france', 59: 'germany', 77: 'italy', 148: 'spain', 167: 'usa', 6: 'argentina'}
+    d_dates = {48: '2025-08-14', 55: '2025-08-14', 59: '2025-05-29', 77: '2025-05-29', 148: '2025-08-14', 167: '2025-05-29', 6: '2025-02-06'}
 
     # Creo directorio donde guardar datos
-    base_path_clean = 'data/all/p3_data_preparation/clean_data'
-    base_path_int = 'data/all/p3_data_preparation/integrate_data'
+    base_path_clean = 'data/data_preparation/clean_data'
+    base_path_int = 'data/data_preparation/integrate_data'
     directories.make_directories(l_directorios=[base_path_clean, base_path_int])
 
     # Concatendo df_map
-    df_map, df_player_sofifa, df_player_fifa_sofifa = concat_integrate_data_by_country(l_countries=d_countries.values())
+    df_map, df_player_sofifa, df_player_fifa_sofifa = concat_integrate_data_by_country(d_countries=d_countries, d_dates=d_dates)
 
     # Integro datos usando el df_map completo
-    integrate_with_new_map(l_countries=d_countries.values())
+    # integrate_with_new_map(l_countries=d_countries.values())

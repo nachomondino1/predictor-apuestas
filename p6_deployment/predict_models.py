@@ -3,22 +3,23 @@ import sys
 sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p6_deployment.main_next_matches import main
+import datetime
 
-def predict_models(n_models_predict: int = 5):
+
+def predict_models(l_countries, n_models_predict: int = 5):
     """
     Para obtener predicciones en prox partidos de los modelos candidatos
-    """
-    l_countries = [48, 55, 59, 77, 148]
-
-    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}         
+    """       
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  
+    n_days_fill_data = 120 if datetime.datetime.now().month in [8] else 30 
 
     # Defino country, iteration date y modelo
     d_countries = {
-        48: ["england", '2025-05-07'], 
-        55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-08'], 
-        77: ["italy", '2025-05-08'],
-        148: ["spain", '2025-05-07'], 
+        48: ["england", '2025-08-14'], 
+        55: ["france", '2025-08-14'], 
+        59: ["germany", '2025-08-14'], 
+        77: ["italy", '2025-08-14'],
+        148: ["spain", '2025-08-14'], 
         }
     
     # Por pais
@@ -30,20 +31,20 @@ def predict_models(n_models_predict: int = 5):
 
         # Determino mejores n modelos
         df_ite = pd.read_excel(f'data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx')
-        print(df_ite)
-        df_ite = df_ite.head(n_models_predict)
+        df_best_models = df_ite.head(n_models_predict)
+        print(df_ite.head(n_models_predict))
 
         # Por modelo
-        for idx, row in df_ite.iterrows():
+        for idx, row in df_best_models.iterrows():
 
-            col_name = 'n_iteration' if 'n_iteration' in df_ite.columns else 'n_model'
+            col_name = 'n_iteration' if 'n_iteration' in df_best_models.columns else 'n_model'
             n_model = row[col_name]
             model_name = row['model_name']
             print(n_model, model_name)
             d_model = {'n_model': n_model, 'model_name': model_name}
 
             # Obtengo predicciones en proximos partidos
-            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, n_days_fill_data=n_days_fill_data, export=False) 
 
             # Selecciono id_match y predicted_result
             df_filt = df.loc[:, ['id_team_home', 'id_team_away', 'predicted_result']]
@@ -62,4 +63,9 @@ def predict_models(n_models_predict: int = 5):
         df_country.to_excel(f"/Users/nachomondino/Desktop/df_{country}.xlsx")
 
 if __name__ == "__main__":    
-    predict_models(n_models_predict=5)
+
+    # Defino hiperparametros
+    l_countries = [48, 55]
+    n_models_predict=5
+
+    predict_models(l_countries, n_models_predict=n_models_predict)

@@ -216,21 +216,28 @@ if __name__ == "__main__":
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
     l_metrics = ['roi_por_partido', 'error']
-
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
+        # Levanto df_iteration con datos de train y test
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        print(df_ite)
+        print(df_ite.head(5))
         print(df_ite.shape)
+
+        # Evito modelos que tienen menos de 90 registros en test
+        df_ite_dup = df_ite.copy()
+        df_ite_dup['n_test'] = df_ite_dup['X_test'].str.extract(r'\((\d+),')[0].astype(int)
+        df_ite = df_ite_dup[df_ite_dup['n_test'] >= 90]
+        print(f"{len(df_ite_dup)} --> {len(df_ite)}")
 
         # Para maximizar error en metrica
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
         # df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1
 
+        # Seleccion del modelo
         main(
             df_ite=df_ite,
             country=country, iteration_date=iteration_date, 

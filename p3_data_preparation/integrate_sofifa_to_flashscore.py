@@ -450,7 +450,8 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                             
                             # Si no encontro jugador en el actual fifa, busco en el anterior (Solucion cuando aun no salio el nuevo fifa)
                             if (len(df_player_filt) > 0) and len(df_player_fifa_actual) == 0:
-                                # logger.warning("Tuve que usar fifa anterior")
+                                if verbose >= 0:
+                                    logger.warning("Tuve que usar fifa anterior")
                                 df_player_fifa_ant = df_player_filt[(df_player_filt['fifa_year'].astype(int) == int(year_fifa_ant))]
                                 df_player_filt = df_player_fifa_ant.copy()
                                 if len(df_player_fifa_ant) > 0:
@@ -463,6 +464,7 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                                 print(f"Cantidad de jugadores fs: {len(df_map_fs_so)}, Encontró jugador de fs: {len(row_map)}")
                                 print(f"\t\t Hizo match para este jugador! Id jugador en Sofifa: {id_player_sofifa}")       
                                 print(f"\t\t Shape df_player_filt (debe ser 1 o 2): {df_player_filt.shape[0]}")       
+                                logger.error(f"ID competition: {df_player_filt.id_competition}")
 
                             # Guardo datos del jugador
                             if len(df_player_filt) > 0:
@@ -505,7 +507,10 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
                 else:
                     if verbose >= 0:
                         logger.warning(f"Se evitó promediar {titularidad} {condicion} por ser {len(l_age)} menor al minimo de {n_reg_min}")
-   
+
+                if verbose >= 0:
+                    logger.critical(f"NUMERO DE MATHCES PARA {titularidad}-{condicion}: {len(l_age)}")
+
                 progress_bar.update(1)
             progress_bar.close()
 

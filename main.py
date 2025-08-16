@@ -335,7 +335,7 @@ class DataPreparation:
         return df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa
 
     # Integracion de fuentes de datos (Flashscore y Sofifa)
-    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False, export: bool = True):
+    def integrate_data(self, df_match: pd.DataFrame, df_match_player: pd.DataFrame, df_player_sofifa: pd.DataFrame, df_player_fifa_sofifa: pd.DataFrame, prod: bool = False, fifa_not_released_yet: bool = False, export: bool = True):
         """
         Integra los datos de partidos y jugadores en un solo dataframe.
 
@@ -365,7 +365,17 @@ class DataPreparation:
         # Segun si es train o produccion (en el 1ero hago el mapeo, en el 2do uso el mapeo ya hecho)
         if prod:
             logger.critical("Integración para produccion. No vuelvo a mapear sino que levanto df_map del pais ")
-            df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
+
+            if fifa_not_released_yet:
+                logger.warning("Mapeo con todos los paises pues aun no salio el nuevo fifa")
+                path_map = './data/data_preparation/integrate_data/df_map_players_fs_so.xlsx'
+
+                df_player_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
+                df_player_fifa_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+            else:
+                path_map = f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx'
+            
+            df_map_players_fs_so = pd.read_excel(path_map, index_col=0)
             print(df_map_players_fs_so.head(3))
 
         else: 

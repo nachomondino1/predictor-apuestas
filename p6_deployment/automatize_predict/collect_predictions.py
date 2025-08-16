@@ -25,10 +25,8 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
         iteration_date = row['iteration_date'].values[0]
         print(iteration_date)
 
-        n_days_fill_data = 120 if datetime.datetime.now().month in [8] else 30 
-
         # Extraigo, preparo y predigo proximos partidos
-        df_predicciones_country = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=None, n_days_fill_data=n_days_fill_data, export=d_run['export'])
+        df_predicciones_country = main_next_matches.main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=None, export=d_run['export'])
 
         # Elimino predicciones sin id_country y columnas vacias (las variables predictoras como referee)
         if isinstance(df_predicciones_country, pd.DataFrame):
