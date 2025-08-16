@@ -1165,7 +1165,6 @@ def main(
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
             df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
 
-
         else:
             logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
@@ -1206,21 +1205,21 @@ if __name__ == "__main__":
     # Defino country
     d_countries = {
         48: ["england", '2025-08-14'], 
-        55: ["france", '2025-05-07'], 
-        59: ["germany", '2025-05-08'], 
-        77: ["italy", '2025-05-08'],
-        148: ["spain", '2025-05-07'], 
-        167: ["usa", '2025-05-29'], 
+        55: ["france", '2025-08-14'], 
+        59: ["germany", '2025-08-14'], 
+        77: ["italy", '2025-08-14'],
+        148: ["spain", '2025-08-14'], 
+        167: ["usa", '2025-08-14'], 
         }
 
-    id_country = 48
+    id_country = 148
     key, value = 'predict', 'next_matches'
     n_days = 7
 
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 1, 'model_name': "SVC"} # RandomForestClassifier
+    d_model = {'n_model': 24, 'model_name': "LogisticRegression"} # LogisticRegression
     n_days_fill_data = 120 if datetime.datetime.now().month in [8] else 30 
     print(f"n_days_fill_data: {n_days_fill_data}")
 
@@ -1230,7 +1229,7 @@ if __name__ == "__main__":
         df = main(d_run, id_country, iteration_date=iteration_date, export=d_run['export'], country=country) 
 
     elif key == 'predict':
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True} 
+        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False} 
             
         if value == "next_matches":
             logger.warning("Get predictions of specific model")
