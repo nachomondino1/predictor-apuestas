@@ -836,7 +836,7 @@ def main(
         n_seasons_missing : int = 1,                                                                    # Missing
         n_days_max_next_matches: int = 7, predict_missing: bool = False,                                # Data understanding
         n_days_fill_data: int = 30,                                                                     # Data preparation
-        porc_m: float = None, d_model: dict = None,                                                     # Modeling
+        d_model: dict = None,                                                     # Modeling
         verbose: int = 1, export: bool = True, country: str = None,
         date_missing = None
         ):
@@ -844,6 +844,12 @@ def main(
     Recoleccion de proximos partidos, preparacion y prediccion
     """
     start = time.time()
+
+    # si el fifa aun no salió
+    if datetime.datetime.now().month in [8, 9]: 
+        n_days_fill_data = 120
+        fifa_not_released_yet = True
+        print(f"n_days_fill_data: {n_days_fill_data}")
 
     # Determino country si es None
     if country is None:
@@ -1051,7 +1057,7 @@ def main(
             df_match, df_match_player, df_match_odds, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_match_odds, df_player_fifa_sofifa, reformat=False, prod=True, export=False)            
             df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=False)
             df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=True)
-            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
+            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, fifa_not_released_yet=fifa_not_released_yet, export=False) 
         
         else:
             # Forma 2: desde int_missing 
@@ -1077,7 +1083,7 @@ def main(
             ### Selecciono los ultimos partidos de los ya jugados para rellenar
             logger.info(f"Seleccion de ultimos partidos (last {n_days_fill_data} dias) para rellenar formaciones...")
             df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated_clean, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
-            df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas.
+            # df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas. --> hace fallar el fill_data (de subs pues no estan) de equipos recien ascendidos en la primera fecha. Burnley y Sunderland.
             
             ### Relleno datos
             df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
@@ -1220,8 +1226,6 @@ if __name__ == "__main__":
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
     d_model = {'n_model': 24, 'model_name': "LogisticRegression"} # LogisticRegression
-    n_days_fill_data = 120 if datetime.datetime.now().month in [8] else 30 
-    print(f"n_days_fill_data: {n_days_fill_data}")
 
     if key == 'missing':
         d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
@@ -1233,7 +1237,7 @@ if __name__ == "__main__":
             
         if value == "next_matches":
             logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, n_days_fill_data=n_days_fill_data, export=True, country=country) 
+            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=True, country=country) 
 
         elif value == 'missing':
             df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False, country=country) 
