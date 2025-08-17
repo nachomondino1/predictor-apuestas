@@ -150,11 +150,15 @@ class Crawler:
     def extract_tag(self, xpath: str, xpath_alt: str = None, tag_inicial=None, attribute: str = None, text:bool = False, sec_wait: float = 10, print_fail: bool = True):
         """
         Extrae texto de un tag
-        :param xpath: XPATH del tag del cual extraer datos
-        :param tag_inicial: Selenium Web Element desde el cual se busca el xpath
-        :param attribute: String con el nombre del atributo a extraer del tag
-        :param text: True para extraer texto del tag
-        :return: String. En caso que falle la extraccion, None
+        
+        # Parameters
+            xpath: XPATH del tag del cual extraer datos
+            tag_inicial: Selenium Web Element desde el cual se busca el xpath
+            attribute: String con el nombre del atributo a extraer del tag (e.g. "href")
+            text: True para extraer texto del tag
+        
+        # Return
+            String. En caso que falle la extraccion, None
         """
         tag_inicial = self.driver if tag_inicial is None else tag_inicial  # Tag desde el que buscar el xpath
         xpaths = [xpath] if xpath_alt is None else [xpath, xpath_alt]
@@ -201,9 +205,10 @@ class Crawler:
     def click_boton(self, tag_boton, sec_wait: float = 10):
         """
         Click en boton
-        :param tag_boton: Selenium Web Element. Tag HTML (y no xpath) sobre el cual hacer click.
-        :param sec_wait: Integer. Espera maxima para encontrar el boton y hacer click.
-        :return:
+
+        # Parameters:
+            tag_boton: Selenium Web Element. Tag HTML (y no xpath) sobre el cual hacer click.
+            sec_wait: Integer. Espera maxima para encontrar el boton y hacer click.            
         """
         if tag_boton is not None:
             try:
@@ -248,7 +253,11 @@ class Crawler:
         tag_boton = self.extract_tag(xpath=xpath_boton)
         self.click_boton(tag_boton)
 
+    # Login website
     def fill_form(self, xpath_input, text, enter=True):
+        """
+        Carga de texto en input.
+        """
         # Busco tag input para el usuario y escribo el usuario
         input_tag = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_input)))
         input_tag.send_keys(text)
@@ -263,6 +272,13 @@ class Crawler:
     def login_website(self, user, password, xpath_user, xpath_pass, xpath_boton_login, xpath_boton_validate_user=None):
         """
         Login website
+
+        # Parameters:
+            user: Tu usuario (string).
+            password: Tu password (string).
+            xpath_user: Xpath del input donde cargar usuario (string)
+            xpath_pass: Xpath del input donde cargar password (string)
+            xpath_boton_login: Xpath del boton donde clickear para hacer login (string)
         """
         # Busco tag input para el usuario y escribo el usuario
         self.fill_form(xpath_user, user, enter=False)
@@ -280,3 +296,28 @@ class Crawler:
         # Localizo el boton "Iniciar sesion" y lo clickeo
         tag_boton = self.extract_tag(xpath=xpath_boton_login)
         self.click_boton(tag_boton)
+
+    # Select option in multiple choice input
+    def select_option(self, option, xpath_flechita, xpath_input):
+        """
+        Seleccionar una opcion de un input multiple choice
+
+        # Parameters
+            option: Opcion a seleccionar (string)
+            xpath_input: Xpath del input multiple choice (string)
+            xpath_options: Xpath del listado de opciones (string)
+        """
+        # Click en flechita para desplegar opciones
+        tag_flechita = self.extract_tag(xpath=xpath_flechita)
+        self.click_boton(tag_boton=tag_flechita)
+        sleep(1) # Tiempo para que despliegue las opciones y cargen
+
+        # Ubicar tag input donde escribir
+        tag_input = self.extract_tag(xpath=xpath_input)
+
+        # Cargo opcion
+        tag_input.send_keys(option)
+
+        # Click en primera opcion
+        tag_input.send_keys(Keys.RETURN)
+        sleep(1) # Tiempo para que carue la pagina luego del enter
