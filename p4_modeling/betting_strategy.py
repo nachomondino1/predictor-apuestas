@@ -312,6 +312,30 @@ class BettingStrategy:
 
         return df
 
+    
+    def calculate_roi_in_combination(self, df, param_dict):
+        """
+        Para calcular ROI de las prediciones de un modelo
+
+        ### Parameters:
+            df: Predicciones de un modelo (DataFrame)
+            param_dict: Estrategia de apuesta (dict)
+        """
+        if 'expected_result' not in df.columns:
+            df = determine_expected_result(df, verbose=0)
+
+        # Aplicar estrategia a df_pred
+        df_aux = self.apply_strategy(df, param_dict, prod=False)
+
+        # Calculo de metricas (ROI y roi_pp)
+        df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
+        df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
+        
+        # # Concateno datos de ROI y Expected ROI
+        missing_columns = [col for col in df_pred_with_metrics_2.columns if col not in df_pred_with_metrics.columns]
+        df_pred_with_metrics = pd.concat([df_pred_with_metrics, df_pred_with_metrics_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
+        d_metrics.update(d_metrics_2)
+        return df_pred_with_metrics, d_metrics
     # Prod
     def apply_strategy(self, df, param_dict, prod: bool = True):
         
