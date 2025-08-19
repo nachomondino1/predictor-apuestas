@@ -568,7 +568,28 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
                         print(f"Valor a rellenar: {val_to_copy} en {variable}")
 
     return df_to_fill, df_copiado_form
-    
+
+def corregir_goals(df):
+    """
+    Corrijo goals cuando hubo penales o fueron a alargue
+    """
+    # Identifica los índices de los partidos con penales
+    idxs = df[df['penalties'] > 0].index.tolist()
+
+    # Usar .isin() para crear una máscara booleana que identifique las filas en `df` con un 'id_match' que esté en la lista de partidos neutrales
+    mask = df.index.isin(idxs)
+
+    # Reemplazo valor 
+    df.loc[mask, 'penalties'] = "AFTER PENALTIES"
+
+    # For matches that went to penalties, make goals_home and goals_away equal to the minimum.
+    # First, calculate the minimum goals for the relevant rows.
+    min_goals = df.loc[mask, ['goals_home', 'goals_away']].min(axis=1)
+
+    # Now, assign this `min_goals` series to both columns in a single line.
+    df.loc[mask, ['goals_home', 'goals_away']] = min_goals
+    return df
+   
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
     import os
