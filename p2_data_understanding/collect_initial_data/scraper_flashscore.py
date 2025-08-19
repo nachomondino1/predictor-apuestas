@@ -19,8 +19,8 @@ class FlashscoreCrawler(Crawler):
     def __init__(self, headless: bool = True, browser: str = "Chrome", verbose: int = 0):
         super().__init__(headless, browser)
         self.child_driver = self.driver
-        self.SEC_WAIT_MIN = 0.8 * 5 # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
-        self.SEC_WAIT_MED = 1.5 * 5 # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MIN = 0.8  # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
+        self.SEC_WAIT_MED = 1.5  # Espera para elementos que casi siempre estan
         self.SEC_WAIT_MAX = 5 # Espera para elementos que casi siempre estan
         self.verbose =  verbose # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
 
@@ -125,6 +125,7 @@ class FlashscoreCrawler(Crawler):
             d_row_match.update(self.extract_result())
         ### Teams
         d_row_match.update(self.extract_teams())
+        d_row_match.update(self.extract_disclaimer_data())
 
         # Si es un prox partido, determino cuanto falta para el partido
         if next_matches:
@@ -138,7 +139,7 @@ class FlashscoreCrawler(Crawler):
         # STATS
         ## Si tiene hoja "stats", extraigo campos
         if not next_matches:
-            boton_stats = super().extract_tag(xpath='//a[@data-analytics-alias="match-statistics"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=True) # './/div[@class="filterOver filterOver--indent"]//button[text()="Stats"]'
+            boton_stats = super().extract_tag(xpath='//a[@data-analytics-alias="match-statistics"]/button', sec_wait=self.SEC_WAIT_MED, print_fail=True)
             if super().click_boton(boton_stats) is not False:
                 d_row_match.update(self.extract_stats())
 
@@ -250,8 +251,8 @@ class FlashscoreCrawler(Crawler):
     def extract_result(self):
         d_row = {}
         d_field_xpath = {
-            'goals_home': './/div[@class="detailScore__wrapper"]/span[1]', # './/div[@class="detailScore__wrapper"]/div[@class="detailScore__divider"]/preceding-sibling::span',
-            'goals_away': './/div[@class="detailScore__wrapper"]/span[3]' #  './/div[@class="detailScore__wrapper"]/div[@class="detailScore__wrapper"]/following-sibling::span'
+            'goals_home': './/div[@class="detailScore__wrapper"]/span[1]',
+            'goals_away': './/div[@class="detailScore__wrapper"]/span[3]'
         }
 
         # Por campo a extraer
@@ -361,7 +362,27 @@ class FlashscoreCrawler(Crawler):
         if self.verbose >= 1:
             print(f"Extracting lineups: {d_row}")
         return d_row
+    
+    def extract_disclaimer_data(self):
+        d_row = {}
+
+        # Penalties
+        d_row['penalties'] = super().extract_tag(xpath='.//div[@class="detailScore__status"]', text=True, sec_wait=0.4, print_fail=False)  # After Penalties o FINISHED  
+
+        # Neutralidad
+        tag_neutral = super().extract_tag(xpath='.//div[contains(@class, "infoBoxModule")]//div[contains(text(), "Neutral") or contains(text(), "Playing at")]', sec_wait=0.4, print_fail=False) # 
+
+        if tag_neutral is not None:
+            neutralidad = 1
+        else:
+            neutralidad = 0
         
+        d_row.update({"neutral": neutralidad}) #  "url_team": url_team_away
+
+        if self.verbose >= 1:
+            print(f"Extracting goals: {d_row}")
+        return d_row                
+
     def extract_coaches(self):
         """
         Extrae entrenadores tanto del equipo local como del equipo visitante.
@@ -412,7 +433,7 @@ class FlashscoreCrawler(Crawler):
         for tag in l_tags_stats:
 
             # Extraigo el name de la stat
-            name_stat = super().extract_tag(tag_inicial=tag, xpath='.//div[@data-testid="wcl-statistics-category"]', text=True, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
+            name_stat = super().extract_tag(tag_inicial=tag, xpath='.//div[@data-testid="wcl-statistics-category"]', text=True, sec_wait=self.SEC_WAIT_MED, print_fail=False)
             name_stat_form = name_stat.lower().replace(" ", "_").replace('á', 'a').replace('é', 'e').replace('í', 'i').replace("ó", "o").replace('ú', 'u')
             if self.verbose >= 1:
                 print(f"Stat a recolectar: {name_stat} --> Name formateado: {name_stat_form}")
@@ -758,7 +779,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     """
     # Definicion de variables
     df_match, df_match_player, df_match_odds = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    crawler = FlashscoreCrawler(headless=True)
+    crawler = FlashscoreCrawler(headless=False)
 
     # Formateo variables para construir url
     country_form = country.lower().replace(' ', "-")
@@ -807,7 +828,7 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
 def extract_matches_result(country: str, competition: str, l_ids:list):
 
     # DEFINCION DE PARAMETROS & VARIABLES
-    crawler = FlashscoreCrawler(headless=True)
+    crawler = FlashscoreCrawler(headless=False)
     df = pd.DataFrame()
 
     # Formateo variables para construir url
@@ -845,53 +866,3 @@ def extract_matches_result(country: str, competition: str, l_ids:list):
     progress_bar.close()
     crawler.driver.close()
     return df
-
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv
-    load_dotenv() # Cargar las variables de entorno desde el archivo .env
-    BASE_DIR_LOCAL = os.getenv('BASE_DIR_LOCAL')
-
-    # Parametros de corrida
-    id_country = 77
-
-    # Levanto dataframes
-    df_countries = pd.read_excel('./data/df_countries.xlsx')
-    df_comp = pd.read_excel('./data/df_competencies.xlsx')
-
-    # Defino variables
-    df_match_concat, df_match_player_concat,df_match_odds_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Flashscore
-    country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
-    df_comp_country = df_comp[(df_comp['id_country'] == id_country)]
-    print(f' COUNTRY: {country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
-
-    # POR COMPETITION
-    for i, row in df_comp_country.iterrows():
-        print(f' Competition: {row["competition_flashscore"]} '.center(120, '+'))
-
-        # if row['id_competition'] == 774:
-
-        # Extraigo partidos de Flashscore (df_match y df_match_player)
-        df_match, df_match_player, df_match_odds = extract_data(id_country, country, row['id_competition'], row['competition_flashscore'], row['is_cup'], export=True)
-        
-        # Guardo datos
-        df_match_concat = pd.concat([df_match_concat, df_match], axis=0)
-        df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
-        df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
-        
-        # Exporto datos
-        # df_match_concat.to_excel(f'./data/{country}/p2_data_understanding/data_seg/df_match.xlsx', index=True)
-        # df_match_player_concat.to_excel(f'./data/{country}/p2_data_understanding/data_seg/df_match_player.xlsx', index=True)
-        # df_match_odds_concat.to_excel(f'./data/{country}/p2_data_understanding/data_seg/df_match_odds.xlsx', index=True)       
-        df_match_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match.xlsx', index=True)
-        df_match_player_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match_player.xlsx', index=True)
-        df_match_odds_concat.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds.xlsx', index=True)
-
-    # Extraer partidos missing
-    # df_match = pd.read_excel(f"data/{country}/p2_data_understanding/data_seg/per_season/df_match/premier-league_2023_2024.xlsx", index_col=0)
-    # df_match_miss, df_match_player_miss, df_match_odds_miss = extract_data(id_country, country, id_competicion, competition, is_cup, n_seasons_max=1, l_ids_already_collected=list(df_match.index), export=False)
-    # df_match_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_miss.xlsx', index=True)
-    # df_match_player_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_player_miss.xlsx', index=True)
-    # df_match_odds_miss.to_excel(f'{BASE_DIR_LOCAL}/df_match_odds_miss.xlsx', index=True)
