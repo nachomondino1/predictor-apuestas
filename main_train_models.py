@@ -28,6 +28,7 @@ def comprehensive_search(
     d_params, 
     l_modelos, 
     data_unders: bool = True,
+    update_missing = False,
     data_prep_int: bool = True,
     data_prep_int_miss: bool = True,
     update_sofifa: bool = True,
@@ -101,13 +102,43 @@ def comprehensive_search(
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
     
+    # Determino si el nuevo fifa ya salio o nó
+    if datetime.datetime.now().month in [8, 9]: 
+        fifa_not_released_yet = True
+        logger.warning("FIFA NOT RELEASED YET = TRUE")
+    else:
+        fifa_not_released_yet = False
+    
     ####################################################################### DATA UNDERSTANDING ####################################################################### --> Si hubo missing, esta bueno correrlo...
     if data_unders:
         directories.make_directories(l_directorios=[BASE_DIR_du, BASE_DIR_sofifa])
 
-        # Defino paths de donde levantar los datos
-        df_match, df_match_player, df_match_odds = get_flashscore_data(BASE_DIR_flashscore, update_missing=False)
-        df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa, n_seasons_update=1)
+        # Podria recolectar missing para tener lo ultimos partidos actualzados
+        if update_missing:
+            d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
+            main_next_matches.main(d_run, id_country, iteration_date=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
+
+        # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
+        df_match = pd.read_excel(f'{BASE_DIR_flashscore}/df_match.xlsx', index_col=0)
+        df_match_player = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_player.xlsx', index_col=0)
+        df_match_odds = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_odds.xlsx', index_col=0)
+        if verbose > 1:
+            describe_fs_data(df_match, df_match_player, df_match_odds)
+
+        if fifa_not_released_yet:
+
+            logger.warning("Mapeo con todos los paises pues aun no salio el nuevo fifa. Te recomiendo haber ejecutado concat_mapeos.py antes para tener datos lo mas recientes posibles. ")
+            directories.duplicate_archivo(
+                source_path='./data/data_preparation/integrate_data/df_map_players_fs_so.xlsx',
+                destination_path=f'./data/{country}/p3_data_preparation/{date}/integrate_data/df_map_players_fs_so.xlsx'
+            )
+        
+            # Acordate de ejecutar concat_mapeos.py recientemente para tener datos relativamente nuevos.
+            df_player_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
+            df_player_fifa_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+        
+        else:
+            df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa, n_seasons_update=1)
 
         # Exporto los datos para saber que datos use en el entrenamiento actual (no copio directorios porque me borra lo que ya hay en el directorio.)
         df_match.to_excel(f'{BASE_DIR_du}/df_match.xlsx', index=True)
@@ -137,8 +168,7 @@ def comprehensive_search(
         df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=True)
 
         # Integrate data (tengo que volver a integrar... para generar df_player de fs bien y tener los nuevos jugadores que surgen en missing y mapearlos..)
-        prod = True if id_country == -1 else False # No vuelvo a mapear si es para all_countries
-        df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, prod=prod, export=True) 
+        df_integrated = dp.integrate_data(df_match, df_match_player, df_player_sofifa=df_player_sofifa, df_player_fifa_sofifa=df_player_fifa_sofifa, fifa_not_released_yet=fifa_not_released_yet, export=True) 
         df_integrated.to_excel(f'{BASE_DIR_flashscore}/df_integrated.xlsx', index=True) # Exporto como df_int_old_updated
 
     else:
@@ -146,6 +176,7 @@ def comprehensive_search(
         print(df_integrated)
 
      ####################################################################### DATA PREPARATION (MISSING) #######################################################################
+    
     # ACTUALIZAR PREPARACION DE MISSING (con el ultimo mapeo y los ultimos datos de sofifa, es clave)
     if data_prep_int_miss:
 
@@ -318,20 +349,10 @@ def define_n_iterations(d_params):
             n_iter *= len(d_params_task[key])
     return n_iter
 
-def get_flashscore_data(BASE_DIR_flashscore, update_missing: bool = False, verbose: int = 0):
+def describe_fs_data(df_match, df_match_player, df_match_odds, verbose: int = 0):
     """
     Obtengo datos de Flashscore a usar en el nuevo entrenamiento.
     """    
-    # Podria recolectar missing para tener lo ultimos partidos actualzados
-    if update_missing:
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}
-        main_next_matches.main(d_run, id_country, iteration_date=date, extract_missing=True, prepare_missing=False, export=d_run['export'])
-
-    # Levanto datos --> Correr missing con Extract_missing=True pero Prepare_missing=False ?--> Deberia usarlos en modeling cuando hago retrain...
-    df_match = pd.read_excel(f'{BASE_DIR_flashscore}/df_match.xlsx', index_col=0)
-    df_match_player = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_player.xlsx', index_col=0)
-    df_match_odds = pd.read_excel(f'{BASE_DIR_flashscore}/df_match_odds.xlsx', index_col=0)
-    
     # Verificacion 
     df_match_sin_dup = df_match[~df_match.index.duplicated()]
     if len(df_match) != len(df_match_sin_dup):
@@ -448,25 +469,25 @@ def define_params_space(id_country):
     d_comps = determine_country_competitions(id_country)
     l_modelos = [LogisticRegression(), SVC()] #  XGBClassifier()
 
-    l_comp = [d_comps['all_comp']] #  d_comps['comp_sin_cups'] 
-    l_comp_sin_duplicados = list(map(list, set(map(tuple, l_comp)))) # l_comp = [[1671], [1671]]
+    l_comp = [d_comps['all_comp']]
+    l_comp_sin_duplicados = list(map(list, set(map(tuple, l_comp))))
     print(l_comp_sin_duplicados)
 
     d_params = {  
         'clean_post_integrate': {
             'competencies_to_select': l_comp_sin_duplicados, 
-            'n_years_to_select': [5, 10], #3 
+            'n_years_to_select': [5, 10],
         },
         'construct': {
             'n_last_matches': [[120]], # [60, 180] # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
             'segun_localia': [True, False], 
             'calculate_dif': [True], # False
-            'decay_rate': [0.1], # 0.3
+            'decay_rate': [0.1, 0.5],
         },
         'select': {
             'thr_corr': [0.7, None], #  0.85
-            'thr_fs': [None, 0.1, 0.25], # 0.9 para ver metricas con la variable mas importante. Si no le gano a eso, es porque las otras variables son una verga.
+            'thr_fs': [0.05, 0.15], # 0.9 para ver metricas con la variable mas importante. Si no le gano a eso, es porque las otras variables son una verga.
             'fill_na': [None, "0"] # en realidad es clean_post_select
         },
         'modeling': {
@@ -486,11 +507,11 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
+    l_countries = [55, 59, 77, 148]
 
-    data_unders = True  # si es True es asincronico con el cambio de dia y no falla? No. Tmb df_integrated..
+    data_unders = True 
     update_sofifa = False if data_unders else False
-    data_prep_int = True # si queres entrenar ≠ con mismos datos, copiar df_int e integrate_data/ en nuevo p3_data_prep.
+    data_prep_int = True
     data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
