@@ -32,6 +32,17 @@ def mover_archivo(origen, destino):
     except Exception as e:
         logger.error(f"Ocurrió un error al intentar mover el archivo: {e}")
 
+def duplicate_archivo(source_path, destination_path):
+
+    # Copy the file directly
+    try:
+        shutil.copy(source_path, destination_path)
+        print(f"File copied successfully from {source_path} to {destination_path}")
+    except FileNotFoundError:
+        print(f"Error: The source file {source_path} was not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 def remove_directories(directories):
     """
     Elimina directorios o archivos especificados en la lista.
