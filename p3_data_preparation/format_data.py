@@ -6,22 +6,38 @@ from utils.set_up_logging import logger
 # main.py
 def convert_ball_possession_to_int(df):
     """
-    Transformo posesion de string a float
+    Transforma la posesión de balón a un entero de 0 a 100.
     
-    :param df: Dataframe. Con columnas 'posesion_loc' y 'posesion_vis' donde la posesion se interpreta como string. Por
-    ejemplo '65%'.
-    :return: Dataframe. Con columna 'fecha' interpretada como float. Por ejemplo, '0.65'
+    :param df: DataFrame con columnas 'ball_possession_home' y 'ball_possession_away'.
+    :return: DataFrame con las columnas de posesión convertidas a entero.
     """
-    func = lambda x: float(x.replace('%', '')) if isinstance(x, str) and x.replace('%', '').isnumeric() else np.nan
+    
+    def convert_value(x):
+        try:
+            # Si es un string, elimina el '%' y convierte a entero
+            if isinstance(x, str):
+                # Verifica si el string sin '%' es un número
+                clean_x = x.replace('%', '')
+                if clean_x.isnumeric():
+                    return int(clean_x)
+                else:
+                    return np.nan
+            # Si ya es un número (int o float), conviértelo a entero directamente
+            elif isinstance(x, (int, float)):
+                return int(x)
+            else:
+                return np.nan
+        except (ValueError, AttributeError):
+            return np.nan
 
     if ("ball_possession_home" in df.columns) and ('ball_possession_away' in df.columns):
-        df["ball_possession_home"] = df["ball_possession_home"].apply(func)
-        df["ball_possession_away"] = df["ball_possession_away"].apply(func)
+        df["ball_possession_home"] = df["ball_possession_home"].apply(convert_value)
+        df["ball_possession_away"] = df["ball_possession_away"].apply(convert_value)
     
-        # Verifica si todos los elementos de la columna son de tipo float
-        if not all(isinstance(value, float) for value in df["ball_possession_home"]):
-            logger.error(f"Not all elements in the column '' are float.")  # Si no todos los elementos son de tipo float, raise una advertencia
-            
+    # Verifica si la conversión fue exitosa
+    if not all(pd.api.types.is_integer_dtype(df[col]) for col in ["ball_possession_home", "ball_possession_away"]):
+        logger.warning("Not all elements in the ball possession columns are integers after conversion.")
+        
     return df
 
 def convert_value_to_int(df):
@@ -192,6 +208,12 @@ def format_percentage_columns(df, base_columns, verbose: int = 0):
                 print(df[col_name].head())
     return df
 
+def format_penalties(df):
+
+    df.loc[df['penalties'] == 'FINISHED', 'penalties'] = 0
+    df.loc[df['penalties'] == 'AFTER EXTRA TIME', 'penalties'] = 0.5
+    df.loc[df['penalties'] == 'AFTER PENALTIES', 'penalties'] = 1
+    return df
 
 def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
     """

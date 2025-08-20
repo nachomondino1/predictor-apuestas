@@ -192,11 +192,15 @@ class DataPreparation:
         df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         ## Capacity & Attendance
         df_match = format_data.convert_capacity_to_int(df_match)
-        ## Ball posession
-        df_match = format_data.convert_ball_possession_to_int(df_match)
-        ## Goals
         if not prod:
+            ## Ball posession
+            df_match = format_data.convert_ball_possession_to_int(df_match)
+            
+            ## Goals
             df_match = format_data.convert_goals_to_int(df_match)
+            df_match = format_data.format_penalties(df_match)
+            df_match = clean_data.corregir_goals(df_match)
+
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
         ## Todas las columnas
         df_match = format_data.convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
@@ -363,19 +367,9 @@ class DataPreparation:
         print("\nIntegrating player's data to df_match...")
 
         # Segun si es train o produccion (en el 1ero hago el mapeo, en el 2do uso el mapeo ya hecho)
-        if prod:
-            logger.critical("Integración para produccion. No vuelvo a mapear sino que levanto df_map del pais ")
-
-            if fifa_not_released_yet:
-                logger.warning("Mapeo con todos los paises pues aun no salio el nuevo fifa")
-                path_map = './data/data_preparation/integrate_data/df_map_players_fs_so.xlsx'
-
-                df_player_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
-                df_player_fifa_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
-            else:
-                path_map = f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx'
-            
-            df_map_players_fs_so = pd.read_excel(path_map, index_col=0)
+        if prod or fifa_not_released_yet:
+            logger.critical("Integración para produccion. No vuelvo a mapear sino que levanto df_map del pais ")            
+            df_map_players_fs_so = pd.read_excel(f'{self.base_path}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
             print(df_map_players_fs_so.head(3))
 
         else: 
@@ -729,7 +723,7 @@ class DataPreparation:
         
         # Eliminacion de columnas usadas para construir
         cols_not_constructed = df.filter(regex='(_home|_away)$').columns.tolist()  # Eliminar toda stat "..._home" y "..._away" --> para eliminar stats no construidas como "attacks_home", "dang_attacks_home", 'goalkeeper_saves', etc.
-        cols_data_leakage = ['season', 'date', 'expected_result']
+        cols_data_leakage = ['season', 'date', 'expected_result', 'penalties']
         cols_noise = ['id_team_home', 'id_team_away']  # Elimino variables que no usare en el modelo fecha (la idea es usar todas las posibles)
         
         cols_set = set(cols_data_leakage + self.stats_to_derive + cols_not_constructed + cols_noise)
@@ -1130,8 +1124,7 @@ class Modeling:
 
         # Aplico estrategia "sin ea" para tener bank, stakes y rois 
         bs = betting_strategy.BettingStrategy()
-        param_dict = bs.define_hiperparameters(strategy='train')
-        df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, param_dict)
+        df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, bs.define_hiperparameters(strategy='train'))
 
         # G/P x rdo
         d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones))

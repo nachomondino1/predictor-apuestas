@@ -146,9 +146,31 @@ class DataUnderstandingNew():
         if len(df_match_concat) > 0:
 
             ## Df_match_player
+            missing_start_cols = not any("_start_" in col for col in df_match_player_concat.columns)
+            missing_sub_cols = not any("_sub_" in col for col in df_match_player_concat.columns)
+
             if len(df_match_player_concat.columns) == 0:
-                logger.error(f"No se tiene las formaciones de ninguno de los {len(df_match_player_concat.columns)} partido ya jugado. Esto es correcto solo si realmente no existe el dato de las formaciones para estos partidos.")
+                logger.error(f"No se tiene las formaciones de ninguno de los {len(df_match_player_concat.columns)} partidos ya jugados. Esto no es comun. Solo es correcto si realmente no existe ningun dato de las formaciones para estos partidos (ni missing players).")
                 raise ValueError
+            
+            elif missing_start_cols or missing_sub_cols:
+                
+                warning_message = "No se encontraron datos de jugadores en las columnas.\n"
+                if missing_start_cols:
+                    warning_message += "  - Faltan columnas que contengan '_start_'.\n"
+                if missing_sub_cols:
+                    warning_message += "  - Faltan columnas que contengan '_sub_'.\n"
+                
+                warning_message += "El unico caso en que esto no es un problema es si los partidos missing recien recolectados son poco importantes o de competencias no tan seguidas. Pero sino, posiblemente se deba a un cambio en el XPATH de los datos de las formaciones.\n"
+
+                logger.warning(warning_message)
+                
+                # Pausa el script y espera la entrada del usuario
+                user_input = input("Queres continuar igual? (y/n)")
+                
+                # Opcional: Podrías salir del script si el usuario ingresa un valor específico
+                if user_input.lower() != 'y':
+                    sys.exit("Script detenido por el usuario.")
 
             ## Df_match_odds
             porcentaje_nan = df_match_odds_concat.isna().mean().mean()
@@ -915,7 +937,7 @@ def main(
             df_match_miss_new_f, df_match_player_miss_new_f, df_match_odds_miss_new_f, df_player_fifa_sofifa = dp.format_data(df_match_miss_new, df_match_player_miss_new, df_match_odds_miss_new, df_player_fifa_sofifa, reformat=True, export=False)            
             df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match_miss_new_f, df_match_player_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, export=False)
             # df_match_miss_new_vf, df_match_player_miss_new_vf, df_match_odds_miss_new_vf, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match_miss_new_c, df_match_player_miss_new_c, df_match_odds_miss_new_f, df_player_sofifa, df_player_fifa_sofifa, prod=False) # prod=False pues los partidos ya se jugaron..
-            df_integrated_missing_new = dp.integrate_data(df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
+            df_integrated_missing_new = dp.integrate_data(df_match_miss_new_c, df_match_player_miss_new_c, df_player_sofifa, df_player_fifa_sofifa, prod=True, fifa_not_released_yet=fifa_not_released_yet, export=False) 
 
             # Concateno missing y old (que puede tener algunos missing ya)
             df_integrated_updated = pd.concat([df_integrated_upd, df_integrated_missing_new], axis=0)
@@ -1057,7 +1079,7 @@ def main(
             df_match, df_match_player, df_match_odds, df_player_fifa_sofifa = dp.format_data(df_match, df_match_player, df_match_odds, df_player_fifa_sofifa, reformat=False, prod=True, export=False)            
             df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa = dp.clean_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, export=False)
             df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa = dp.verify_format(df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, prod=True)
-            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, fifa_not_released_yet=fifa_not_released_yet, export=False) 
+            df = dp.integrate_data(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, prod=True, export=False) 
         
         else:
             # Forma 2: desde int_missing 
@@ -1083,7 +1105,6 @@ def main(
             ### Selecciono los ultimos partidos de los ya jugados para rellenar
             logger.info(f"Seleccion de ultimos partidos (last {n_days_fill_data} dias) para rellenar formaciones...")
             df_last_old_matches_fill = filter_dataframe_by_date(df=df_integrated_updated_clean, initial_date=initial_date, n_days=n_days_fill_data) # Los parates pueden ser de 3 meses o mas. Por eso tomo 5 meses para tener un poco de margen de seguridad.
-            # df_last_old_matches_fill = df_last_old_matches_fill[df_last_old_matches_fill['id_competition'].isin(comp_public)] # Quiero rellenar solo con las competencias publicas. --> hace fallar el fill_data (de subs pues no estan) de equipos recien ascendidos en la primera fecha. Burnley y Sunderland.
             
             ### Relleno datos
             df, df_c1, df_c2 = dp.fill_data_not_available_yet(df, df_last_old_matches_fill)
@@ -1166,7 +1187,7 @@ def main(
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
-        d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}
+        d_strategy = {'prob_dp': None, 'curva': 'kelly_linear', 'm': 10, 'b': 0, 'k': 1}
         if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
             df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
@@ -1174,19 +1195,7 @@ def main(
         else:
             logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
-
-        # Aplico reducciones a stake
-        if not predict_missing:
-
-            # No apostamos en local
-            df.loc[df['result_to_bet'] == 1, 'stake_to_bet'] *= 0
-
-            # Confidence margin
-            df.loc[(df['confidence_margin'] < 0.025) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.3 # Reducir stake si confidence_margin < threshold
-
-            # Disminuyo stake por rellenado de emergencia
-            df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= 0
-
+            
         if export:
             df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
 
@@ -1203,44 +1212,30 @@ def main(
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":    
     directorio = os.getenv('BASE_DIR_LOCAL')
-    d_run_type = {
-        'missing': [0],
-        'predict': ['next_matches', 'missing'],
-    }
-    
+
     # Defino country
     d_countries = {
-        48: ["england", '2025-08-14'], 
-        55: ["france", '2025-08-14'], 
-        59: ["germany", '2025-08-14'], 
-        77: ["italy", '2025-08-14'],
-        148: ["spain", '2025-08-14'], 
+        48: ["england", '2025-08-18'], 
+        55: ["france", '2025-08-18'], 
+        59: ["germany", '2025-08-18'], 
+        77: ["italy", '2025-08-19'],
+        148: ["spain", '2025-08-19'], 
         167: ["usa", '2025-08-14'], 
         }
 
-    id_country = 148
+    id_country = 48
     key, value = 'predict', 'next_matches'
     n_days = 7
 
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 24, 'model_name': "LogisticRegression"} # LogisticRegression
+    # d_model = {'n_model': 24, 'model_name': "LogisticRegression"} # LogisticRegression
 
-    if key == 'missing':
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-        logger.warning("Extract and prepare missing matches")
-        df = main(d_run, id_country, iteration_date=iteration_date, export=d_run['export'], country=country) 
 
-    elif key == 'predict':
-        d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False} 
-            
-        if value == "next_matches":
-            logger.warning("Get predictions of specific model")
-            df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, d_model=d_model, export=True, country=country) 
+    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
+    df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, export=True, country=country)  #d_model=d_model
 
-        elif value == 'missing':
-            df = main(d_run, id_country, iteration_date=iteration_date, predict_missing=True, d_model=d_model, export=False, country=country) 
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")
