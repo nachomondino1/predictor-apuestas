@@ -201,16 +201,15 @@ def main(
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [148]
     assess = False # Para usar True, cv y esas metricas de test deberia agregarlas al assess...
 
     d_countries = {
-        48: ["england", '2025-08-14'],
-        55: ["france", '2025-08-14'], 
-        59: ["germany", '2025-08-14'],
-        77: ["italy", '2025-08-14'],
-        148: ["spain", '2025-08-14'],
-        167: ["usa", '2025-08-14'],
+        48: ["england", '2025-08-18'],
+        55: ["france", '2025-08-18'], 
+        59: ["germany", '2025-08-18'],
+        77: ["italy", '2025-08-19'],
+        148: ["spain", '2025-08-19'],
+        167: ["usa", '2025-08-18'],
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
@@ -224,6 +223,8 @@ if __name__ == "__main__":
 
         # Levanto df_iteration con datos de train y test
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/bs/stake_kelly_linear_no_home/df_iteration.xlsx")
+
         print(df_ite.head(5))
         print(df_ite.shape)
 

@@ -5,11 +5,8 @@ import numpy as np
 from utils.set_up_logging import logger
 from p3_data_preparation.format_data import value_nan_to_none
 from p3_data_preparation.construct_data import determine_expected_result
-from p4_modeling.asses_model import calculate_roi, determine_roi, drop_old_metrics, normalize_column
+from p4_modeling.asses_model import calculate_roi
 from utils import directories
-import datetime
-from itertools import product
-from tqdm import tqdm
 
 
 class BettingStrategy:
@@ -98,7 +95,7 @@ class BettingStrategy:
             probs_sorted = np.sort([row['prob_class_1'], row['prob_class_0'], row['prob_class_2']], axis=0)  # axis=0 para vertical sorting si trabajas filas como columnas
             confidence_margin = probs_sorted[2] - probs_sorted[1]  # La diferencia entre la probabilidad más alta y la segunda más alta
 
-            # Si el riesgo-beneficio es malo
+            # Si el riesgo-beneficio es malo, doble oportunidad
             if thr_prob_min is not None and row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
                 if self.verbose >= 1:
                     logger.warning(f"Aplicamos doble oportunidad por kelly_crit = {kelly_crit} < {thr_prob_min}. ")
@@ -156,61 +153,8 @@ class BettingStrategy:
 
         return odd_to_bet
 
-    def determine_winning_bets(self, df: pd.DataFrame, name_extension=''):
-        """
-        Determina si el resultado apostado fue el resultado real del partido o no.
-        
-        # Parameters
-            df: Dataframe con partidos en los que se indica tanto el resultado a apostar como el resultado real del partido.
-
-        # Returns
-            Dataframe pasado como parametro con una nueva columna, 'acerte' indicando si se acertó el resultado apostado o no.
-        """
-        # inicializo columna "acerte"
-        var_result=f'{name_extension}result'
-        var_acerte=f'{name_extension}acerte'
-
-        df[var_acerte] = 0
-
-        # Por partido
-        for id_match, row in df.iterrows():
-
-            # Si el resultado a apostar es Home, Draw o Away
-            if row['result_to_bet'] >= 0:
-                if row[var_result] == row['result_to_bet']:
-                    df.loc[id_match, var_acerte] = 1
-
-            # Si el resultado a apostar es doble oportunidad sin Home
-            elif row['result_to_bet'] == -1:
-                if (row[var_result] == 0) or (row[var_result] == 2):
-                    df.loc[id_match, var_acerte] = 1
-
-            # Si el resultado a apostar es doble oportunidad sin Away
-            elif row['result_to_bet'] == -2:
-                if (row[var_result] == 0) or (row[var_result] == 1):
-                    df.loc[id_match, var_acerte] = 1
-
-            # Si el resultado a apostar es doble oportunidad sin Draw
-            elif row['result_to_bet'] == -0:
-                if (row[var_result] == 2) or (row[var_result] == 1):
-                    df.loc[id_match, var_acerte] = 1
-
-            # Si fallo la prediccion
-            else:
-                df.loc[id_match, var_acerte] = np.nan
-
-        # Imprimo warning si supuestamente acerté el 100% de partidos
-        if len(df[df[var_acerte]==1]) == len(df):
-            logger.warning(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
-
-        return df
-
     # STAKE TO BET
-    def determine_stake_to_bet(self, 
-                               df, type_relation: str = 'equal',                                                                            # Estrategia
-                               p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, k: float = 1,                                  # Puntos de rectas
-                               porc_emergency: float = 0.5                                                                                  # Disminucion por relleno de emergencia
-                               ):
+    def determine_stake_to_bet(self, df, type_relation: str = 'equal', p1: tuple = (0, 0), p2: tuple = (1, 1),  m: float = None, b: float = None, k: float = 1):
         """
         Construye multiplicador para variar el stake y poder apostar difentes cantidades en diferentes partidos. 
         Cuanto mayor es la probabilidad del modelo para el resultado a apostar, mas dinero apuesto.
@@ -292,6 +236,25 @@ class BettingStrategy:
         df = self.cap_stake(df)
         return df
     
+    def stake_reduction(self, df):
+        """
+        Aplico reducciones a stake en PROD.
+        """
+        logger.warning("Aplicando modificadores de stake para PROD...")
+
+        # No apostamos en local
+        df.loc[df['result_to_bet'] == 1, 'stake_to_bet'] *= 0
+
+        # Apostamos el doble en empate
+        # df.loc[df['result_to_bet'] == 2, 'stake_to_bet'] *= 2
+
+        # Confidence margin
+        # df.loc[(df['confidence_margin'] < 0.025) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.3 # Reducir stake si confidence_margin < threshold
+
+        # Disminuyo stake por rellenado de emergencia
+        df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= 0
+        return df
+
     def cap_stake(self, df):
         # Restringo stake de 0 a 99 (e.g. evito que el stake a apostar sea mayor al 100% del bank)
         val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
@@ -311,8 +274,57 @@ class BettingStrategy:
         df['stake_to_bet_norm'] = (df['kelly_criterion'] - p_min) / (p_max - p_min)
 
         return df
-
     
+    # Calculo de ROI en predicciones
+    def determine_winning_bets(self, df: pd.DataFrame, name_extension=''):
+        """
+        Determina si el resultado apostado fue el resultado real del partido o no.
+        
+        # Parameters
+            df: Dataframe con partidos en los que se indica tanto el resultado a apostar como el resultado real del partido.
+
+        # Returns
+            Dataframe pasado como parametro con una nueva columna, 'acerte' indicando si se acertó el resultado apostado o no.
+        """
+        # inicializo columna "acerte"
+        var_result=f'{name_extension}result'
+        var_acerte=f'{name_extension}acerte'
+
+        df[var_acerte] = 0
+
+        # Por partido
+        for id_match, row in df.iterrows():
+
+            # Si el resultado a apostar es Home, Draw o Away
+            if row['result_to_bet'] >= 0:
+                if row[var_result] == row['result_to_bet']:
+                    df.loc[id_match, var_acerte] = 1
+
+            # Si el resultado a apostar es doble oportunidad sin Home
+            elif row['result_to_bet'] == -1:
+                if (row[var_result] == 0) or (row[var_result] == 2):
+                    df.loc[id_match, var_acerte] = 1
+
+            # Si el resultado a apostar es doble oportunidad sin Away
+            elif row['result_to_bet'] == -2:
+                if (row[var_result] == 0) or (row[var_result] == 1):
+                    df.loc[id_match, var_acerte] = 1
+
+            # Si el resultado a apostar es doble oportunidad sin Draw
+            elif row['result_to_bet'] == -0:
+                if (row[var_result] == 2) or (row[var_result] == 1):
+                    df.loc[id_match, var_acerte] = 1
+
+            # Si fallo la prediccion
+            else:
+                df.loc[id_match, var_acerte] = np.nan
+
+        # Imprimo warning si supuestamente acerté el 100% de partidos
+        if len(df[df[var_acerte]==1]) == len(df):
+            logger.warning(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
+
+        return df
+
     def calculate_roi_in_combination(self, df, param_dict):
         """
         Para calcular ROI de las prediciones de un modelo
@@ -336,6 +348,7 @@ class BettingStrategy:
         df_pred_with_metrics = pd.concat([df_pred_with_metrics, df_pred_with_metrics_2[missing_columns]], axis=1) # Concatenar únicamente las columnas que faltan
         d_metrics.update(d_metrics_2)
         return df_pred_with_metrics, d_metrics
+    
     # Prod
     def apply_strategy(self, df, param_dict, prod: bool = True):
         
@@ -345,7 +358,7 @@ class BettingStrategy:
         
         # Determino result to bet
         df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
-  
+
         # Determino acierto de prediccion
         if not prod:
             df = self.determine_winning_bets(df)
@@ -359,6 +372,10 @@ class BettingStrategy:
             'k': param_dict.get('k', 1)   # 1 por defecto si falta 'k'
         }
         df = self.determine_stake_to_bet(df, **d_params_stake)
+        df = self.stake_reduction(df)
+        if prod:
+            df = self.stake_reduction(df)
+            
         return df
 
     def apply_strategy_by_result(self, df, df_hiper):
