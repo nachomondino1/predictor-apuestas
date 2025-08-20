@@ -153,7 +153,8 @@ class Crawler:
         
         # Parameters
             xpath: XPATH del tag del cual extraer datos
-            tag_inicial: Selenium Web Element desde el cual se busca el xpath
+            tag_inicial: Selenium Web Element desde el cual se busca el xpath. 
+                Si usas tag_inicial el xpath debe empezar con un punto (".//") para buscar dicho xpath desde el tag (y desde todo el html)
             attribute: String con el nombre del atributo a extraer del tag (e.g. "href")
             text: True para extraer texto del tag
         
