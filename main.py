@@ -192,10 +192,11 @@ class DataPreparation:
         df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') # Convierto fecha de object a datetime
         ## Capacity & Attendance
         df_match = format_data.convert_capacity_to_int(df_match)
-        ## Ball posession
-        df_match = format_data.convert_ball_possession_to_int(df_match)
-        ## Goals
         if not prod:
+            ## Ball posession
+            df_match = format_data.convert_ball_possession_to_int(df_match)
+            
+            ## Goals
             df_match = format_data.convert_goals_to_int(df_match)
             df_match = format_data.format_penalties(df_match)
             df_match = clean_data.corregir_goals(df_match)
