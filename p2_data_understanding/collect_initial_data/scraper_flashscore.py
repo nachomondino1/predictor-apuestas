@@ -111,6 +111,8 @@ class FlashscoreCrawler(Crawler):
     def extract_match_data(self, next_matches:bool = False):
         """
         Extrae datos del partido siendo este un partido ya jugado.
+
+        Mejoras: Ponerle nombre "main" o algo asi.
         """
         # Reinicio diccionario en el que guardar datos del nuevo match
         d_row_match = {}
@@ -154,8 +156,11 @@ class FlashscoreCrawler(Crawler):
         ## Si tiene hoja "Lineups"
         if super().click_boton(boton_formations) is not False:
 
+            # Determino formaciones a extraer
+            d_formations = self.determine_formations_to_extract(next_matches=next_matches, hours_diff=hours_diff)
+
             ### Alineaciones titulares, suplentes y ausentes
-            d_row_match_player.update(self.extract_lineups(next_matches, hours_diff))
+            d_row_match_player.update(self.extract_lineups(d_formations))
             
             ### Coaches
             d_row_match.update(self.extract_coaches())
@@ -264,13 +269,7 @@ class FlashscoreCrawler(Crawler):
             print(f"Extracting goals: {d_row}")
         return d_row
     
-    def extract_lineups(self, next_matches, hours_diff):
-        """
-        Extrae de jugadores titulares, suplentes y ausentes de cada equipo.
-        :return: Diccionario.
-        """
-        # Definicion de variables
-        d_row = {}
+    def determine_formations_to_extract(self, next_matches, hours_diff):
 
         if next_matches:
             # Definir conjuntos de formaciones
@@ -304,6 +303,15 @@ class FlashscoreCrawler(Crawler):
                 "Substitutes": "sub", # "Substituted players": "sub_enter", # ya estan en substitutes
                 "Missing Players": "miss"
             }
+        return d_formations
+
+    def extract_lineups(self, d_formations):
+        """
+        Extrae de jugadores titulares, suplentes y ausentes de cada equipo.
+        :return: Diccionario.
+        """
+        # Definicion de variables
+        d_row = {}
 
         # Por formation ("Formation inicial", "Suplentes" y  "Ausentes")
         for formation, titularidad in d_formations.items():
@@ -325,44 +333,44 @@ class FlashscoreCrawler(Crawler):
 
                     team_side = "home" if team == '1' else "away"
 
-                    # Si se extraen jugadores ausentes
-                    if formation == "Missing Players":
+                    # --- INICIO DEL INTENTO PRIMARIO ---
+                    # Intento 1: Extraer jugadores usando el XPath de a[@href]
+                    l_tags_players = super().extract_tags(
+                                            tag_inicial=tag_lineup, 
+                                            xpath=f'.//div[@class="lf__side"][{team}]//a[starts-with(@href, "/player/")]', # //span[text()="Missing Players"]//ancestor::div[@class="section"]//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]                
+                                            sec_wait=self.SEC_WAIT_MIN, 
+                                            print_fail=False
+                                        )
+                
+                    l_urls = [tag.get_attribute('href') for tag in l_tags_players]
 
-                        # Obtengo listado de jugadores
-                        l_tags_players = super().extract_tags(
-                                                tag_inicial=tag_lineup, 
-                                                xpath=f'.//div[@class="lf__side"][{team}]//a[starts-with(@href, "/player/")]', # //span[text()="Missing Players"]//ancestor::div[@class="section"]//div[@class="lf__side"][1]//a[starts-with(@href, "/player/")]                
-                                                sec_wait=self.SEC_WAIT_MIN, 
-                                                print_fail=False
-                                            )
+                    if not l_tags_players:
 
-                        # Obtengo Urls
-                        l_urls = [tag.get_attribute('href') for tag in l_tags_players]
+                        if self.verbose > 0:
+                            logger.warning("SEGUNDO INTENTO")
 
-                        # Obtengo nombre e id de url
-                        d_player = self.save_player_data(l_urls, titularidad, team_side)
-                        d_row.update(d_player)
-                        print(d_player)
-
-                    # Si se extraen titulares o suplentes
-                    else:
-
-                        # Obtengo listado de jugadores
+                        # --- INICIO DEL FALLBACK A LA SEGUNDA FORMA ---
+                        # Intento 2 (Fallback): Si no se encontraron jugadores, intenta el XPath para //button
                         l_tags_players = super().extract_tags(
                             tag_inicial=tag_lineup, 
                             xpath=f'.//div[@class="lf__side"][{team}]//button', # //span[text()="Starting Lineups"]//ancestor::div[@class="section"]//div[@class="lf__side"][1]//button
                             sec_wait=self.SEC_WAIT_MIN, 
                             print_fail=False
                         )
-
+                        
                         # Obtengo Urls
                         l_urls = self.obtain_urls_players(l_tags_players)
-                        print(l_urls)
-                            
-                        # Obtengo nombre e id de url
+                    
+                    # Si hay listado de urls, extraigo id y nombre del jugador de cada una
+                    if l_urls:
                         d_player = self.save_player_data(l_urls, titularidad, team_side)
                         d_row.update(d_player)
-                        print(d_player)
+
+                        if self.verbose > 0:
+                            print(d_player)
+                    else:
+                        # Manejar el caso donde no hay URLs para procesar
+                        print(f"No se procesarán datos para el equipo {team_side} ya que no se encontraron URLs.")
 
             else:
                 logger.warning(f"No se encontró la seccion {formation} en Lineups.")
@@ -419,6 +427,9 @@ class FlashscoreCrawler(Crawler):
         return d_player_data
 
     def extract_disclaimer_data(self):
+        """
+        Extrar si se juega en estadio neutral y si el partido fue a penales
+        """
         d_row = {}
 
         # Penalties
