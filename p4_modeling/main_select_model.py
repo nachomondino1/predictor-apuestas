@@ -196,7 +196,7 @@ def main(
     if export:
         df_ite_bs.to_excel(f'{d_paths['path_bet_strategy']}/df_ite_bs.xlsx', index=False)
 
-    return df_ite_bs
+    return n_model, model_name 
 
 if __name__ == "__main__":
     # Defino parametros
@@ -204,18 +204,21 @@ if __name__ == "__main__":
     assess = False # Para usar True, cv y esas metricas de test deberia agregarlas al assess...
 
     d_countries = {
-        48: ["england", '2025-08-18'],
-        55: ["france", '2025-08-18'], 
-        59: ["germany", '2025-08-18'],
-        77: ["italy", '2025-08-19'],
-        148: ["spain", '2025-08-19'],
-        167: ["usa", '2025-08-18'],
+        48: ["england", '2025-08-20'],
+        55: ["france", '2025-08-20'], 
+        59: ["germany", '2025-08-20'],
+        77: ["italy", '2025-08-20'],
+        148: ["spain", '2025-08-20'],
+        167: ["usa", '2025-08-20'],
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
     l_metrics = ['roi_por_partido', 'error']
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
+
+    # Levanto df_best_models
+    df_bm = pd.read_excel('data/df_best_models.xlsx')
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -239,7 +242,7 @@ if __name__ == "__main__":
         # df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1
 
         # Seleccion del modelo
-        main(
+        n_model, model_name = main(
             df_ite=df_ite,
             country=country, iteration_date=iteration_date, 
             l_metrics=l_metrics, l_weights=l_weights,
@@ -247,3 +250,7 @@ if __name__ == "__main__":
             export=True
             )
         
+        df_bm.loc[df_bm['id_country'] == id_country, ['iteration_date', 'n_model', 'model_name']] = [iteration_date, n_model, model_name]
+        print(df_bm)
+    
+    df_bm.to_excel('data/df_best_models_2.xlsx', index=False)
