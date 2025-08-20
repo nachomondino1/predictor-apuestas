@@ -372,7 +372,6 @@ class BettingStrategy:
             'k': param_dict.get('k', 1)   # 1 por defecto si falta 'k'
         }
         df = self.determine_stake_to_bet(df, **d_params_stake)
-        df = self.stake_reduction(df)
         if prod:
             df = self.stake_reduction(df)
             
