@@ -23,9 +23,9 @@ class StakeHunterCrawler(Crawler):
         
         super().__init__(headless, browser)
         self.child_driver = self.driver
-        self.SEC_WAIT_MIN = 0.8 * 5 # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
-        self.SEC_WAIT_MED = 1.5 * 5 # Espera para elementos que casi siempre estan
-        self.SEC_WAIT_MAX = 5 # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MIN = 2 # Espera para elementos que muchas veces no estan # con 0.2 fallaba extraccion de campos que si estaban como goals
+        self.SEC_WAIT_MED = 4 # Espera para elementos que casi siempre estan
+        self.SEC_WAIT_MAX = 6 # Espera para elementos que casi siempre estan
         self.verbose =  verbose # Para imprimir el funcionamiento de cada funcion y poder hacer pruebas...
 
     def league_to_search(self, bet):
@@ -61,8 +61,17 @@ class StakeHunterCrawler(Crawler):
         )
 
         # Seleccionar event (partido)
+        list_names = bet['id_team_home'].split(" ") # {bet['id_team_away']} --> Evito nombres compuestos que hacen fallar como "manchester utd", "r oviedo"
+        
+        max_lenght = 0
+        for elem in list_names:
+            elem_lenght = len(elem)
+            if elem_lenght > max_lenght:
+                search = elem
+                max_lenght = elem_lenght
+
         super().select_option(
-            option = f"{bet['id_team_home']}", # {bet['id_team_away']}
+            option=search,
             xpath_flechita="//span[@aria-labelledby='select2-chosen-event-container']/span[contains(@class, 'arrow')]",
             xpath_input = xpath_input
         )
@@ -94,17 +103,19 @@ class StakeHunterCrawler(Crawler):
         )
 
         # Escribir descripcion (podria hacerlo con chatGPT...)
+        '''
         des = f"The result of the match between {bet['id_team_home']} and {bet['id_team_away']} will be {ganador} with a {bet['prob_result_to_bet']*100}% of probability."
         super().accept_cookies_in_document_tag(
             xpath_document_parent=".//iframe[contains(@class, 'cke_wysiwyg_frame')]",
             xpath_boton=".//body[contains(@class, 'cke_editable')]"
             )
         super.fill_form(xpath_input=".//body[contains(@class, 'cke_editable')]", text=des) # Esta en un #document
+        '''
 
         # Click en "Publish"
         tag_pub = super().extract_tag(xpath=".//input[@value='Publish']")
         super().click_boton(tag_boton=tag_pub)
-        sleep(10)
+        sleep(random.randint(5, 7))
 
 def main(df):
     
@@ -119,7 +130,7 @@ def main(df):
     # Click en "Sing in"
     tag_boton = crawler.extract_tag(xpath="//a[@href='/auth']") # attribute="href"
     crawler.click_boton(tag_boton)
-    sleep(5)
+    sleep(random.randint(3,5))
     
     # Ingreso con credenciales    
     crawler.login_website(
@@ -139,9 +150,7 @@ def main(df):
         
         logger.info(match)
 
-        crawler.load_bet(match)
-
-        sleep(random.randint(2,5))
+        crawler.load_bet(match)        
 
     crawler.driver.close()
 
@@ -149,15 +158,26 @@ def main(df):
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
 
+    l_countries = [148]
     hoy = datetime.now()
 
     # Load bets to publish
-    df = pd.read_excel("./data/predicciones.xlsx")
-    
+    df = pd.read_excel("./data/predicciones.xlsx", index_col=0)
+    logger.info(df)
+    print(df.shape)
+
+    # Filtro por pais
+    df = df[df['id_country'].isin(l_countries)]
+
+    # Filtro por ids a evitar
+    l_ids_to_avoid = []
+    df = df[~df.index.isin(l_ids_to_avoid)]
+
     # Me quedo con aquellos en los que el stake > 0 y que aun no se hayan jugado
     df_filt = df[(df['stake_to_bet'] > 0) & (df['date'] > hoy)]
-
-    print(df.shape)
     print(df_filt.shape)
 
-    main(df_filt)
+    if len(df_filt) > 0:
+        main(df_filt)
+    else:
+        logger.info("Se evito cargar apuestas porque no hay proximos partidos con stake > 0.")
