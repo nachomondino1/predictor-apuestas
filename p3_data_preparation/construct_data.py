@@ -18,15 +18,15 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result', prod: bool = Fa
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
-    df = df.copy()  # Evitar modificar el original
+    # if prod:
+    #     df[['goals_home', 'goals_away']] = df[['goals_home', 'goals_away']].fillna(0)
 
-    if prod:
-        df[['goals_home', 'goals_away']] = df[['goals_home', 'goals_away']].fillna(0)
-
-    df[var_resp] = df.apply(lambda row: 1 if row['goals_home'] > row['goals_away'] 
-                            else 2 if row['goals_home'] < row['goals_away'] 
-                            else 0, axis=1)
-
+    condicion_victoria_local = df['goals_home'] > df['goals_away']
+    condicion_victoria_visitante = df['goals_home'] < df['goals_away']
+    
+    df[var_resp] = np.where(condicion_victoria_local, 1, 
+                            np.where(condicion_victoria_visitante, 2, 0))
+    
     return df
 
 ## Points
