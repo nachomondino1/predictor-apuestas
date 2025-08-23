@@ -75,7 +75,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         logger.info(df_pred_with_result)
 
         # Exportar dataset
-        # df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
+        df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
         logger.critical(f"Se recolecto el resultado de {len(df_results)} partidos.")
     else:
         logger.warning("Se evitó el update de resultados puesto que no se detectaron partidos jugados ayer")
