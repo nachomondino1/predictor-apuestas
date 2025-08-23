@@ -1187,7 +1187,8 @@ def main(
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
-        d_strategy = {'prob_dp': None, 'curva': 'kelly_linear', 'm': 10, 'b': 0, 'k': 1}
+        d_m = {'england': 10, 'france': 5, 'germany': 10, 'italy': 10, 'spain': 5}
+        d_strategy = {'prob_dp': None, 'curva': 'kelly_linear', 'm': d_m[country], 'b': 0, 'k': 1}
         if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
             df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
