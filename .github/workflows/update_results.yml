@@ -40,7 +40,8 @@ on:
   # Para forzar a que se ejecute la action  
   # push: 
   #   branches:
-  #     - staging
+      # - staging
+      # - prod
 
 jobs:
   collect_results:

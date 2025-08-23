@@ -965,4 +965,3 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds
-
