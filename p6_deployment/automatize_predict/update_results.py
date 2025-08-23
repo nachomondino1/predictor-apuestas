@@ -66,6 +66,11 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         # Determino ganador y si acerté
         df_pred_with_result = determine_result(df, var_resp='result')
         df_pred_with_result = bs.determine_winning_bets(df_pred_with_result)  # Determino acierto o fallo
+
+        # Calculo yield
+        df_pred_with_result.loc[df_pred_with_result['acerte'] == 1, 'bet_yield'] = df_pred_with_result['stake_to_bet'] * (df_pred_with_result['odd_to_bet'] - 1)
+        df_pred_with_result.loc[df_pred_with_result['acerte'] == 0, 'bet_yield'] = -df_pred_with_result['stake_to_bet']
+
         df_pred_with_result.index.name = 'id_match'  # Es importante para la base de datos MySQL
         logger.info(df_pred_with_result)
 
@@ -144,7 +149,7 @@ if __name__ == "__main__":
     
     # Parametros de ejecución
     if env == 'dev':
-        n_days = 10
+        n_days = 1
     
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
