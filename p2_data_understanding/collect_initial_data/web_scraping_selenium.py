@@ -31,7 +31,7 @@ class Crawler:
 
     def get_chrome_version(self):
         """
-        Detecta la version de mi Google Chrome. Esto es para poder crear el chrome driver con la misma version para evitar el problema de incompatibilidad de versiones.
+        Detecta la version de Google Chrome en mi compu local. Esto es para poder crear el chrome driver con la misma version para evitar el problema de incompatibilidad de versiones.
         """
         system = platform.system()
         try:
@@ -101,7 +101,7 @@ class Crawler:
             return driver
         
         except Exception as e:
-            logger.error(f"Failed to inicialize the ChromeDriver with the latest version. Probablemente tengas una actualizacion de software pendiente en tu compu. Una vez actualizada, deberia funcionar.")
+            logger.error(f"Failed to inicialize the ChromeDriver with the latest version: {e}. Puede ser por: 1) tener una actualizacion de software pendiente en tu compu. 2) tenes que eliminar caché de webdriver-manager.")
 
             try:
                 # 2) Inicializar ChromeDriver con la versión de Google Chorme en mi compu
