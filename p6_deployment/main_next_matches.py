@@ -432,9 +432,10 @@ class DataPreparationNew(DataPreparation):
         perc = len(nan_cols) / len(df.columns)
 
         # Imprimir información y generar un error si se cumplen las condiciones
-        if full_nan_cols:
+        if full_nan_cols: 
             msg = f"Error: Hay {len(full_nan_cols)} columnas que tienen 100% de NaN values. Columnas 100% NaN: {full_nan_cols}."
             logger.error(msg)
+            # En inicios de temporada las columnas stat pueden ser nan si n_days no agarrra la temporada anterior (hasta la 2da fecha debido a stats por localia)
             raise ValueError(msg)
 
         elif perc > 0.5:
