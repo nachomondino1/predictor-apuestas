@@ -436,7 +436,7 @@ class DataPreparationNew(DataPreparation):
             msg = f"Error: Hay {len(full_nan_cols)} columnas que tienen 100% de NaN values. Columnas 100% NaN: {full_nan_cols}."
             logger.error(msg)
             # En inicios de temporada las columnas stat pueden ser nan si n_days no agarrra la temporada anterior (hasta la 2da fecha debido a stats por localia)
-            raise ValueError(msg)
+            # raise ValueError(msg)
 
         elif perc > 0.5:
             msg = f"Error: Hay {len(nan_cols)} columnas con mucho NaN value. Columnas > {nan_min*100:.0f}% NaN: {nan_cols}."
@@ -880,6 +880,8 @@ def main(
         country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
 
     # Determino competence e ite_date
+    # fecha_dt = pd.to_datetime(iteration_date, unit='D', origin='1899-12-30')
+    # iteration_date_dt = fecha_dt.date()
     iteration_date_dt = pd.to_datetime(iteration_date, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
     
     d_comps = determine_country_competitions(id_country)
@@ -1188,8 +1190,8 @@ def main(
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
-        d_m = {'england': 10, 'france': 5, 'germany': 10, 'italy': 10, 'spain': 5}
-        d_strategy = {'prob_dp': None, 'curva': 'kelly_linear', 'm': d_m[country], 'b': 0, 'k': 1}
+        # d_strategy = {'prob_dp': None, 'curva': 'kelly_linear', 'm': 10, 'b': 0, 'k': 3} # Linear infla mucho con cuotas chotas..
+        d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
         if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
             df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
