@@ -44,6 +44,24 @@ class StakeHunterCrawler(Crawler):
 
         return f"{bet['country']} - {comp}"
 
+    def format_team_name(self, team):
+        
+        d_teams = {'wolves': 'wolverhampton'}
+
+        list_names = team.split(" ") # Evito nombres compuestos que hacen fallar como "manchester utd", "r oviedo"
+        
+        max_lenght = 0
+        for elem in list_names:
+            elem_lenght = len(elem)
+            if elem_lenght > max_lenght:
+                search = elem
+                max_lenght = elem_lenght
+        
+        if search in d_teams.keys():
+            search = d_teams[search]
+
+        return search
+    
     def load_bet(self, bet):
         
         xpath_input = "//span[contains(@class, 'search--dropdown')]/input"
@@ -61,17 +79,11 @@ class StakeHunterCrawler(Crawler):
         )
 
         # Seleccionar event (partido)
-        list_names = bet['id_team_home'].split(" ") # {bet['id_team_away']} --> Evito nombres compuestos que hacen fallar como "manchester utd", "r oviedo"
-        
-        max_lenght = 0
-        for elem in list_names:
-            elem_lenght = len(elem)
-            if elem_lenght > max_lenght:
-                search = elem
-                max_lenght = elem_lenght
+        home_team = self.format_team_name(bet['id_team_home'])
+        away_team = self.format_team_name(bet['id_team_away'])
 
         super().select_option(
-            option=search,
+            option=home_team,
             xpath_flechita="//span[@aria-labelledby='select2-chosen-event-container']/span[contains(@class, 'arrow')]",
             xpath_input = xpath_input
         )
@@ -93,7 +105,7 @@ class StakeHunterCrawler(Crawler):
 
         # Definir ganador
         res = bet['result_to_bet']
-        ganador = bet['id_team_home'] if res == 1 else ("draw" if res==0 else bet['id_team_away'])
+        ganador = home_team if res == 1 else ("draw" if res==0 else away_team)
         print(res, ganador)
 
         super().select_option(
@@ -150,7 +162,11 @@ def main(df):
         
         logger.info(match)
 
-        crawler.load_bet(match)        
+        crawler.load_bet(match)    
+        
+        # Recarga la página
+        crawler.driver.refresh()
+        sleep(2)
 
     crawler.driver.close()
 
@@ -170,11 +186,13 @@ if __name__ == "__main__":
     df = df[df['id_country'].isin(l_countries)]
 
     # Filtro por ids a evitar
-    l_ids_to_avoid = []
-    df = df[~df.index.isin(l_ids_to_avoid)]
+    # l_ids_to_avoid = ['4EQGmZBs', '0fab0Cem']
+    l_ids_to_sel = ['IJLdrvz2']
+    # df = df[~df.index.isin(l_ids_to_avoid)]
+    df = df[df.index.isin(l_ids_to_sel)]
 
     # Me quedo con aquellos en los que el stake > 0 y que aun no se hayan jugado
-    df_filt = df[(df['stake_to_bet'] > 0) & (df['date'] > hoy)]
+    df_filt = df[(df['stake_to_bet'] > 0.5) & (df['date'] > hoy)]
     print(df_filt.shape)
 
     if len(df_filt) > 0:
