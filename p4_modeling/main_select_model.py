@@ -204,18 +204,20 @@ if __name__ == "__main__":
     assess = False # Para usar True, cv y esas metricas de test deberia agregarlas al assess...
 
     d_countries = {
-        48: ["england", '2025-08-20'],
-        55: ["france", '2025-08-20'], 
-        59: ["germany", '2025-08-20'],
-        77: ["italy", '2025-08-20'],
-        148: ["spain", '2025-08-20'],
-        167: ["usa", '2025-08-20'],
+        48: ["england", '2025-08-26'],
+        55: ["france", '2025-08-26'], 
+        59: ["germany", '2025-08-26'],
+        77: ["italy", '2025-08-26'],
+        148: ["spain", '2025-08-26'],
+        167: ["usa", '2025-08-26'],
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
-    l_metrics = ['roi_por_partido', 'error']
+    l_metrics = ['n_draw', 'error'] # roi_por_partido # 
+    l_metrics = ['n_draw', 'f1_score_away'] # roi_por_partido # expected_f1_score
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
+    l_weights = [0.5, 0.5]
 
     # Levanto df_best_models
     df_bm = pd.read_excel('data/df_best_models.xlsx')
@@ -253,4 +255,4 @@ if __name__ == "__main__":
         df_bm.loc[df_bm['id_country'] == id_country, ['iteration_date', 'n_model', 'model_name']] = [iteration_date, n_model, model_name]
         print(df_bm)
     
-    df_bm.to_excel('data/df_best_models_2.xlsx', index=False)
+    df_bm.to_excel('data/df_best_models.xlsx', index=False)
