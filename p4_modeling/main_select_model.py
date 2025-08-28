@@ -214,10 +214,8 @@ if __name__ == "__main__":
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
-    l_metrics = ['n_draw', 'error'] # roi_por_partido # 
-    l_metrics = ['n_draw', 'f1_score_away'] # roi_por_partido # expected_f1_score
+    l_metrics = ['n_draw', 'expected_roi']
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
-    l_weights = [0.5, 0.5]
 
     # Levanto df_best_models
     df_bm = pd.read_excel('data/df_best_models.xlsx')
@@ -232,6 +230,10 @@ if __name__ == "__main__":
 
         print(df_ite.head(5))
         print(df_ite.shape)
+
+        # Calculo new metrics
+        df_ite['sum_aciertos_draw'] = df_ite['aciertos_draw'] + df_ite['expected_aciertos_draw']
+        df_ite['sum_aciertos_away'] = df_ite['aciertos_away'] + df_ite['expected_aciertos_away']
 
         # Evito modelos que tienen menos de 90 registros en test
         df_ite_dup = df_ite.copy()
