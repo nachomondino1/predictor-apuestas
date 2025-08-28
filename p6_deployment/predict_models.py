@@ -11,15 +11,14 @@ def predict_models(l_countries, n_models_predict: int = 5):
     Para obtener predicciones en prox partidos de los modelos candidatos
     """       
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False}  
-    n_days_fill_data = 120 if datetime.datetime.now().month in [8] else 30 
 
     # Defino country, iteration date y modelo
     d_countries = {
-        48: ["england", '2025-08-14'], 
-        55: ["france", '2025-08-14'], 
-        59: ["germany", '2025-08-14'], 
-        77: ["italy", '2025-08-14'],
-        148: ["spain", '2025-08-14'], 
+        48: ["england", '2025-08-26'], 
+        55: ["france", '2025-08-26'], 
+        59: ["germany", '2025-08-26'], 
+        77: ["italy", '2025-08-26'],
+        148: ["spain", '2025-08-26'], 
         }
     
     # Por pais
@@ -44,10 +43,10 @@ def predict_models(l_countries, n_models_predict: int = 5):
             d_model = {'n_model': n_model, 'model_name': model_name}
 
             # Obtengo predicciones en proximos partidos
-            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, n_days_fill_data=n_days_fill_data, export=False) 
+            df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, export=False) 
 
             # Selecciono id_match y predicted_result
-            df_filt = df.loc[:, ['id_team_home', 'id_team_away', 'predicted_result']]
+            df_filt = df.loc[:, ['id_team_home', 'id_team_away', 'odds_home', 'odds_draw', 'odds_away', 'predicted_result']]
             df_filt.rename(columns={'predicted_result': f'{n_model}_{model_name}'}, inplace=True)
             new_cols = [col for col in df_filt.columns if col not in df_country.columns]
 
@@ -65,7 +64,8 @@ def predict_models(l_countries, n_models_predict: int = 5):
 if __name__ == "__main__":    
 
     # Defino hiperparametros
-    l_countries = [48, 55]
-    n_models_predict=5
+    l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48, 59, 77, 148]
+    n_models_predict=10
 
     predict_models(l_countries, n_models_predict=n_models_predict)
