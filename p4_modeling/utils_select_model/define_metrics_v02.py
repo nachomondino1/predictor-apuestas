@@ -61,10 +61,23 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         d_metrics_test_sin_ea = asses_model.calculate_metrics(df_test)
         d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_')
 
+        d_metrics_test_sin_ea.update({
+            'sum_aciertos_draw': d_metrics_test_sin_ea['aciertos_draw'] + d_metrics_test_sin_ea_ex['expected_aciertos_draw'], 
+            'sum_aciertos_away': d_metrics_test_sin_ea['aciertos_away'] + d_metrics_test_sin_ea_ex['expected_aciertos_away'], 
+            'sum_aciertos_home': d_metrics_test_sin_ea['aciertos_home'] + d_metrics_test_sin_ea_ex['expected_aciertos_home'], 
+            })
+
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
         d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_prod, suffix='_prod')
         d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_prod, var_resp='expected_result', prefix='expected_', suffix='_prod')
+
+        d_metrics_test_sin_ea.update({
+            'sum_aciertos_draw_prod': d_metrics_prod_sin_ea['aciertos_draw_prod'] + d_metrics_prod_sin_ea_ex['expected_aciertos_draw_prod'], 
+            'sum_aciertos_away_prod': d_metrics_prod_sin_ea['aciertos_away_prod'] + d_metrics_prod_sin_ea_ex['expected_aciertos_away_prod'], 
+            'sum_aciertos_home_prod': d_metrics_prod_sin_ea['aciertos_home_prod'] + d_metrics_prod_sin_ea_ex['expected_aciertos_home_prod'], 
+            })
+
 
         # Renombro metricas para evitar sobreescribirlas
         d_rois_prod = asses_model.rename_dict_keys(d_rois_prod, suffix='_prod')
@@ -155,6 +168,17 @@ def exhaustive_metric_combination_search(df, l_metrics_test, col_prod, perc_mode
     logger.critical(f"\nMejor combinación: {best_combination} con score {best_score:.4f} en {col_prod}")
     return pd.DataFrame(history, columns=["metrics", f"mean_{col_prod}", f"wei_mean_{col_prod}", f"std_{col_prod}"]).set_index("metrics")
 
+def calculate_mean_cols(df):
+
+    # Calculo media y desvio
+    media = df.mean(axis=1)
+    desv = df.std(axis=1)  
+
+    # Guardo res  
+    df["mean"] = media
+    df["std"] = desv
+    return df
+
 if __name__ == "__main__":
 
     # Defino parametros
@@ -162,25 +186,11 @@ if __name__ == "__main__":
 
     d_countries = {
         # train nuevos
-        48: ["england", '2025-04-22'],
-        55: ["france", '2025-04-23'], 
-        59: ["germany", '2025-04-23'],
-        77: ["italy", '2025-04-23'],
-        148: ["spain", '2025-04-23'],
-
-        # train viejos
-        # 48: ["england", '2025-05-07'],
-        # 55: ["france", '2025-05-07'], 
-        # 59: ["germany", '2025-05-08'],
-        # 77: ["italy", '2025-05-08'],
-        # 148: ["spain", '2025-05-07']
-
-        # new train
-        # 48: ["england", '2025-05-28'],
-        # 55: ["france", '2025-05-28'], 
-        # 59: ["germany", '2025-05-29'],
-        # 77: ["italy", '2025-05-29'],
-        # 148: ["spain", '2025-05-28']
+        48: ["england", '2025-08-26'],
+        55: ["france", '2025-08-26'], 
+        59: ["germany", '2025-08-26'],
+        77: ["italy", '2025-08-26'],
+        148: ["spain", '2025-08-26'],
         }
     
     # Condiciones 
@@ -189,14 +199,17 @@ if __name__ == "__main__":
     method = ['corr', 'fs', 'mean', 'select_best_model'][3] # deberia tener un fs que considere metricas juntas... tal vez ese que va eliminando variables de a una.
     l_metrics_test = [
         "roi_por_partido", "expected_roi_por_partido", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score", 
-        "cv_accuracy", "cv_f1_score", "cv_cross_entropy_loss", "cv_f1_score_wei", "cv_f1_score_draw",
-        # "f1_score_draw", "f1_score_away", "f1_score_home", 
-        # "expected_f1_score_draw", "expected_f1_score_away", "expected_f1_score_home",
+        # "cv_accuracy", "cv_f1_score", "cv_cross_entropy_loss", "cv_f1_score_draw",
+        # "aciertos_draw", "aciertos_home", "aciertos_away", 
+        "sum_aciertos_draw", "sum_aciertos_home", "sum_aciertos_away", 
+        "n_draw", "n_away", "n_home", 
+        "f1_score_draw", "f1_score_away", "f1_score_home", 
+        "expected_f1_score_draw", "expected_f1_score_away", "expected_f1_score_home",
         ]
     col_prod = 'roi_por_partido' # Definir metrica a optimizar en produccion
 
     # Defino variables
-    df_ct = pd.DataFrame()
+    df_ct, df_corr_ct = pd.DataFrame(), pd.DataFrame()
     d = {}
     corr_metric = f'{col_prod}_prod'
     print("Corr col: ", col_prod)
@@ -210,7 +223,7 @@ if __name__ == "__main__":
         print(f" {country.upper()} ".center(120, "$"))
         
         path_save = f"data/_metrics/{country}/{iteration_date}"
-        directories.make_directories(l_directorios=[f'{path_save}/input_data', f"{path_save}/results/{iteration_date}", f'data/_metrics/results/{method}' ])
+        directories.make_directories(l_directorios=[f'{path_save}/input_data', f"{path_save}/results/{iteration_date}", f'data/_metrics/results/{method}', f'data/_metrics/results/corr'])
 
         # PASO 1: Division en "test" y "prod" por cada modelo
         ## Levanto df_ite
@@ -222,56 +235,59 @@ if __name__ == "__main__":
             df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1 
 
         ## Divido en "test" y "prod" y recalculo metricas
-        try:
-            df_ite_test = pd.read_excel(f"{path_save}/input_data/df_ite_test_{perc_matches_test}.xlsx", index_col=0)
-            df_ite_prod = pd.read_excel(f"{path_save}/input_data/df_ite_prod_{1-perc_matches_test}.xlsx", index_col=0)
-            print(df_ite_test)
-            print(df_ite_prod)
-        except FileNotFoundError:
-            df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=perc_matches_test)
-            df_ite_test.to_excel(f'{path_save}/input_data/df_ite_test_{perc_matches_test}.xlsx', index=True)
-            df_ite_prod.to_excel(f'{path_save}/input_data/df_ite_prod_{1-perc_matches_test}.xlsx', index=True)
+        # try:
+        #     df_ite_test = pd.read_excel(f"{path_save}/input_data/df_ite_test_{perc_matches_test}.xlsx", index_col=0)
+        #     df_ite_prod = pd.read_excel(f"{path_save}/input_data/df_ite_prod_{1-perc_matches_test}.xlsx", index_col=0)
+        #     print(df_ite_test)
+        #     print(df_ite_prod)
+        # except FileNotFoundError:
+        df_ite_test, df_ite_prod = determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_test=perc_matches_test)
+        df_ite_test.to_excel(f'{path_save}/input_data/df_ite_test_{perc_matches_test}.xlsx', index=True)
+        df_ite_prod.to_excel(f'{path_save}/input_data/df_ite_prod_{1-perc_matches_test}.xlsx', index=True)
 
         ## Concateno "test" y "prod" en un solo df    
         df_ite = pd.merge(df_ite_test, df_ite_prod, on=['n_model', 'model_name'], how='outer')        
 
-        ## Normalizo las metricas de test
+
+        # PASO 2: Normalizo las metricas de test
         df_ite_scaled = df_ite.copy()
         scaler = MinMaxScaler()
         df_ite_scaled[l_metrics_test] = scaler.fit_transform(df_ite_scaled[l_metrics_test]) # Cuidado!: Invertir las métricas donde menor es mejor
 
 
-        # PASO 2: Calculo correlacion entre metricas de test y produccion
-        ## Filtrar columnas de test y prod
+        # PASO 3: Uso ≠ metodos para definir las mejores metricas de test
+        ## PASO 3.a: Calculo correlacion entre metricas de test y produccion
+        ### Filtrar columnas de test y prod
         prod_cols = [col for col in df_ite_scaled.columns if col.endswith('_prod')]
 
-        ## Seleccionar solo las columnas relevantes
+        ### Seleccionar solo las columnas relevantes
         df_correlacion = df_ite_scaled[l_metrics_test + prod_cols].corr()
         
-        ## Dropear las filas de prod_cols y las columnas de test_cols (para evitar redundancia)
+        ### Dropear las filas de prod_cols y las columnas de test_cols (para evitar redundancia)
         df_correlacion = df_correlacion.drop(index=prod_cols, columns=l_metrics_test)
 
-        # Selecciono solo la columna de la metrica de produccion 
-        df = df_correlacion[['roi_por_partido_prod']]  # Sigue siendo un DataFrame
-        df.rename(columns={"roi_por_partido_prod": f"{country}_{corr_metric}"}, inplace=True)
+        ### Selecciono solo la columna de la metrica de produccion 
+        df_corr = df_correlacion[['roi_por_partido_prod']]  
+        df_corr.rename(columns={"roi_por_partido_prod": f"{country}_corr_{corr_metric}"}, inplace=True)
+
+        ## PASO 3.b: Defino mejor combinacion de metricas de test en metrica de produccion
+        df = exhaustive_metric_combination_search(df_ite_scaled, l_metrics_test=l_metrics_test, perc_models=perc_models, col_prod=corr_metric, max_comb_size=2, verbose=True)
         
-        # Defino mejor combinacion de metricas de test en metrica de produccion
-        # df = exhaustive_metric_combination_search(df_ite_scaled, l_metrics_test=l_metrics_test, perc_models=perc_models, col_prod=corr_metric, max_comb_size=2, verbose=True)
-        
-        # Exporto y guardo rdos
-        d[id_country] = df_ite_scaled.copy()
+        # Exporto datos 
         df_ite.to_excel(f'{path_save}/input_data/df_iteration_{perc_matches_test}.xlsx', index=False)
         df_ite_scaled.to_excel(f"{path_save}/input_data/df_scaled.xlsx", index=True)
         df_correlacion.to_excel(f'{path_save}/results/df_corr.xlsx', index=True)
         df.to_excel(f"{path_save}/results/{iteration_date}/df_{col_prod}_{country}.xlsx", index=True)
+        
+        # Guardo rdos
+        d[id_country] = df_ite_scaled.copy()
+        df_corr_ct = pd.concat([df_corr_ct, df_corr], axis=1)
         df_ct = pd.concat([df_ct, df], axis=1)
         print(df_ct.shape)
 
-    # Calculo media de todos los paises
-    media = df_ct.mean(axis=1)
-    desv = df_ct.std(axis=1)    
-    df_ct["mean"] = media
-    df_ct["std"] = desv
+    # PASO 4: Calculo media de todos los paises
+    df_ct = calculate_mean_cols(df_ct)
+    df_corr_ct = calculate_mean_cols(df_corr_ct)
     print(df_ct)
     
     # Seleccionar la combinacion que maximiza la suma pero minimiza el desvio.
@@ -280,8 +296,12 @@ if __name__ == "__main__":
 
     # Exportar resultados finales
     df_ct.to_excel(f"data/_metrics/results/{method}/{col_prod}_{iteration_date}.xlsx") 
+    df_corr_ct.to_excel(f"data/_metrics/results/corr/{col_prod}_{iteration_date}.xlsx") 
 
 
+
+    '''
+    # PASO 5: ?
     # Defino las mejores metricas de test
     max_mean = df_ct["mean"].max()
     l_metrics_test_filt = df_ct[df_ct["mean"].between(max_mean * 0.8, max_mean)].index
@@ -289,19 +309,19 @@ if __name__ == "__main__":
 
     df_ct_2 = pd.DataFrame()
 
-    # PASO 3: Defino mejor combinacion de metricas de test en metrica de produccion
+    # Defino mejor combinacion de metricas de test en metrica de produccion
     for id_country in l_countries:
 
         # Defino mejor combinacion de metricas de test en metrica de produccion
         df = exhaustive_metric_combination_search(d[id_country], l_metrics_test=l_metrics_test_filt, perc_models=perc_models, col_prod=corr_metric, verbose=True)
-
         df_ct_2 = pd.concat([df_ct_2, df], axis=1)
     
 
-     # Calculo media de todos los paises
+    # Calculo media de todos los paises
     media = df_ct_2.filter(like='mean_').mean(axis=1)
     desv = df_ct_2.filter(like='mean_').std(axis=1)    
     df_ct_2["mean"] = media
     df_ct_2["std"] = desv
 
     df_ct_2.to_excel(f"data/_metrics/results/{method}/2_{col_prod}_{iteration_date}.xlsx") 
+    '''
