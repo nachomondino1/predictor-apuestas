@@ -476,9 +476,9 @@ class DataPreparation:
         
         # (3) Tratamiento de nan inicial (solo elimino lo que es absurdamente nan)
         if not prod:
-            df = self.treat_nan_in_cols(df, porc_nan_max=0.8) # Columnas
-            df = clean_data.delete_rows_nan(df, porc_nan_max=0.6) ## Filas                   
-   
+            df = self.treat_nan_in_cols(df, porc_nan_max=0.9) # Columnas
+            df.dropna(subset=['mean_rat_player_start_home', 'mean_rat_player_sub_home'], inplace=True)
+
         # Exporto datos
         if self.verbose >= 0 and not prod:
             df.to_excel(f'{self.base_path}/clean_post_integrate/df_cleaned.xlsx', index=True)
@@ -597,27 +597,13 @@ class DataPreparation:
                 df['defensive_efficiency_home'] = np.where(df['expected_goals_(xg)_away'].notna(),  df['goals_away'] - df['expected_goals_(xg)_away'], None)
                 df['defensive_efficiency_away'] = np.where(df['expected_goals_(xg)_home'].notna(), df['goals_home'] - df['expected_goals_(xg)_home'],  None)
 
-                # df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500, expected=True) 
+                df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500, expected=True) 
             
             # (3) GENERAL: ELO o ranking fifa --> deberia hacerlo para ≠ timelapses? No tarda nada en construirse en prod.
             df = construct_data.assign_elo_before_match(df, k=30, base_rating=1500)
             df_preconstructed = df.copy()
 
-            # VARIABLES HISTORICAS
-            ## 1) EN ULTIMOS N PARTIDOS
-            for n_matches in [15]:
-                n_matches_loc = int(n_matches / 2)
-                
-                # Result
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, idxs_to_construct=prod_idxs)
-                df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, idxs_to_construct=prod_idxs)
-
-                # Expected Result
-                if 'expected_result' in df.columns:
-                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches, segun_localia=False, var_resp='expected_result', idxs_to_construct=prod_idxs) # Hay que ver si funciona tanto sin como con localia.
-                   df = construct_data.determine_number_results_last_matches(df, n_matches=n_matches_loc, segun_localia=True, var_resp='expected_result', idxs_to_construct=prod_idxs) # Hay que ver si funciona tanto sin como con localia.               
-               
-            ## 2) EN PARTIDOS EN ULTIMOS N DAYS
+            # VARIABLES HISTORICAS (EN ULTIMOS N DAYS)
             df = construct_data.h2h_by_date(df, n_years=n_years_h2h, idxs_to_construct=prod_idxs) # no mas por localia por alto nan.
             
             for n_days in n_last_matches:
@@ -675,7 +661,7 @@ class DataPreparation:
         logger.info(f"Para identificar si Flashscore dejó de medir alguna variable en el ultimo tiempo (e.g. attacks):")
 
         cols_to_review = [col for col in recent_df.columns if any(substring in col for substring in cols_to_use)]
-        print(cols_to_review)
+        # print(cols_to_review)
 
         for col in cols_to_review:  # Revisar cada columna (menos la columna de fecha)
             if col == 'date':
@@ -698,7 +684,7 @@ class DataPreparation:
 
         return df, df_etiquetas
     
-    def clean_post_construct(self, df: pd.DataFrame, n_years_to_select: int = None, col_nan_max: float = 0.35, prod: bool = False):
+    def clean_post_construct(self, df: pd.DataFrame, n_years_to_select: int = None, col_nan_max: float = 0.7, prod: bool = False):
         """
         Eliminacion de filas y columnas con mucho NaN y escalado de datos
 
@@ -832,7 +818,7 @@ class DataPreparation:
         """
         # Tratamiento de nan values 
         if prod:
-            df = df.fillna(0)
+            df = df.fillna(0) # Si o si tengo que predecir, no puede ser None.
         else:
             df = self.treat_nan_in_rows(df, fill_na=fill_na)  # Elimino registros con al menos un NaN value
 
