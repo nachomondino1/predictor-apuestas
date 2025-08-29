@@ -65,7 +65,6 @@ if __name__ == "__main__":
 
     # Defino hiperparametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48, 59, 77, 148]
     n_models_predict=10
 
     predict_models(l_countries, n_models_predict=n_models_predict)

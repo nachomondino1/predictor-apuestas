@@ -9,7 +9,7 @@ from p3_data_preparation import construct_data
 # CALCULO DE METRICAS BASICAS (ACCURACY, F1_SCORE, ETC)
 def calculate_metrics(
         df, var_resp = 'result', var_pred = 'predicted_result',
-        metrics_by_result: bool = True, bet_metrics: bool = True, gp_result: bool = True,
+        metrics_by_result: bool = True, bet_metrics: bool = True, gp_result: bool = True, n_predictions: bool = True,
         prefix: str = None, suffix: str = None, 
         verbose: int = 0
         ):
@@ -57,17 +57,18 @@ def calculate_metrics(
         df_conf_mat = confusion_matrix(y_test, y_pred)
         # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
 
-    n_home, n_draw, n_away = np.sum(y_pred == 1), np.sum(y_pred == 0), np.sum(y_pred == 2)
-    n_home_r, n_draw_r, n_away_r = np.sum(y_test == 1), np.sum(y_test == 0), np.sum(y_test == 2)
-    dif_home = calculate_variation(end=n_home, ini=n_home_r)
-    dif_draw = calculate_variation(end=n_draw, ini=n_draw_r)
-    dif_away = calculate_variation(end=n_away, ini=n_away_r)
-    d_metrics.update({
-        'n_home': n_home, 'n_draw': n_draw, 'n_away': n_away,
-        'n_home_r': n_home_r, 'n_draw_r': n_draw_r, 'n_away_r': n_away_r,
-        'dif_home': dif_home, 'dif_draw': dif_draw, 'dif_away': dif_away,
-        '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3
-        })
+    if n_predictions:
+        n_home, n_draw, n_away = np.sum(y_pred == 1), np.sum(y_pred == 0), np.sum(y_pred == 2)
+        n_home_r, n_draw_r, n_away_r = np.sum(y_test == 1), np.sum(y_test == 0), np.sum(y_test == 2)
+        dif_home = calculate_variation(end=n_home, ini=n_home_r)
+        dif_draw = calculate_variation(end=n_draw, ini=n_draw_r)
+        dif_away = calculate_variation(end=n_away, ini=n_away_r)
+        d_metrics.update({
+            'n_home': n_home, 'n_draw': n_draw, 'n_away': n_away,
+            'n_home_r': n_home_r, 'n_draw_r': n_draw_r, 'n_away_r': n_away_r,
+            'dif_home': dif_home, 'dif_draw': dif_draw, 'dif_away': dif_away,
+            '%_dif': (abs(dif_home) + abs(dif_draw) + abs(dif_away)) / 3
+            })
 
     if metrics_by_result and 'precision_home' in d_metrics.keys():
         d_metrics.update({
