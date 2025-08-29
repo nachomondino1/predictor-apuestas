@@ -266,20 +266,20 @@ def calculate_roi(df: pd.DataFrame, name_extension=''):
         df.loc[idx, f'{name_extension}bank_final'] = bank_final
 
         # Determino ganancias / perdidas (sin bank)
-        ingresos_sin_bank = row['stake_to_bet'] * row['odd_to_bet'] if row[f'{name_extension}acerte'] == 1 else 0
-        ganancia_sin_bank = ingresos_sin_bank - row['stake_to_bet']
-        df.loc[idx, f'{name_extension}G/P_sin_bank'] = ganancia_sin_bank
+        yield_ = row['stake_to_bet'] * (row['odd_to_bet'] - 1) if row[f'{name_extension}acerte'] == 1 else -row['stake_to_bet']
+        df.loc[idx, f'{name_extension}yield'] = yield_
 
         # Raise error si perdi todo el dinero de las apuestas
         if bank_final <= 0:
             logger.warning("El dinero tras apuestas se hizo negativo y esto no es posible puesto que el stake siempre es un % del bank.")
             break
 
-    # Calculo el ROI
+    # Calculo metricas totales
     roi = (bank_final - bank_inicial) / bank_inicial * 100
     roi_por_partido = roi / n_apuestas  # No quiero el ROI mas alto sino el ROI / partido mas alto
     d_rois[f'{name_extension}roi'] = roi
     d_rois[f'{name_extension}roi_por_partido'] = roi_por_partido
+    d_rois[f'{name_extension}yield'] = df[f'{name_extension}yield'].sum()
     return df, d_rois
 
 def calculate_reality_roi(df: pd.DataFrame):
@@ -401,9 +401,9 @@ def calculate_nan_metrics(df_predicciones):
         rows_player_not_filled = df_predicciones[df_predicciones['player_emergency_fill'] != 1].index
 
         # G/P por estado de relleno de NaN
-        gp_filled = df_predicciones.loc[rows_player_filled, 'G/P_sin_bank'].sum()
-        gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'G/P_sin_bank'].sum()
-        gp_total = df_predicciones['G/P_sin_bank'].sum()
+        gp_filled = df_predicciones.loc[rows_player_filled, 'yield'].sum()
+        gp_not_filled = df_predicciones.loc[rows_player_not_filled, 'yield'].sum()
+        gp_total = df_predicciones['yield'].sum()
 
         perc_gp_filled = calculate_perc_gp(gp_filled, gp_total)
         perc_gp_not_filled = calculate_perc_gp(gp_not_filled, gp_total)
@@ -411,7 +411,7 @@ def calculate_nan_metrics(df_predicciones):
     else:
         average_col_filled = -1
         rows_player_filled = []
-        gp_filled, gp_not_filled = 0, df_predicciones['G/P_sin_bank'].sum()
+        gp_filled, gp_not_filled = 0, df_predicciones['yield'].sum()
         perc_gp_filled, perc_gp_not_filled = 0, 1
         
     d = {
@@ -432,9 +432,9 @@ def calculate_gp_by_result(df_predicciones, var_resp: str = 'result'):
 
     # Defino la columna de G/P a usar
     if var_resp == 'result':
-        col_gp = 'G/P_sin_bank'
+        col_gp = 'yield'
     elif var_resp == 'expected_result':
-        col_gp = 'expected_G/P_sin_bank'
+        col_gp = 'expected_yield'
 
     # Dividir DataFrame por tipo de resultado
     df_pred_home = df_predicciones[df_predicciones[var_pred] == 1]
@@ -525,8 +525,8 @@ def drop_old_metrics(df_predicciones):
     # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
     columns_to_exclude = [
         'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
-        'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank'
-        'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank'
+        'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'yield'
+        'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_yield'
     ]
     df_predicciones = df_predicciones.drop(columns=columns_to_exclude, errors='ignore')
     return df_predicciones
