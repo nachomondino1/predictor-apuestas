@@ -37,13 +37,19 @@ def add_metric(df_ite, country,  iteration_date, path):
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
         df_pred_test = pd.read_excel(path_test, index_col=0)
 
+        # Correlacion entre expected_result y result por resultado.
+        match = len(df_pred_test[df_pred_test['result'] == df_pred_test['expected_result']])
+        pos_match = len(df_pred_test)
+        porc = match / pos_match * 100
+        d_metrics = {'match': porc}
+
         # 1: Calculo correlacion de columna con todas las otras stats
-        cols_sel = [
-            'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'stake_to_bet', 
-            'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'G/P_sin_bank', 'kelly_criterion',
-            'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_G/P_sin_bank'
-        ]
-        d_correlaciones = df_pred_test[cols_sel].corr()['acerte'].to_dict()
+        # cols_sel = [
+        #     'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'stake_to_bet', 
+        #     'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'yield', 'kelly_criterion',
+        #     'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_yield'
+        # ]
+        # d_metrics = df_pred_test[cols_sel].corr()['acerte'].to_dict()
         
         '''
         # 2: Calculo corerlacion entre dos columnas
@@ -59,7 +65,7 @@ def add_metric(df_ite, country,  iteration_date, path):
         d_metrics = {'coef_pearson': coef_pearson, 'mean_prob_acerte': mean_acerte_cm, 'mean_prob_falle': mean_falle_cm}
         '''
         # Guardo datos
-        new_row = {'n_iteration': n_model, 'model_name': model_name, **d_correlaciones}
+        new_row = {'n_iteration': n_model, 'model_name': model_name, **d_metrics}
         rows.append(new_row)
         
 
@@ -208,14 +214,14 @@ def main_strategy(l_countries, d_countries, folder_name):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    folder_name='corr_acerte'
+    folder_name='corr_res_xres'
 
     d_countries = {
-        48: ["england", '2025-08-20'],
-        55: ["france", '2025-08-20'], 
-        59: ["germany", '2025-08-20'],
-        77: ["italy", '2025-08-20'],
-        148: ["spain", '2025-08-20'],
+        48: ["england", '2025-08-26'],
+        55: ["france", '2025-08-26'], 
+        59: ["germany", '2025-08-26'],
+        77: ["italy", '2025-08-26'],
+        148: ["spain", '2025-08-26'],
         }
     
     l_metrics = []

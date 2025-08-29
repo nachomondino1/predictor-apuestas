@@ -1,0 +1,4 @@
+Separar main_missing_data de main_next_matches.py
+    - collect_missing_data()
+    - class MissingData:
+    - codigo de main.py para missing. --> en mnm.py solo tengo que levantar el df_integrated con los missing actualizados.
