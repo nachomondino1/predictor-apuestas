@@ -214,7 +214,7 @@ if __name__ == "__main__":
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
-    l_metrics = ['n_draw', 'expected_roi']
+    l_metrics = ['sum_aciertos_away', 'n_draw'] # Tras define_metrics_v02.py
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 
     # Levanto df_best_models
@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
         # Para maximizar error en metrica
         df_ite.loc[df_ite['error'] > 0, 'error'] *= -1
-        # df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1
+        df_ite.loc[df_ite['expected_error'] > 0, 'expected_error'] *= -1
 
         # Seleccion del modelo
         n_model, model_name = main(

@@ -812,7 +812,7 @@ def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
 
     return n_model, model_name
 
-def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, holgura: int = 0.5):
+def filter_dataframe_by_date(df: pd.DataFrame, initial_date, n_days: int, holgura: int = 0.4):
     """
     Filtrar registros de dataframe por fecha segun columna 'date'.
 
@@ -869,10 +869,14 @@ def main(
     start = time.time()
 
     # si el fifa aun no salió
-    if datetime.datetime.now().month in [8, 9]: 
-        n_days_fill_data = 120
+    fecha_hoy = datetime.datetime.now()
+    if fecha_hoy.month in [8, 9]: 
         fifa_not_released_yet = True
-        print(f"n_days_fill_data: {n_days_fill_data}")
+
+        if fecha_hoy.month == 8 and fecha_hoy.day <= 20:
+            logger.warning("⚠️⚠️⚠️ Copias formaciones de la anterior temporada (ideal solo si es la fecha inicial) ⚠️⚠️⚠️")
+            n_days_fill_data = 120 # solo en la fecha inicial. Dsp ya te conviene usar 30 dias (para que copie las formaciones mas recientes)
+            print(f"n_days_fill_data: {n_days_fill_data}")
 
     # Determino country si es None
     if country is None:

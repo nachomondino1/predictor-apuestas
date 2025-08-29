@@ -78,7 +78,7 @@ def assess_models_in_prod(
         
         # Obtengo metricas de assess
         df_assess = df_pred_met[df_pred_met.index.isin(df_pred_missing.index)]
-        gp_assess = df_assess['G/P_sin_bank'].sum()
+        gp_assess = df_assess['yield'].sum()
 
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg': len(df_pred_met), 'n_reg_assess': len(df_assess), 'gp_assess': gp_assess, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}

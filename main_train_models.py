@@ -232,7 +232,7 @@ def comprehensive_search(
                 df_constructed.to_excel(path_construct, index=True)
 
             # Clean post construct
-            df_cons_etiquetado = dp.clean_post_construct(df_constructed, n_years_to_select=n_years_to_select, col_nan_max=0.4)
+            df_cons_etiquetado = dp.clean_post_construct(df_constructed, n_years_to_select=n_years_to_select)
 
             # Etiqueto df_constructed
             df_cons_etiquetado, df_etiquetas = dp.tag_string_data_to_integer(df_cons_etiquetado)
@@ -467,7 +467,7 @@ def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), SVC()] #  XGBClassifier()
+    l_modelos = [LogisticRegression(), XGBClassifier(), RandomForestClassifier()] # Pruebo Modelos no lineales #  MLPClassifier() (distrib de probas rara)
 
     l_comp = [d_comps['all_comp']]
     l_comp_sin_duplicados = list(map(list, set(map(tuple, l_comp))))
@@ -479,7 +479,7 @@ def define_params_space(id_country):
             'n_years_to_select': [5, 10],
         },
         'construct': {
-            'n_last_matches': [[120]], # [60, 180] # Variables historicas en ultimos n partidos,
+            'n_last_matches': [[60], [120]], # [30] [60, 180] # Variables historicas en ultimos n partidos,
             'n_years_h2h': [2],
             'segun_localia': [True, False], 
             'calculate_dif': [True], # False
