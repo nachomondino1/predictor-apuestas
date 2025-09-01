@@ -55,7 +55,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
 
         # Aplico estrategia "sin_ea"
         # d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
-        d_params_sin_ea = {'prob_dp': None, 'curva': 'kelly', 'm': 10, 'b': 0, 'k': 10}
+        d_params_sin_ea = {'prob_dp': 0.5, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
@@ -210,20 +210,20 @@ if __name__ == "__main__":
     l_metrics_test = [
         "yield", "expected_yield", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score",  # roi_por_partido, expected_roi_por_partido
         # "cv_accuracy", "cv_f1_score", "cv_cross_entropy_loss", "cv_f1_score_draw",
-        # "aciertos_draw", "aciertos_home", "aciertos_away", 
+        "aciertos_draw", "aciertos_home", "aciertos_away", 
         "sum_aciertos_draw", "sum_aciertos_home", "sum_aciertos_away", 
-        "n_draw", "n_away", "n_home", 
+        # "n_draw", "n_away", "n_home", 
         "f1_score_draw", "f1_score_away", "f1_score_home", 
         "expected_f1_score_draw", "expected_f1_score_away", "expected_f1_score_home",
         ]
     # Definir metrica a optimizar en produccion
-    col_prod = 'yield'  # yield
+    col_prod = 'test_accuracy_rtb'  # yield
 
     # Defino variables
     df_ct, df_corr_ct = pd.DataFrame(), pd.DataFrame()
-    perc_matches_prod = round(1 - perc_matches_test, 1)
     d = {}
     corr_metric = f'{col_prod}_prod'
+    perc_matches_prod = round(1 - perc_matches_test, 1)
 
     # Por pais
     for id_country in l_countries:

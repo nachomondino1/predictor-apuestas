@@ -214,7 +214,8 @@ if __name__ == "__main__":
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
     l_metrics = ['roi_por_partido'] # benchmark
-    l_metrics = ['sum_aciertos_away', 'n_draw'] # Tras define_metrics_v02.py
+    # l_metrics = ['sum_aciertos_away', 'n_draw'] # Tras define_metrics_v02.py (max yield) (semana 2)
+    l_metrics = ['expected_error', 'sum_aciertos_away'] # Tras define_metrics_v02.py max test_acc (sin n_draw y esas)  (semana 3)
     l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 
     # Levanto df_best_models
