@@ -46,8 +46,8 @@ def predict_models(l_countries, n_models_predict: int = 5):
             df = main(d_run, id_country, iteration_date=iteration_date, d_model=d_model, export=False) 
 
             # Selecciono id_match y predicted_result
-            df_filt = df.loc[:, ['id_team_home', 'id_team_away', 'odds_home', 'odds_draw', 'odds_away', 'predicted_result']]
-            df_filt.rename(columns={'predicted_result': f'{n_model}_{model_name}'}, inplace=True)
+            df_filt = df.loc[:, ['id_team_home', 'id_team_away', 'odds_home', 'odds_draw', 'odds_away', 'result_to_bet']] 
+            df_filt.rename(columns={'result_to_bet': f'{n_model}_{model_name}'}, inplace=True)
             new_cols = [col for col in df_filt.columns if col not in df_country.columns]
 
             # Concateno predicciones de modelos
@@ -65,6 +65,6 @@ if __name__ == "__main__":
 
     # Defino hiperparametros
     l_countries = [48, 55, 59, 77, 148]
-    n_models_predict=10
+    n_models_predict=5
 
     predict_models(l_countries, n_models_predict=n_models_predict)
