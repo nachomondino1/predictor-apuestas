@@ -28,11 +28,13 @@ def calculate_metrics(
     if verbose >= 1:
         print(f"Shape de y_pred_prob: {y_pred_prob.shape}")
 
+    df_copy = determine_winning_bets(df)
 
     # Calculo métricas básicas
     d_metrics = {
         'error': -log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100, # 'test_accuracy_dp': df['acerte'].mean() * 100,
+        'test_accuracy_rtb': df_copy['acerte'].mean() * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
     }
@@ -117,6 +119,55 @@ def confusion_matrix(y_real, y_pred):
     print(f"\n\nMatriz de confusion:\n {df_cm}")
     return df_cm
 
+def determine_winning_bets(df: pd.DataFrame, name_extension=''):
+    """
+    Determina si el resultado apostado fue el resultado real del partido o no.
+    
+    # Parameters
+        df: Dataframe con partidos en los que se indica tanto el resultado a apostar como el resultado real del partido.
+
+    # Returns
+        Dataframe pasado como parametro con una nueva columna, 'acerte' indicando si se acertó el resultado apostado o no.
+    """
+    # inicializo columna "acerte"
+    var_result=f'{name_extension}result'
+    var_acerte=f'{name_extension}acerte'
+
+    df[var_acerte] = 0
+
+    # Por partido
+    for id_match, row in df.iterrows():
+
+        # Si el resultado a apostar es Home, Draw o Away
+        if row['result_to_bet'] >= 0:
+            if row[var_result] == row['result_to_bet']:
+                df.loc[id_match, var_acerte] = 1
+
+        # Si el resultado a apostar es doble oportunidad sin Home
+        elif row['result_to_bet'] == -1:
+            if (row[var_result] == 0) or (row[var_result] == 2):
+                df.loc[id_match, var_acerte] = 1
+
+        # Si el resultado a apostar es doble oportunidad sin Away
+        elif row['result_to_bet'] == -2:
+            if (row[var_result] == 0) or (row[var_result] == 1):
+                df.loc[id_match, var_acerte] = 1
+
+        # Si el resultado a apostar es doble oportunidad sin Draw
+        elif row['result_to_bet'] == -0:
+            if (row[var_result] == 2) or (row[var_result] == 1):
+                df.loc[id_match, var_acerte] = 1
+
+        # Si fallo la prediccion
+        else:
+            df.loc[id_match, var_acerte] = np.nan
+
+    # Imprimo warning si supuestamente acerté el 100% de partidos
+    if len(df[df[var_acerte]==1]) == len(df):
+        logger.warning(f"Considera que acertó todos los partidos (es decir, 100% de precision). Es muy probable que no este filtrando bien los partidos que acierta de los que no.")
+
+    return df
+    
 # Bookies
 def calculate_bookie_metrics(df_pred_proba, var_resp: str = 'result', var_pred_bm: str = 'bookmaker_result'):
     """
