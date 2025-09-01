@@ -71,13 +71,15 @@ class BettingStrategy:
         return dic
 
     # RESULT TO BET
-    def determine_result_to_bet(self, df: pd.DataFrame, thr_prob_min):
+    def determine_result_to_bet(self, df: pd.DataFrame, thr_prob_min, thr="prob"):
         """
         Determina el/los resultado/s a apostar (no necesariamente coincide con el resultado predicho).
         
         # Parameters:
             df: Dataframe con probabilidades de mi modelo y con predicciones y cuotas de la casa de apuestas. (DataFrame)
-            _print: True para imprimir por pantalla el procesamiento de la funcion, en caso contrario, False. (bool)
+            thr: 
+                "kelly", "prob", "odd"
+            thr_prob_min: Valor umbral minimo de thr para apostar al resultado predicho. Si es menor, apuesto doble oportunidad sin el resultado predicho. (float)
 
         # Returns:
             Dataframe pasado como parametro con resultado a apostar, la cuota a apostar, la estrategia utiilizada y la probabilidad del resultado al que se apuesta. (DataFrame)
@@ -90,28 +92,29 @@ class BettingStrategy:
             prob_result_to_bet = max(row['prob_class_1'], row['prob_class_0'], row['prob_class_2'])
             odd_to_bet = row['odds_home'] if row['predicted_result'] == 1 else (row['odds_draw'] if row['predicted_result'] == 0 else row['odds_away'])  # Verificada
             kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # creo que esta bien
+            thr_val = kelly_crit if thr == "kelly" else (prob_result_to_bet if thr == "prob" else odd_to_bet)
             
             # Calculo la confianza de la prediccion
             probs_sorted = np.sort([row['prob_class_1'], row['prob_class_0'], row['prob_class_2']], axis=0)  # axis=0 para vertical sorting si trabajas filas como columnas
             confidence_margin = probs_sorted[2] - probs_sorted[1]  # La diferencia entre la probabilidad más alta y la segunda más alta
 
             # Si el riesgo-beneficio es malo, doble oportunidad
-            if thr_prob_min is not None and row['predicted_result'] != 0 and kelly_crit < thr_prob_min:
+            if thr_prob_min is not None and row['predicted_result'] != 0 and thr_val < thr_prob_min:
                 if self.verbose >= 1:
-                    logger.warning(f"Aplicamos doble oportunidad por kelly_crit = {kelly_crit} < {thr_prob_min}. ")
+                    logger.warning(f"Aplicamos doble oportunidad por {thr} = {thr_val} < {thr_prob_min}. ")
 
                 # Apuesto doble oportunidad sin el resultado predicho
                 result_to_bet = -1 if row['predicted_result'] == 1 else (-2 if row['predicted_result'] == 2 else -0)
                 prob_result_to_bet = 1 - prob_result_to_bet
                 odd_to_bet = self.calculate_odd_double_chance(row, result_to_bet)
-                strategy = f" kelly_crit < {thr_prob_min}"
+                strategy = f" {thr} < {thr_prob_min}"
                 kelly_crit = ((odd_to_bet - 1) * prob_result_to_bet - (1 - prob_result_to_bet)) / (odd_to_bet - 1)  # Lo recalculo pues ahora apuesto a otro rdo
 
             # Si el riesgo-beneficio es alto
             else:
                 # Apuesto al resultado predicho
                 result_to_bet = row['predicted_result']
-                strategy = f" kelly_crit > {thr_prob_min}"
+                strategy = f" {thr} > {thr_prob_min}"
 
             # Guardo el resultado a apostar
             df.loc[id_match, 'result_to_bet'] = result_to_bet
