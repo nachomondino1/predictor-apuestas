@@ -151,7 +151,8 @@ class FlashscoreCrawler(Crawler):
             d_row_match_odds.update(self.extract_odds())
 
         # LINE UPS
-        boton_formations = super().extract_tag(xpath='//a[@href="#/match-summary/lineups"]/button', sec_wait=self.SEC_WAIT_MAX, print_fail=print_not_next_matches)
+        xpath_lineups ='//a[@data-analytics-alias="lineups"]/button' # //a[@href="#/match-summary/lineups"]/button
+        boton_formations = super().extract_tag(xpath=xpath_lineups, sec_wait=self.SEC_WAIT_MAX, print_fail=print_not_next_matches)
 
         ## Si tiene hoja "Lineups"
         if super().click_boton(boton_formations) is not False:
@@ -479,7 +480,7 @@ class FlashscoreCrawler(Crawler):
                 coach_away = extract_name_from_href(url_coach_away)
                 d_row.update({"id_coach_away": id_coach_away, "coach_away": coach_away}) #  "url_coach": url_coach_away
 
-        if self.verbose >= 0:
+        if self.verbose >= 1:
             print(f"Extracting coaches: {d_row}")
         return d_row
 
