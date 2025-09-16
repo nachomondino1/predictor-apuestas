@@ -573,6 +573,14 @@ def corregir_goals(df):
     """
     Corrijo goals cuando hubo penales o fueron a alargue
     """
+    # Reemplazo explícito de valores no numéricos
+    df['penalties'] = df['penalties'].replace("ABANDONED", 0) # -> solo x falla en FA cup
+
+    # Si 'penalties' es NaN, reemplazar por 0 --> solo x falla en FA cup
+    if not pd.api.types.is_integer_dtype(df['penalties']):
+        df['penalties'] = df['penalties'].fillna(0)
+        df['penalties'] = df['penalties'].astype(int) # Opcional: convertir a entero si querés forzar el tipo
+
     # Identifica los índices de los partidos con penales
     idxs = df[df['penalties'] > 0].index.tolist()
 

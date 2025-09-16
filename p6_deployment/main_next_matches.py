@@ -119,11 +119,16 @@ class DataUnderstandingNew():
         l_competencies = df_match['id_competition'].unique()
         print("Competencias extraidas: ", l_competencies)
 
+        # Competencias a evitar
+        l_supercups = [] if datetime.datetime.now().month in [1, 8] else [65, 66, 67, 482, 553, 594, 772, 1484] # Supercopas que se juegan 1 vez al año (se juegan en Enero y en Agosto)
+        l_comps_discontinued = [554] # Competencia discontinuadas (e.g. Coupe de la Ligue)
+        l_comps_to_avoid = l_supercups + l_comps_discontinued
+
         # POR COMPETITION (solo las que hay en df_match)
         for id_competition in l_competencies:
 
             # evito competencias que extraje en df_match pero no quiero recolectar missing
-            if id_competition in [1672, 1673]:
+            if id_competition in l_comps_to_avoid:
                 continue
 
             # Obtengo nombre de competicion y is_cup
@@ -150,8 +155,10 @@ class DataUnderstandingNew():
             missing_sub_cols = not any("_sub_" in col for col in df_match_player_concat.columns)
 
             if len(df_match_player_concat.columns) == 0:
-                logger.error(f"No se tiene las formaciones de ninguno de los {len(df_match_player_concat.columns)} partidos ya jugados. Esto no es comun. Solo es correcto si realmente no existe ningun dato de las formaciones para estos partidos (ni missing players).")
-                raise ValueError
+                logger.error(f"No se tiene las formaciones de ninguno de los {len(df_match_concat)} partidos ya jugados. Esto no es comun. Solo es correcto si realmente no existe ningun dato de las formaciones para estos partidos (ni missing players).")
+                inp = str(input("Presiona y para continuar:"))
+                if inp.lower() != 'y':
+                    raise ValueError
             
             elif missing_start_cols or missing_sub_cols:
                 
@@ -177,7 +184,9 @@ class DataUnderstandingNew():
             umbral = 0.5
             if porcentaje_nan > umbral: 
                 logger.error(f"El DataFrame df_match_odds_concat tiene {porcentaje_nan:.2%} valores NaN, lo cual supera el umbral de {umbral:.2%}. Esto no es posible una vez jugado el partido, se deben tener las cuotas.")
-                raise ValueError
+                inp = str(input("Presiona y para continuar: "))
+                if inp.lower() != 'y':
+                    raise ValueError
 
             if len(df_match_odds_concat.columns) != 3:
                 logger.error("No se recolectaron todas las odds en df_match_odds. Esto no es posible una vez jugado el partido, se debe tener las cuotas.")

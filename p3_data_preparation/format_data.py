@@ -30,14 +30,23 @@ def convert_ball_possession_to_int(df):
         except (ValueError, AttributeError):
             return np.nan
 
-    if ("ball_possession_home" in df.columns) and ('ball_possession_away' in df.columns):
-        df["ball_possession_home"] = df["ball_possession_home"].apply(convert_value)
-        df["ball_possession_away"] = df["ball_possession_away"].apply(convert_value)
-    
-    # Verifica si la conversión fue exitosa
-    if not all(pd.api.types.is_integer_dtype(df[col]) for col in ["ball_possession_home", "ball_possession_away"]):
-        logger.warning("Not all elements in the ball possession columns are integers after conversion.")
+    # Lista de columnas que podrían representar posesión
+    possession_cols = ["ball_possession_home", "ball_possession_away"]
+
+    for col in possession_cols:
+
+        # Si la columna está en el DataFrame
+        if col in df.columns:
+            df[col] = df[col].apply(convert_value)
+
+            # Verifica si la conversión fue exitosa (debe ser int)
+            if not pd.api.types.is_integer_dtype(df[col]):
+                logger.warning(f"La columna '{col}' no se convirtió completamente a enteros.")
         
+        # Si la columna no está en el df
+        else:
+            logger.warning(f"La columna '{col}' no está presente en el DataFrame. Se omite.")
+
     return df
 
 def convert_value_to_int(df):
