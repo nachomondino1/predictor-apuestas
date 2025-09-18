@@ -16,7 +16,7 @@ def assess_models_in_prod(
         iteration_date,
         update_missing: bool = False,
         predict_missing: bool = True,
-        concat_with_test: bool = True,
+        concat_with_test: bool = False,
         xlsx_name: str = 'df_ite_bs.xlsx',
         export: bool = True
 ):
@@ -69,7 +69,8 @@ def assess_models_in_prod(
         df_pred = asses_model.drop_old_metrics(df_pred)
 
         # 📌 Aplicar estrategia "sin_ea"
-        d_params = bs.define_hiperparameters(strategy='train')
+        # d_params = bs.define_hiperparameters(strategy='train')
+        d_params = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} 
         df_pred_met, d_rois = bs.calculate_roi_in_combination(df_pred, d_params)
 
         ## Calculo metricas
@@ -77,11 +78,13 @@ def assess_models_in_prod(
         d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
         
         # Obtengo metricas de assess
-        df_assess = df_pred_met[df_pred_met.index.isin(df_pred_missing.index)]
-        gp_assess = df_assess['yield'].sum()
+        if concat_with_test:
+            df_assess = df_pred_met[df_pred_met.index.isin(df_pred_missing.index)]
+            gp_assess = df_assess['yield'].sum()
+            # dict:  'n_reg': len(df_assess), 'gp_assess': gp_assess,
 
         # Guardo datos
-        new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg': len(df_pred_met), 'n_reg_assess': len(df_assess), 'gp_assess': gp_assess, **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
+        new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg_assess': len(df_pred_met),  **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
         rows.append(new_row)
         df_ite_bs = pd.DataFrame(data=rows)
 
@@ -92,7 +95,7 @@ def assess_models_in_prod(
             path_final = path2 if concat_with_test else path1
             
             df_pred_met.to_excel(path_final, index=True) # Cuando haces assess
-            df_ite_bs.to_excel(f'{path}/{xlsx_name}.xlsx', index=False)
+            df_ite_bs.to_excel(f'{path}/bis_{xlsx_name}.xlsx', index=False)
     
     return df_ite_bs
 
@@ -116,62 +119,56 @@ def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [167]
-
-    xlsx_name = 'expected_f1_score'
-    one_model, n_model = False, 328
+    one_model = False
     n_models = 10
-    concat_with_test = False
 
-    d_countries = {
-        # 48: ["england", '2025-05-07'],
-        # 55: ["france", '2025-05-07'], 
-        # 59: ["germany", '2025-05-08'],
-        # 77: ["italy", '2025-05-08'],
-        # 148: ["spain", '2025-05-07']
-        
-        48: ["england", '2025-05-28'],
-        55: ["france", '2025-05-28'], 
-        59: ["germany", '2025-05-29'],
-        77: ["italy", '2025-05-29'],
-        148: ["spain", '2025-05-28'],
-        167: ["usa", '2025-05-29'],
-        }
+    # Levanto df_best_models
+    df_best_models = pd.read_excel('data/df_best_models.xlsx')
     
+    # Por pais
     for id_country in l_countries:
-        country = d_countries[id_country][0]
-        iteration_date = d_countries[id_country][1]
+
+        country = df_best_models['country'][df_best_models['id_country'] == id_country].values[0]
+        iteration_date = df_best_models['iteration_date'][df_best_models['id_country'] == id_country].values[0]
+        iteration_date_dt = pd.to_datetime(iteration_date, format='%Y-%m-%d').date()  # con .date() saco hora y minutos
+        print(f"--- {country} {iteration_date_dt} ---")
 
         # Levanto df_ite
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/3_bet_strategy/df_ite_bs.xlsx") # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date_dt}/best_model/3_bet_strategy/df_ite_bs.xlsx") # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
      
         if one_model:
 
+            # Eligo el modelo de prod
+            n_model = df_best_models['n_model'][df_best_models['id_country'] == id_country].values[0]
+            model_name = df_best_models['model_name'][df_best_models['id_country'] == id_country].values[0]
+            print(f"--- {n_model} {model_name} ---")
+            # Filtro df_ite
             df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
+            df_ite = df_ite[df_ite['model_name'].isin([model_name])]
     
-            df_ite_bs, df_pred_met = assess_models_in_prod(
+            df_ite_bs = assess_models_in_prod( # df_ite_bs, df_pred_met
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 
-                iteration_date=iteration_date, 
-                concat_with_test=concat_with_test,
-                export=False
+                iteration_date=iteration_date_dt, 
+                export=True
                 )
             
-            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/metrics_{n_model}.xlsx')
-            df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}.xlsx')
+            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/metrics_{n_model}_{model_name}.xlsx')
+            # df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}_{model_name}.xlsx')
 
         else:
             df_ite = df_ite.head(n_models)
             print(df_ite)
 
+            xlsx_name = 'expected_f1_score'
+
             df_ite_bs = assess_models_in_prod(
                 df_ite=df_ite,
                 id_country=id_country, 
                 country=country, 
-                iteration_date=iteration_date, 
-                concat_with_test=concat_with_test,
+                iteration_date=iteration_date_dt, 
                 xlsx_name=xlsx_name
                 )
     
-            df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{xlsx_name}.xlsx")
+            df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date_dt}/best_model/2_assess/{xlsx_name}.xlsx")
