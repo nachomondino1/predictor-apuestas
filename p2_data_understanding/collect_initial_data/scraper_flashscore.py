@@ -151,8 +151,12 @@ class FlashscoreCrawler(Crawler):
             d_row_match_odds.update(self.extract_odds())
 
         # LINE UPS
-        xpath_lineups ='//a[@data-analytics-alias="lineups"]/button' # //a[@href="#/match-summary/lineups"]/button
-        boton_formations = super().extract_tag(xpath=xpath_lineups, sec_wait=self.SEC_WAIT_MAX, print_fail=print_not_next_matches)
+        if next_matches:
+            xpath_lineups_button = '//a[@data-analytics-alias="predicted-lineups"]/button'
+        else:
+            xpath_lineups_button ='//a[@data-analytics-alias="lineups"]/button' # //a[@href="#/match-summary/lineups"]/button
+
+        boton_formations = super().extract_tag(xpath=xpath_lineups_button, sec_wait=self.SEC_WAIT_MAX, print_fail=print_not_next_matches)
 
         ## Si tiene hoja "Lineups"
         if super().click_boton(boton_formations) is not False:
@@ -187,15 +191,13 @@ class FlashscoreCrawler(Crawler):
             'result_2nd_half': './/div[contains(@class, "smv__incidentsHeader")][2]/div[2]', # Con esto genero 2nd_ht_goals_home y 2nd_half_goals_away y result_2nd_half (1, 0 o 2)
             'goals_home_ft': './/div[@class="detailScore__fullTime"]/span[1]',
             'goals_away_ft': './/div[@class="detailScore__fullTime"]/span[3]',
-            'neutral_location': "//div[contains(@class, 'infoBox__wrapper') and contains(., 'Neutral location.')]"
             }
         
         for field, xpath in d_field_xpath.items():
-            if field == 'neutral_location':
-                # Para neutral_location, buscamos si el elemento existe en lugar de extraer texto
-                value = super().extract_tag(xpath=xpath, sec_wait=self.SEC_WAIT_MIN, print_fail=False)
-                d_row[field] = 1 if value is not None else 0
-        pass
+            value = super().extract_tag(xpath=xpath, sec_wait=self.SEC_WAIT_MIN, text=True, print_fail=False)
+            d_row[field] = value
+
+        return d_row
 
     def extract_match_information(self, next_matches):
         """
@@ -437,10 +439,15 @@ class FlashscoreCrawler(Crawler):
         d_row['penalties'] = super().extract_tag(xpath='.//div[@class="detailScore__status"]', text=True, sec_wait=0.4, print_fail=False)  # After Penalties o FINISHED  
 
         # Neutralidad
-        tag_neutral = super().extract_tag(xpath='.//div[contains(@class, "infoBoxModule")]//div[contains(text(), "Neutral") or contains(text(), "Playing at")]', sec_wait=0.4, print_fail=False) # 
+        tag_info_box = super().extract_tag(xpath='.//div[contains(@class, "infoBoxModule")]', text=True, sec_wait=0.4, print_fail=False) # 
 
-        if tag_neutral is not None:
-            neutralidad = 1
+        if tag_info_box is not None:
+            # Defino los textos que indican neutralidad
+            pos_texts = ['neutral', "playing at", "at a different stadium"]
+            
+            # Si alguno de los textos está en el tag, entonces es neutral
+            texts_in_tag = [text for text in pos_texts if text in tag_info_box.lower()]
+            neutralidad = 1 if texts_in_tag else 0
         else:
             neutralidad = 0
         
