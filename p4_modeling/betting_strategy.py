@@ -245,15 +245,6 @@ class BettingStrategy:
         """
         logger.warning("Aplicando modificadores de stake para PROD...")
 
-        # No apostamos en local
-        df.loc[df['result_to_bet'] == 1, 'stake_to_bet'] *= 0
-
-        # Apostamos el doble en empate
-        # df.loc[df['result_to_bet'] == 2, 'stake_to_bet'] *= 2
-
-        # Confidence margin
-        # df.loc[(df['confidence_margin'] < 0.025) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.3 # Reducir stake si confidence_margin < threshold
-
         # Disminuyo stake por rellenado de emergencia
         df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= 0
         return df
@@ -342,7 +333,8 @@ class BettingStrategy:
         # Aplicar estrategia a df_pred
         df_aux = self.apply_strategy(df, param_dict, prod=False)
 
-        # Calculo de metricas (ROI y roi_pp)
+        # Calculo de metricas (ROI y roi_pp) --> es al pedo el ROI.
+        # calculate_yield()
         df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
         df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
         

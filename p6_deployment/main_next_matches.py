@@ -1203,7 +1203,12 @@ def main(
         bs = betting_strategy.BettingStrategy(country=country, iteration_date=iteration_date_dt)
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
-        d_strategy = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # Linear infla mucho con cuotas chotas..
+        if predict_missing:
+            d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}  # predict_missing. Usamod prod=True porque no tenemos result todavia
+        else:
+            # d_strategy = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # Linear infla mucho con cuotas chotas..
+            d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
+
         if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
             df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
@@ -1231,27 +1236,25 @@ if __name__ == "__main__":
 
     # Defino country
     d_countries = {
-        48: ["england", '2025-08-18'], 
-        55: ["france", '2025-08-18'], 
-        59: ["germany", '2025-08-18'], 
-        77: ["italy", '2025-08-19'],
-        148: ["spain", '2025-08-19'], 
-        167: ["usa", '2025-08-14'], 
+        48: ["england", '2025-08-26'], 
+        55: ["france", '2025-08-26'], 
+        59: ["germany", '2025-08-26'], 
+        77: ["italy", '2025-08-26'],
+        148: ["spain", '2025-08-26'], 
+        167: ["usa", '2025-08-26'], 
         }
 
     id_country = 48
-    key, value = 'predict', 'next_matches'
     n_days = 7
 
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    # d_model = {'n_model': 24, 'model_name': "LogisticRegression"} # LogisticRegression
+    d_model = {'n_model': 3, 'model_name': "LogisticRegression"} # LogisticRegression
 
 
-    d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True} 
-    df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, export=True, country=country)  #d_model=d_model
-
+    d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False} 
+    df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, export=True, d_model=d_model, country=country)
 
     if isinstance(df, pd.DataFrame):
         df.to_excel(f"{directorio}/predicciones.xlsx")

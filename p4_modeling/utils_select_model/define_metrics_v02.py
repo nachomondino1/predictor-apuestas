@@ -54,20 +54,14 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         print(df_first_matches.shape, df_last_matches.shape)
 
         # Aplico estrategia "sin_ea"
-        # d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
-        d_params_sin_ea = {'prob_dp': 0.5, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
+        d_params_sin_ea = bs.define_hiperparameters(strategy='train') 
+        # d_params_sin_ea = {'prob_dp': 0.5, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
 
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
         df_test, d_rois = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
         d_metrics_test_sin_ea = asses_model.calculate_metrics(df_test, bet_metrics=False)
         d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_', bet_metrics=False)
-
-        d_metrics_test_sin_ea.update({
-            'sum_aciertos_draw': d_metrics_test_sin_ea['aciertos_draw'] + d_metrics_test_sin_ea_ex['expected_aciertos_draw'], 
-            'sum_aciertos_away': d_metrics_test_sin_ea['aciertos_away'] + d_metrics_test_sin_ea_ex['expected_aciertos_away'], 
-            'sum_aciertos_home': d_metrics_test_sin_ea['aciertos_home'] + d_metrics_test_sin_ea_ex['expected_aciertos_home'], 
-            })
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
@@ -204,20 +198,20 @@ if __name__ == "__main__":
         }
     
     # Condiciones 
-    perc_matches_test = 0.7
-    n_models = 20
+    perc_matches_test = 0.65
+    n_models = 200
     used_saved = False # Usar FALSE si queres usar ≠ metricas de test o dividir segun distinta proporcion  
     l_metrics_test = [
-        "yield", "expected_yield", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score",  # roi_por_partido, expected_roi_por_partido
-        # "cv_accuracy", "cv_f1_score", "cv_cross_entropy_loss", "cv_f1_score_draw",
-        "aciertos_draw", "aciertos_home", "aciertos_away", 
-        "sum_aciertos_draw", "sum_aciertos_home", "sum_aciertos_away", 
-        # "n_draw", "n_away", "n_home", 
+        "yield", "expected_yield", "error", "expected_error", "test_accuracy", "recall", "f1_score", "expected_f1_score", 
         "f1_score_draw", "f1_score_away", "f1_score_home", 
-        "expected_f1_score_draw", "expected_f1_score_away", "expected_f1_score_home",
+        "expected_f1_score_draw", "expected_f1_score_away", "expected_f1_score_home"
+        # No usar:
+        # "cv_accuracy", "cv_f1_score", "cv_cross_entropy_loss", "cv_f1_score_draw",
+        # "aciertos_draw", "aciertos_home", "aciertos_away", 
+        # "n_draw", "n_away", "n_home", 
         ]
     # Definir metrica a optimizar en produccion
-    col_prod = 'test_accuracy_rtb'  # yield
+    col_prod = 'yield'
 
     # Defino variables
     df_ct, df_corr_ct = pd.DataFrame(), pd.DataFrame()

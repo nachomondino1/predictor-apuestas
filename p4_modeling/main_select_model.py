@@ -213,10 +213,16 @@ if __name__ == "__main__":
         }
     
     # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
-    l_metrics = ['roi_por_partido'] # benchmark
-    # l_metrics = ['sum_aciertos_away', 'n_draw'] # Tras define_metrics_v02.py (max yield) (semana 2)
-    l_metrics = ['expected_error', 'sum_aciertos_away'] # Tras define_metrics_v02.py max test_acc (sin n_draw y esas)  (semana 3)
-    l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
+    # l_metrics = ['roi_por_partido'] # benchmark
+    # l_metrics = ['expected_error', 'sum_aciertos_away'] # Tras define_metrics_v02.py max test_acc (sin n_draw y esas)  (semana 3)
+
+    d_metrics = {
+        48: ['expected_error', 'expected_f1_score_away'],
+        55: ['roi', 'expected_f1_score_away'],  # yield
+        59: ['roi', 'f1_score_draw'], # yield
+        77: ['expected_error', 'expected_f1_score_home'],
+        148: ['expected_error', 'expected_f1_score_away'],
+    }
 
     # Levanto df_best_models
     df_bm = pd.read_excel('data/df_best_models.xlsx')
@@ -225,16 +231,16 @@ if __name__ == "__main__":
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
+        # Defino metricas
+        l_metrics = d_metrics[id_country]
+        l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
+
         # Levanto df_iteration con datos de train y test
         df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
         # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/bs/stake_kelly_linear_no_home/df_iteration.xlsx")
 
         print(df_ite.head(5))
         print(df_ite.shape)
-
-        # Calculo new metrics
-        df_ite['sum_aciertos_draw'] = df_ite['aciertos_draw'] + df_ite['expected_aciertos_draw']
-        df_ite['sum_aciertos_away'] = df_ite['aciertos_away'] + df_ite['expected_aciertos_away']
 
         # Evito modelos que tienen menos de 90 registros en test
         df_ite_dup = df_ite.copy()
