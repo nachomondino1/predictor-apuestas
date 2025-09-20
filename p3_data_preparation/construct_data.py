@@ -10,7 +10,7 @@ from p3_data_preparation.clean_data import replace_nan_with_zero
 
 # (1) VARIABLES DERIVADAS
 # Variable respuesta
-def determine_result(df: pd.DataFrame, var_resp: str = 'result', prod: bool = False):
+def determine_result(df: pd.DataFrame, var_resp: str = 'result', var_goals: str = "goals"):
     """
     Determina el 'result' a partir de los goles que hizo cada equipo.
     
@@ -18,11 +18,11 @@ def determine_result(df: pd.DataFrame, var_resp: str = 'result', prod: bool = Fa
     :param var_resp: Nombre de la nueva columna de resultado.
     :return: DataFrame con la nueva columna 'result'.
     """
-    # if prod:
-    #     df[['goals_home', 'goals_away']] = df[['goals_home', 'goals_away']].fillna(0)
+    col1 = f'{var_goals}_home'
+    col2 = f'{var_goals}_away'
 
-    condicion_victoria_local = df['goals_home'] > df['goals_away']
-    condicion_victoria_visitante = df['goals_home'] < df['goals_away']
+    condicion_victoria_local = df[col1] > df[col2]
+    condicion_victoria_visitante = df[col1] < df[col2]
     
     df[var_resp] = np.where(condicion_victoria_local, 1, 
                             np.where(condicion_victoria_visitante, 2, 0))

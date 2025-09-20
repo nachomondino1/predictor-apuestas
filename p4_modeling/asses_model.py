@@ -15,6 +15,9 @@ def calculate_metrics(
         ):
     """
     Calculo de metricas que no requieren mas que y_pred e y_test
+
+    # Paramters:
+        var_pred: Nombre de la variable con las predicciones del modelo. A pesar de que uses 'result_to_bet' las metricas se calcularan con 'predicted_result'. (str)
     """
     # Elimino filas con nan en variable respuesta (sobretodo para expected)
     df_filt = df.dropna(subset=[var_resp])
@@ -28,13 +31,14 @@ def calculate_metrics(
     if verbose >= 1:
         print(f"Shape de y_pred_prob: {y_pred_prob.shape}")
 
-    df_copy = determine_winning_bets(df)
+    # if var_pred =='result_to_bet':
+    #     df_copy = determine_winning_bets(df) # sobretodo cuando predicted_result ≠ result_to_bet por ea
+    #     'test_accuracy_rtb': df_copy['acerte'].mean() * 100,
 
     # Calculo métricas básicas
     d_metrics = {
         'error': -log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100, # 'test_accuracy_dp': df['acerte'].mean() * 100,
-        'test_accuracy_rtb': df_copy['acerte'].mean() * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
     }
@@ -78,7 +82,7 @@ def calculate_metrics(
             'aciertos_draw': n_draw * d_metrics['precision_draw'] / 100,
             'aciertos_away': n_away * d_metrics['precision_away'] / 100
             }
-        )
+        )      
 
     # Calculo metricas de la bookie --> necesita df_match_odds Pero quiero tener las metricas cuando hago el assess...
     if bet_metrics:
@@ -278,6 +282,22 @@ def rename_dict_keys(d, prefix=None, suffix=None):
     return {f"{prefix or ''}{k}{suffix if suffix else ''}": v for k, v in d.items()}
 
 # CALCULO DE METRICAS DE ROI
+def calculate_yield(df: pd.DataFrame, name_extension=''):
+    
+    # Definicion de variables
+    d_rois = {}
+
+    # Por partido
+    for idx, row in df.iterrows():
+
+        # Determino ganancias / perdidas (sin bank)
+        yield_ = row['stake_to_bet'] * (row['odd_to_bet'] - 1) if row[f'{name_extension}acerte'] == 1 else -row['stake_to_bet']
+        df.loc[idx, f'{name_extension}yield'] = yield_
+
+    # Calculo metricas totales
+    d_rois[f'{name_extension}yield'] = df[f'{name_extension}yield'].sum()
+    return df, d_rois
+
 def calculate_roi(df: pd.DataFrame, name_extension=''):
     """
     Calcula ROI obtenido segun las predicciones del modelo y el resultado real de los partidos. Para poder seleccionar el mejor modelo.
@@ -575,8 +595,8 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
 
 def drop_old_metrics(df_predicciones):
     # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
+    # 'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
     columns_to_exclude = [
-        'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
         'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'yield'
         'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_yield'
     ]

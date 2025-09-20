@@ -101,7 +101,7 @@ class Crawler:
             return driver
         
         except Exception as e:
-            logger.error(f"Failed to inicialize the ChromeDriver with the latest version: {e}. Puede ser por: 1) tener una actualizacion de software pendiente en tu compu. 2) tenes que eliminar caché de webdriver-manager.")
+            logger.error(f"Failed to inicialize the ChromeDriver with the latest version: {e}. \n Posibles soluciones: \n1) Tenes una actualizacion de software pendiente en tu compu. \n2) Tenes que eliminar caché de webdriver-manager (abri terminal y ejecutá 'rm -rf ~/.wdm') \n3) Cerrar Google Chrome y volver a ejecutar el script.")
 
             try:
                 # 2) Inicializar ChromeDriver con la versión de Google Chorme en mi compu

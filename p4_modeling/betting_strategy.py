@@ -245,15 +245,6 @@ class BettingStrategy:
         """
         logger.warning("Aplicando modificadores de stake para PROD...")
 
-        # No apostamos en local
-        df.loc[df['result_to_bet'] == 1, 'stake_to_bet'] *= 0
-
-        # Apostamos el doble en empate
-        # df.loc[df['result_to_bet'] == 2, 'stake_to_bet'] *= 2
-
-        # Confidence margin
-        # df.loc[(df['confidence_margin'] < 0.025) & (df['result_to_bet'] != 0), 'stake_to_bet'] *= 0.3 # Reducir stake si confidence_margin < threshold
-
         # Disminuyo stake por rellenado de emergencia
         df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= 0
         return df
@@ -328,7 +319,7 @@ class BettingStrategy:
 
         return df
 
-    def calculate_roi_in_combination(self, df, param_dict):
+    def calculate_roi_in_combination(self, df):
         """
         Para calcular ROI de las prediciones de un modelo
 
@@ -339,12 +330,13 @@ class BettingStrategy:
         if 'expected_result' not in df.columns:
             df = determine_expected_result(df, verbose=0)
 
-        # Aplicar estrategia a df_pred
-        df_aux = self.apply_strategy(df, param_dict, prod=False)
+        # Determino acierto de prediccion
+        df = self.determine_winning_bets(df)
+        df = self.determine_winning_bets(df, name_extension='expected_')
 
-        # Calculo de metricas (ROI y roi_pp)
-        df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
-        df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
+        # Calculo de metricas (ROI y roi_pp) --> es al pedo el ROI.
+        df_pred_with_metrics, d_metrics = calculate_roi(df)         # calculate_yield()
+        df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df, name_extension="expected_")
         
         # # Concateno datos de ROI y Expected ROI
         missing_columns = [col for col in df_pred_with_metrics_2.columns if col not in df_pred_with_metrics.columns]
@@ -361,11 +353,6 @@ class BettingStrategy:
         
         # Determino result to bet
         df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
-
-        # Determino acierto de prediccion
-        if not prod:
-            df = self.determine_winning_bets(df)
-            df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
         d_params_stake = {

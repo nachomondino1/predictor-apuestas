@@ -15,13 +15,13 @@ def assess_models_in_prod(
         country,
         iteration_date,
         update_missing: bool = False,
-        predict_missing: bool = True,
         concat_with_test: bool = False,
         xlsx_name: str = 'df_ite_bs.xlsx',
-        export: bool = True
+        export: bool = True,
+        verbose: int = 1
 ):
     date = datetime.datetime.now().date()
-    path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date}"
+    path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date}" # _con_ea
     directories.make_directories(l_directorios=[path])    
     bs = betting_strategy.BettingStrategy(country, iteration_date, verbose=0)
     rows = []
@@ -37,51 +37,40 @@ def assess_models_in_prod(
         col2 = 'model_name' if 'model_name' in df_ite.columns else 'model_name_x'
         n_model, model_name = row[col1], row[col2]
         logger.info(f'{n_model} {model_name}')
-        
-        if predict_missing:
-            logger.warning("Se estan concatenando las predicciones de TEST y ASSESS...")
+    
+        # 1. Predict missing
+        try:
+            df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
+        except FileNotFoundError:
+            df_pred_missing = assess_model_in_prod(id_country, iteration_date, n_model, model_name)
+            if export: # Exportamos para no tener que volver a hacer el assess
+                df_pred_missing.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
 
-            # 1. Predict missing
-            try:
-                df_pred_missing = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
-            except FileNotFoundError:
-                df_pred_missing = assess_model_in_prod(id_country, iteration_date, n_model, model_name)
-                if export:
-                    df_pred_missing.to_excel(f"{path}/{n_model}__{model_name}_predicciones.xlsx", index=True) # Cuando haces assess
-
-            # 2. Concat test + missing 
-            if concat_with_test:
-                # Levanto predicciones del modelo (test o test + assess)
-                path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
-                df_pred_test = pd.read_excel(path_test, index_col=0)
-                df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
-            else:
-                df_pred = df_pred_missing.copy()
-
-            # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
-            df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
-            df_pred = construct_data.determine_expected_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
-                    
+        # 2. Concat test + missing 
+        if concat_with_test:
+            # Levanto predicciones del modelo (test o test + assess)
+            path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+            df_pred_test = pd.read_excel(path_test, index_col=0)
+            df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
         else:
-            df_pred = pd.read_excel(f'{path}/{n_model}__{model_name}_predicciones.xlsx', index_col=0)
+            df_pred = df_pred_missing.copy()
 
+        # 3. Agrego columnas 'result' y 'expected_result' --> Lo podria implementar en betting strategy no?
+        df_pred = construct_data.determine_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
+        df_pred = construct_data.determine_expected_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
+                    
         # Dropeo old metrics (sino calcula mal las nuevas)
         df_pred = asses_model.drop_old_metrics(df_pred)
 
-        # 📌 Aplicar estrategia "sin_ea"
+        # 📌 Aplicar estrategia "sin_ea" --> predict_missing ya tiene la estrategia aplicada cuando corri mnm.py. Solo seria para test que tiene la de train.
         # d_params = bs.define_hiperparameters(strategy='train')
-        d_params = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} 
-        df_pred_met, d_rois = bs.calculate_roi_in_combination(df_pred, d_params)
+        # d_params = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} 
+        # df_pred = bs.apply_strategy(df_pred, d_params)
 
-        ## Calculo metricas
+        ## Calculo metricas (precision, f1_score, etc)
+        df_pred_met, d_rois = bs.calculate_roi_in_combination(df_pred) # Ver si hago solo el yield en vez del ROI --> Deberia separar la aplicacion de la strategia del calculo del roi
         d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
         d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
-        
-        # Obtengo metricas de assess
-        if concat_with_test:
-            df_assess = df_pred_met[df_pred_met.index.isin(df_pred_missing.index)]
-            gp_assess = df_assess['yield'].sum()
-            # dict:  'n_reg': len(df_assess), 'gp_assess': gp_assess,
 
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg_assess': len(df_pred_met),  **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}
@@ -119,6 +108,7 @@ def assess_model_in_prod(id_country, iteration_date, n_model, model_name):
 if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
+    l_countries = [48]
     one_model = False
     n_models = 10
 
@@ -142,6 +132,7 @@ if __name__ == "__main__":
             n_model = df_best_models['n_model'][df_best_models['id_country'] == id_country].values[0]
             model_name = df_best_models['model_name'][df_best_models['id_country'] == id_country].values[0]
             print(f"--- {n_model} {model_name} ---")
+            
             # Filtro df_ite
             df_ite = df_ite[df_ite['n_iteration'].isin([n_model])]
             df_ite = df_ite[df_ite['model_name'].isin([model_name])]
