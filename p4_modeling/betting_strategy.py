@@ -319,7 +319,7 @@ class BettingStrategy:
 
         return df
 
-    def calculate_roi_in_combination(self, df, param_dict):
+    def calculate_roi_in_combination(self, df):
         """
         Para calcular ROI de las prediciones de un modelo
 
@@ -330,13 +330,13 @@ class BettingStrategy:
         if 'expected_result' not in df.columns:
             df = determine_expected_result(df, verbose=0)
 
-        # Aplicar estrategia a df_pred
-        df_aux = self.apply_strategy(df, param_dict, prod=False)
+        # Determino acierto de prediccion
+        df = self.determine_winning_bets(df)
+        df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Calculo de metricas (ROI y roi_pp) --> es al pedo el ROI.
-        # calculate_yield()
-        df_pred_with_metrics, d_metrics = calculate_roi(df_aux)
-        df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df_aux, name_extension="expected_")
+        df_pred_with_metrics, d_metrics = calculate_roi(df)         # calculate_yield()
+        df_pred_with_metrics_2, d_metrics_2 = calculate_roi(df, name_extension="expected_")
         
         # # Concateno datos de ROI y Expected ROI
         missing_columns = [col for col in df_pred_with_metrics_2.columns if col not in df_pred_with_metrics.columns]
@@ -353,11 +353,6 @@ class BettingStrategy:
         
         # Determino result to bet
         df = self.determine_result_to_bet(df, thr_prob_min=param_dict['prob_dp'])
-
-        # Determino acierto de prediccion
-        if not prod:
-            df = self.determine_winning_bets(df)
-            df = self.determine_winning_bets(df, name_extension='expected_')
 
         # Determino stake to bet
         d_params_stake = {
