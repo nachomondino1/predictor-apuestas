@@ -1204,10 +1204,12 @@ def main(
 
         # Pasarle "strategy" prod o bien ya pasarle el d_params...
         if predict_missing:
-            d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}  # predict_missing. Usamod prod=True porque no tenemos result todavia
+            # d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}  # Usamos prod=True porque no tenemos result todavia
+            d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
         else:
             # d_strategy = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # Linear infla mucho con cuotas chotas..
-            d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
+            # d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # demasiada volatilidad en stakes. Dejamos $ en la mesa por kelly_crit < 0 y al ser k alto, el stake lo hace 0.
+            d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 10, 'b': 0, 'k': 3}
 
         if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
@@ -1250,8 +1252,7 @@ if __name__ == "__main__":
     # iteration date y modelo
     country = d_countries[id_country][0]
     iteration_date = d_countries[id_country][1]
-    d_model = {'n_model': 3, 'model_name': "LogisticRegression"} # LogisticRegression
-
+    d_model = {'n_model': 39, 'model_name': "XGBClassifier"} # LogisticRegression
 
     d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': False} 
     df = main(d_run, id_country, iteration_date=iteration_date, n_days_max_next_matches=n_days, export=True, d_model=d_model, country=country)

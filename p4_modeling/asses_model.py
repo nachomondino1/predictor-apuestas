@@ -31,13 +31,14 @@ def calculate_metrics(
     if verbose >= 1:
         print(f"Shape de y_pred_prob: {y_pred_prob.shape}")
 
-    df_copy = determine_winning_bets(df) # sobretodo cuando predicted_result ≠ result_to_bet por ea
+    # if var_pred =='result_to_bet':
+    #     df_copy = determine_winning_bets(df) # sobretodo cuando predicted_result ≠ result_to_bet por ea
+    #     'test_accuracy_rtb': df_copy['acerte'].mean() * 100,
 
     # Calculo métricas básicas
     d_metrics = {
         'error': -log_loss(y_test, y_pred_prob, labels=[0, 1, 2]),
         'test_accuracy': accuracy_score(y_test, y_pred) * 100, # 'test_accuracy_dp': df['acerte'].mean() * 100,
-        'test_accuracy_rtb': df_copy['acerte'].mean() * 100,
         'recall': recall_score(y_test, y_pred, average='macro') * 100,
         'f1_score': f1_score(y_test, y_pred, average='macro') * 100,
     }
@@ -594,8 +595,8 @@ def normalize_column(df, col, norm_extension: str = '_norm', verbose : int = 0):
 
 def drop_old_metrics(df_predicciones):
     # Elimino columnas de metricas dejando las predicciones raw (evitar eliminar 'player_emergency_fill' pues genera dif entre los mismos partidos del test y assess. Tmb evitar eliminar goals y demas.)
+    # 'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
     columns_to_exclude = [
-        'result_to_bet', 'prob_result_to_bet', 'odd_to_bet', 'strategy', 'stake_to_bet', 
         'acerte', 'bank_inicial', 'stake_to_bet_en_$', 'G/P', 'bank_final', 'yield'
         'expected_acerte', 'expected_bank_inicial', 'expected_stake_to_bet_en_$', 'expected_G/P', 'expected_bank_final', 'expected_yield'
     ]

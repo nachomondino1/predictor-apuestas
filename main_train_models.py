@@ -190,7 +190,7 @@ def comprehensive_search(
         print(df_integrated_missing.shape)
 
         if len(df_match_miss) != len(df_integrated_missing):
-            logger.error("Fallo la obtencion del df_integrated_missing a partir del df_integrated. Revisar.")
+            logger.error(f"Fallo la obtencion del df_integrated_missing a partir del df_integrated. {len(df_match_miss)} ≠ {len(df_integrated_missing)}.")
             raise ValueError
         
         df_integrated_missing.to_excel(f'data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
@@ -507,11 +507,11 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [55, 59, 77, 148]
+    l_countries = [48]
 
-    data_unders = True 
+    data_unders = False 
     update_sofifa = False if data_unders else False
-    data_prep_int = True
+    data_prep_int = False
     data_prep_int_miss = True
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}

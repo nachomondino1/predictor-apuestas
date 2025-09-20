@@ -224,6 +224,31 @@ def format_penalties(df):
     df.loc[df['penalties'] == 'AFTER PENALTIES', 'penalties'] = 1
     return df
 
+def format_result_per_half(df):
+    """
+    Convierto resultado de un tiempo "2 - 1" en columnas goals "2" y "1".
+    """
+    
+    df[['goals_1st_half_home', 'goals_1st_half_away']] = (
+        df['result_1st_half']
+        .str.strip()
+        .str.split('-', expand=True)
+        .apply(lambda x: x.str.strip().astype(int))
+    )
+
+    df[['goals_2nd_half_home', 'goals_2nd_half_away']] = (
+        df['result_2nd_half']
+        .str.strip()
+        .str.split('-', expand=True)
+        .apply(lambda x: x.str.strip().astype(int))
+    )
+
+    # Determino variable resultado por half
+    from p3_data_preparation.construct_data import determine_result
+    df = determine_result(df, var_resp="result_1h", var_goals="goals_1st_half") 
+    df = determine_result(df, var_resp="result_2h", var_goals="goals_2nd_half")
+    return df
+
 def rename_and_merge_columns(df, rename_dict): # Funciona perfecto! Verificado.
     """
     Función para renombrar, combinar y eliminar columnas viejas

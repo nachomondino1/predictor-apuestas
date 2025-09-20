@@ -201,6 +201,9 @@ class DataPreparation:
             df_match = format_data.format_penalties(df_match)
             df_match = clean_data.corregir_goals(df_match)
 
+            # Goals per Half  
+            # df = format_data.format_result_per_half(df)
+
         df_match_player = df_match_player[df_match_player.index.isin(df_match.index)]
         ## Todas las columnas
         df_match = format_data.convert_columns_to_float(df_match)  # Formateo estadisticas a float (no se por que son object)
@@ -548,7 +551,7 @@ class DataPreparation:
         if with_historic:
 
             # VARIABLE RESPUESTA (no son historicas estan filtradas)
-            df = construct_data.determine_result(df, self.var_resp, prod=prod)
+            df = construct_data.determine_result(df, self.var_resp)
             df = construct_data.determine_points(df)
 
             # VARIABLES DERIVADAS
@@ -1110,9 +1113,10 @@ class Modeling:
 
         # Aplico estrategia "sin ea" para tener bank, stakes y rois 
         bs = betting_strategy.BettingStrategy()
-        df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones, bs.define_hiperparameters(strategy='train'))
+        df_predicciones = bs.apply_strategy(df_predicciones, bs.define_hiperparameters(strategy='train'), prod=False)
 
         # G/P x rdo
+        df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones)
         d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones))
 
         # Calculo metricas de bet (en assess no tengo cuotas)

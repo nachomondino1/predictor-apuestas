@@ -569,6 +569,7 @@ def fillna_with_mean_in_last_matches_with_df(df_to_fill: pd.DataFrame, df: pd.Da
 
     return df_to_fill, df_copiado_form
 
+# Penalties 
 def corregir_goals(df):
     """
     Corrijo goals cuando hubo penales o fueron a alargue
