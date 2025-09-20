@@ -7,6 +7,7 @@ from tqdm import tqdm
 from datetime import datetime, timedelta
 import re
 from utils.set_up_logging import logger
+from utils.directories import make_directories
 from time import sleep
 import random
 
@@ -187,14 +188,14 @@ class FlashscoreCrawler(Crawler):
         """
         d_row = {}
         d_field_xpath = {
-            'result_1st_half': './/div[contains(@class, "smv__incidentsHeader")][1]/div[2]', # Con este genero 1st_ht_goals_home y 1st_half_goals_away y result_1st_half (1, 0 o 2) 
-            'result_2nd_half': './/div[contains(@class, "smv__incidentsHeader")][2]/div[2]', # Con esto genero 2nd_ht_goals_home y 2nd_half_goals_away y result_2nd_half (1, 0 o 2)
-            'goals_home_ft': './/div[@class="detailScore__fullTime"]/span[1]',
-            'goals_away_ft': './/div[@class="detailScore__fullTime"]/span[3]',
+            'result_1st_half': '//span[text()="1st Half"]/parent::div/span[2]', # Con este genero 1st_ht_goals_home y 1st_half_goals_away y result_1st_half (1, 0 o 2) 
+            'result_2nd_half': '//span[text()="2nd Half"]/parent::div/span[2]', # Con esto genero 2nd_ht_goals_home y 2nd_half_goals_away y result_2nd_half (1, 0 o 2)
             }
         
         for field, xpath in d_field_xpath.items():
             value = super().extract_tag(xpath=xpath, sec_wait=self.SEC_WAIT_MIN, text=True, print_fail=False)
+
+            print(field, value)
             d_row[field] = value
 
         return d_row
@@ -508,7 +509,12 @@ class FlashscoreCrawler(Crawler):
 
             # Extraigo el name de la stat
             name_stat = super().extract_tag(tag_inicial=tag, xpath='.//div[@data-testid="wcl-statistics-category"]', text=True, sec_wait=self.SEC_WAIT_MED, print_fail=False)
-            name_stat_form = name_stat.lower().replace(" ", "_").replace('á', 'a').replace('é', 'e').replace('í', 'i').replace("ó", "o").replace('ú', 'u')
+            try:
+                name_stat_form = name_stat.lower().replace(" ", "_").replace('á', 'a').replace('é', 'e').replace('í', 'i').replace("ó", "o").replace('ú', 'u')
+            except AttributeError as e: #  'NoneType' object has no attribute 'lower'
+                name_stat_form = name_stat
+                logger.warning(f"Error {e} al intentar formatear el nombre de una stat que es None.")
+            
             if self.verbose >= 1:
                 print(f"Stat a recolectar: {name_stat} --> Name formateado: {name_stat_form}")
 
@@ -718,7 +724,7 @@ def extract_name_from_href(href: str) -> str:
         return name
     return None
 
-def extract_data(id_country, country: str, id_competicion, competition: str, is_cup: int, n_seasons_max: int = 0, l_ids_already_collected: list = None, export: bool = True):
+def extract_data(id_country, country: str, id_competicion: int, competition: str, is_cup: int, n_seasons_max: int = 0, l_ids_already_collected: list = None, export: bool = True):
     """
     It contains all the extraction logic, i.e. it directs the bot on WHEN to perform each action. First initialize the
     driver, then enter the page, then accept cookies and so on.
@@ -742,7 +748,11 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
     competition_form = competition.lower().replace(".", "").replace(" ", "-")  # formateo competition para las rutas de archivo y urls
-    ruta_base = f"./p2_data_understanding/data/{country_form}/data_seg"
+    ruta_base = f"./data/{country_form}/p2_data_understanding/data_seg"
+    make_directories(l_directorios=[
+        f'{ruta_base}/per_competition/df_match', f'{ruta_base}/per_competition/df_match_player', f'{ruta_base}/per_competition/df_match_odds',
+        f'{ruta_base}/per_season/df_match', f'{ruta_base}/per_season/df_match_player', f'{ruta_base}/per_season/df_match_odds'
+        ])
 
     # Ingreso a pagina
     url = f'https://www.flashscore.com/football/{country_form}/{competition_form}/archive/'
@@ -754,7 +764,7 @@ def extract_data(id_country, country: str, id_competicion, competition: str, is_
 
     # Extraigo urls de las distintas seasons (años) de la competition
     l_urls_seasons = crawler.extract_urls_seasons(n_seasons_max)
-    print(f'Cantidad de seasons: {len(l_urls_seasons)}')
+    print(f'Cantidad de seasons: {len(l_urls_seasons)}: {l_urls_seasons}')
 
     # POR season
     for n_season, url_season in enumerate(l_urls_seasons):  # for url_season in l_urls_seasons:  # De mas reciente a menos reciente
@@ -856,7 +866,7 @@ def extract_missing_matches(id_country, country: str, id_competicion, competitio
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
     competition_form = competition.lower().replace(".", "").replace(" ", "-")  # formateo competition para las rutas de archivo y urls
-    ruta_base = f"./p2_data_understanding/data/{country_form}/data_seg"
+    ruta_base = f"./data/p2_data_understanding/{country_form}/data_seg"
 
     # Ingreso a pagina
     url = f'https://www.flashscore.com/football/{country_form}/{competition_form}/archive/'
@@ -973,3 +983,35 @@ def extract_next_matches(id_country, country: str, id_competicion, competition: 
     # Finalizada la extraccion, cierro el web browser automático
     crawler.driver.close()
     return df_match, df_match_player, df_match_odds
+
+# Código que se ejecuta solo cuando el archivo se ejecuta directamente
+if __name__ == "__main__":
+
+    # Definir paises y competencias a extraer
+    l_countries = [1000]
+    l_competences = [1001, 1002, 1003]
+
+    d_countries = {-1: "all", 1000: "europe", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
+    df_comp = pd.read_excel("data/df_competencies.xlsx")
+    print(df_comp)
+    
+    # Por pais
+    for id_country in l_countries:
+
+        country = d_countries[id_country]
+        print(country)
+
+        # Por competencia
+        for id_comp in l_competences:
+
+            row_comp = df_comp[(df_comp['id_country'] == id_country) & (df_comp['id_competition']==id_comp)]
+            competition = row_comp['competition_flashscore'].values[0]
+            is_cup = row_comp['is_cup'].values[0]
+            print(competition, is_cup)
+            
+            extract_data(id_country, country, id_comp, competition, is_cup=is_cup, n_seasons_max=15)  # df_match, df_match_player, df_match_odds = 
+
+            # Exporto datos
+            # df_match.to_excel(f"data/{country}/p2_data_understanding/df_match.xlsx") 
+            # df_match_player.to_excel(f"data/{country}/p2_data_understanding/df_match_player.xlsx") 
+            # df_match_odds.to_excel(f"data/{country}/p2_data_understanding/df_match_odds.xlsx") 
