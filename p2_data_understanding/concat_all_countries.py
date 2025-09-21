@@ -20,7 +20,7 @@ def paths(country, iteration_date):
     directories.make_directories(l_directorios=d_paths.values())
     return d_paths
 
-def main(d_countries, data_unders: bool = False, data_prep: bool = False, deployment: bool = False):
+def main(d_countries, data_unders: bool = False, data_prep: bool = False, deployment: bool = False, sofifa: bool = False):
 
     df1, df2, df3, df4, df5, df6, df7, df8, df9, df10, df11, df12, df13, df14, df15, df16 = pd.DataFrame(), pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),  pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     date = datetime.datetime.now().date()
@@ -43,19 +43,25 @@ def main(d_countries, data_unders: bool = False, data_prep: bool = False, deploy
             df_match = pd.read_excel(f'{BASE_DIR_du}/df_match.xlsx', index_col=0)
             df_match_player = pd.read_excel(f'{BASE_DIR_du}/df_match_player.xlsx', index_col=0)
             df_match_odds = pd.read_excel(f'{BASE_DIR_du}/df_match_odds.xlsx', index_col=0)
-            df_player_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index_col=0)
-            df_player_fifa_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index_col=0)
+            
+            if sofifa:
+                df_player_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_sofifa.xlsx', index_col=0)
+                df_player_fifa_sofifa = pd.read_excel(f'{BASE_DIR_du}/df_player_fifa_sofifa.xlsx', index_col=0)
+                print(df_player_sofifa.shape, df_player_fifa_sofifa.shape)
+
             print(df_match.shape, df_match_player.shape,df_match_odds.shape)
-            print(df_player_sofifa.shape, df_player_fifa_sofifa.shape)
 
             # Concateno datos
             df1 = pd.concat([df1, df_match], axis=0)
             df2 = pd.concat([df2, df_match_player], axis=0)
             df3 = pd.concat([df3, df_match_odds], axis=0)
-            df4 = pd.concat([df4, df_player_sofifa], axis=0)
-            df5 = pd.concat([df5, df_player_fifa_sofifa], axis=0)
+            
+            if sofifa:
+                df4 = pd.concat([df4, df_player_sofifa], axis=0)
+                df5 = pd.concat([df5, df_player_fifa_sofifa], axis=0)
+                print(df4.shape, df5.shape)
+
             print(df1.shape, df2.shape, df3.shape)
-            print(df4.shape, df5.shape)
 
         if data_prep:
             # Levanto datos de data prep
@@ -99,8 +105,10 @@ def main(d_countries, data_unders: bool = False, data_prep: bool = False, deploy
         df1.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_match.xlsx')
         df2.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_match_player.xlsx')
         df3.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_match_odds.xlsx')
-        df4.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_player_sofifa.xlsx')
-        df5.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_player_fifa_sofifa.xlsx')
+        
+        if sofifa:
+            df4.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_player_sofifa.xlsx')
+            df5.to_excel(f'{d_paths_all['BASE_DIR_du']}/df_player_fifa_sofifa.xlsx')
     
     if data_prep:
         # df6.to_excel(f'{d_paths_all['BASE_DIR_dp']}/df_integrated.xlsx')
@@ -121,15 +129,16 @@ def main(d_countries, data_unders: bool = False, data_prep: bool = False, deploy
 if __name__ == "__main__":
 
     d_countries = {
-        48: ["england", '2025-04-20'],
-        55: ["france", '2025-04-21'], 
-        59: ["germany", '2025-04-21'],
-        77: ["italy", '2025-04-20'],
-        148: ["spain", '2025-04-21']
+        1000: ["europe", '2025-08-26'],
+        48: ["england", '2025-08-26'],
+        55: ["france", '2025-08-26'], 
+        59: ["germany", '2025-08-26'],
+        77: ["italy", '2025-08-26'],
+        148: ["spain", '2025-08-26']
         }
     
-    data_unders = False
+    data_unders = True
     data_prep = False
-    deployment = True
+    deployment = False
 
     main(d_countries, data_unders=data_unders, data_prep=data_prep, deployment=deployment)

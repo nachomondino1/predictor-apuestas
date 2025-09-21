@@ -576,6 +576,7 @@ def corregir_goals(df):
     """
     # Reemplazo explícito de valores no numéricos
     df['penalties'] = df['penalties'].replace("ABANDONED", 0) # -> solo x falla en FA cup
+    df['penalties'] = df['penalties'].replace("AWARDED", 0) # -> solo x falla en FA cup
 
     # Si 'penalties' es NaN, reemplazar por 0 --> solo x falla en FA cup
     if not pd.api.types.is_integer_dtype(df['penalties']):

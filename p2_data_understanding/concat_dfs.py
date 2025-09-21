@@ -20,7 +20,7 @@ def concat_raw_data_by_competition(id_country, country, l_dataframes, export=Tru
     # Por dataframe (e.f. df_match, df_match_player)
     for dataframe in l_dataframes:
 
-        ruta_base_comp = f'./p2_data_understanding/data/{country.lower()}/data_seg/per_competition/{dataframe}'
+        ruta_base_comp = f'./data/{country.lower()}/p2_data_understanding/data_seg/per_competition/{dataframe}'
         df_concat = pd.DataFrame()
         print("\n", f"\n Dataframe: {dataframe} \n".center(240, "#"))
 
@@ -209,8 +209,8 @@ if __name__ == "__main__":
 
     # CONCATENACION DE DATA SEG X SEASON O COMPETICION
     # Definicion de variables
-    competicion, temporada = False, False
-    id_country = 148
+    competicion, temporada = True, False
+    id_country = 1000
     export = True
 
     # Levento df_countries y obtengo id
@@ -220,7 +220,8 @@ if __name__ == "__main__":
 
     # Concateno competiciones del country
     if competicion:
-        l_dataframes =  ['df_teams_sofifa'] # ["df_match", "df_match_player", 'df_match_odds', 'df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
+        # l_dataframes =  ['df_teams_sofifa'] 
+        l_dataframes = ["df_match", "df_match_player", 'df_match_odds'] # df_teams', 'df_player', 'df_coaches', 'df_player_sofifa', 'df_player_fifa_sofifa']
         concat_raw_data_by_competition(id_country, country, l_dataframes, export)
 
     # Concateno temporadas de una misma competition del country

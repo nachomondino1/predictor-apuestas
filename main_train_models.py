@@ -507,12 +507,12 @@ if __name__ == "__main__":
         
     # Parametros de ejecucion
     l_countries = [48, 55, 59, 77, 148]
-    l_countries = [48]
+    l_countries = [-1]
 
-    data_unders = False 
+    data_unders = True 
     update_sofifa = False if data_unders else False
-    data_prep_int = False
-    data_prep_int_miss = True
+    data_prep_int = True
+    data_prep_int_miss = False
     
     d_countries = {-1: "all", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
 

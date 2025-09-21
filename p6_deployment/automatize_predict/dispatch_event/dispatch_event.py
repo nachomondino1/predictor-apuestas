@@ -4,6 +4,10 @@ from utils.set_up_logging import logger
 import requests
 import json
 import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde el archivo .env
+load_dotenv()
 
 # Configura tus variables
 TARGET_OWNER = "mondineta"  # Cambia esto al nombre de tu usuario u organización en GitHub
