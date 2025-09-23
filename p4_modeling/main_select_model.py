@@ -202,6 +202,7 @@ if __name__ == "__main__":
     # Defino parametros
     l_countries = [48, 55, 59, 77, 148]
     assess = False # Para usar True, cv y esas metricas de test deberia agregarlas al assess...
+    metrics_per_country = False
 
     d_countries = {
         48: ["england", '2025-08-26'],
@@ -212,17 +213,20 @@ if __name__ == "__main__":
         167: ["usa", '2025-08-26'],
         }
     
-    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais)    
-    # l_metrics = ['roi_por_partido'] # benchmark
-    # l_metrics = ['expected_error', 'sum_aciertos_away'] # Tras define_metrics_v02.py max test_acc (sin n_draw y esas)  (semana 3)
-
-    d_metrics = {
-        48: ['expected_error', 'expected_f1_score_away'],
-        55: ['roi', 'expected_f1_score_away'],  # yield
-        59: ['roi', 'f1_score_draw'], # yield
-        77: ['expected_error', 'expected_f1_score_home'],
-        148: ['expected_error', 'expected_f1_score_away'],
-    }
+    # Defino metricas y pesos (Metricas comunes pero pesos ≠ por pais) 
+    if metrics_per_country: 
+        ## Metricas por pais
+        d_metrics = {
+            48: ['expected_error', 'expected_f1_score_away'],
+            55: ['roi', 'expected_f1_score_away'],  # yield
+            59: ['roi', 'f1_score_draw'], # yield
+            77: ['expected_error', 'expected_f1_score_home'],
+            148: ['expected_error', 'expected_f1_score_away'],
+        }
+    else:
+        ## Metricas comunes a todos los paises  
+        l_metrics = ['roi_por_partido'] # benchmark
+        l_metrics = ['roi', 'expected_error'] # Tras define_metrics_v02.py max test_acc (sin n_draw y esas)  (semana 3)
 
     # Levanto df_best_models
     df_bm = pd.read_excel('data/df_best_models.xlsx')
@@ -232,7 +236,8 @@ if __name__ == "__main__":
         iteration_date = d_countries[id_country][1]
 
         # Defino metricas
-        l_metrics = d_metrics[id_country]
+        if metrics_per_country: 
+            l_metrics = d_metrics[id_country]
         l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 
         # Levanto df_iteration con datos de train y test

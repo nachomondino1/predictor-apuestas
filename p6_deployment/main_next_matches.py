@@ -1209,7 +1209,7 @@ def main(
         else:
             # d_strategy = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # Linear infla mucho con cuotas chotas..
             # d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # demasiada volatilidad en stakes. Dejamos $ en la mesa por kelly_crit < 0 y al ser k alto, el stake lo hace 0.
-            d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 8, 'b': 0, 'k': 2}
+            d_strategy = {'prob_dp': 0.4, 'curva': 'kelly', 'm': 8, 'b': 0, 'k': 2}
 
         if isinstance(d_strategy, dict):
             logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
