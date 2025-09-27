@@ -37,7 +37,7 @@ on:
     - cron: "00 21 * * 1" # 18:00 hs ARG
     # - cron: "45 21 * * 1" # 18:45 hs ARG
 
-  # Para forzar a que se ejecute la action  
+  # Para forzar a que se ejecute la action  !
   push: 
     branches:
       - staging
