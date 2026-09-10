@@ -262,8 +262,10 @@ Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
   pero esas carpetas **nunca existieron** (inconsistencia pre-existente, no la
   causó esta limpieza). El pipeline de esos 2 países no está armado para ese
   modelo.
-- **Pendiente `venv/`:** recrear (`pip` roto por shebang viejo) + borrar
-  `p6_deployment/venv_mnm/` (178 MB stale).
+- **`venv/` recreado** (`python3.12` + `requirements.txt` sin TensorFlow): 2.1 GB
+  → 1.0 GB, `pip` ya no está roto. Borrado `p6_deployment/venv_mnm/` (178 MB).
+  `pytest` 29/29, imports OK desde cwd ajeno.
+- **Total repo: ~52 GB → ~16 GB** (`.git` 8.9 + `venv` 1.0 + `data` 6.3 + código).
 - **Pendiente `.git` (8.9 GB):** la bloat (commits viejos de `data/`,
   `env-model/`, `django_project/`) es ancestro de `staging`/`prod` → NO se puede
   reducir el `.git` local sin reescribir esas ramas (force-push coordinado). Si
