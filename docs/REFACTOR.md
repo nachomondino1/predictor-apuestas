@@ -179,7 +179,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 | # | Prio | Cambio | Riesgo |
 |---|---|---|---|
-| g-1 | P1 | Borrar código muerto: ~~`main.py::main` + `__main__`~~ ✅, ~~`set_up_logging_save.py`~~ ✅, `utils_select_model/old/` (pendiente), decisión WhoScored/`nn` (pendiente). | Bajo |
+| g-1 | P1 | Borrar código muerto: ~~`main.py::main` + `__main__`~~ ✅, ~~`set_up_logging_save.py`~~ ✅, ~~WhoScored → archive/~~ ✅, ~~`nn.py`~~ ✅. (`utils_select_model/old/` ya está en `.gitignore`, no está en el repo — nada que borrar.) | Bajo |
 | g-2 | P1 | ~~Quitar los 4 `logger.x("Este es un mensaje…")` de `utils/set_up_logging.py`~~ ✅. | Nulo |
 | g-3 | P2 | Empaquetado: `pyproject.toml` + `pip install -e .`, borrar todos los `sys.path.append`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
