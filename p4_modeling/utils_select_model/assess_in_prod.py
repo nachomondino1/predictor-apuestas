@@ -1,10 +1,10 @@
 
 import sys
-sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from utils.set_up_logging import logger
 from p3_data_preparation import construct_data
-from p4_modeling import betting_strategy, asses_model
+from p4_modeling import betting_strategy, assess_model
 from p6_deployment import main_next_matches
 from utils import directories
 import datetime
@@ -60,7 +60,7 @@ def assess_models_in_prod(
         df_pred = construct_data.determine_expected_result(df_pred) # Intento hacerlo antes con df_match pero rompia.
                     
         # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = asses_model.drop_old_metrics(df_pred)
+        df_pred = assess_model.drop_old_metrics(df_pred)
 
         # 📌 Aplicar estrategia "sin_ea" --> predict_missing ya tiene la estrategia aplicada cuando corri mnm.py. Solo seria para test que tiene la de train.
         # d_params = bs.define_hiperparameters(strategy='train')
@@ -69,8 +69,8 @@ def assess_models_in_prod(
 
         ## Calculo metricas (precision, f1_score, etc)
         df_pred_met, d_rois = bs.calculate_roi_in_combination(df_pred) # Ver si hago solo el yield en vez del ROI --> Deberia separar la aplicacion de la strategia del calculo del roi
-        d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result')
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
+        d_metric_sin_ea = assess_model.calculate_metrics(df_pred_met, var_resp='result')
+        d_metric_sin_ea_ex = assess_model.calculate_metrics(df_pred_met, var_resp='expected_result', prefix='expected_')
 
         # Guardo datos
         new_row = {'n_model': n_model, 'model_name': model_name, 'n_reg_assess': len(df_pred_met),  **d_rois, **d_metric_sin_ea, **d_metric_sin_ea_ex}

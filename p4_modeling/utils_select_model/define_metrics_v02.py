@@ -1,13 +1,13 @@
 
 import sys
-sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 from utils import directories
 from utils.set_up_logging import logger
 from p3_data_preparation.select_data import normalize_column
 import p3_data_preparation.select_data as sd # --> le da importancia a metricas con corr negativa pero que deberian ser max no min.
-from p4_modeling import betting_strategy, asses_model
+from p4_modeling import betting_strategy, assess_model
 from p4_modeling.utils_select_model import assess_in_prod
 from tqdm import tqdm
 import datetime
@@ -40,7 +40,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         # Obtengo predicciones
         path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
         df_pred = pd.read_excel(path_test, index_col=0)
-        df_pred = asses_model.drop_old_metrics(df_pred) # Dropeo old metrics (sino calcula mal las nuevas)
+        df_pred = assess_model.drop_old_metrics(df_pred) # Dropeo old metrics (sino calcula mal las nuevas)
         
         df_pred = df_pred.head(300) # Selecciono menos registros de test pues 500 son muchos...
         print(df_pred.shape)
@@ -60,13 +60,13 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
         # Aplico estrategia a "TEST" (first_matches)
         # 📌 Sin ea 
         df_test, d_rois = bs.calculate_roi_in_combination(df_first_matches, d_params_sin_ea)
-        d_metrics_test_sin_ea = asses_model.calculate_metrics(df_test, bet_metrics=False)
-        d_metrics_test_sin_ea_ex = asses_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_', bet_metrics=False)
+        d_metrics_test_sin_ea = assess_model.calculate_metrics(df_test, bet_metrics=False)
+        d_metrics_test_sin_ea_ex = assess_model.calculate_metrics(df_test, var_resp='expected_result', prefix='expected_', bet_metrics=False)
 
         # Aplico estrategia a "PROD" o "ASSESS" (last_matches) 
         df_prod, d_rois_prod = bs.calculate_roi_in_combination(df_last_matches, d_params_sin_ea)
-        d_metrics_prod_sin_ea = asses_model.calculate_metrics(df_prod, suffix='_prod', bet_metrics=False)
-        d_metrics_prod_sin_ea_ex = asses_model.calculate_metrics(df_prod, var_resp='expected_result', prefix='expected_', suffix='_prod', bet_metrics=False)
+        d_metrics_prod_sin_ea = assess_model.calculate_metrics(df_prod, suffix='_prod', bet_metrics=False)
+        d_metrics_prod_sin_ea_ex = assess_model.calculate_metrics(df_prod, var_resp='expected_result', prefix='expected_', suffix='_prod', bet_metrics=False)
 
         d_metrics_test_sin_ea.update({
             'sum_aciertos_draw_prod': d_metrics_prod_sin_ea['aciertos_draw_prod'] + d_metrics_prod_sin_ea_ex['expected_aciertos_draw_prod'], 
@@ -76,7 +76,7 @@ def determine_metrics_by_model(df_ite, country, iteration_date, perc_matches_tes
 
 
         # Renombro metricas para evitar sobreescribirlas
-        d_rois_prod = asses_model.rename_dict_keys(d_rois_prod, suffix='_prod')
+        d_rois_prod = assess_model.rename_dict_keys(d_rois_prod, suffix='_prod')
 
         # Guardo métricas del modelo en un solo diccionario
         row_dict = {

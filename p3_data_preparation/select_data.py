@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from p3_data_preparation import clean_data
 from p4_modeling.build_model import select_best_hiperparameters
-from p4_modeling.asses_model import normalize_column
+from p4_modeling.assess_model import normalize_column
 from sklearn.feature_selection import SelectKBest, f_classif, chi2  # modelos estadisticos
 from sklearn.feature_selection import f_regression  # via
 from sklearn.feature_selection import RFE  # rfe

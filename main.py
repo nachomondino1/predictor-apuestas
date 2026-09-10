@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 ## Modeling
 from sklearn.metrics import log_loss
-from p4_modeling import generate_test_design, build_model, asses_model, betting_strategy
+from p4_modeling import generate_test_design, build_model, assess_model, betting_strategy
 ### Generate test design
 from sklearn.model_selection import train_test_split
 ### Build model
@@ -1102,7 +1102,7 @@ class Modeling:
         df_pred_proba = self.construct_predictions_dataframe(model=model, X_test=X_test, y_pred_prob=y_pred_prob, y_pred=y_pred, y_test=y_test)
 
         # Calculo metricas
-        d_metrics = asses_model.calculate_metrics(df_pred_proba, suffix=suffix, bet_metrics=False, gp_result=False) 
+        d_metrics = assess_model.calculate_metrics(df_pred_proba, suffix=suffix, bet_metrics=False, gp_result=False) 
         return df_pred_proba, d_metrics
 
     def assess_model_with_roi(self, df_pred_proba, df_match, df_match_odds, expected_metrics: bool = False):
@@ -1118,10 +1118,10 @@ class Modeling:
 
         # G/P x rdo
         df_predicciones, d_metrics_roi = bs.calculate_roi_in_combination(df_predicciones)
-        d_metrics_roi.update(asses_model.calculate_gp_by_result(df_predicciones))
+        d_metrics_roi.update(assess_model.calculate_gp_by_result(df_predicciones))
 
         # Calculo metricas de bet (en assess no tengo cuotas)
-        d_metrics_bm = asses_model.calculate_bookie_metrics(df_predicciones)
+        d_metrics_bm = assess_model.calculate_bookie_metrics(df_predicciones)
         d_metrics_roi.update(d_metrics_bm)
 
         # Calculo metricas "Expected" --> necesita df_match por expected_goals 
@@ -1133,7 +1133,7 @@ class Modeling:
             df_predicciones_ex = df_predicciones.dropna(subset=['expected_result']) 
             
             # Calculo metricas
-            d_metric_sin_ea_ex = asses_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_', bet_metrics=False, gp_result=False)
+            d_metric_sin_ea_ex = assess_model.calculate_metrics(df_predicciones_ex, var_resp='expected_result', prefix='expected_', bet_metrics=False, gp_result=False)
             d_metrics_roi.update(d_metric_sin_ea_ex)
 
         return df_predicciones, d_metrics_roi
@@ -1153,8 +1153,8 @@ class Modeling:
         df_match = df_match[l_cols_match]
 
         # Calculo 'bookmaker_result" y sus probas
-        df_match_odds = asses_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
-        df_match_odds = asses_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
+        df_match_odds = assess_model.calculate_result_probabilities_by_bookmaker(df_match_odds=df_match_odds)
+        df_match_odds = assess_model.determine_result_by_bookmaker(df=df_match_odds, col_name='bookmaker_result')
 
         # Concatenar todos alineados por index
         df_predicciones = pd.concat([
@@ -1177,7 +1177,7 @@ class Modeling:
     def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, k: int = 5, verbose: int = 0):
         """
         Pruebo varios modelos 
-        Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y asses_model.
+        Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y assess_model.
         """
         # Defino variables
         train_rows, test_rows = [], []

@@ -1,11 +1,11 @@
 import sys
-sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from p3_data_preparation.format_data import value_nan_to_none
 from p3_data_preparation.construct_data import determine_expected_result
-from p4_modeling.asses_model import calculate_roi
+from p4_modeling.assess_model import calculate_roi
 from utils import directories
 
 

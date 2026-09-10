@@ -1,9 +1,9 @@
 import sys
-sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from utils.set_up_logging import logger
 from utils import directories
-from p4_modeling import asses_model, betting_strategy
+from p4_modeling import assess_model, betting_strategy
 from main_train_models import concat_dataframes_on_iteration
 
 
@@ -132,7 +132,7 @@ def try_strategy(df_ite, country,  iteration_date, path):
         df_pred = df_pred_test.copy()
 
         # Dropeo old metrics (sino calcula mal las nuevas)
-        df_pred = asses_model.drop_old_metrics(df_pred)
+        df_pred = assess_model.drop_old_metrics(df_pred)
 
         # 📌 Aplicar estrategia "sin_ea"
         d_params = bs.define_hiperparameters(strategy='train')  
@@ -140,8 +140,8 @@ def try_strategy(df_ite, country,  iteration_date, path):
         df_pred_met, d_metrics = bs.calculate_roi_in_combination(df_pred, d_params)
 
         # Calculo metricas
-        d_metric_sin_ea = asses_model.calculate_metrics(df_pred_met, var_resp='result', var_pred="result_to_bet")
-        d_metric_sin_ea_ex = asses_model.calculate_metrics(df_pred_met, var_resp='expected_result', var_pred="result_to_bet", prefix='expected_')
+        d_metric_sin_ea = assess_model.calculate_metrics(df_pred_met, var_resp='result', var_pred="result_to_bet")
+        d_metric_sin_ea_ex = assess_model.calculate_metrics(df_pred_met, var_resp='expected_result', var_pred="result_to_bet", prefix='expected_')
 
         # Guardo datos
         new_row = {'n_iteration': n_model, 'model_name': model_name, **d_metrics, **d_metric_sin_ea, **d_metric_sin_ea_ex}

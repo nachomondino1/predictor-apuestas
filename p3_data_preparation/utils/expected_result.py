@@ -1,5 +1,5 @@
 import sys
-sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p3_data_preparation import construct_data
 from p3_data_preparation.select_data import determine_country_competitions

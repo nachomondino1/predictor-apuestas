@@ -1,11 +1,11 @@
 import sys
-sys.path.append('.')  # Fallaba el import de mainimport pandas as pd
+sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 from utils.set_up_logging import logger
 from utils import directories
 import datetime
-from p4_modeling import asses_model
+from p4_modeling import assess_model
 from p4_modeling.utils_select_model import assess_in_prod
 
 def initialize_directories(country, iteration_date):
@@ -156,7 +156,7 @@ def main(
 
     # Paso 1: Seleccionar candidatos solo con test
     ## 1. Calculo metrica combinada
-    df_ite_bs = asses_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=False)
+    df_ite_bs = assess_model.calculate_combined_metric(df_ite, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric, penalize_std=False)
 
     ## 2. Ordeno por metrica combinada
     df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
@@ -181,7 +181,7 @@ def main(
             export=True
         )       
 
-        df_ite_bs = asses_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric) # cv y esas metricas de test deberia agregarlas al assess...
+        df_ite_bs = assess_model.calculate_combined_metric(df_ite_bs, l_metrics=l_metrics, l_weights=l_weights, metric_name=metric) # cv y esas metricas de test deberia agregarlas al assess...
         df_ite_bs = df_ite_bs.sort_values(by=metric, ascending=False)  # Ordenar los registros por 'metric' en orden descendente
 
     # Paso 3: Seleccionar modelo para prod de los candidatos
