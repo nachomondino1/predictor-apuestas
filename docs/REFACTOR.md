@@ -137,7 +137,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | p2-3 | P2 | `extract_data`: quitar `headless=False` hardcodeado y el `SEC_WAIT_MED = SEC_WAIT_MIN` mágico tras `n_season > 9` → parámetros explícitos (valores idénticos). | Bajo | Consultar: cambia *cómo* se setean las esperas |
 | p2-4 | P2 | `check_if_season_already_extracted`: `os.path.exists` en vez de 3 lecturas Excel + `except:` desnudo. | Bajo | No |
 | p2-5 | P2 | Mover `clean_id`, `extract_id_from_href`, `extract_name_from_href` a `parsers.py` + tests unitarios. | Nulo | No |
-| p2-6 | P3 | Decidir destino de `scraper_whoscored.py` / `scraper_new_variables.py` / `validate_data.py` (arreglar o `archive/`). | Bajo | No |
+| p2-6 | P3 | Decidir destino de ~~`scraper_whoscored.py` → `archive/`~~ ✅ / `scraper_new_variables.py` / `validate_data.py` (pendiente). | Bajo | No |
 | p2-7 | P3 | `concat_*.py` → funciones con parámetros. | Bajo | No |
 
 ### 2.2 `p3_data_preparation`
@@ -157,7 +157,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
 | p4-1 | P1 | Consolidar `utils_select_model`: elegir `define_metrics_v02.py`, borrar la otra versión + `old/`. | Bajo (código muerto/dup) | No |
-| p4-2 | P1 | Decidir sobre `nn.py`: si no se entrenan NN, borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements de training. | Bajo | No |
+| p4-2 | P1 | ~~Decidir sobre `nn.py`: borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements~~ ✅ | Bajo | No |
 | p4-3 | P2 | Renombrar `asses_model.py` → `assess_model.py` + actualizar 2 imports. | Bajo | No |
 | p4-4 | P2 | Podar `asses_model.py`: mapear qué métricas usa de verdad `train_and_assess_models` / `main_select_model` y borrar el resto. | Medio | No |
 | p4-5 | P2 | `build_model.py::space_params`: escalera if/elif → dict/config. | Bajo | No |
@@ -206,6 +206,19 @@ Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
 ### 2026-09-10 — Documentación inicial
 - Creados `docs/ARQUITECTURA.md` y `docs/REFACTOR.md` (este archivo).
 - Sin cambios de comportamiento.
+
+### 2026-09-10 — p2-6 / p4-2: archivado de WhoScored + borrado de `nn.py`
+- `p2_data_understanding/collect_initial_data/scraper_whoscored.py` →
+  `archive/scraper_whoscored.py` (con `archive/README.md` explicando el motivo).
+- `p4_modeling/nn.py` **borrado** (`git rm`). Solo lo usaba el `main.py::main`
+  removido; recuperable del historial.
+- `requirements.txt`: quitados 13 paquetes del stack de TensorFlow
+  (`tensorflow`, `keras`, `scikeras`, `tensorboard`, `tensorboard-data-server`,
+  `astunparse`, `flatbuffers`, `gast`, `google-pasta`, `libclang`, `ml-dtypes`,
+  `namex`, `opt_einsum`). 131 → 118 paquetes. Ningún otro archivo importa
+  tensorflow/keras (verificado con `git grep`).
+- **Verificación:** `git grep` confirma que nada más importa `nn` /
+  `TrainNeuralNetwork` / `tensorflow` / `keras`.
 
 ### 2026-09-10 — g-1 / g-2: borrado de código muerto (parcial)
 - `main.py`: eliminados `crear_variables()`, `main()` y el bloque

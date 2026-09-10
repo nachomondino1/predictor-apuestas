@@ -103,8 +103,8 @@ p6_deployment/automatize_predict/collect_predictions.py
 | `p6_deployment/predict_models.py` | Comparación de N modelos candidatos | Ocasional, manual |
 | `p2_data_understanding/collect_initial_data/scraper_flashscore.py` | Scrapeo histórico Flashscore | **Sí**, manual (bootstrap) |
 | `p2_data_understanding/collect_initial_data/scraper_sofifa.py` | Scrapeo histórico Sofifa | **Sí**, manual (bootstrap) |
-| `main.py` | `main()` + `__main__` | **NO** — roto/obsoleto (ver REFACTOR.md); las **clases** sí se usan |
-| `p2_.../scraper_whoscored.py` | Scrapeo WhoScored | **NO** — roto/legacy |
+| `main.py` | ~~`main()` + `__main__`~~ | Removidos en el refactor. Solo quedan las **clases** (biblioteca). |
+| `archive/scraper_whoscored.py` | Scrapeo WhoScored | **NO** — roto/legacy, movido a `archive/` |
 | `p2_.../scraper_new_variables.py`, `validate_data.py`, `concat_*.py` | Utilitarios one-shot | Esporádico, no cableados |
 | El resto de `p3_*/`, `p4_*/` con `__main__` | Bloques de prueba / scripts sueltos | Esporádico |
 
@@ -194,9 +194,9 @@ p6_deployment/automatize_predict/collect_predictions.py
   `main_train_models`).
 - **`describe_data.py`** — `getting_to_know_data`, `verificar_unicidad_registros`,
   `scatter_plot` (genera los PNG grandes de `images/`).
-- **Legacy / one-shot:** `scraper_whoscored.py` (constructor roto),
-  `scraper_new_variables.py`, `validate_data.py` (tiene un validador de esquema
-  útil pero huérfano), `concat_*.py`.
+- **Legacy / one-shot:** `archive/scraper_whoscored.py` (constructor roto,
+  movido a `archive/`), `scraper_new_variables.py`, `validate_data.py` (tiene un
+  validador de esquema útil pero huérfano), `concat_*.py`.
 
 ### 5.2 `p3_data_preparation`
 
@@ -253,9 +253,9 @@ Todo se orquesta desde `main.py :: DataPreparation` (y su subclase
   (umbral de probabilidad), `determine_stake_to_bet` (relación lineal / Kelly),
   `stake_reduction` / `cap_stake` / `normalize_stake`, `determine_winning_bets`,
   `calculate_roi_in_combination`, `apply_strategy` / `apply_strategy_by_result`.
-- **`nn.py`** — `TrainNeuralNetwork` (MLP Keras). Solo alcanzable desde el
-  `main.py::build_model` rama `"neural_network"`, que solo llama el `main.py::main`
-  roto → **de facto sin uso**.
+- ~~**`nn.py`** — `TrainNeuralNetwork` (MLP Keras)~~ — **borrado** en el refactor
+  (junto con tensorflow/keras/scikeras de `requirements.txt`). Recuperable del
+  historial git si se quiere volver a probar redes neuronales.
 - **`main_select_model.py`** + **`utils_select_model/`** — a partir de
   `df_iteration.xlsx` filtran y rankean modelos:
   `filter_models_by_metric/distribution`, `define_metrics.py` **y**
