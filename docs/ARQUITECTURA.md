@@ -4,7 +4,7 @@
 > Se actualiza a medida que el refactor avanza. Para el plan y el registro de
 > cambios ver [`REFACTOR.md`](./REFACTOR.md).
 >
-> Última actualización: 2026-09-10 · commit base `6b5a83e8f`
+> Última actualización: 2026-09-10 (post Nivel 0 de reestructura) · commit base `6b5a83e8f`
 
 ---
 
@@ -21,9 +21,11 @@ numerada:
 | `p4_modeling/` | Modeling | Diseño de test, entrenamiento, evaluación, estrategia de apuesta, selección de modelo |
 | `p6_deployment/` | Deployment | Predicción de próximos partidos, scrapeo de resultados, publicación de apuestas |
 | `utils/` | — | Logging, creación de directorios, helpers varios |
-| `main.py` | — | **Biblioteca de clases** (`DataUnderstanding`, `DataPreparation`, `Modeling`) usada por los orquestadores |
+| `stages.py` | — | **Biblioteca de clases** (`DataUnderstanding`, `DataPreparation`, `Modeling`) usada por los orquestadores. (ex `main.py`) |
 | `main_train_models.py` | — | Orquestador de **entrenamiento** |
 | `analysis/` | — | Análisis ad-hoc fuera del pipeline (p. ej. `evaluate_vs_bet365.py`) |
+| `scripts/` | — | Scripts sueltos de una sola vez (concat de dfs, regeneración de artefactos) |
+| `tests/` | — | `pytest`: smoke de imports + tests de parsers |
 | `docs/` | — | Documentación viva (`ARQUITECTURA.md`, `REFACTOR.md`, `EVALUACION_VS_BET365.md`) |
 
 > No hay carpeta `p1` ni `p5`; la numeración sigue CRISP-DM (p1 = business
@@ -33,7 +35,7 @@ numerada:
 
 ## 2. Los dos modos de ejecución
 
-El sistema tiene **dos flujos** que comparten las clases de `main.py` y los
+El sistema tiene **dos flujos** que comparten las clases de `stages.py` y los
 módulos de `p3`/`p4`:
 
 ### 2.1 Entrenamiento (manual / local)
@@ -105,9 +107,10 @@ p6_deployment/automatize_predict/collect_predictions.py
 | `p6_deployment/predict_models.py` | Comparación de N modelos candidatos | Ocasional, manual |
 | `p2_data_understanding/collect_initial_data/scraper_flashscore.py` | Scrapeo histórico Flashscore | **Sí**, manual (bootstrap) |
 | `p2_data_understanding/collect_initial_data/scraper_sofifa.py` | Scrapeo histórico Sofifa | **Sí**, manual (bootstrap) |
-| `main.py` | ~~`main()` + `__main__`~~ | Removidos en el refactor. Solo quedan las **clases** (biblioteca). |
+| `stages.py` | ~~`main()` + `__main__`~~ | Removidos en el refactor. Solo quedan las **clases** (biblioteca). (ex `main.py`) |
 | `archive/scraper_whoscored.py` | Scrapeo WhoScored | **NO** — roto/legacy, movido a `archive/` |
-| `p2_.../scraper_new_variables.py`, `validate_data.py`, `concat_*.py` | Utilitarios one-shot | Esporádico, no cableados |
+| `p2_.../scraper_new_variables.py`, `p2_.../validate_data.py` | Utilitarios one-shot | Esporádico, no cableados |
+| `scripts/*.py` | Glue de una sola vez (concat de dfs, regeneración de artefactos) | Esporádico, no importados |
 | El resto de `p3_*/`, `p4_*/` con `__main__` | Bloques de prueba / scripts sueltos | Esporádico |
 
 ---
@@ -198,11 +201,11 @@ p6_deployment/automatize_predict/collect_predictions.py
   `scatter_plot` (genera los PNG grandes de `images/`).
 - **Legacy / one-shot:** `archive/scraper_whoscored.py` (constructor roto,
   movido a `archive/`), `scraper_new_variables.py`, `validate_data.py` (tiene un
-  validador de esquema útil pero huérfano), `concat_*.py`.
+  validador de esquema útil pero huérfano), `scripts/concat_*.py` (movidos en el Nivel 0).
 
 ### 5.2 `p3_data_preparation`
 
-Todo se orquesta desde `main.py :: DataPreparation` (y su subclase
+Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
 `DataPreparationNew` en `main_next_matches.py`).
 
 - **`format_data.py`** — conversión de tipos (`convert_*_to_int/float`),

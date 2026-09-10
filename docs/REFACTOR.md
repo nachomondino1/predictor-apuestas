@@ -192,7 +192,27 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
 | g-6 | P2 | Migrar intercambio de datos `.xlsx` → Parquet + acumulación por lista. | Medio (mucha superficie) |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
-| g-8 | P3 | `pytest` + un smoke test por fase. | Bajo |
+| g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, 29 tests). Falta cobertura por fase. | Bajo |
+
+### 2.7 Estructura de archivos
+
+**Diagnóstico:** el split por fases CRISP-DM (`p2→p3→p4→p6`) es defendible pero se
+desvía de buenas prácticas: `main.py` mal nombrado, orquestación en 4 "mains" a 3
+profundidades, `p6_deployment/` como cajón de sastre, prefijos `pN_` no
+idiomáticos, `utils/` grab-bag + un 2º `utils/` en p3, ~15 scripts sueltos como
+código de librería, sin `src/` ni `tests/`. **Mayor riesgo de cualquier rename:**
+el árbol `data/` (39 GB) espeja los nombres de paquete, hardcodeado en cientos de
+f-strings.
+
+**Target propuesto** (para Nivel 2): `src/predictor/{scraping,preparation,modeling,
+betting,pipeline,publish}` + `conf/` + `[project.scripts]` + `data/{raw,interim,
+processed,models}`. Refs: cookiecutter-data-science, Kedro.
+
+| Nivel | Qué | Riesgo | Estado |
+|---|---|---|---|
+| **0** | Renombrar `main.py`→`stages.py`; `scripts/` con los glue; limpiar `utils/`; esqueleto `tests/`. | Bajo | ✅ 2026-09-10 |
+| **1** | Renombrar paquetes `pN_` → dominio (`scraping`/`preparation`/…) por codemod (~66 imports). Desacoplar nombres de `data/` vía constante en `config.py` **o** migrar el árbol. Commit dedicado + test de imports. | Medio | pendiente |
+| **2** | `src/` layout + `[project.scripts]` + disolver `stages.DataPreparation`. Va con p3-2 y p6-1. | Alto | pendiente |
 
 ### 2.6 Orden de ejecución sugerido
 
@@ -214,6 +234,21 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-10 — Estructura Nivel 0 + g-8 (esqueleto de tests)
+- `main.py` → `stages.py` (es biblioteca de clases, no entrypoint). 3
+  importadores + `py-modules` de `pyproject` actualizados.
+- Nuevo `scripts/` con los glue sin importadores: `concat_all_countries`,
+  `concat_dfs`, `concat_flashscore_data`, `concat_sofifa_data` (ex p2),
+  `expected_table` (ex utils), `train_expected_result` (ex
+  `p3_data_preparation/utils/expected_result.py` — el dir vacío se eliminó).
+- `git rm utils/caracteres_especiales.txt` (sin uso).
+- Nuevo `tests/`: `test_imports.py` (26 módulos de librería) + `test_parsers.py`
+  (`clean_id` / `extract_id_from_href` / `extract_name_from_href`). **29 passed.**
+  `[tool.pytest.ini_options]` en `pyproject`. `pytest` instalado en el venv.
+- **Verificación:** `pytest` 29/29, `py_compile` OK, `import stages` OK.
+
+
 
 ### 2026-09-10 — g-3: empaquetado, fin de `sys.path.append('.')`
 - Nuevo `pyproject.toml` (setuptools, namespace packages, `dependencies = []` —
