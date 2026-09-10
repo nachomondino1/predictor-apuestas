@@ -33,6 +33,40 @@ numerada:
 
 ---
 
+## 1bis. Por qué está organizado así
+
+El proyecto lleva 4 iteraciones CRISP-DM documentadas (ene-2023 → jun-2025, en
+`~/Downloads/doc_tiptopia/`, no versionadas). Decisiones de diseño que **no** son
+descuido y conviene respetar:
+
+- **Prefijos `p2_/p3_/p4_/p6_`** — mapean 1:1 con las fases CRISP-DM y con los
+  documentos de iteración. Es trazabilidad código ↔ documentación; renombrar
+  pierde ese vínculo.
+- **`id_match` como índice** de `df_match` / `df_match_player` (iter2) — sobrevive
+  al shuffle y al split train/test; permite tener las odds en un df aparte y
+  calcular ROI / precisión del bookie trivialmente; en `main_next_matches`
+  identifica a qué partido corresponde cada predicción.
+- **Árbol `data/{country}/{fase}/…`** (iter3) — "unificación de archivos de datos
+  en una sola carpeta". Deliberado. Por eso los nombres de fase aparecen como
+  segmentos de ruta en cientos de f-strings.
+- **`data/all/` + `id_country = -1`** — el experimento "entrenar con todos los
+  países, testear en uno" (iter4). Está vivo.
+- **Selección de modelo semi-manual** — `main_select_model.py` saca el top-10 por
+  `n_draw + expected_roi`; después se elige a mano (`predict_models.py`) el que
+  más empates predice. `define_metrics.py` mostró que "cada país es un caso
+  distinto" (en una liga conviene el empate, en otra la visita…). `roi_in_time.py`
+  sirve para decidir cada cuánto reentrenar. **No son scripts muertos: son el
+  workflow.**
+- **Umbrales de NaN laxos** (`clean_post_construct` ~0.7) — a propósito: estrictos
+  matan `expected_goals` (85% NaN) y todas sus derivadas.
+- **`fill_na` solo `None` / `"0"`** (ya no `'ml'`) — el fill por modelo requería
+  guardar un modelo por columna para prod, demasiado almacenamiento.
+- **Betting strategy** — la iter4 concluye explícitamente que hay que reducirla a
+  "sin ea" (stake plano) y dejar de seleccionar estrategia por test (duplicaba el
+  overfitting). Ver [`REFACTOR.md`](./REFACTOR.md) ítem p4-7.
+
+---
+
 ## 2. Los dos modos de ejecución
 
 El sistema tiene **dos flujos** que comparten las clases de `stages.py` y los

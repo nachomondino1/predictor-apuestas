@@ -162,12 +162,13 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
-| p4-1 | P1 | Consolidar `utils_select_model`: elegir `define_metrics_v02.py`, borrar la otra versión + `old/`. | Bajo (código muerto/dup) | No |
+| p4-7 | **P1 (endorsed por iter4)** | **`betting_strategy.py` → "sin ea".** La iter4 concluye: reducir la bs a stake plano, sacar `apply_strategy_by_result`, `define_hiperparameters(strategy=…)` y la selección de estrategia por test (duplicaba overfitting). Dejar solo las 2 salvedades que iter4 mantiene: `stake=0` en local (`result_to_bet==1`) y `stake=0` si `player_emergency_fill==1`. | Bajo | No |
+| p4-1 | P2 | Consolidar `utils_select_model` (`define_metrics.py` vs `v02`). ⚠️ **NO es código muerto** — `main_select_model` / `predict_models` / `define_metrics` / `roi_in_time` son el workflow **semi-manual intencional** de selección de modelo (ver ARQUITECTURA §1bis). Consolidar sí, podar no. Falta que el usuario diga qué `define_metrics` usa. | Bajo | No |
 | p4-2 | P1 | ~~Decidir sobre `nn.py`: borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements~~ ✅ | Bajo | No |
 | p4-3 | ~~P2~~ ✅ | `asses_model.py` → `assess_model.py` + 8 importadores. | Bajo | No |
-| p4-4 | P2 | Podar `asses_model.py`: mapear qué métricas usa de verdad `train_and_assess_models` / `main_select_model` y borrar el resto. | Medio | No |
+| p4-4 | P2 | Podar `assess_model.py`: mapear qué métricas usa de verdad `train_and_assess_models` / `main_select_model` y borrar el resto. Se hace **junto con p4-7** (al simplificar la bs caen métricas de ROI/estrategia). | Medio | No |
 | p4-5 | P2 | `build_model.py::space_params`: escalera if/elif → dict/config. | Bajo | No |
-| p4-6 | P3 | Externalizar params de `betting_strategy` a config por país. | Bajo | No |
+| p4-6 | ~~P3~~ | ~~Externalizar params de `betting_strategy` a config por país~~ — obsoleto: p4-7 elimina esos params. | — | No |
 
 ### 2.4 `p6_deployment`
 
@@ -198,11 +199,18 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 **Diagnóstico:** el split por fases CRISP-DM (`p2→p3→p4→p6`) es defendible pero se
 desvía de buenas prácticas: `main.py` mal nombrado, orquestación en 4 "mains" a 3
-profundidades, `p6_deployment/` como cajón de sastre, prefijos `pN_` no
-idiomáticos, `utils/` grab-bag + un 2º `utils/` en p3, ~15 scripts sueltos como
-código de librería, sin `src/` ni `tests/`. **Mayor riesgo de cualquier rename:**
-el árbol `data/` (39 GB) espeja los nombres de paquete, hardcodeado en cientos de
-f-strings.
+profundidades, `p6_deployment/` como cajón de sastre, prefijos `pN_` verbosos,
+`utils/` grab-bag + un 2º `utils/` en p3, ~15 scripts sueltos como código de
+librería, sin `src/` ni `tests/`.
+
+**Dos frenos a renombrar los paquetes `pN_`** (contexto de las iteraciones, ver
+ARQUITECTURA §1bis):
+1. Los prefijos `pN_` mapean 1:1 con las fases CRISP-DM y con los 4 documentos de
+   iteración → renombrar rompe esa trazabilidad.
+2. El árbol `data/` (39 GB) espeja esos nombres, hardcodeado en cientos de
+   f-strings.
+→ **Nivel 1 baja a P3.** Si se hace, preservar la semántica de fase (no
+`scraping/` a secas) y desacoplar los nombres de `data/` con una constante.
 
 **Target propuesto** (para Nivel 2): `src/predictor/{scraping,preparation,modeling,
 betting,pipeline,publish}` + `conf/` + `[project.scripts]` + `data/{raw,interim,
@@ -211,29 +219,45 @@ processed,models}`. Refs: cookiecutter-data-science, Kedro.
 | Nivel | Qué | Riesgo | Estado |
 |---|---|---|---|
 | **0** | Renombrar `main.py`→`stages.py`; `scripts/` con los glue; limpiar `utils/`; esqueleto `tests/`. | Bajo | ✅ 2026-09-10 |
-| **1** | Renombrar paquetes `pN_` → dominio (`scraping`/`preparation`/…) por codemod (~66 imports). Desacoplar nombres de `data/` vía constante en `config.py` **o** migrar el árbol. Commit dedicado + test de imports. | Medio | pendiente |
+| **1** | Renombrar paquetes `pN_` por codemod (~66 imports). Desacoplar nombres de `data/` vía constante en `config.py` **o** migrar el árbol. Commit dedicado + test de imports. | Medio | **P3** — 2 frenos arriba; hacer solo si el Nivel 2 lo pide |
 | **2** | `src/` layout + `[project.scripts]` + disolver `stages.DataPreparation`. Va con p3-2 y p6-1. | Alto | pendiente |
 
 ### 2.6 Orden de ejecución sugerido
 
-1. ~~**g-1, g-2**~~ ✅ — borrado de código muerto.
-2. ~~**p4-2**~~ ✅ (nn.py) · **p4-1, p4-3** — consolidar `utils_select_model`, rename `asses_model`.
-3. **Entender por qué el modelo no le gana a bet365** (nueva prioridad, ver
-   `EVALUACION_VS_BET365.md`): validar que el backtest es out-of-sample, analizar
-   el drift trimestral, revisar calibración y `betting_strategy.py`.
-4. **p3-3, p3-4, p3-5** (quick wins / bugs) → **p3-2** (sprawl `prod`) →
-   **p3-1** (vectorización de `construct_data`, con golden test) — habilita
-   iterar modelos rápido.
-5. **p6-1** → **p6-2** — partir `main_next_matches` + resolver workflows.
-6. **g-3, g-4, g-6, g-8** — empaquetado, requirements, Parquet, tests.
-7. **[congelado] p2-1 → p2-2 → p2-8** — modernización del scraping, solo si el
-   modelo muestra edge real.
+Foco actual del usuario: **simplificar / sacar repetido / lean**. La comparación
+vs bet365 y la modernización de scrapers están en pausa.
+
+1. ~~**g-1, g-2, g-3, p4-2, p4-3, p3-3/4/5, estructura Nivel 0**~~ ✅ hechos.
+2. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" (endorsed por iter4) y podar
+   `assess_model.py` de las métricas de ROI/estrategia que quedan sin uso.
+   Recorte grande de código, bajo riesgo, alineado con tu conclusión.
+3. **g-4** — separar requirements + pinear `mnm`. Bajo riesgo.
+4. **p6-1** — partir `main_next_matches.main` en etapas + sacar los 11 `input()`.
+5. **p3-2** (sprawl `prod`) → **p3-1** (vectorizar `construct_data`, con golden
+   test). Los dos grandes; habilitan iterar modelos rápido.
+6. **p6-2** (workflows), **g-6** (Parquet), **g-8** (cobertura de tests), **p4-1**
+   (consolidar `define_metrics`, cuando digas cuál usás).
+7. **[pausa]** comparación vs bet365 (`EVALUACION_VS_BET365.md`) · **[pausa]**
+   p2-1 / p2-2 / p2-8 (scrapers) · **[P3]** estructura Nivel 1.
 
 ---
 
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-10 — Contexto de las 4 iteraciones CRISP-DM (docs externos)
+Leídos los 4 `.docx` de `~/Downloads/doc_tiptopia/` (ene-2023 → jun-2025). Impacto
+en el plan (sin cambios de código):
+- Nuevo **p4-7 (P1, endorsed)**: la iter4 concluye que hay que reducir
+  `betting_strategy.py` a "sin ea". `p4-6` queda obsoleto.
+- **Nivel 1 de estructura baja a P3**: los `pN_` mapean con las fases CRISP-DM y
+  con los docs; el árbol `data/` los espeja.
+- `p4-1` deja de ser "borrar código muerto": `main_select_model` /
+  `predict_models` / `define_metrics` / `roi_in_time` son el workflow semi-manual
+  intencional de selección de modelo.
+- Rationale documentado en `ARQUITECTURA.md` §1bis (`id_match` como índice, árbol
+  `data/`, `data/all` + `id_country=-1`, umbrales de NaN, `fill_na`).
 
 ### 2026-09-10 — Estructura Nivel 0 + g-8 (esqueleto de tests)
 - `main.py` → `stages.py` (es biblioteca de clases, no entrypoint). 3
