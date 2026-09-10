@@ -23,6 +23,8 @@ numerada:
 | `utils/` | — | Logging, creación de directorios, helpers varios |
 | `main.py` | — | **Biblioteca de clases** (`DataUnderstanding`, `DataPreparation`, `Modeling`) usada por los orquestadores |
 | `main_train_models.py` | — | Orquestador de **entrenamiento** |
+| `analysis/` | — | Análisis ad-hoc fuera del pipeline (p. ej. `evaluate_vs_bet365.py`) |
+| `docs/` | — | Documentación viva (`ARQUITECTURA.md`, `REFACTOR.md`, `EVALUACION_VS_BET365.md`) |
 
 > No hay carpeta `p1` ni `p5`; la numeración sigue CRISP-DM (p1 = business
 > understanding, p5 = evaluation) aunque esas fases no tienen código propio.
@@ -300,6 +302,11 @@ Todo se orquesta desde `main.py :: DataPreparation` (y su subclase
 - **`df_countries.xlsx` / `df_competencies.xlsx`** — tablas maestras: id ↔ nombre
   de país, y por competición su nombre en Flashscore/Sofifa, `is_cup`,
   `is_public`.
+- **`data/backup_predictor_apuestas.sql`** (no versionado) — dump MySQL de la DB
+  de producción (Django + tabla `historial_predicciones` con resultados y
+  `acerte`/`bet_yield`). Es la fuente de verdad para la evaluación retrospectiva;
+  el `historial_predicciones.xlsx` de la rama `staging` NO tiene resultados
+  cargados (eso se escribe en `prod`).
 - **Salida final:** `predicciones.xlsx` (index = `id_match`, importante para
   MySQL) → repo `landing` vía dispatch.
 

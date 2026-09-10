@@ -130,10 +130,16 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 ### 2.1 `p2_data_understanding`
 
+> ⚠️ **p2-1, p2-2, p2-8 CONGELADOS** (2026-09-10). La evaluación
+> [`EVALUACION_VS_BET365.md`](./EVALUACION_VS_BET365.md) mostró que el modelo aún
+> no le gana a bet365, así que no se justifica invertir en modernizar los
+> scrapers todavía. Se retoman si/cuando el modelo muestre edge real.
+
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
-| p2-1 | P1 | Centralizar los XPaths de los 3 scrapers en un módulo de selectores único + validación ruidosa post-scrape (cablear `validate_data.py`). | Bajo (aditivo) | XPaths se **mueven**, no cambian |
-| p2-2 | P1 | Deduplicar `extract_data` / `extract_missing_matches` / `extract_next_matches` en una función con flag `mode`. Acumular filas en lista → un `DataFrame`. | Medio, self-contained | No |
+| p2-1 | ❄️ | Centralizar los XPaths de los 3 scrapers en un módulo de selectores único + validación ruidosa post-scrape (cablear `validate_data.py`). | Bajo (aditivo) | XPaths se **mueven**, no cambian |
+| p2-2 | ❄️ | Deduplicar `extract_data` / `extract_missing_matches` / `extract_next_matches` en una función con flag `mode`. Acumular filas en lista → un `DataFrame`. | Medio, self-contained | No |
+| p2-8 | ❄️ | Entrypoint único del scraper: dispatcher fino `python -m scraper <job>` (subcomandos `flashscore-history`, `sofifa-history`, `next-matches`, `results`, `missing`) que solo llama a las funciones que ya existen. Reemplaza el patrón "editá el `__main__`" + `sys.argv`/`ast.literal_eval`. Va junto con p2-2. | Bajo (aditivo) | No |
 | p2-3 | P2 | `extract_data`: quitar `headless=False` hardcodeado y el `SEC_WAIT_MED = SEC_WAIT_MIN` mágico tras `n_season > 9` → parámetros explícitos (valores idénticos). | Bajo | Consultar: cambia *cómo* se setean las esperas |
 | p2-4 | P2 | `check_if_season_already_extracted`: `os.path.exists` en vez de 3 lecturas Excel + `except:` desnudo. | Bajo | No |
 | p2-5 | P2 | Mover `clean_id`, `extract_id_from_href`, `extract_name_from_href` a `parsers.py` + tests unitarios. | Nulo | No |
@@ -190,18 +196,39 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 ### 2.6 Orden de ejecución sugerido
 
-1. **g-1, g-2** — borrado de código muerto (puras eliminaciones).
-2. **p2-1** → **p2-2** — XPaths centralizados + validación, luego dedupe de extractores.
-3. **p3-3, p3-4, p3-5** (quick wins) → **p3-2** (sprawl `prod`) → **p3-1** (vectorización, con golden test).
-4. **p4-1, p4-2, p4-3** — consolidar selección + rename.
+1. ~~**g-1, g-2**~~ ✅ — borrado de código muerto.
+2. ~~**p4-2**~~ ✅ (nn.py) · **p4-1, p4-3** — consolidar `utils_select_model`, rename `asses_model`.
+3. **Entender por qué el modelo no le gana a bet365** (nueva prioridad, ver
+   `EVALUACION_VS_BET365.md`): validar que el backtest es out-of-sample, analizar
+   el drift trimestral, revisar calibración y `betting_strategy.py`.
+4. **p3-3, p3-4, p3-5** (quick wins / bugs) → **p3-2** (sprawl `prod`) →
+   **p3-1** (vectorización de `construct_data`, con golden test) — habilita
+   iterar modelos rápido.
 5. **p6-1** → **p6-2** — partir `main_next_matches` + resolver workflows.
 6. **g-3, g-4, g-6, g-8** — empaquetado, requirements, Parquet, tests.
+7. **[congelado] p2-1 → p2-2 → p2-8** — modernización del scraping, solo si el
+   modelo muestra edge real.
 
 ---
 
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-10 — Evaluación modelo vs bet365 (cambia prioridades)
+- Nuevo: `analysis/evaluate_vs_bet365.py` — parsea el dump MySQL de producción
+  (`data/backup_predictor_apuestas.sql`, no versionado) y calcula acierto 1X2,
+  calibración (log-loss/Brier) y ROI del modelo vs bet365. Reproducible; escribe
+  la parte de cifras de `docs/EVALUACION_VS_BET365.md` (preserva el TL;DR escrito
+  a mano por encima de un marcador).
+- **Resultado:** sobre 2079 partidos resueltos (jul-2024 → sep-2025) el modelo
+  **no le gana a bet365**: acierto 49.0 % vs 53.7 %, probabilidades peor
+  calibradas, ROI de la estrategia ≈ 0 %. Detalle en
+  [`EVALUACION_VS_BET365.md`](./EVALUACION_VS_BET365.md).
+- **Impacto en el plan:** p2-1 / p2-2 / p2-8 (modernización del scraping) quedan
+  **congelados** hasta entender por qué el modelo va detrás del bookie. El foco
+  pasa a calidad de modelo / calibración / drift.
+- Sin cambios de comportamiento en el código del pipeline.
 
 ### 2026-09-10 — Documentación inicial
 - Creados `docs/ARQUITECTURA.md` y `docs/REFACTOR.md` (este archivo).
