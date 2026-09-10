@@ -246,6 +246,29 @@ vs bet365 y la modernización de scrapers están en pausa.
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
 
+### 2026-09-10 — Limpieza de peso (archivos y `data/`)
+- **Tracked borrados** (recuperables del historial): `archive/`,
+  `dispatch_event/config_webhook.py`, `scraper_new_variables.py`,
+  `validate_data.py`, `update_predictions/` (`create_action_update.py` +
+  `schedules.xlsx`). `.gitignore`: `.pytest_cache/`.
+- **Local (no tracked):** borrado `__pycache__` del proyecto, 350 `.DS_Store`,
+  `.github/workflows/desuso/`.
+- **`data/` 39 GB → 6 GB** (−32 GB): borradas todas las carpetas `old/` /
+  `data/_old/` / `data/_metrics/` y los `iteration_date` `< 2025-08-26` en
+  `p2/old_updated`, `p3_data_preparation`, `p4_modeling`. Se conserva `2025-08-26`
+  (el modelo activo según `df_best_models.xlsx`) y posteriores (08-29, 08-30,
+  09-19, 09-21). `pytest` 29/29 tras la limpieza.
+- **Nota:** `df_best_models.xlsx` apunta a `2025-08-26` para `usa` y `argentina`
+  pero esas carpetas **nunca existieron** (inconsistencia pre-existente, no la
+  causó esta limpieza). El pipeline de esos 2 países no está armado para ese
+  modelo.
+- **Pendiente `venv/`:** recrear (`pip` roto por shebang viejo) + borrar
+  `p6_deployment/venv_mnm/` (178 MB stale).
+- **Pendiente `.git` (8.9 GB):** la bloat (commits viejos de `data/`,
+  `env-model/`, `django_project/`) es ancestro de `staging`/`prod` → NO se puede
+  reducir el `.git` local sin reescribir esas ramas (force-push coordinado). Si
+  `staging`/`prod` no se tocan, el `.git` se queda en 8.9 GB.
+
 ### 2026-09-10 — Contexto de las 4 iteraciones CRISP-DM (docs externos)
 Leídos los 4 `.docx` de `~/Downloads/doc_tiptopia/` (ene-2023 → jun-2025). Impacto
 en el plan (sin cambios de código):
