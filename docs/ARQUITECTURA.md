@@ -336,9 +336,10 @@ Todo se orquesta desde `main.py :: DataPreparation` (y su subclase
   - `USER_SH` / `PASS_SH` — credenciales de stakehunters.com (`publish_bets.py`).
   - `CHROMEDRIVER_PATH` — *(añadido en el refactor, módulo 1)* ruta al ejecutable
     de chromedriver como último fallback del init del driver.
-- **`sys.path.append('.')`** al inicio de ~20 archivos (y una ruta absoluta en
-  `select_data.py`) — parche para que funcionen los imports absolutos sin
-  instalar el paquete.
+- **Imports:** el repo se instala como paquete con `pip install -e . --no-deps`
+  (`pyproject.toml`, namespace packages). Eso reemplaza el viejo
+  `sys.path.append('.')` que había al inicio de ~33 archivos. Alternativa sin
+  instalar: `PYTHONPATH=.` (lo que usa la GitHub Action).
 - **`utils/set_up_logging.py`** — logger con formato de colores por nivel
   (CRITICAL en verde = "éxito"). Emite 4 líneas de ejemplo en cada import
   (pendiente de limpiar). Existe también `set_up_logging_save.py` (muerto).

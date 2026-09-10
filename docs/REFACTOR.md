@@ -187,7 +187,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 |---|---|---|---|
 | g-1 | P1 | Borrar código muerto: ~~`main.py::main` + `__main__`~~ ✅, ~~`set_up_logging_save.py`~~ ✅, ~~WhoScored → archive/~~ ✅, ~~`nn.py`~~ ✅. (`utils_select_model/old/` ya está en `.gitignore`, no está en el repo — nada que borrar.) | Bajo |
 | g-2 | P1 | ~~Quitar los 4 `logger.x("Este es un mensaje…")` de `utils/set_up_logging.py`~~ ✅. | Nulo |
-| g-3 | P2 | Empaquetado: `pyproject.toml` + `pip install -e .`, borrar todos los `sys.path.append`. | Medio |
+| g-3 | ~~P2~~ ✅ | `pyproject.toml` + `pip install -e .`; `sys.path.append('.')` borrado de 33 archivos; CI usa `PYTHONPATH=.`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
 | g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
 | g-6 | P2 | Migrar intercambio de datos `.xlsx` → Parquet + acumulación por lista. | Medio (mucha superficie) |
@@ -214,6 +214,21 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-10 — g-3: empaquetado, fin de `sys.path.append('.')`
+- Nuevo `pyproject.toml` (setuptools, namespace packages, `dependencies = []` —
+  las deps siguen en `requirements*.txt`). Instalación: `pip install -e . --no-deps`.
+- Quitado `import sys` + `sys.path.append('.')` de **33 archivos**. Los 3 que
+  usan `sys.argv` / `sys.exit` conservan `import sys`.
+- `.github/workflows/update_results.yml`: `PYTHONPATH: .` en el job +
+  `pyproject.toml` agregado al `sparse-checkout` (replica el efecto en CI sin
+  depender del editable install).
+- `.gitignore`: `*.egg-info/`, `build/`, `dist/`. README actualizado.
+- **Nota lateral:** `p3_data_preparation/utils/expected_result.py` tiene código a
+  nivel de módulo (lee un `.xlsx` en el import) → falla al importarlo fuera de la
+  raíz. Pre-existente, nadie lo importa; queda para limpieza futura.
+- **Verificación:** los 38 módulos importan desde `cwd=/tmp` con el editable
+  install; import chain de CI OK con `PYTHONPATH`; `py_compile` OK en 42 `.py`.
 
 ### 2026-09-10 — p3-3/p3-4/p3-5/g-5/p4-3: bugs, rutas personales y rename
 - **Bugs (`main.py`):**
