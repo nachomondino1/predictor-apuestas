@@ -43,3 +43,6 @@ data/*
 !data/df_competencies.xlsx
 !data/historial_predicciones.xlsx
 !data/predicciones.xlsx
+
+# pytest
+.pytest_cache/
