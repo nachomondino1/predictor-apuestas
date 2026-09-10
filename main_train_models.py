@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression  # Regresion Logistica
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC  # SVM
 from sklearn.neural_network import MLPClassifier
-from p2_data_understanding.collect_initial_data import update_sofifa_data
+from p2_data_understanding import update_sofifa_data
 from p3_data_preparation.select_data import select_league_matches
 from p3_data_preparation import concat_mapeos
 from p3_data_preparation.select_data import determine_country_competitions

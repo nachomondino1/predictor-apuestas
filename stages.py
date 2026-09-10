@@ -7,7 +7,7 @@ import time
 from utils.set_up_logging import logger
 from utils import directories
 ## Data understanding
-from p2_data_understanding.collect_initial_data import scraper_flashscore, scraper_sofifa
+from p2_data_understanding import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
 ## Data preparation
 from p3_data_preparation import format_data, select_data, clean_data, construct_data, integrate_sofifa_to_flashscore

@@ -21,7 +21,7 @@ Snapshot al commit base `6b5a83e8f` (rama `staging`), sesión iniciada 2026-09-1
 - ~16.000 líneas de Python en 41 archivos versionados (`git ls-files '*.py'`).
 - Archivos más grandes: `main.py` (1356), `p6_deployment/main_next_matches.py`
   (1260), `p3_data_preparation/construct_data.py` (1028),
-  `p2_.../scraper_flashscore.py` (1017).
+  `p2_data_understanding/scraper_flashscore.py` (1017).
 - Sin tests. Sin linter/formatter configurado en CI (aunque `black` está en
   `requirements.txt`).
 - 3 archivos de dependencias: `requirements.txt` (~150 paquetes, incluye Django
@@ -49,14 +49,14 @@ Resumen:
   `df_teams_sofifa`, `construct_data` con `l_days`/`dif_con_against`,
   `treat_nan_values` inexistente, `DataPreparation(id_country, country)` sin
   `date`). Las **clases** de `main.py` sí se usan.
-- `p2_.../scraper_whoscored.py` — `WhoScoredCrawler(headless, path)` llama
+- `p2_data_understanding/scraper_whoscored.py` — `WhoScoredCrawler(headless, path)` llama
   `super().__init__(headless, path)` pero el constructor actual es
   `Crawler(headless, browser="Chrome")` → `path` entra como `browser`. Rutas
   absolutas de un repo viejo (`/Users/nachomondino/Documents/GitHub/predictor-apuestas/...`),
   `df_competencias.xlsx` (nombre viejo).
 - `utils/set_up_logging_save.py` — no se importa; ruta `/home/runner/...`
   hardcodeada.
-- `p4_modeling/utils_select_model/old/` — 4 archivos.
+- `p4_modeling/model_selection/old/` — 4 archivos.
 - `p4_modeling/nn.py` — solo alcanzable vía el `main.py::main` roto.
 - `define_metrics.py` vs `define_metrics_v02.py` — dos versiones de
   `determine_metrics_by_model`.
@@ -163,7 +163,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
 | p4-7 | **P1 (endorsed por iter4)** | **`betting_strategy.py` → "sin ea".** La iter4 concluye: reducir la bs a stake plano, sacar `apply_strategy_by_result`, `define_hiperparameters(strategy=…)` y la selección de estrategia por test (duplicaba overfitting). Dejar solo las 2 salvedades que iter4 mantiene: `stake=0` en local (`result_to_bet==1`) y `stake=0` si `player_emergency_fill==1`. | Bajo | No |
-| p4-1 | P2 | Consolidar `utils_select_model` (`define_metrics.py` vs `v02`). ⚠️ **NO es código muerto** — `main_select_model` / `predict_models` / `define_metrics` / `roi_in_time` son el workflow **semi-manual intencional** de selección de modelo (ver ARQUITECTURA §1bis). Consolidar sí, podar no. Falta que el usuario diga qué `define_metrics` usa. | Bajo | No |
+| p4-1 | P2 | Consolidar `model_selection` (`define_metrics.py` vs `v02`). ⚠️ **NO es código muerto** — `main_select_model` / `predict_models` / `define_metrics` / `roi_in_time` son el workflow **semi-manual intencional** de selección de modelo (ver ARQUITECTURA §1bis). Consolidar sí, podar no. Falta que el usuario diga qué `define_metrics` usa. | Bajo | No |
 | p4-2 | P1 | ~~Decidir sobre `nn.py`: borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements~~ ✅ | Bajo | No |
 | p4-3 | ~~P2~~ ✅ | `asses_model.py` → `assess_model.py` + 8 importadores. | Bajo | No |
 | p4-4 | P2 | Podar `assess_model.py`: mapear qué métricas usa de verdad `train_and_assess_models` / `main_select_model` y borrar el resto. Se hace **junto con p4-7** (al simplificar la bs caen métricas de ROI/estrategia). | Medio | No |
@@ -186,7 +186,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 | # | Prio | Cambio | Riesgo |
 |---|---|---|---|
-| g-1 | P1 | Borrar código muerto: ~~`main.py::main` + `__main__`~~ ✅, ~~`set_up_logging_save.py`~~ ✅, ~~WhoScored → archive/~~ ✅, ~~`nn.py`~~ ✅. (`utils_select_model/old/` ya está en `.gitignore`, no está en el repo — nada que borrar.) | Bajo |
+| g-1 | P1 | Borrar código muerto: ~~`main.py::main` + `__main__`~~ ✅, ~~`set_up_logging_save.py`~~ ✅, ~~WhoScored → archive/~~ ✅, ~~`nn.py`~~ ✅. (`model_selection/old/` ya está en `.gitignore`, no está en el repo — nada que borrar.) | Bajo |
 | g-2 | P1 | ~~Quitar los 4 `logger.x("Este es un mensaje…")` de `utils/set_up_logging.py`~~ ✅. | Nulo |
 | g-3 | ~~P2~~ ✅ | `pyproject.toml` + `pip install -e .`; `sys.path.append('.')` borrado de 33 archivos; CI usa `PYTHONPATH=.`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
@@ -245,6 +245,24 @@ vs bet365 y la modernización de scrapers están en pausa.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — Aplanado de carpetas (estructura, dentro de fase)
+Sin renombrar los paquetes de fase `pN_` (mapean con CRISP-DM y con `data/`).
+- `p2_data_understanding/collect_initial_data/*` → sube a `p2_data_understanding/`.
+- `p6_deployment/automatize_predict/*` y `.../dispatch_event/*` → suben a
+  `p6_deployment/`.
+- `p4_modeling/utils_select_model/` → renombrado `p4_modeling/model_selection/`;
+  borrado su `old/` (4 scripts, untracked). Borrado `utils/prueba.py` (untracked).
+- Codemod de imports (13 `.py`) + `update_results.yml` (sparse-checkout +
+  rutas de invocación) + `tests/`. `pip install -e .` refrescado.
+- **−4 niveles de carpeta.** Estructura de código: `p2_data_understanding/`,
+  `p3_data_preparation/`, `p4_modeling/` (+`model_selection/`), `p6_deployment/`,
+  `utils/`, `scripts/`, `tests/`, `analysis/`, `docs/`.
+- **Verificación:** `pytest` 29/29, `py_compile` 40/40, imports OK desde
+  `cwd=/tmp`.
+- ⚠️ El cambio de `update_results.yml` está en `claude-test`; el CI de `prod` usa
+  la estructura vieja hasta que se mergee. **No cherry-pickear el yml sin el
+  código** (van juntos).
 
 ### 2026-09-10 — Limpieza de peso (archivos y `data/`)
 - **Tracked borrados** (recuperables del historial): `archive/`,
@@ -353,7 +371,7 @@ en el plan (sin cambios de código):
 - Sin cambios de comportamiento.
 
 ### 2026-09-10 — p2-6 / p4-2: archivado de WhoScored + borrado de `nn.py`
-- `p2_data_understanding/collect_initial_data/scraper_whoscored.py` →
+- `p2_data_understanding/scraper_whoscored.py` →
   `archive/scraper_whoscored.py` (con `archive/README.md` explicando el motivo).
 - `p4_modeling/nn.py` **borrado** (`git rm`). Solo lo usaba el `main.py::main`
   removido; recuperable del historial.
@@ -376,7 +394,7 @@ en el plan (sin cambios de código):
   `/home/runner/...` hardcodeada).
 - `utils/set_up_logging.py`: quitadas las 4 líneas `logger.x("Este es un
   mensaje…")` que se ejecutaban en cada import.
-- **Pendiente de g-1:** borrar `p4_modeling/utils_select_model/old/` y decidir
+- **Pendiente de g-1:** borrar `p4_modeling/model_selection/old/` y decidir
   destino de `scraper_whoscored.py` + `p4_modeling/nn.py` (requiere tu OK).
 
 **Verificación:** `py_compile` de `main.py`, `main_train_models.py`,
@@ -384,7 +402,7 @@ en el plan (sin cambios de código):
 clases OK en `venv/`. El logger ya no imprime las 4 líneas de ejemplo.
 
 ### 2026-09-10 — Módulo 1: limpieza de `inicialize_chrome_driver`
-Archivo: `p2_data_understanding/collect_initial_data/web_scraping_selenium.py`
+Archivo: `p2_data_understanding/web_scraping_selenium.py`
 (+ `.env.example`).
 
 - `try/except` anidado de 3 niveles → lista ordenada de 3 estrategias

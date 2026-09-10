@@ -4,7 +4,7 @@ from utils.set_up_logging import logger
 from utils import directories
 import datetime
 from p4_modeling import assess_model
-from p4_modeling.utils_select_model import assess_in_prod
+from p4_modeling.model_selection import assess_in_prod
 
 def initialize_directories(country, iteration_date):
     """

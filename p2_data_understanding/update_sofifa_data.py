@@ -4,7 +4,7 @@ from utils import directories
 from utils.set_up_logging import logger
 from dotenv import load_dotenv
 import pandas as pd
-from p2_data_understanding.collect_initial_data import scraper_sofifa
+from p2_data_understanding import scraper_sofifa
 from p3_data_preparation.format_data import verify_format
 
 

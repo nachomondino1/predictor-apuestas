@@ -4,7 +4,7 @@
 > Se actualiza a medida que el refactor avanza. Para el plan y el registro de
 > cambios ver [`REFACTOR.md`](./REFACTOR.md).
 >
-> Última actualización: 2026-09-10 (post Nivel 0 de reestructura) · commit base `6b5a83e8f`
+> Última actualización: 2026-09-11 (post aplanado de carpetas) · commit base `6b5a83e8f`
 
 ---
 
@@ -16,7 +16,7 @@ numerada:
 
 | Carpeta | Fase | Responsabilidad |
 |---|---|---|
-| `p2_data_understanding/` | Data understanding | Web scraping (Flashscore, Sofifa, WhoScored) y descripción de datos crudos |
+| `p2_data_understanding/` | Data understanding | Web scraping (Flashscore, Sofifa) y descripción de datos crudos |
 | `p3_data_preparation/` | Data preparation | Formateo, limpieza, integración de fuentes, construcción de features, selección |
 | `p4_modeling/` | Modeling | Diseño de test, entrenamiento, evaluación, estrategia de apuesta, selección de modelo |
 | `p6_deployment/` | Deployment | Predicción de próximos partidos, scrapeo de resultados, publicación de apuestas |
@@ -87,12 +87,12 @@ main_train_models.py  →  comprehensive_search()
 - Escribe una fila por modelo entrenado en `df_ite_train.xlsx` / `df_ite_test.xlsx`
   / `df_params_ite.xlsx` bajo `data/{country}/p4_modeling/{date}/`.
 - La selección del "mejor modelo" se hace después con `p4_modeling/main_select_model.py`
-  y `p4_modeling/utils_select_model/`.
+  y `p4_modeling/model_selection/`.
 
 ### 2.2 Producción / predicción (manual / local hoy)
 
 ```
-p6_deployment/automatize_predict/collect_predictions.py
+p6_deployment/collect_predictions.py
    →  p6_deployment/main_next_matches.py :: main(d_run, id_country, ...)
 ```
 
@@ -115,8 +115,8 @@ p6_deployment/automatize_predict/collect_predictions.py
 
 ```
 .github/workflows/update_results.yml  (cron)
-   →  p6_deployment/automatize_predict/update_results.py 1
-   →  p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
+   →  p6_deployment/update_results.py 1
+   →  p6_deployment/dispatch_event.py
 ```
 
 - **Único flujo que corre en GitHub Actions.** ~25 crons (fines de semana y
@@ -134,16 +134,14 @@ p6_deployment/automatize_predict/collect_predictions.py
 | Archivo | Rol | ¿Se usa? |
 |---|---|---|
 | `main_train_models.py` | Entrenamiento (orquestador real) | **Sí**, manual |
-| `p6_deployment/automatize_predict/collect_predictions.py` | Predicción multi-país | **Sí**, manual |
+| `p6_deployment/collect_predictions.py` | Predicción multi-país | **Sí**, manual |
 | `p6_deployment/main_next_matches.py` | Predicción de un país (también librería) | **Sí**, manual / debug |
-| `p6_deployment/automatize_predict/update_results.py` | Scrapeo de resultados | **Sí**, CI |
+| `p6_deployment/update_results.py` | Scrapeo de resultados | **Sí**, CI |
 | `p6_deployment/publish_bets.py` | Auto-bet en stakehunters.com vía Selenium | **Sí**, manual |
 | `p6_deployment/predict_models.py` | Comparación de N modelos candidatos | Ocasional, manual |
-| `p2_data_understanding/collect_initial_data/scraper_flashscore.py` | Scrapeo histórico Flashscore | **Sí**, manual (bootstrap) |
-| `p2_data_understanding/collect_initial_data/scraper_sofifa.py` | Scrapeo histórico Sofifa | **Sí**, manual (bootstrap) |
+| `p2_data_understanding/scraper_flashscore.py` | Scrapeo histórico Flashscore | **Sí**, manual (bootstrap) |
+| `p2_data_understanding/scraper_sofifa.py` | Scrapeo histórico Sofifa | **Sí**, manual (bootstrap) |
 | `stages.py` | ~~`main()` + `__main__`~~ | Removidos en el refactor. Solo quedan las **clases** (biblioteca). (ex `main.py`) |
-| `archive/scraper_whoscored.py` | Scrapeo WhoScored | **NO** — roto/legacy, movido a `archive/` |
-| `p2_.../scraper_new_variables.py`, `p2_.../validate_data.py` | Utilitarios one-shot | Esporádico, no cableados |
 | `scripts/*.py` | Glue de una sola vez (concat de dfs, regeneración de artefactos) | Esporádico, no importados |
 | El resto de `p3_*/`, `p4_*/` con `__main__` | Bloques de prueba / scripts sueltos | Esporádico |
 
@@ -186,7 +184,7 @@ p6_deployment/automatize_predict/collect_predictions.py
         assess_model    → métricas básicas + calculate_metrics
         assess_model_with_roi + betting_strategy → stakes, ROI, Kelly
         → modelo.pkl + df_ite_train/test/params
-        main_select_model + utils_select_model → elige "mejor modelo" por país
+        main_select_model + model_selection → elige "mejor modelo" por país
                                         ▼
    p6   main_next_matches.main() reusa p3+p4 sobre PRÓXIMOS partidos
         → data/{country}/p6_deployment/predicciones.xlsx
@@ -202,7 +200,7 @@ p6_deployment/automatize_predict/collect_predictions.py
 
 ### 5.1 `p2_data_understanding`
 
-- **`collect_initial_data/web_scraping_selenium.py`** — clase base `Crawler`.
+- **`p2_data_understanding/web_scraping_selenium.py`** — clase base `Crawler`.
   Encapsula:
   - Init del WebDriver. `inicialize_chrome_driver()` intenta **3 estrategias en
     orden** (última versión vía `webdriver-manager` → versión del Chrome local →
@@ -295,7 +293,7 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
 - ~~**`nn.py`** — `TrainNeuralNetwork` (MLP Keras)~~ — **borrado** en el refactor
   (junto con tensorflow/keras/scikeras de `requirements.txt`). Recuperable del
   historial git si se quiere volver a probar redes neuronales.
-- **`main_select_model.py`** + **`utils_select_model/`** — a partir de
+- **`main_select_model.py`** + **`model_selection/`** — a partir de
   `df_iteration.xlsx` filtran y rankean modelos:
   `filter_models_by_metric/distribution`, `define_metrics.py` **y**
   `define_metrics_v02.py` (dos versiones), `assess_in_prod.py`, `roi_in_time.py`,
@@ -308,18 +306,16 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   `TrainingDataLoader` (carga hiperparámetros/artefactos del entrenamiento),
   `MissingData` (lee/concatena datasets old + missing). Función `main()` de ~370
   líneas.
-- **`automatize_predict/collect_predictions.py`** — loop de países + acumulación
+- **`p6_deployment/collect_predictions.py`** — loop de países + acumulación
   en los xlsx de `data/`.
-- **`automatize_predict/update_results.py`** — scrapeo de marcadores finales +
+- **`p6_deployment/update_results.py`** — scrapeo de marcadores finales +
   cálculo de acierto/yield.
-- **`automatize_predict/dispatch_event/`** — `dispatch_event.py` (POST a la API de
-  GitHub para `repository_dispatch`), `config_webhook.py`.
-- **`automatize_predict/update_predictions/create_action_update.py`** — genera un
-  workflow `.yml` por **concatenación de strings** a partir de `schedules.xlsx`.
-- **`publish_bets.py`** — `StakeHunterCrawler(Crawler)`: login y carga de apuestas
-  reales en stakehunters.com vía Selenium.
-- **`predict_models.py`** — corre `main_next_matches.main()` para los N mejores
-  modelos y cuenta coincidencias de predicción.
+- **`p6_deployment/dispatch_event.py`** — POST a la API de GitHub para
+  `repository_dispatch` (dispara el repo `landing`).
+- **`p6_deployment/publish_bets.py`** — `StakeHunterCrawler(Crawler)`: login y
+  carga de apuestas reales en stakehunters.com vía Selenium.
+- **`p6_deployment/predict_models.py`** — corre `main_next_matches.main()` para
+  los N mejores modelos y cuenta coincidencias de predicción.
 
 ---
 

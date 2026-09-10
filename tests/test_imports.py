@@ -13,10 +13,10 @@ LIBRARY_MODULES = [
     "stages",
     "main_train_models",
     # scraping (p2)
-    "p2_data_understanding.collect_initial_data.web_scraping_selenium",
-    "p2_data_understanding.collect_initial_data.scraper_flashscore",
-    "p2_data_understanding.collect_initial_data.scraper_sofifa",
-    "p2_data_understanding.collect_initial_data.update_sofifa_data",
+    "p2_data_understanding.web_scraping_selenium",
+    "p2_data_understanding.scraper_flashscore",
+    "p2_data_understanding.scraper_sofifa",
+    "p2_data_understanding.update_sofifa_data",
     "p2_data_understanding.describe_data",
     # preparation (p3)
     "p3_data_preparation.format_data",
@@ -31,11 +31,11 @@ LIBRARY_MODULES = [
     "p4_modeling.betting_strategy",
     "p4_modeling.generate_test_design",
     "p4_modeling.main_select_model",
-    "p4_modeling.utils_select_model.assess_in_prod",
+    "p4_modeling.model_selection.assess_in_prod",
     # deployment (p6)
     "p6_deployment.main_next_matches",
-    "p6_deployment.automatize_predict.collect_predictions",
-    "p6_deployment.automatize_predict.update_results",
+    "p6_deployment.collect_predictions",
+    "p6_deployment.update_results",
     "p6_deployment.predict_models",
     "p6_deployment.publish_bets",
     # infra

@@ -6,7 +6,7 @@ from utils.set_up_logging import logger
 from p3_data_preparation.select_data import normalize_column
 import p3_data_preparation.select_data as sd # --> le da importancia a metricas con corr negativa pero que deberian ser max no min.
 from p4_modeling import betting_strategy, assess_model
-from p4_modeling.utils_select_model import assess_in_prod
+from p4_modeling.model_selection import assess_in_prod
 from tqdm import tqdm
 import datetime
 import numpy as np

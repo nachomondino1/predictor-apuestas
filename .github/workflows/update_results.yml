@@ -70,7 +70,7 @@ jobs:
             data/df_competencies.xlsx
             data/historial_predicciones.xlsx
             data/predicciones.xlsx
-            p2_data_understanding/collect_initial_data
+            p2_data_understanding
             p3_data_preparation/format_data.py
             p3_data_preparation/construct_data.py
             p3_data_preparation/clean_data.py
@@ -124,9 +124,9 @@ jobs:
       # Run update_results script
       - name: Run update_results script
         run: |
-          python p6_deployment/automatize_predict/update_results.py 1
+          python p6_deployment/update_results.py 1
           # echo "Ejecutando el script con n_days=${{ env.n_days }}"
-          # python p6_deployment/automatize_predict/update_results.py ${{ env.n_days }}
+          # python p6_deployment/update_results.py ${{ env.n_days }}
 
       # Push to Github
       - name: Commit and push all changes
@@ -144,4 +144,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
-          python p6_deployment/automatize_predict/dispatch_event/dispatch_event.py
+          python p6_deployment/dispatch_event.py

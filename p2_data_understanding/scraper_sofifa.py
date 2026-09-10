@@ -4,7 +4,7 @@ from utils import directories
 from utils.set_up_logging import logger
 from dotenv import load_dotenv
 import pandas as pd
-from p2_data_understanding.collect_initial_data.web_scraping_selenium import Crawler
+from p2_data_understanding.web_scraping_selenium import Crawler
 from selenium.webdriver.common.keys import Keys
 from tqdm import tqdm
 

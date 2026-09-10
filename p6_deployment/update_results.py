@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import pandas as pd
 import datetime
-from p2_data_understanding.collect_initial_data.scraper_flashscore import FlashscoreCrawler
+from p2_data_understanding.scraper_flashscore import FlashscoreCrawler
 from p3_data_preparation.construct_data import determine_result
 from p4_modeling.betting_strategy import BettingStrategy
 from tqdm import tqdm

@@ -7,7 +7,7 @@ from utils.set_up_logging import logger
 from utils import directories
 import os
 ## Data understanding
-from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
+from p2_data_understanding.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
 from stages import DataPreparation, Modeling
