@@ -32,9 +32,3 @@ debug_console_handler.setFormatter(formatter)
 
 # Agregar el controlador a logger
 logger.addHandler(debug_console_handler)
-
-# Ejemplo de uso del logger
-logger.info("Este es un mensaje de información")
-logger.warning("Este es un mensaje de warning")
-logger.error("Este es un mensaje de error")
-logger.critical("Este es un mensaje de exito")

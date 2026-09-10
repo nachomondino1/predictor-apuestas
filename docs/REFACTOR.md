@@ -179,8 +179,8 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 | # | Prio | Cambio | Riesgo |
 |---|---|---|---|
-| g-1 | P1 | Borrar código muerto: `main.py::main` + `__main__`, `set_up_logging_save.py`, `utils_select_model/old/`, decisión WhoScored/`nn`. | Bajo |
-| g-2 | P1 | Quitar los 4 `logger.x("Este es un mensaje…")` de `utils/set_up_logging.py`. | Nulo |
+| g-1 | P1 | Borrar código muerto: ~~`main.py::main` + `__main__`~~ ✅, ~~`set_up_logging_save.py`~~ ✅, `utils_select_model/old/` (pendiente), decisión WhoScored/`nn` (pendiente). | Bajo |
+| g-2 | P1 | ~~Quitar los 4 `logger.x("Este es un mensaje…")` de `utils/set_up_logging.py`~~ ✅. | Nulo |
 | g-3 | P2 | Empaquetado: `pyproject.toml` + `pip install -e .`, borrar todos los `sys.path.append`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
 | g-5 | P2 | Quitar las ~20 rutas `/Users/nachomondino/...` (env var / scratch dir). | Bajo |
@@ -206,6 +206,24 @@ Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
 ### 2026-09-10 — Documentación inicial
 - Creados `docs/ARQUITECTURA.md` y `docs/REFACTOR.md` (este archivo).
 - Sin cambios de comportamiento.
+
+### 2026-09-10 — g-1 / g-2: borrado de código muerto (parcial)
+- `main.py`: eliminados `crear_variables()`, `main()` y el bloque
+  `if __name__ == "__main__"` (firmas desactualizadas, nadie lo llamaba). El
+  módulo queda como biblioteca de clases; se añadió una nota al pie apuntando a
+  `main_train_models.py` y `p6_deployment/main_next_matches.py`. Imports sin
+  podar (algunos los usan los métodos de clase; limpieza de imports queda para
+  g-3).
+- Eliminado `utils/set_up_logging_save.py` (sin referencias; ruta
+  `/home/runner/...` hardcodeada).
+- `utils/set_up_logging.py`: quitadas las 4 líneas `logger.x("Este es un
+  mensaje…")` que se ejecutaban en cada import.
+- **Pendiente de g-1:** borrar `p4_modeling/utils_select_model/old/` y decidir
+  destino de `scraper_whoscored.py` + `p4_modeling/nn.py` (requiere tu OK).
+
+**Verificación:** `py_compile` de `main.py`, `main_train_models.py`,
+`main_next_matches.py`, `concat_mapeos.py` OK. `import main` + acceso a las 3
+clases OK en `venv/`. El logger ya no imprime las 4 líneas de ejemplo.
 
 ### 2026-09-10 — Módulo 1: limpieza de `inicialize_chrome_driver`
 Archivo: `p2_data_understanding/collect_initial_data/web_scraping_selenium.py`
