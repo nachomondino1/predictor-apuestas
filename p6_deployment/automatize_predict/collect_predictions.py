@@ -74,10 +74,10 @@ if __name__ == "__main__":
     # Defino argumentos (no puedo usar variables entorno por update_predictions.yml que usa parametros especificos para cada corrida)
     if env == 'dev':
         # Definir condiciones del análisis
-        n_days = 5  # si uso muy grande, juegan dos veces los equipos y falla determine_results()?
+        n_days = 10  # si uso muy grande, juegan dos veces los equipos y falla determine_results()?
         l_countries = [48, 55, 59, 77, 148] 
-        d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}   # Prod
-        # d_run = {'run_missing': False, 'data_unders': False, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
+        # d_run = {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True}   # Prod
+        d_run = {'run_missing': False, 'data_unders': True, 'data_prep': True, 'modeling': True, 'export': True}   # Prod
 
     elif env == 'prod':
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
