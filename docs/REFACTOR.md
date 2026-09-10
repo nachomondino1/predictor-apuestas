@@ -224,21 +224,51 @@ processed,models}`. Refs: cookiecutter-data-science, Kedro.
 
 ### 2.6 Orden de ejecución sugerido
 
-Foco actual del usuario: **simplificar / sacar repetido / lean**. La comparación
-vs bet365 y la modernización de scrapers están en pausa.
+Foco actual: **simplificar / lean**, y llegar a un **primer entrenamiento de
+prueba** (england) que valide que el código corre end-to-end.
 
-1. ~~**g-1, g-2, g-3, p4-2, p4-3, p3-3/4/5, estructura Nivel 0**~~ ✅ hechos.
-2. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" (endorsed por iter4) y podar
-   `assess_model.py` de las métricas de ROI/estrategia que quedan sin uso.
-   Recorte grande de código, bajo riesgo, alineado con tu conclusión.
-3. **g-4** — separar requirements + pinear `mnm`. Bajo riesgo.
-4. **p6-1** — partir `main_next_matches.main` en etapas + sacar los 11 `input()`.
-5. **p3-2** (sprawl `prod`) → **p3-1** (vectorizar `construct_data`, con golden
-   test). Los dos grandes; habilitan iterar modelos rápido.
-6. **p6-2** (workflows), **g-6** (Parquet), **g-8** (cobertura de tests), **p4-1**
-   (consolidar `define_metrics`, cuando digas cuál usás).
-7. **[pausa]** comparación vs bet365 (`EVALUACION_VS_BET365.md`) · **[pausa]**
-   p2-1 / p2-2 / p2-8 (scrapers) · **[P3]** estructura Nivel 1.
+**Hecho** ✅: módulo 1 (chromedriver), g-1, g-2, g-3 (packaging), g-5 (parcial),
+p2-6, p3-3/4/5, p4-2 (nn+TF), p4-3 (rename), estructura Nivel 0 + aplanado de
+carpetas, limpieza de peso (repo 52→16 GB, `data/` 39→6 GB).
+
+**Próximo:**
+1. **Smoke de entrenamiento england** (ver §2.8) — `main_train_models` con grid
+   mínimo. Forma más rápida de saber si el refactor rompió algo del pipeline de
+   train. Bloqueadores de código: ninguno detectado; solo config + velocidad.
+2. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
+3. **g-4** — separar requirements + pinear `mnm`.
+4. **p6-1** — partir `main_next_matches.main` + sacar los 11 `input()`.
+5. **p3-1** (vectorizar `construct_data`) → **p3-2** (sprawl `prod`). Grandes;
+   p3-1 acelera la iteración de modelos.
+6. **p6-2** (workflows), **g-6** (Parquet), **g-8** (más tests), **p4-1**
+   (`define_metrics`, cuando digas cuál usás).
+7. **[pausa]** comparación vs bet365 · **[pausa]** p2-1/2/8 (scrapers) · **[P3]**
+   estructura Nivel 1.
+
+### 2.8 Distancia a un primer entrenamiento de prueba (england)
+
+**Muy cerca.** Entrada verificada: todos los `.xlsx` que lee
+`comprehensive_search` para england existen tras la limpieza de `data/`
+(`p6_deployment/missing/old_updated/df_match*.xlsx`,
+`p2_data_understanding/df_player_*sofifa.xlsx`,
+`data/data_preparation/{integrate_data,clean_data}/*`,
+`df_competencies`/`df_countries`).
+
+- **Sin `input()`** en el path de train (están en `main_next_matches`, que no se
+  toca con `update_missing=False`).
+- `stages` / `assess_model` / `model_selection` ya renombrados; `tests` 29/29.
+- Mes 9 → `fifa_not_released_yet=True` → usa `data/data_preparation/*` (existe).
+  Es el path previsto para septiembre.
+
+**Config para el smoke** (en `main_train_models.__main__` / `define_params_space`):
+`l_countries=[48]`, `data_unders=True`, `data_prep_int=True`,
+`data_prep_int_miss=False`, `update_sofifa=False`, `update_missing=False`, y
+`d_params` reducido a 1 valor por hiperparámetro + 1 modelo. Grid completo =
+128 iter × 3 modelos; smoke = 1.
+
+**Riesgos:** (a) bugs latentes en el path "fresh completo" que no se ejecutó en
+este estado; (b) velocidad de `construct_data` O(n²) (minutos por combo). La
+única forma de saberlo es correrlo.
 
 ---
 
