@@ -1,5 +1,4 @@
 import sys
-sys.path.append('.')  # Fallaba el import de main
 from utils.set_up_logging import logger
 import os
 from dotenv import load_dotenv

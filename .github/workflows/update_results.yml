@@ -50,6 +50,7 @@ jobs:
     env:
       TZ: America/Argentina/Buenos_Aires
       ENVIRONMENT: "prod"
+      PYTHONPATH: .  # reemplaza el viejo sys.path.append('.') de cada script
 
     # Agrego permisos en job para poder hacer push
     permissions: 
@@ -64,6 +65,7 @@ jobs:
         with:
           sparse-checkout: |
             utils
+            pyproject.toml
             data/df_countries.xlsx
             data/df_competencies.xlsx
             data/historial_predicciones.xlsx

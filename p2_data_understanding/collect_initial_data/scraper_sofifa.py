@@ -1,6 +1,4 @@
 # Importo librerias
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import os
 from utils import directories
 from utils.set_up_logging import logger

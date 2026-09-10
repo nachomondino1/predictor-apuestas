@@ -1,5 +1,3 @@
-import sys
-sys.path.append('.')  # Fallaba el import de main
 from utils.set_up_logging import logger
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager

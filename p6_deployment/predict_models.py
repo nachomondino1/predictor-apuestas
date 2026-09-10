@@ -1,6 +1,4 @@
 # Importo librerias
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p6_deployment.main_next_matches import main
 import datetime

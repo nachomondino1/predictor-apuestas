@@ -1,5 +1,3 @@
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from fuzzywuzzy import fuzz
 import time

@@ -1,11 +1,22 @@
 # Predictor de apuestas deportivas
 
-## Instalación del Virtual Environment
+> Documentación del código y del refactor en curso: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)
+> y [`docs/REFACTOR.md`](docs/REFACTOR.md).
 
-- 1. Instalar virtualenv: `pip install virtualenv`
-- 2. Crear un nuevo virtual environment: `virtualenv <nombre_virtual_env>`. Ejemplo: `virtualenv backEnv`
-- 3. Activar el virtual env: `source <nombre_virtual_env>/bin/activate`. Ejemplo: `source backEnv/bin/activate`
-- 4. Instalar las dependencias: `pip install -r requirements.txt`
+## Instalación
+
+```bash
+python3.12 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt      # dependencias (para entrenar)
+# o, más liviano, solo para predecir/scrapear:  pip install -r p6_deployment/requirements_mnm.txt
+pip install -e . --no-deps           # instala el repo como paquete -> imports absolutos sin sys.path hacks
+```
+
+El `pip install -e .` reemplaza el viejo `sys.path.append('.')` que había al inicio
+de cada script: con el paquete instalado, `import main`, `from utils...`,
+`from p3_data_preparation...` funcionan desde cualquier directorio. Alternativa
+sin instalar nada: correr los scripts con `PYTHONPATH=.` (así lo hace la GitHub Action).
 
 ## Actualizar el Virtual Environment luego de agregar una libreria: 
 

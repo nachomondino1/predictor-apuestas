@@ -1,5 +1,4 @@
 import sys
-sys.path.append('.')  # Fallaba el import de main
 import os
 from dotenv import load_dotenv
 import ast

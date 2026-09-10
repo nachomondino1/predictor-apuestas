@@ -4,6 +4,11 @@ backEnv/
 venv_mnm/
 requirements_updated.txt
 
+# Empaquetado (pip install -e .)
+*.egg-info/
+build/
+dist/
+
 # Variables entorno
 .env
 

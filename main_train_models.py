@@ -1,6 +1,4 @@
 # Importo librerias
-import sys
-sys.path.append('.')  # Fallaba el import de main
 from utils.set_up_logging import logger
 import pandas as pd
 import numpy as np

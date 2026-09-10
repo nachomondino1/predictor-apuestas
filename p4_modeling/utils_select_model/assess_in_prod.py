@@ -1,6 +1,4 @@
 
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from utils.set_up_logging import logger
 from p3_data_preparation import construct_data

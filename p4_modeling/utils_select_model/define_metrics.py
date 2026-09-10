@@ -1,6 +1,4 @@
 
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 import numpy as np
 from utils import directories

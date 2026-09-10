@@ -1,0 +1,33 @@
+# Empaquetado mínimo del repo para poder hacer `pip install -e .` y así resolver
+# los imports absolutos (`import main`, `from utils...`, `from p3_data_preparation...`)
+# sin el viejo `sys.path.append('.')` en cada archivo.
+#
+# Las dependencias NO se declaran acá (siguen en requirements*.txt / requirements_mnm.txt).
+# Instalar el proyecto: `pip install -e . --no-deps`
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "predictor-apuestas"
+version = "0.0.0"
+description = "Predictor de resultados de fútbol para apuestas"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools]
+# Scripts sueltos en la raíz que se importan como módulos
+py-modules = ["main", "main_train_models"]
+
+[tool.setuptools.packages.find]
+# El repo usa namespace packages (sin __init__.py)
+namespaces = true
+include = [
+    "p2_data_understanding*",
+    "p3_data_preparation*",
+    "p4_modeling*",
+    "p6_deployment*",
+    "utils*",
+    "analysis*",
+]
+exclude = ["archive*", "venv*", "data*", "docs*", "images*"]

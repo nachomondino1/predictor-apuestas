@@ -1,6 +1,4 @@
 # Importo librerias
-import sys
-sys.path.append('.')  # Fallaba el import de p4_modeling
 from utils.set_up_logging import logger
 import pandas as pd
 from sklearn.model_selection import train_test_split

@@ -1,6 +1,4 @@
 # Importo librerias
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from p2_data_understanding.collect_initial_data.web_scraping_selenium import Crawler
 from tqdm import tqdm

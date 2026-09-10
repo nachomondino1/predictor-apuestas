@@ -1,5 +1,3 @@
-import sys
-sys.path.append('.')  # Fallaba el import de main
 import pandas as pd
 from tqdm import tqdm
 from p2_data_understanding.collect_initial_data.scraper_flashscore import FlashscoreCrawler
