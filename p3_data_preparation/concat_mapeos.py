@@ -96,7 +96,7 @@ def integrate_with_new_map(l_countries):
     """
     Generar el df_integrated con el nuevo mapeo completo (para poder hacer main_best_model directamente)
     """
-    from main import DataPreparation
+    from stages import DataPreparation
     dp = DataPreparation()
 
     # Por pais

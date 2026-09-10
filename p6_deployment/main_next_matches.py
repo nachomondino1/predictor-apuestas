@@ -10,7 +10,7 @@ import os
 from p2_data_understanding.collect_initial_data.scraper_flashscore import extract_next_matches, extract_data
 from p2_data_understanding import describe_data
 ## Data preparation
-from main import DataPreparation, Modeling
+from stages import DataPreparation, Modeling
 from p3_data_preparation.format_data import value_nan_to_none
 from p3_data_preparation import clean_data
 from p3_data_preparation.integrate_sofifa_to_flashscore import *

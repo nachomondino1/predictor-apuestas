@@ -16,7 +16,7 @@ from p3_data_preparation.select_data import determine_country_competitions
 from p6_deployment import main_next_matches
 import utils.directories as directories
 from itertools import product
-from main import DataUnderstanding, DataPreparation, Modeling
+from stages import DataUnderstanding, DataPreparation, Modeling
 import time
 
 

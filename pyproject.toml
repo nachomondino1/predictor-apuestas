@@ -16,8 +16,8 @@ requires-python = ">=3.12"
 dependencies = []
 
 [tool.setuptools]
-# Scripts sueltos en la raíz que se importan como módulos
-py-modules = ["main", "main_train_models"]
+# Módulos sueltos en la raíz que se importan por nombre
+py-modules = ["stages", "main_train_models"]
 
 [tool.setuptools.packages.find]
 # El repo usa namespace packages (sin __init__.py)
@@ -30,4 +30,8 @@ include = [
     "utils*",
     "analysis*",
 ]
-exclude = ["archive*", "venv*", "data*", "docs*", "images*"]
+exclude = ["archive*", "venv*", "data*", "docs*", "images*", "scripts*", "tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
