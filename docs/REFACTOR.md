@@ -152,9 +152,9 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 |---|---|---|---|---|
 | p3-1 | P1 | Vectorizar el hot path de `construct_data.py` (medias móviles / h2h / nº partidos) con `groupby` + rolling temporal / `merge_asof`. | Alto esfuerzo, alto payoff. Requiere golden-output test. | No |
 | p3-2 | P1 | Domar el sprawl de `prod`: extraer core compartido, train/prod como wrappers finos. | Medio-alto. Test de paridad. | No |
-| p3-3 | P2 | Fix bug `format_data.py:256` (archivo de dtypes pisado). | Nulo | No |
-| p3-4 | P2 | Fix bug `construct_data.py:655` (`df_preconstructed` posiblemente indefinida). | Bajo | No |
-| p3-5 | P2 | Quitar `clean_data.py:220` (`~/Desktop/df_nan.xlsx`) y `select_data.py:3` (`sys.path` absoluto). | Bajo | No |
+| p3-3 | ~~P2~~ ✅ | Fix bug (era `main.py` format_data, no `format_data.py:256`): archivo de dtypes pisado. | Nulo | No |
+| p3-4 | ~~P2~~ ✅ | Fix bug (era `main.py` construct_data): `df_preconstructed` indefinida si `with_historic=False`. | Bajo | No |
+| p3-5 | ~~P2~~ ✅ | Quitado `clean_data.py` dump `~/Desktop/df_nan.xlsx` y `select_data.py` `sys.path` absoluto. | Bajo | No |
 | p3-6 | P2 | `integrate_sofifa_to_flashscore`: blocking key + caché en el fuzzy matcher. | Medio. Test de calidad de mapeo. | No |
 | p3-7 | P3 | `describe_data.scatter_plot`: cap de columnas / flag (originó los PNG de 29 MB). | Bajo | No |
 
@@ -164,7 +164,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 |---|---|---|---|---|
 | p4-1 | P1 | Consolidar `utils_select_model`: elegir `define_metrics_v02.py`, borrar la otra versión + `old/`. | Bajo (código muerto/dup) | No |
 | p4-2 | P1 | ~~Decidir sobre `nn.py`: borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements~~ ✅ | Bajo | No |
-| p4-3 | P2 | Renombrar `asses_model.py` → `assess_model.py` + actualizar 2 imports. | Bajo | No |
+| p4-3 | ~~P2~~ ✅ | `asses_model.py` → `assess_model.py` + 8 importadores. | Bajo | No |
 | p4-4 | P2 | Podar `asses_model.py`: mapear qué métricas usa de verdad `train_and_assess_models` / `main_select_model` y borrar el resto. | Medio | No |
 | p4-5 | P2 | `build_model.py::space_params`: escalera if/elif → dict/config. | Bajo | No |
 | p4-6 | P3 | Externalizar params de `betting_strategy` a config por país. | Bajo | No |
@@ -189,7 +189,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-2 | P1 | ~~Quitar los 4 `logger.x("Este es un mensaje…")` de `utils/set_up_logging.py`~~ ✅. | Nulo |
 | g-3 | P2 | Empaquetado: `pyproject.toml` + `pip install -e .`, borrar todos los `sys.path.append`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
-| g-5 | P2 | Quitar las ~20 rutas `/Users/nachomondino/...` (env var / scratch dir). | Bajo |
+| g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
 | g-6 | P2 | Migrar intercambio de datos `.xlsx` → Parquet + acumulación por lista. | Medio (mucha superficie) |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
 | g-8 | P3 | `pytest` + un smoke test por fase. | Bajo |
@@ -214,6 +214,25 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-10 — p3-3/p3-4/p3-5/g-5/p4-3: bugs, rutas personales y rename
+- **Bugs (`main.py`):**
+  - `format_data()` escribía `df_match_odds_dtype` al archivo de
+    `df_match_player_dtype` (lo pisaba). → `df_match_odds_dtype.xlsx`.
+  - `construct_data()`: `df_preconstructed.to_excel()` daba `UnboundLocalError`
+    si `with_historic=False`. → guardado bajo `if with_historic`.
+- **Rutas `/Users/nachomondino/…` en código activo (g-5):** `select_data.py`
+  `sys.path` absoluto → `'.'`; quitados dumps de debug a `~/Desktop` en
+  `clean_data.py` / `expected_result.py` / `define_metrics.py`; paths de
+  `__main__` en `format_data.py` / `generate_test_design.py` → relativos;
+  salidas de `assess_in_prod.py` / `evaluate_test_with_new_metrics.py` /
+  `predict_models.py` → `data/…` en vez de `~/Desktop`. Queda solo 1 referencia
+  comentada en `utils/expected_table.py`.
+- **p4-3:** `asses_model.py` → `assess_model.py` (typo) + 8 importadores
+  actualizados. De paso: comentario roto `# Fallaba el import de mainimport
+  pandas as pd` corregido en 11 archivos.
+- **Verificación:** `py_compile` en todos los tocados; `import assess_model` OK.
+  Sin cambios de comportamiento en flujos activos.
 
 ### 2026-09-10 — Evaluación modelo vs bet365 (cambia prioridades)
 - Nuevo: `analysis/evaluate_vs_bet365.py` — parsea el dump MySQL de producción
