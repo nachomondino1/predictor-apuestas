@@ -278,7 +278,6 @@ if __name__ == "__main__":
             elif method == 'fs':
                 ## Op 2: Feature selection # Usar df_ite en vez de df_ite_test para poder calcular los promedios ponderados de todas las metricas de prod... (asi no tengo que definirlo de antemano.)
                 l_important_features, df_normalized = sd.select_best_features(df_ct, var_resp=corr_metric, thr_fs=0.2)
-                df_normalized.to_excel("/Users/nachomondino/Desktop/df_normalized.xlsx")
 
             elif method == 'mean':
                 # Op 3: Prom ponderado

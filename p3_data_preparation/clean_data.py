@@ -216,9 +216,7 @@ def determine_columns_to_fill(df, percentil_nan, porc_max_fixed: float = 0.3, ve
     porc_nan_max_col = min(porc_max_fixed, porc_max_by_percentile)
     logger.warning(f'Las columnas con mas de {porc_nan_max_col*100:.0f}% NaN values, seran consideradas con mucho NaN y seran rellenadas.')
 
-    if verbose >=2:
-        df_nan.to_excel('/Users/nachomondino/Desktop/df_nan.xlsx')
-        logger.info(f"Porcentaje min de nan para considerar con mucho nan: {porc_max_fixed}")
+    if verbose >= 2:
         logger.info(f"Porcentaje min de nan para considerar con mucho nan: {porc_max_fixed}")
         logger.info(f"Porcentaje a considerar: {porc_nan_max_col}")
 

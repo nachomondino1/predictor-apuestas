@@ -253,7 +253,7 @@ class DataPreparation:
             # Exporto dtypes de columnas de cada df
             df_match_dtype.to_excel(f'{self.base_path}/format_data/df_match_dtype.xlsx', index=True)
             df_match_player_dtype.to_excel(f'{self.base_path}/format_data/df_match_player_dtype.xlsx', index=True)
-            df_match_odds_dtype.to_excel(f'{self.base_path}/format_data/df_match_player_dtype.xlsx', index=True)
+            df_match_odds_dtype.to_excel(f'{self.base_path}/format_data/df_match_odds_dtype.xlsx', index=True)
             df_player_fifa_sofifa_dtype.to_excel(f'{self.base_path}/format_data/df_player_fifa_sofifa_dtype.xlsx', index=True)
 
         return df_match, df_match_player, df_match_odds, df_player_fifa_sofifa
@@ -651,9 +651,10 @@ class DataPreparation:
         print(f"Construccion de datos en {(end - start)/60:.1f} minutos")
         
         # Exporto datos
-        sp = path_prod if prod else self.base_path 
+        sp = path_prod if prod else self.base_path
         df.to_excel(f'{sp}/df_constructed.xlsx', index=True)
-        df_preconstructed.to_excel(f'{sp}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
+        if with_historic:  # df_preconstructed solo existe si se construyeron variables historicas
+            df_preconstructed.to_excel(f'{sp}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
         
         return df
 

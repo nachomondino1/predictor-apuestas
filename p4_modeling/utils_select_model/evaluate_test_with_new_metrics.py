@@ -96,7 +96,7 @@ def main_add_metric(l_countries, d_countries, folder_name):
 
         df = pd.concat([df, df_country])
     
-    df.to_excel(f'/Users/nachomondino/Desktop/AAA.xlsx', index=False)
+    df.to_excel('data/_metrics/df_ite_test_with_new_metrics.xlsx', index=False)
 
 
 # Pruebo ≠ estrategias de apuesta en df_test

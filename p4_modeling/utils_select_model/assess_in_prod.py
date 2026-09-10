@@ -145,8 +145,7 @@ if __name__ == "__main__":
                 export=True
                 )
             
-            df_ite_bs.to_excel(f'/Users/nachomondino/Desktop/metrics_{n_model}_{model_name}.xlsx')
-            # df_pred_met.to_excel(f'/Users/nachomondino/Desktop/{n_model}_{model_name}.xlsx')
+            df_ite_bs.to_excel(f'data/{country}/p4_modeling/metrics_{n_model}_{model_name}.xlsx')
 
         else:
             df_ite = df_ite.head(n_models)

@@ -52,14 +52,14 @@ def predict_models(l_countries, n_models_predict: int = 5):
 
             # Concateno predicciones de modelos
             df_country = pd.concat([df_country, df_filt[new_cols]], axis=1)
-            df_country.to_excel(f"/Users/nachomondino/Desktop/df_{country}.xlsx")
+            df_country.to_excel(f"data/{country}/p6_deployment/predict_models_compare.xlsx")
 
         # Luego contamos cuántas veces aparece cada valor
         cols_to_check = df_country.columns
         for val in [0, 1, 2]:
             df_country[str(val)] = df_country[cols_to_check].apply(lambda row: sum(row == val), axis=1)
 
-        df_country.to_excel(f"/Users/nachomondino/Desktop/df_{country}.xlsx")
+        df_country.to_excel(f"data/{country}/p6_deployment/predict_models_compare.xlsx")
 
 if __name__ == "__main__":    
 

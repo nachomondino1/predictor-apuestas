@@ -103,12 +103,6 @@ for modelo in l_models:
     }
     print("Metricas finales:", d_metrics)
 
-    # Exporto datos para ver
-    X_test_aux = X_test.copy()
-    X_test_aux.loc[X_test.index, 'result'] = y_test  # Guardar y_pred como 'expected_result'
-    X_test_aux.loc[X_test.index, 'expected_result'] = y_pred  # Guardar y_pred como 'expected_result'
-    X_test_aux.to_excel("/Users/nachomondino/Desktop/prueba_expected.xlsx")
-
 
 # Exporto modelo (para usar en construccion durante el train)
 pickle.dump(model, open("./data/expected_result_2.pkl", "wb"))
