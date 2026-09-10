@@ -11,8 +11,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException, NoSuchWindowException
 from time import sleep
+import os
 import platform
 import subprocess
+from dotenv import load_dotenv
+
+load_dotenv()  # Permite leer CHROMEDRIVER_PATH (y demás env vars) aunque se use el módulo directamente
 
 
 class Crawler:
@@ -67,9 +71,13 @@ class Crawler:
         """
         Initialize a Chrome WebDriver.
 
+        Intenta 3 estrategias en orden y devuelve el primer driver que se cree:
+          1) ChromeDriver con la última versión que ofrece webdriver-manager.
+          2) ChromeDriver con la misma versión que el Google Chrome instalado localmente.
+          3) ChromeDriver desde un ejecutable local (ruta en la env var CHROMEDRIVER_PATH).
+
         Args:
             headless (bool): True to prevent the web browser from opening, False otherwise.
-            path (str): Path to the Chrome WebDriver executable (.exe).
 
         Returns:
             WebDriver: Chrome WebDriver instance.
@@ -93,40 +101,51 @@ class Crawler:
         if headless:
             options.add_argument("--headless")
 
-        try:
-            # 1) Inicializar ChromeDriver con la última versión disponible 
+        # Estrategias de inicialización en orden de preferencia. Cada una devuelve un
+        # driver o lanza una excepción; se usa la primera que tenga éxito.
+        def _driver_latest_version():
+            # 1) ChromeDriver con la última versión disponible
             chrome_driver = ChromeDriverManager().install()
-            driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-            logger.critical("ChromeDriver initialized with the latest version")
-            return driver
-        
-        except Exception as e:
-            logger.error(f"Failed to inicialize the ChromeDriver with the latest version: {e}. \n Posibles soluciones: \n1) Tenes una actualizacion de software pendiente en tu compu. \n2) Tenes que eliminar caché de webdriver-manager (abri terminal y ejecutá 'rm -rf ~/.wdm') \n3) Cerrar Google Chrome y volver a ejecutar el script.")
+            return webdriver.Chrome(service=Service(chrome_driver), options=options)
 
+        def _driver_local_chrome_version():
+            # 2) ChromeDriver con la misma versión que el Google Chrome instalado
+            chrome_version = self.get_chrome_version()
+            if not chrome_version:
+                raise RuntimeError("No se pudo detectar la versión de Google Chrome instalada")
+            logger.info(f"Detected Google Chrome version: {chrome_version}")
+            chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
+            return webdriver.Chrome(service=Service(chrome_driver), options=options)
+
+        def _driver_from_executable():
+            # 3) ChromeDriver desde ejecutable local (descargar desde https://googlechromelabs.github.io/chrome-for-testing/)
+            chrome_driver_path = os.getenv("CHROMEDRIVER_PATH")
+            if not chrome_driver_path:
+                raise RuntimeError("La env var CHROMEDRIVER_PATH no está definida")
+            return webdriver.Chrome(service=Service(chrome_driver_path), options=options)
+
+        strategies = [
+            ("última versión de webdriver-manager", _driver_latest_version),
+            ("versión del Chrome local", _driver_local_chrome_version),
+            ("ejecutable local (CHROMEDRIVER_PATH)", _driver_from_executable),
+        ]
+        hint = (
+            "Posibles soluciones: "
+            "\n1) Tenes una actualizacion de software pendiente en tu compu. "
+            "\n2) Tenes que eliminar caché de webdriver-manager (abri terminal y ejecutá 'rm -rf ~/.wdm'). "
+            "\n3) Cerrar Google Chrome y volver a ejecutar el script."
+        )
+
+        for name, build_driver in strategies:
             try:
-                # 2) Inicializar ChromeDriver con la versión de Google Chorme en mi compu
-                chrome_version = self.get_chrome_version()
-                if chrome_version:
-                    logger.info(f"Detected Google Chrome version: {chrome_version}")
-                    chrome_driver = ChromeDriverManager(driver_version=chrome_version).install()
-                    driver = webdriver.Chrome(service=Service(chrome_driver), options=options)
-                    logger.info(f"ChromeDriver initialized with version {chrome_version}")
-                    return driver
-                else:
-                    logger.error("Failed to detect Google Chrome version")
-                
+                driver = build_driver()
+                logger.critical(f"ChromeDriver inicializado ({name})")
+                return driver
             except Exception as e:
-                logger.error(f"Failed to inicialize the chromedriver with the same version of yout Google Chrome.")  # logger.error(f"Failed to inicialize the chromedriver with the same version of yout Google Chrome: {e}")
+                logger.error(f"Falló la inicialización de ChromeDriver por '{name}': {e}")
 
-                try:
-                    # 3) Inicializar ChromeDriver desde archivo ejecutable (actualizar versión desde https://googlechromelabs.github.io/chrome-for-testing/)
-                    chrome_driver_path = '/Users/nachomondino/Documents/chromedriver' # Ultima actualizacion: 31 Agosto 2024
-                    return webdriver.Chrome(service=Service(chrome_driver_path), options=options)  # Es none si retorno la variable "driver" con el chorme driver desde ejecutable
-                
-                except Exception as e:
-                    logger.error(f"Failed to inicialize the chromedriver from executable")
-                    logger.error(f"All ways to inicialize webdriver have failed.")
-                    raise ValueError
+        logger.error(f"Fallaron todas las vías de inicialización del webdriver. \n{hint}")
+        raise RuntimeError("No se pudo inicializar el ChromeDriver por ninguna vía")
 
     def initialize_safari_driver(self):
         driver = webdriver.Safari()
