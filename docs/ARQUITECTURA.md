@@ -279,11 +279,14 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   - Derivadas puntuales: `determine_result/points`, `determine_expected_result`,
     `assign_elo_before_match`, `construct_sum_columns`, `construct_percentaje_column`,
     columnas `KGP`, `PPDA`, `cards`, `clean_sheet`, `defensive_efficiency`…
-  - **Históricas (hot path de performance):** `h2h_by_date`,
-    `determine_number_matches_last_days`, `determine_mean_last_matches_home_away`,
-    `determine_mean_last_matches_difference`. Bucles Python por equipo × por
-    partido con `.iterrows()` + slicing por máscara → **O(n²)**, y se llaman
-    dentro del `product` de 5 niveles del entrenamiento.
+  - **Históricas:** `h2h_by_date`, `determine_number_matches_last_days`,
+    `determine_mean_last_matches_difference_batch` (vectorizada en `p3-1`:
+    procesa todas las stats de una pasada por equipo, en vez de una llamada
+    completa por stat — antes era el 96% del tiempo de `construct_data`,
+    ahora corre en segundos). `determine_mean_last_matches_home_away` sigue
+    sin vectorizar (camino `calculate_dif=False`, no usado hoy en
+    `define_params_space`). Se llaman dentro del `product` de 5 niveles del
+    entrenamiento.
   - `calculate_dif_col_players` — diferencias home−away de variables de jugadores.
 - **`select_data.py`** — `delete_correlated_columns` (triangular superior de la
   matriz de correlación), clase `FeatureSelection` (ANOVA, RF, RFE, Lasso →

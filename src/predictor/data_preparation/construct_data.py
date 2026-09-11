@@ -676,97 +676,151 @@ def construct_percentaje_column(df: pd.DataFrame, col_num: str, col_den: str, co
 
     return df
 
-def determine_mean_last_matches_difference(df, n_days, variable, segun_localia, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None, verbose: int = 0):
+def determine_mean_last_matches_difference_batch(
+    df: pd.DataFrame,
+    n_days: int,
+    variables: list,
+    segun_localia: bool,
+    decay_rate: float = 0.1,
+    diff: bool = True,
+    idxs_to_construct: list = None,
+) -> pd.DataFrame:
     """
-    Calcula la media en los ultimos partidos a partir de una columna de diferencias ("dif_") (e.g. dif goals). 
-    Usa diferencia previa antes del promedio.
-    
-    # Parameters:
-        df: DataFrame. Unidad de análisis: match. Columnas: al menos fecha, id_team_home, id_team_away y result.
-        n_days: Integer. Número de días a tener en cuenta para determinar la media.
-        variable: String. Nombre de la variable a promediar (e.g. goals).
-        segun_localia: Boolean. Si True, calcula la media según localía.
-        decay_rate: Float. Tasa de decaimiento para el promedio ponderado.
-        diff: Boolean. Si True, calcula dif entre home y away del promedio en last matches.
+    Calcula, para TODAS las `variables` (columnas "dif_X" ya calculadas por
+    `stages.py`) de una sola pasada por equipo, la media ponderada en los
+    últimos partidos — vectorizado: antes había una función que hacía esto
+    para UNA variable a la vez y `stages.py` la llamaba una vez por stat
+    (recorriendo el dataframe equipo-por-equipo y partido-por-partido en cada
+    llamada). Perfilado: eso era el 96% del tiempo de `construct_data` (24
+    llamadas de ~9seg c/u sobre england). Ver docs/REFACTOR.md, ítem p3-1
+    (la implementación vieja, reemplazada acá, queda en el historial de git).
 
-    # Returns:
-        DataFrame con nuevas columnas que contienen la media de los últimos partidos.
+    Validado bit a bit contra la versión vieja sobre datos reales (ver
+    changelog de p3-1) y con tests sintéticos
+    (tests/test_construct_data_batch.py): promedio ponderado
+    (decaimiento exponencial por ANTIGÜEDAD -no por calendario-) de la
+    variable en los partidos de CADA equipo en los últimos `n_days` días
+    (estrictamente antes de la fecha del partido). El signo se invierte si el
+    equipo jugó de visitante en el partido histórico (la variable ya es una
+    diferencia home-away). Los NaN se excluyen del promedio; el rank de
+    decaimiento (0 = más reciente) se calcula ENTRE LOS SOBREVIVIENTES de esa
+    variable específica dentro de la ventana -no entre todos los partidos de
+    la ventana-, igual que la version vieja (`.dropna()` antes de generar los
+    pesos): dos NaN intercalados en distintas variables corren el rank
+    distinto para cada una, por eso no alcanza con una única máscara/ventana
+    compartida entre variables — sí se comparten equipo, ventana de fechas
+    (`lo`/`hi`) y el resto del cómputo.
+
+    # Parameters
+        df: DataFrame de partidos (misma unidad que la version original).
+        n_days: ventana en días. (int)
+        variables: columnas "dif_X" a promediar, todas de una. (list[str])
+        segun_localia: si True, arma el historial de cada equipo por separado
+            para sus partidos de local y de visitante (sin flip de signo: cada
+            grupo ya es de un solo rol). (bool)
+        decay_rate: tasa de decaimiento exponencial del promedio ponderado. (float)
+        diff: si True, devuelve `dif_{prefijo}mean_last_{n_days}_days_{variable}`
+            (home - away) por variable y borra las columnas home/away
+            intermedias; si False, deja las columnas home/away sueltas. (bool)
+        idxs_to_construct: subset de índices a calcular (prod); None = todos. (list)
+
+    # Returns
+        df con una columna nueva por variable.
     """
     df = df.sort_values(by='date', ascending=False)
-    team_matches = {}
-    results = {}
+    name_ext = "loc_" if segun_localia else ""
+    n_matches = len(df)
+    n_vars = len(variables)
 
-    # Determino equipos a los que construir 
-    l_teams = get_teams_in_matches(df, idxs_to_construct=idxs_to_construct)
+    # (1) Matriz de valores (ya a numerico) en el mismo orden de filas que df.
+    values = df[variables].apply(pd.to_numeric, errors='coerce').to_numpy(dtype=float)
+    dates = df['date'].to_numpy()
+    home_teams = df['id_team_home'].to_numpy()
+    away_teams = df['id_team_away'].to_numpy()
 
-    # Construyo df por equipo
-    for team in l_teams:
-        if segun_localia:
-            team_matches[f"{team}_local"] = df[df['id_team_home'] == team]
-            team_matches[f"{team}_visitante"] = df[df['id_team_away'] == team]
-            name_ext = "loc_"
-        else:
-            team_matches[team] = df[(df['id_team_home'] == team) | (df['id_team_away'] == team)]
-            name_ext = ""
+    # (2) Tabla "perspectiva de equipo": 2 filas por partido (home/away). El
+    # signo invierte la variable para el equipo visitante (ya es una
+    # diferencia home-away) — igual en ambos modos: en `segun_localia` cada
+    # grupo ("_local"/"_visitante") ya es de un solo rol, pero la condición
+    # de flip de la version vieja (`id_team_away == team`) sigue siendo
+    # siempre-True dentro del grupo "_visitante", así que el flip es el mismo.
+    if segun_localia:
+        persp_team = np.concatenate([
+            np.char.add(home_teams.astype(str), "_local"),
+            np.char.add(away_teams.astype(str), "_visitante"),
+        ])
+    else:
+        persp_team = np.concatenate([home_teams, away_teams])
+    persp_sign = np.concatenate([np.ones(n_matches), -np.ones(n_matches)])
 
-    # Por equipo
-    for team_key, df_team in team_matches.items():
+    persp_date = np.concatenate([dates, dates])
+    persp_role = np.array(['home'] * n_matches + ['away'] * n_matches)  # rol EN ESE partido (no en el historico)
+    persp_pos = np.concatenate([np.arange(n_matches), np.arange(n_matches)])  # fila de `values` a la que pertenece
 
-        team = team_key.split('_')[0] if segun_localia else team_key
+    df_persp = pd.DataFrame({'team': persp_team, 'date': persp_date, 'sign': persp_sign, 'role': persp_role, 'pos': persp_pos})
 
-        # Construyo solo para los partidos de idxs_to_construct
-        df_team_to_construct = filter_by_idxs(df_team, idxs_to_construct)
+    # (3) Resultado por rol (home/away), para armar dif = home - away al final.
+    result_home = np.full((n_matches, n_vars), np.nan)
+    result_away = np.full((n_matches, n_vars), np.nan)
+    n_days_delta = np.timedelta64(n_days, 'D')
 
-        # Por partido
-        for idx, row in df_team_to_construct.iterrows():
-            match_date = row['date']
-            home_or_away = 'home' if row['id_team_home'] == team else 'away'
+    # (4) Por equipo (o equipo+rol si segun_localia): historial cronológico
+    # propio, UNA sola vez, para las n_vars variables juntas.
+    for team, g in df_persp.groupby('team', sort=False):
+        order = np.argsort(g['date'].to_numpy(), kind='mergesort')  # ascendente
+        g_dates = g['date'].to_numpy()[order]
+        g_role = g['role'].to_numpy()[order]
+        g_pos = g['pos'].to_numpy()[order]
+        g_values = values[g_pos] * g['sign'].to_numpy()[order][:, None]  # (m, n_vars), signo ya aplicado
 
-            # Filtrar por fecha
-            limit_date = match_date - timedelta(days=n_days)
-            df_last_matches = df_team[(df_team['date'] >= limit_date) & (df_team['date'] < match_date)] 
+        m = len(g_dates)
+        lo_arr = np.searchsorted(g_dates, g_dates - n_days_delta, side='left')
 
-            # Obtengo valores de la variable.
-            s_values = df_last_matches[variable]  # Obtiene los valores de la variable
+        for i in range(m):
+            lo = lo_arr[i]
+            if i - lo <= 0:
+                continue  # sin partidos previos en la ventana -> NaN (default)
 
-            # Convertir a numérico y eliminar NaN
-            s_values = pd.to_numeric(s_values, errors="coerce").dropna()
-            df_last_matches = df_last_matches.loc[s_values.index]  # <-- alineación necesaria con s_values
+            # Más reciente primero (orden en el que la version vieja itera).
+            window_vals = g_values[lo:i][::-1]  # (w, n_vars)
+            mask = ~np.isnan(window_vals)
 
-            # En los visitantes, invierto la diferencia pues es positiva para el visitante.
-            s_values = np.where(df_last_matches['id_team_away'] == team, -s_values, s_values)
-            s_values = pd.Series(s_values, index=df_last_matches.index)
+            # Rank de decaimiento = posición ENTRE LOS SOBREVIVIENTES (0 = más
+            # reciente no-NaN), no la posición cruda en la ventana.
+            prior_survivors = np.cumsum(mask, axis=0) - mask
+            weight = np.where(mask, np.exp(-decay_rate * prior_survivors), 0.0)
 
-            # Calcular promedio ponderado (priorizando registros recientes)
-            if not s_values.empty:
-                weights = np.exp(-decay_rate * np.arange(len(s_values)))  # Pesos exponenciales
-                weights /= weights.sum()  # Normalizar pesos
-                weighted_mean = np.dot(s_values, weights)  # Promedio ponderado
+            num = (weight * np.where(mask, window_vals, 0.0)).sum(axis=0)
+            den = weight.sum(axis=0)
+            with np.errstate(invalid='ignore', divide='ignore'):
+                row_result = np.where(den > 0, num / den, np.nan)
 
-                # Guardar resultado en el diccionario
-                results.setdefault(idx, {})[f"{name_ext}mean_last_{n_days}_days_{variable}_{home_or_away}"] = weighted_mean
-            
-    # Convertir a DataFrame y hacer join con el original
-    if results:
-        df_update = pd.DataFrame.from_dict(results, orient="index")
-        df = df.join(df_update)       
-    
-    if diff:
-        dif_col = f'dif_{name_ext}mean_last_{n_days}_days_{variable}'
-        col1 = f'{name_ext}mean_last_{n_days}_days_{variable}_home'
-        col2 = f'{name_ext}mean_last_{n_days}_days_{variable}_away'
-        
-        # Si construyo al menos un registro 
-        if col1 in df.columns and col2 in df.columns:
-            df[dif_col] = df[col1] - df[col2] 
-            df.drop(columns=[col1, col2], inplace=True) # eliminar columnas col1 o col2 o dejar que las elimine si asi fuera necesario el feature_selection? --> al parecer no tienen mucha impor
+            if g_role[i] == 'home':
+                result_home[g_pos[i]] = row_result
+            else:
+                result_away[g_pos[i]] = row_result
 
-        else:
-            df[dif_col] = np.nan
+    # (5) En prod, solo hacen falta los resultados de idxs_to_construct.
+    if idxs_to_construct is not None:
+        mask_to_construct = df.index.isin(idxs_to_construct)
+        result_home[~mask_to_construct] = np.nan
+        result_away[~mask_to_construct] = np.nan
+
+    # (6) Vuelco los resultados al df original, una columna por variable.
+    for v_i, variable in enumerate(variables):
+        col_home = f'{name_ext}mean_last_{n_days}_days_{variable}_home'
+        col_away = f'{name_ext}mean_last_{n_days}_days_{variable}_away'
+        df[col_home] = result_home[:, v_i]
+        df[col_away] = result_away[:, v_i]
+
+        if diff:
+            dif_col = f'dif_{name_ext}mean_last_{n_days}_days_{variable}'
+            df[dif_col] = df[col_home] - df[col_away]
+            df.drop(columns=[col_home, col_away], inplace=True)
 
     return df
 
-def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None, verbose: int = 0): 
+def determine_mean_last_matches_home_away(df: pd.DataFrame, n_days: int, variable: str, segun_localia: bool, decay_rate: float = 0.1, diff: bool = True, idxs_to_construct: list = None, verbose: int = 0):
     """
     Calcula la media en los ultimos partidos a partir de valores separados en columnas "home" y "away" (e.g. goals_home y goals_away). 
     No usa diferencia previa.
@@ -1017,7 +1071,7 @@ if __name__ == "__main__":
 
     # PLAYER 
     # Construyo variables de diferencias para las variables promedio de los players
-    # df = determine_mean_last_matches_difference(df, n_days, variable='mean_rat_player_start', segun_localia=segun_localia)
+    # df = determine_mean_last_matches_difference_batch(df, n_days, variables=['mean_rat_player_start'], segun_localia=segun_localia)
     # df = df.drop(columns=['mean_last_match_mean_rat_player_start_home', 'mean_last_match_mean_rat_player_start_away'], axis=1)
     # df = calculate_dif_col_players(df)
 

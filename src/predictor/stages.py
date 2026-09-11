@@ -616,31 +616,47 @@ class DataPreparation:
             # Por stat (e.g. shots_on_goal)
             stats = [col for col in self.stats_to_construct if f'{col}_home' in df.columns]
             logger.info(f"Stats a promediar en ultimos partidos: {stats}")
-            for var in stats:
-                logger.info(f"Estadística a promediar: {var}")
-                
-                cols_to_drop = []
-                variable = f'dif_{var}' if calculate_dif else var # (e.g. dif_goals o goals)
 
-                if calculate_dif:
-                     df[variable] = df[f'{var}_home'] - df[f'{var}_away']
-                     cols_to_drop.append(variable)
-                cols_to_drop.extend([f'{var}_home', f'{var}_away'])
+            if calculate_dif:
+                # (p3-1) Vectorizado: construyo TODAS las "dif_{var}" de una y
+                # promedio-en-ultimos-partidos para TODAS las stats juntas en
+                # una sola pasada por equipo, en vez de una llamada completa
+                # por stat. Perfilado: este loop (antes 1 llamada x stat) era
+                # el 96% del tiempo de construct_data. Ver
+                # determine_mean_last_matches_difference_batch y
+                # docs/REFACTOR.md item p3-1.
+                variables = [f'dif_{var}' for var in stats]
+                for var, variable in zip(stats, variables):
+                    df[variable] = df[f'{var}_home'] - df[f'{var}_away']
 
-                # Por numero de days
+                cols_to_drop = variables + [f'{var}_home' for var in stats] + [f'{var}_away' for var in stats]
+
                 for n_days in n_last_matches:
-
-                    func = construct_data.determine_mean_last_matches_difference if calculate_dif else construct_data.determine_mean_last_matches_home_away
-
-                    # Calculo promedio en ultimos partidos
-                    df = func(df, n_days=n_days, variable=variable, segun_localia=False, decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs)
-
-                    # Si quiero calcular la diferencia por localia
+                    df = construct_data.determine_mean_last_matches_difference_batch(
+                        df, n_days=n_days, variables=variables, segun_localia=False,
+                        decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs,
+                    )
                     if segun_localia:
-                        df = func(df, n_days=n_days, variable=variable, segun_localia=segun_localia, decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs)
+                        df = construct_data.determine_mean_last_matches_difference_batch(
+                            df, n_days=n_days, variables=variables, segun_localia=segun_localia,
+                            decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs,
+                        )
 
-                # Elimino variables utilizadas para construir historicas
                 df.drop(columns=cols_to_drop, inplace=True)
+
+            else:
+                # calculate_dif=False no se usa hoy en define_params_space (ver
+                # REFACTOR.md p3-1) -- se deja sin vectorizar, stat por stat.
+                for var in stats:
+                    logger.info(f"Estadística a promediar: {var}")
+                    cols_to_drop = [f'{var}_home', f'{var}_away']
+
+                    for n_days in n_last_matches:
+                        df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=var, segun_localia=False, decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs)
+                        if segun_localia:
+                            df = construct_data.determine_mean_last_matches_home_away(df, n_days=n_days, variable=var, segun_localia=segun_localia, decay_rate=decay_rate, diff=True, idxs_to_construct=prod_idxs)
+
+                    df.drop(columns=cols_to_drop, inplace=True)
         
         else:
             logger.warning("Evito construccion de variables historicas debido a la falta de ultimos partidos")

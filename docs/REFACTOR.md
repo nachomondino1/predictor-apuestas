@@ -151,7 +151,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
 | p3-9 | ~~P1~~ ✅ | **Vectorizar `integrate_player_data_in_match`** (`integrate_sofifa_to_flashscore.py`). Medido con el profiling del smoke: **85% del tiempo de entrenamiento**, no `construct_data`. **45.7 min → 0.85 seg** sobre los 15.886 partidos de england (~3200x). Ver detalle en el registro de cambios. | Bajo (test bit-a-bit contra la versión vieja) | No |
-| p3-1 | P3 (bajó de prioridad) | Vectorizar `construct_data.py` (medias móviles / h2h / nº partidos). Medido: solo ~3% del tiempo total (1.7 min de 53.5 min) — mucho menos urgente de lo que se pensaba antes de medir. | Alto esfuerzo, payoff medio. Requiere golden-output test. | No |
+| p3-1 | ~~P1 (subió tras resolver p3-9/g-6)~~ ✅ | **Vectorizar `construct_data.py`**. Perfilado tras p3-9+g-6: `determine_mean_last_matches_difference` (llamada una vez por stat, ~23 veces) era el **96% del tiempo de `construct_data`** (24 llamadas de ~9seg c/u). Nueva `determine_mean_last_matches_difference_batch`: procesa todas las stats de una sola pasada por equipo. **`construct_data` completo: 3.9 min → ~5 seg (~40x)**. Ver detalle en el registro de cambios. | Medio (validado bit a bit + tests sintéticos + golden end-to-end) | No |
 | p3-2 | P1 | Domar el sprawl de `prod`: extraer core compartido, train/prod como wrappers finos. | Medio-alto. Test de paridad. | No |
 | p3-3 | ~~P2~~ ✅ | Fix bug (era `main.py` format_data, no `format_data.py:256`): archivo de dtypes pisado. | Nulo | No |
 | p3-4 | ~~P2~~ ✅ | Fix bug (era `main.py` construct_data): `df_preconstructed` indefinida si `with_historic=False`. | Bajo | No |
@@ -194,7 +194,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
 | g-6 | ~~P1~~ ✅ | Migrar intercambio de datos `.xlsx` → Parquet, alcance "desde `clean_data` en adelante" (`utils/io.py`). Medido: **8.1 → 6.8 min** en el smoke de england. | Medio (mucha superficie) — mitigado con scope acotado + grep exhaustivo |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
-| g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, 29 tests). Falta cobertura por fase. | Bajo |
+| g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, + tests dedicados de p3-9/p3-1, 41 tests). Falta cobertura por fase. | Bajo |
 | g-9 | ~~P1~~ ✅ | Historial de entrenamientos (`utils/training_log.py` → `data/_training_log.xlsx`): cada corrida de `comprehensive_search` (smoke o real) queda anotada con commit, país, duración, métricas de test y carpeta de modelos, para comparar corridas entre sí. | Nulo |
 | g-10 | ~~P1~~ ✅ | Estructura de carpetas Nivel 1: todo el código bajo `src/predictor/{data_understanding,data_preparation,modeling,deployment,utils}` + `stages.py`. Pedido explícito del usuario ("una sola carpeta para scripts .py"). Ver §2.7. | Medio (mitigado: codemod anclado a imports, no toca `data/`) |
 
@@ -232,21 +232,25 @@ al refactor.
 
 **Hecho** ✅: módulo 1 (chromedriver), g-1, g-2, g-3 (packaging), g-5 (parcial),
 p2-6, p3-3/4/5, p3-7 (scatter_plot), p3-9 (vectorizo `integrate_data`), g-6
-(Parquet), g-9 (historial de entrenamientos), p4-2 (nn+TF), p4-3 (rename),
-estructura Nivel 0 + aplanado de carpetas, limpieza de peso (repo 52→16 GB,
-`data/` 39→6 GB), smoke de entrenamiento england (53.5 → 8.1 → 6.8 min).
+(Parquet), g-9 (historial de entrenamientos), g-10 (estructura `src/predictor/`),
+p4-1 (selección de modelo por ROI real, se borra el estudio retrospectivo),
+**p3-1** (vectorizo `construct_data`), p4-2 (nn+TF), p4-3 (rename), estructura
+Nivel 0 + aplanado de carpetas, limpieza de peso (repo 52→16 GB, `data/`
+39→6 GB), primer entrenamiento real (england, grid completo 128×3), smoke de
+entrenamiento england (53.5 → 8.1 → 6.8 → 5.1 min).
 
 **Próximo:**
 1. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
 2. **g-4** — separar requirements + pinear `mnm`.
 3. **p6-1** — partir `main_next_matches.main` + sacar los 11 `input()`.
-4. **p3-1** (vectorizar `construct_data`) → **p3-2** (sprawl `prod`). Con
-   `integrate_data` y el I/O resueltos, `construct_data` (1.7 min, ahora la
-   mayor parte del total) vuelve a ser el próximo cuello de botella real.
-5. **p6-2** (workflows), **g-8** (más tests), **p4-1** (`define_metrics`,
-   cuando digas cuál usás).
-6. **[pausa]** comparación vs bet365 · **[pausa]** p2-1/2/8 (scrapers) · **[P3]**
-   estructura Nivel 1.
+4. **p3-2** (sprawl `prod`): extraer core compartido, train/prod como wrappers
+   finos.
+5. **p6-2** (workflows), **g-8** (más tests).
+6. Repetir el entrenamiento real en los 4 países restantes (france, germany,
+   italy, spain) — pendiente explícito del usuario.
+7. **[pausa]** comparación vs bet365 · **[pausa]** p2-1/2/8 (scrapers) · **[P3]**
+   estructura Nivel 2 (`[project.scripts]` + disolver `stages.DataPreparation`
+   en clases por fase, si algún día hiciera falta ir más allá de `g-10`).
 
 ### 2.8 Primer entrenamiento de prueba (england) — ✅ hecho, 2026-09-10
 
@@ -262,6 +266,76 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — p3-1: vectorizo `construct_data` (96% del tiempo → segundos)
+
+Pedido explícito del usuario: seguir con la reducción de tiempo de
+entrenamiento, ahora que tocaba `construct_data`, con un smoke test en cada
+paso para ir comparando que nada se rompe.
+
+**Profiling** (`cProfile` sobre el `df_cleaned` cacheado de england,
+`clean_post_integrate`): `determine_mean_last_matches_difference` —llamada
+una vez por cada stat a promediar (~23 veces, una por `goals`,
+`shots_on_goal`, `expected_goals_(xg)`, etc.)— era el **96% del tiempo de
+`construct_data`** (24 llamadas de ~9seg c/u, 222 de 232seg totales). Cada
+llamada recorría el dataframe completo equipo-por-equipo y
+partido-por-partido para UNA sola variable, repitiendo el mismo filtrado por
+equipo y la misma ventana de fechas 23 veces.
+
+**Reescritura:** `determine_mean_last_matches_difference_batch`
+(`construct_data.py`) arma la "perspectiva de equipo" (2 filas por partido:
+home/away, con el signo invertido para el visitante) UNA sola vez, y para
+cada partido de cada equipo calcula el promedio ponderado de **todas las
+stats juntas** con una operación numpy sobre la ventana (en vez de un loop
+Python + filtrado de pandas por variable). El punto más delicado: el NaN se
+excluye del promedio por variable, y el *rank* de decaimiento exponencial
+(0 = más reciente) se cuenta **entre los sobrevivientes de esa variable
+específica** dentro de la ventana, no entre todos los partidos de la ventana
+— un NaN intercalado en una stat corre el rank de la siguiente solo para esa
+stat. Esto se resuelve con una máscara de NaN + `cumsum` por variable
+(`prior_survivors`), no compartiendo un único vector de pesos entre
+variables. La primera versión no tenía en cuenta este detalle y fallaba
+específicamente en ese caso (detectado por el test sintético con NaN
+intercalado, ver abajo).
+
+`stages.py::construct_data()` ahora arma las `dif_{var}` de todas las stats
+antes del loop y llama a la función batcheada una vez por `n_days` (y una vez
+más si `segun_localia=True`), en vez de una llamada completa por stat. El
+camino `calculate_dif=False` (no usado hoy en `define_params_space`) queda
+sin vectorizar, con la función vieja `determine_mean_last_matches_home_away`
+intacta.
+
+**Validación:**
+- `tests/test_construct_data_batch.py` (nuevo, 7 tests sintéticos): promedio
+  ponderado básico, rank entre sobrevivientes con NaN intercalado (el caso
+  que la primera versión manejaba mal), ventana vacía → NaN, partido fuera de
+  la ventana no cuenta, signo invertido de visitante, `segun_localia` separa
+  historiales, y que la llamada batcheada con N variables da lo mismo que N
+  llamadas de a una.
+- Comparación bit a bit contra la función vieja sobre datos reales cacheados
+  (england): 4 escenarios (`n_days`/`decay_rate`/`segun_localia` distintos),
+  con `idxs_to_construct` acotado y `None` (todas las filas, como en
+  training real) — idéntico en todos alineando por índice (una comparación
+  posicional inicial daba "diferencias" que resultaron ser solo reordenamiento
+  por empates de fecha entre sorts sucesivos, no un bug real).
+- **Validación end-to-end**: `DataPreparation.construct_data()` completo
+  sobre el mismo input cacheado y mismos hiperparámetros que generaron
+  `df_constructed_..._5__[60]_2_False_True_0.1.xlsx` en el entrenamiento real
+  de hoy (con el código viejo) — 95 columnas, **0 diferencias reales** (las 3
+  columnas no numéricas que al principio parecían distintas eran solo
+  `None` vs `NaN`, artefacto del ida-y-vuelta por Excel del archivo de
+  referencia). `pytest` 41/41.
+
+**Resultado:** `construct_data()` completo sobre los 6.129 partidos filtrados
+de england: **3.9 min → ~5 seg (~40x)**. Confirmado con `scripts/smoke_train.py`:
+el entrenamiento completo (smoke) pasó de 6.6 a **5.1 minutos** — menos
+dramático que el `construct_data` aislado porque ahora domina el resto del
+pipeline (I/O de los archivos globales de sofifa, formateo, etc.), que queda
+como el próximo candidato si se sigue optimizando.
+
+Se borra la función vieja `determine_mean_last_matches_difference` (sin
+referencias fuera de `stages.py`, que ya usa la batcheada) — queda en el
+historial de git.
 
 ### 2026-09-11 — Primer entrenamiento real (england) + p4-1: simplifico selección de modelo
 
