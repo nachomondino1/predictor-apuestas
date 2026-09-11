@@ -192,7 +192,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-3 | ~~P2~~ ✅ | `pyproject.toml` + `pip install -e .`; `sys.path.append('.')` borrado de 33 archivos; CI usa `PYTHONPATH=.`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
 | g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
-| g-6 | P2 | Migrar intercambio de datos `.xlsx` → Parquet + acumulación por lista. | Medio (mucha superficie) |
+| g-6 | **P1 (subió)** | Migrar intercambio de datos `.xlsx` → Parquet + acumulación por lista. Medido: con `integrate_data` arreglado (p3-9), la lectura/escritura de Excel pasó a ser **~78% del tiempo de entrenamiento** (6.3 de 8.1 min). | Medio (mucha superficie) |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
 | g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, 29 tests). Falta cobertura por fase. | Bajo |
 
@@ -296,9 +296,25 @@ directo, fallback a FIFA anterior, NaN que propaga en una sola métrica, jugador
 sin mapeo, partido por debajo de `n_reg_min`). `pytest` 34/34.
 
 **Resultado:** `integrate_player_data_in_match` sobre los 15.886 partidos de
-england: **45.7 min → 0.85 seg (~3200x)**. El entrenamiento completo debería
-pasar de ~53.5 min a poco más de 1 minuto para 1 combinación (falta confirmar
-end-to-end).
+england: **45.7 min → 0.85 seg (~3200x)**.
+
+**Confirmado end-to-end** con `scripts/smoke_train.py` (mismo grid mínimo):
+**el entrenamiento completo pasó de 53.5 min a 8.1 min** (log: `Integracion de
+datos en 0.0 minutos`). Nuevo desglose medido:
+
+| Fase | Antes | Ahora |
+|---|---|---|
+| Carga inicial + I/O de `.xlsx` (format/clean, leer+escribir varios archivos de varios MB) | ~4 min | **~6.3 min (78% del nuevo total)** |
+| `integrate_data` | 45.7 min | 0.0 min |
+| `construct_data` | 1.7 min | 1.7 min (**21% del nuevo total**, sin tocar) |
+| resto (select/modeling) | ~0 | ~0 |
+| **Total** | **53.5 min** | **8.1 min** |
+
+El cuello de botella cambió de nuevo: con `integrate` resuelto, ahora domina la
+**lectura/escritura de Excel** (`p3-9` no tocó eso). Sube de prioridad **g-6**
+(migrar el intercambio de datos a Parquet) — potencialmente el siguiente salto
+grande. `construct_data` (`p3-1`) queda en un distante segundo lugar (21%, sin
+subir de prioridad todavía).
 
 ### 2026-09-10 — Smoke de entrenamiento england + p3-7
 - **`scripts/smoke_train.py`** (nuevo, reutilizable): corre `comprehensive_search`
