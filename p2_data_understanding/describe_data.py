@@ -1,4 +1,5 @@
 # Importo librerias
+import os
 import pandas as pd
 from utils.set_up_logging import logger
 import seaborn as sns
@@ -46,10 +47,35 @@ def verificar_unicidad_registros(df):
     # else:
     #     logger.info("\tEl índice no tiene valores duplicados.")
 
-def scatter_plot(df: pd.DataFrame, name: str):
-    sns.pairplot(df, diag_kind='kde')
-    plt.savefig(f"images/{name}.png")
-    plt.close()
+def scatter_plot(df: pd.DataFrame, name: str, max_cols: int = 12, max_rows: int = 2000):
+    """
+    Pairplot de a lo sumo `max_cols` columnas numéricas (las primeras) y
+    `max_rows` filas (muestreadas). Sin el cap, un pairplot sobre un df ancho
+    (decenas/cientos de columnas, como df_match con stats) puede tardar horas
+    y generar PNGs de decenas de MB (le pasó en producción: se colgó con
+    df_match de 121 columnas).
+
+    :param df: Dataframe a graficar.
+    :param name: Nombre del archivo de salida bajo images/.
+    """
+    numeric_cols = df.select_dtypes(include="number").columns[:max_cols]
+    if len(numeric_cols) < 2:
+        logger.warning(f"scatter_plot('{name}'): menos de 2 columnas numéricas, salteo el pairplot.")
+        return
+
+    df_plot = df[numeric_cols]
+    if len(df_plot) > max_rows:
+        df_plot = df_plot.sample(max_rows, random_state=42)
+
+    try:
+        path = f"images/{name}.png"
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        sns.pairplot(df_plot, diag_kind='kde')
+        plt.savefig(path)
+        plt.close()
+    except Exception as e:  # el pairplot es diagnóstico, nunca debe tirar abajo el pipeline
+        logger.error(f"scatter_plot('{name}') falló: {e}")
+        plt.close()
 
 def check_ids_in_both_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, column: str = None) -> None:
     """

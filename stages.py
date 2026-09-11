@@ -131,17 +131,17 @@ class DataUnderstanding:
 
         print("\n DF_MATCH_ODDS \n".center(240, "-"))
         describe_data.getting_to_know_data(df_match_odds)
-        describe_data.scatter_plot(df_match, f"{self.country}/scatter_plot_df_match_odds")
+        describe_data.scatter_plot(df_match_odds, f"{self.country}/scatter_plot_df_match_odds")
 
         print("\n DF_PLAYER_SOFIFA \n".center(240, "-"))
         describe_data.getting_to_know_data(df_player_sofifa)
         describe_data.verificar_unicidad_registros(df_player_sofifa)
-        describe_data.scatter_plot(df_match, f"{self.country}/scatter_plot_df_player_sofifa")
+        describe_data.scatter_plot(df_player_sofifa, f"{self.country}/scatter_plot_df_player_sofifa")
 
         print("\n DF_PLAYER_FIFA_SOFIFA \n".center(240, "-"))
         describe_data.getting_to_know_data(df_player_fifa_sofifa)
         # describe_data.check_ids_in_both_dataframes(df_player_sofifa, df_player_fifa_sofifa, column='id_player')  # Verifico consistencia en campos que relacionan entidades
-        describe_data.scatter_plot(df_match, f"{self.country}/scatter_plot_df_player_fifa_sofifa")
+        describe_data.scatter_plot(df_player_fifa_sofifa, f"{self.country}/scatter_plot_df_player_fifa_sofifa")
 
 
 class DataPreparation:
