@@ -164,7 +164,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
 | p4-7 | **P1 (endorsed por iter4)** | **`betting_strategy.py` → "sin ea".** La iter4 concluye: reducir la bs a stake plano, sacar `apply_strategy_by_result`, `define_hiperparameters(strategy=…)` y la selección de estrategia por test (duplicaba overfitting). Dejar solo las 2 salvedades que iter4 mantiene: `stake=0` en local (`result_to_bet==1`) y `stake=0` si `player_emergency_fill==1`. | Bajo | No |
-| p4-1 | P2 | Consolidar `model_selection` (`define_metrics.py` vs `v02`). ⚠️ **NO es código muerto** — `main_select_model` / `predict_models` / `define_metrics` / `roi_in_time` son el workflow **semi-manual intencional** de selección de modelo (ver ARQUITECTURA §1bis). Consolidar sí, podar no. Falta que el usuario diga qué `define_metrics` usa. | Bajo | No |
+| p4-1 | ~~P2~~ ✅ | **Decidido:** se borra el estudio retrospectivo de correlación por país (`define_metrics.py`, `define_metrics_v02.py`, `evaluate_test_with_new_metrics.py`). `main_select_model.py` ya elige el modelo a deployar por ROI real de test (+ `expected_error`) directamente — no hace falta la correlación. Se conserva `roi_in_time.py` (gráfico de ROI en el tiempo, para detectar cuándo un modelo se degrada y hay que reentrenar) y `assess_in_prod.py` (re-evalúa candidatos contra partidos reales recientes antes de elegir, ya integrado en `main_select_model.py` vía `assess=True`). | Bajo | No |
 | p4-2 | P1 | ~~Decidir sobre `nn.py`: borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements~~ ✅ | Bajo | No |
 | p4-3 | ~~P2~~ ✅ | `asses_model.py` → `assess_model.py` + 8 importadores. | Bajo | No |
 | p4-4 | P2 | Podar `assess_model.py`: mapear qué métricas usa de verdad `train_and_assess_models` / `main_select_model` y borrar el resto. Se hace **junto con p4-7** (al simplificar la bs caen métricas de ROI/estrategia). | Medio | No |
@@ -262,6 +262,35 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — Primer entrenamiento real (england) + p4-1: simplifico selección de modelo
+
+**`scripts/real_train.py`** (nuevo): corre `comprehensive_search` con el grid
+completo de `define_params_space` (128 combinaciones de datos × 3 modelos =
+384 filas) para 1 país, en vez del grid mínimo de smoke. Resultado va a
+`data/{country}/p4_modeling/{date}/df_iteration.xlsx`.
+
+**Corrida en england:** 123.7 min, sin errores, `pytest` 34/34. Mejor combo
+por f1_score: `LogisticRegression` (f1=55.6, accuracy=57.8, pero roi=-58.4).
+Mejor por ROI real: `XGBClassifier` (roi=74.4, f1=54.4) — confirma en la
+práctica lo que ya se sospechaba: la mejor métrica de test no siempre es la
+que mejor rinde en plata. Promedio de f1_score por modelo: XGBoost 42.3 >
+RandomForest 41.5 > LogisticRegression 41.3 (bastante parejos). Se anotó solo
+en `data/_training_log.xlsx` vía el hook de `g-9`.
+
+**p4-1 (decisión del usuario):** el propósito histórico de
+`define_metrics.py`/`v02` (estudio retrospectivo de correlación por país
+entre métricas de test y ROI de producción) era elegir qué modelo deployar
+cada fin de semana y detectar cuándo reentrenar. Reviendo `main_select_model.py`
+encontré que **ya no hace falta**: ese script elige el modelo a deployar
+directo por ROI real de test (+ `expected_error`) — el ROI de test *es* la
+métrica de negocio, correlacionarla contra sí misma no aporta. Se borran
+`define_metrics.py`, `define_metrics_v02.py`, `define_metrics_info.txt`,
+`evaluate_test_with_new_metrics.py` (grep exhaustivo: sin referencias fuera
+de sí mismos). Se conservan intactos `main_select_model.py`, `assess_in_prod.py`
+(re-evalúa candidatos contra partidos reales recientes antes de elegir) y
+`roi_in_time.py` (gráfico de ROI en el tiempo — ya cubre "detectar cuándo un
+modelo se degrada y reentrenar" sin agregar nada nuevo). `pytest` 34/34.
 
 ### 2026-09-11 — g-6: Excel → Parquet + g-9: historial de entrenamientos
 

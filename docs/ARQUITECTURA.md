@@ -51,12 +51,15 @@ descuido y conviene respetar:
   segmentos de ruta en cientos de f-strings.
 - **`data/all/` + `id_country = -1`** — el experimento "entrenar con todos los
   países, testear en uno" (iter4). Está vivo.
-- **Selección de modelo semi-manual** — `main_select_model.py` saca el top-10 por
-  `n_draw + expected_roi`; después se elige a mano (`predict_models.py`) el que
-  más empates predice. `define_metrics.py` mostró que "cada país es un caso
-  distinto" (en una liga conviene el empate, en otra la visita…). `roi_in_time.py`
-  sirve para decidir cada cuánto reentrenar. **No son scripts muertos: son el
-  workflow.**
+- **Selección de modelo** — `main_select_model.py` elige el modelo a deployar
+  directo por ROI real de test (+ `expected_error`), sin estudio previo de qué
+  métrica usar. *(Antes había un estudio retrospectivo por país,
+  `define_metrics.py`/`v02`, para decidir eso — se borró en `p4-1`: el ROI de
+  test ya es la métrica de negocio, no hacía falta correlacionarla contra sí
+  misma.)* `roi_in_time.py` sirve para decidir cada cuánto reentrenar (gráfico
+  de ROI en el tiempo). `assess_in_prod.py` re-evalúa los candidatos contra
+  partidos reales recientes antes de la elección final (`assess=True`). **No
+  son scripts muertos: son el workflow.**
 - **Umbrales de NaN laxos** (`clean_post_construct` ~0.7) — a propósito: estrictos
   matan `expected_goals` (85% NaN) y todas sus derivadas.
 - **`fill_na` solo `None` / `"0"`** (ya no `'ml'`) — el fill por modelo requería
@@ -294,10 +297,13 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   (junto con tensorflow/keras/scikeras de `requirements.txt`). Recuperable del
   historial git si se quiere volver a probar redes neuronales.
 - **`main_select_model.py`** + **`model_selection/`** — a partir de
-  `df_iteration.xlsx` filtran y rankean modelos:
-  `filter_models_by_metric/distribution`, `define_metrics.py` **y**
-  `define_metrics_v02.py` (dos versiones), `assess_in_prod.py`, `roi_in_time.py`,
-  `evaluate_test_with_new_metrics.py`. Carpeta `old/` con 4 archivos muertos.
+  `df_iteration.xlsx` filtran y rankean modelos por ROI real de test:
+  `filter_models_by_metric/distribution`, `assess_in_prod.py` (re-evalúa contra
+  partidos reales recientes), `roi_in_time.py` (gráfico de ROI en el tiempo,
+  para saber cuándo reentrenar). *(`define_metrics.py`/`v02` y
+  `evaluate_test_with_new_metrics.py` — el estudio retrospectivo de qué métrica
+  de test usar por país — se borraron en `p4-1`: el ROI de test ya es la
+  métrica de negocio.)* Carpeta `old/` con 4 archivos muertos.
 
 ### 5.4 `p6_deployment`
 
