@@ -4,7 +4,7 @@
 > Se actualiza a medida que el refactor avanza. Para el plan y el registro de
 > cambios ver [`REFACTOR.md`](./REFACTOR.md).
 >
-> Última actualización: 2026-09-11 (post estructura `src/predictor/`, `g-10`) · commit base `930b516ba`
+> Última actualización: 2026-09-11 (post reorganización de `data/`, `g-11`) · commit base `f180f6fed`
 
 ---
 
