@@ -95,7 +95,7 @@ if __name__ == "__main__":
     fill_na = 'ml'
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_selected.xlsx')
+    df = pd.read_excel(f'./data/{country}/data_preparation/df_selected.xlsx')
 
     # Elimino filas con al menos un NaN puesto que al modelo no le pueden ingresar NaN values
     if fill_na is None:

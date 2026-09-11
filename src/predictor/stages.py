@@ -40,7 +40,7 @@ class DataUnderstanding:
         self.make_directories()
 
     def make_directories(self):
-        ruta_base = f'./data/{self.country}/p2_data_understanding/data_seg'
+        ruta_base = f'./data/{self.country}/data_understanding/data_seg'
         l_directorios = [f'{ruta_base}/per_season/df_match/',
                         f'{ruta_base}/per_season/df_match_player/',
                         f'{ruta_base}/per_season/df_match_odds/',                    
@@ -64,7 +64,7 @@ class DataUnderstanding:
         df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()  # Sofifa
 
         # Selecciono competencias del country
-        df_comp = pd.read_excel('./data/df_competencies.xlsx')
+        df_comp = pd.read_excel('./data/_shared/master_tables/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == self.id_country)]
         print(f' COUNTRY: {self.country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
 
@@ -83,9 +83,9 @@ class DataUnderstanding:
             df_match_player_concat = pd.concat([df_match_player_concat, df_match_player], axis=0)
             df_match_odds_concat = pd.concat([df_match_odds_concat, df_match_odds], axis=0) 
             if export:
-                df_match_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_match.xlsx', index=True)
-                df_match_player_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_match_player.xlsx', index=True)
-                df_match_odds_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_match_odds.xlsx', index=True)
+                df_match_concat.to_excel(f'./data/{self.country}/data_understanding/data_seg/df_match.xlsx', index=True)
+                df_match_player_concat.to_excel(f'./data/{self.country}/data_understanding/data_seg/df_match_player.xlsx', index=True)
+                df_match_odds_concat.to_excel(f'./data/{self.country}/data_understanding/data_seg/df_match_odds.xlsx', index=True)
                 
             # Si la competition es una liga
             if row['is_cup'] == 0:
@@ -96,23 +96,23 @@ class DataUnderstanding:
                 df_player_sofifa_concat = pd.concat([df_player_sofifa_concat, df_player_sofifa], axis=0)
                 df_player_fifa_sofifa_concat = pd.concat([df_player_fifa_sofifa_concat, df_player_fifa_sofifa], axis=0)
                 if export:
-                    df_player_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_player_sofifa.xlsx', index=True)
-                    df_player_fifa_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_player_fifa_sofifa.xlsx', index=True)
+                    df_player_sofifa_concat.to_excel(f'./data/{self.country}/data_understanding/data_seg/df_player_sofifa.xlsx', index=True)
+                    df_player_fifa_sofifa_concat.to_excel(f'./data/{self.country}/data_understanding/data_seg/df_player_fifa_sofifa.xlsx', index=True)
                
                 ## Teams
                 df_teams = scraper_sofifa.extract_teams(self.id_country, self.country, row['competition_sofifa'])
                 df_teams_sofifa_concat = pd.concat([df_teams_sofifa_concat, df_teams], axis=0)
                 if export:
-                    df_teams_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/data_seg/df_teams_sofifa.xlsx', index=True)
+                    df_teams_sofifa_concat.to_excel(f'./data/{self.country}/data_understanding/data_seg/df_teams_sofifa.xlsx', index=True)
        
         # Exporto datasets con competiciones del country
         if export:
-            df_match_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_match.xlsx', index=True)
-            df_match_player_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_match_player.xlsx', index=True)
-            df_match_odds_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index=True)
-            df_player_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_player_sofifa.xlsx', index=True)
-            df_player_fifa_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_player_fifa_sofifa.xlsx', index=True)
-            df_teams_sofifa_concat.to_excel(f'./data/{self.country}/p2_data_understanding/df_teams_sofifa.xlsx', index=True)
+            df_match_concat.to_excel(f'./data/{self.country}/data_understanding/df_match.xlsx', index=True)
+            df_match_player_concat.to_excel(f'./data/{self.country}/data_understanding/df_match_player.xlsx', index=True)
+            df_match_odds_concat.to_excel(f'./data/{self.country}/data_understanding/df_match_odds.xlsx', index=True)
+            df_player_sofifa_concat.to_excel(f'./data/{self.country}/data_understanding/df_player_sofifa.xlsx', index=True)
+            df_player_fifa_sofifa_concat.to_excel(f'./data/{self.country}/data_understanding/df_player_fifa_sofifa.xlsx', index=True)
+            df_teams_sofifa_concat.to_excel(f'./data/{self.country}/data_understanding/df_teams_sofifa.xlsx', index=True)
 
         return df_match_concat, df_match_player_concat, df_match_odds_concat, df_player_sofifa_concat, df_player_fifa_sofifa_concat, df_teams_sofifa_concat
 
@@ -154,8 +154,8 @@ class DataPreparation:
         self.var_resp = var_resp
         self.verbose = verbose
 
-        self.base_path = f'./data/{self.country}/p3_data_preparation/{self.date}'
-        # path = f'./data/{self.country}/p3_data_preparation'        
+        self.base_path = f'./data/{self.country}/data_preparation/{self.date}'
+        # path = f'./data/{self.country}/data_preparation'        
         self.make_directories()
 
     def make_directories(self):
@@ -924,12 +924,12 @@ class Modeling:
     def make_directories(self):
 
         if self.date is not None:
-            path = f'./data/{self.country}/p4_modeling/{self.date}'
-            path_dp = f'./data/{self.country}/p3_data_preparation/{self.date}'
+            path = f'./data/{self.country}/modeling/{self.date}'
+            path_dp = f'./data/{self.country}/data_preparation/{self.date}'
         
         else:
-            path = f'./data/{self.country}/p4_modeling'
-            path_dp = f'./data/{self.country}/p3_data_preparation'
+            path = f'./data/{self.country}/modeling'
+            path_dp = f'./data/{self.country}/data_preparation'
 
         self.base_path = path
         self.base_path_dp = path_dp
@@ -1033,7 +1033,7 @@ class Modeling:
 
         if export:
             pickle.dump(model_best_params, open(f"{self.base_path}/modelo.pkl", "wb"))
-            # results.to_excel(f"./data/{self.country}/{ite_date}/p4_modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
+            # results.to_excel(f"./data/{self.country}/{ite_date}/modeling/models/hiperparametros.xlsx")    # Exportar metricas por cada combinacion de hiperparametros (En vez de retornar best_metric.)
 
         return model_best_params, params, d_metrics, results
 

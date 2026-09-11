@@ -30,7 +30,7 @@ class DataUnderstandingNew():
         self.make_directories()
 
     def make_directories(self):
-        base_path = f'./data/{self.country}/p6_deployment'
+        base_path = f'./data/{self.country}/deployment'
         self.path_missing = f'{base_path}/missing'
         self.path_unders = f'{base_path}/data_understanding'
         
@@ -229,7 +229,7 @@ class DataPreparationNew(DataPreparation):
 
     def make_directories(self):
 
-        self.BASE_DIR = f"./data/{self.country}/p6_deployment/data_preparation"
+        self.BASE_DIR = f"./data/{self.country}/deployment/data_preparation"
 
         l_directorios = [
             f'{self.BASE_DIR}/format_data',
@@ -492,8 +492,8 @@ class TrainingDataLoader():
         self.construct_directories()
 
     def construct_directories(self):
-        self.BASE_DIR_dp = f"./data/{self.country}/p3_data_preparation/{self.iteration_date}"
-        self.BASE_DIR_mod = f"./data/{self.country}/p4_modeling/{self.iteration_date}"
+        self.BASE_DIR_dp = f"./data/{self.country}/data_preparation/{self.iteration_date}"
+        self.BASE_DIR_mod = f"./data/{self.country}/modeling/{self.iteration_date}"
     
     # Data preparation
     def load_data_preparation_hyperparameters(self):
@@ -588,7 +588,7 @@ class TrainingDataLoader():
         # Si se levanta de main.py
         else:
             logger.error("Se levanta el modelo y el scaler desde de main.py")
-            path_model_1 = f"./data/{self.country}/p4_modeling/modelo.pkl"
+            path_model_1 = f"./data/{self.country}/modeling/modelo.pkl"
             loaded_model = pickle.load(open(path_model_1, "rb"))
 
         return loaded_model
@@ -635,11 +635,11 @@ class MissingData:
         self.construct_directories()
 
     def construct_directories(self):
-        self.BASE_DIR_du = f"./data/{self.country}/p2_data_understanding"
-        self.BASE_DIR_dp = f"./data/{self.country}/p3_data_preparation/{self.iteration_date}"
-        self.BASE_DIR_mod = f"./data/{self.country}/p4_modeling/{self.iteration_date}"
+        self.BASE_DIR_du = f"./data/{self.country}/data_understanding"
+        self.BASE_DIR_dp = f"./data/{self.country}/data_preparation/{self.iteration_date}"
+        self.BASE_DIR_mod = f"./data/{self.country}/modeling/{self.iteration_date}"
         
-        path_missing = f'./data/{self.country}/p6_deployment/missing'
+        path_missing = f'./data/{self.country}/deployment/missing'
         self.BASE_DIR_MISSING_AND_OLD = f'{path_missing}/old_updated'
         self.BASE_DIR_MISSING_DP = f"{path_missing}/data_preparation"
         self.BASE_DIR_MISSING_ALL_du = f"{path_missing}/data_understanding/all"
@@ -660,9 +660,9 @@ class MissingData:
             
             user_input = input("No se encontraron los dfs con missing concatenados. ¿Quiere levantar los dataframes de partidos viejos? (y/n): ")
             if user_input.strip().lower()  == "y":
-                df_match = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match.xlsx', index_col=0) 
-                df_match_player = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_player.xlsx', index_col=0) 
-                df_match_odds = pd.read_excel(f'data/{self.country}/p2_data_understanding/df_match_odds.xlsx', index_col=0) 
+                df_match = pd.read_excel(f'data/{self.country}/data_understanding/df_match.xlsx', index_col=0) 
+                df_match_player = pd.read_excel(f'data/{self.country}/data_understanding/df_match_player.xlsx', index_col=0) 
+                df_match_odds = pd.read_excel(f'data/{self.country}/data_understanding/df_match_odds.xlsx', index_col=0) 
             else:
                 raise SystemExit("⛔ Predicción cancelada por el usuario.")
         
@@ -806,7 +806,7 @@ def read_data_of_best_model(id_country, d_model = None, verbose : int = 1):
         n_model, model_name = d_model['n_model'], d_model['model_name']
     else:
         # Levanto dataframe con los modelos a usar por pais
-        df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+        df_best_models = pd.read_excel("./data/_shared/master_tables/df_best_models.xlsx")
 
         # Selcciono fila del pais
         row_country = df_best_models[df_best_models['id_country'] == id_country]
@@ -888,7 +888,7 @@ def main(
 
     # Determino country si es None
     if country is None:
-        df_countries = pd.read_excel('./data/df_countries.xlsx')
+        df_countries = pd.read_excel('./data/_shared/master_tables/df_countries.xlsx')
         country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0].lower()
 
     # Determino competence e ite_date
@@ -899,7 +899,7 @@ def main(
     d_comps = determine_country_competitions(id_country)
     print(d_comps['all_comp'])
 
-    df_comp = pd.read_excel('./data/df_competencies.xlsx')
+    df_comp = pd.read_excel('./data/_shared/master_tables/df_competencies.xlsx')
     if id_country == -1:
         df_comp_country = df_comp[df_comp['id_competition'].isin(d_comps['all_comp'])] 
     else:
@@ -924,8 +924,8 @@ def main(
         df_integrated_missing = mis.read_last_integrate_missing_data()
     df_integrated_upd = mis.read_last_integrate_data() # Last df_integrated con missing + old    
     ## SOFIFA
-    df_player_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_sofifa.xlsx", index_col=0)
-    df_player_fifa_sofifa = pd.read_excel(f"data/{country}/p2_data_understanding/old_updated/{iteration_date_dt}/df_player_fifa_sofifa.xlsx")  
+    df_player_sofifa = pd.read_excel(f"data/{country}/data_understanding/old_updated/{iteration_date_dt}/df_player_sofifa.xlsx", index_col=0)
+    df_player_fifa_sofifa = pd.read_excel(f"data/{country}/data_understanding/old_updated/{iteration_date_dt}/df_player_fifa_sofifa.xlsx")  
 
     # _____________________________________________________________ MISSING DATA _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MISSING DATA".center(120) + "\n" + "+"*120 + "\n")
@@ -940,9 +940,9 @@ def main(
             logger.info(f"Cantidad de partidos missing extraidos: {len(df_match_miss_new)}")
         else:
             # Unicamente util para cuando falla la preparacion de missing pero ya extrajiste...
-            df_match_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_miss.xlsx', index_col=0)
-            df_match_player_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_player_miss.xlsx', index_col=0)
-            df_match_odds_miss_new = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/df_match_odds_miss.xlsx', index_col=0)
+            df_match_miss_new = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/df_match_miss.xlsx', index_col=0)
+            df_match_player_miss_new = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/df_match_player_miss.xlsx', index_col=0)
+            df_match_odds_miss_new = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/df_match_odds_miss.xlsx', index_col=0)
             print("Shape:", df_match_miss_new.shape, df_match_player_miss_new.shape, df_match_odds_miss_new.shape)
 
         # Si extrajo missing
@@ -1007,7 +1007,7 @@ def main(
             df_match = df_match[df_match['id_competition'].isin(comp_public)]
  
             # Levanto df_integrated de cuando entrené modelos (tmb los que use en test...)
-            df_integrated_train = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0) 
+            df_integrated_train = pd.read_excel(f'data/{country}/data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0) 
             
             # Podria volver a predecir como prox partido un partido de test (con el que entrené) ? --> Para comparar probas del = partido en test y prod. Son muy similares :
             if date_missing is not None:
@@ -1030,7 +1030,7 @@ def main(
         else:
             # Levanto datos de proximos partidos ya extraidos
             logger.info("Uso los partidos df_match_next ya extraidos.")
-            BASE_DIR_NEXT_MATCHES = f'./data/{country}/p6_deployment/data_understanding'
+            BASE_DIR_NEXT_MATCHES = f'./data/{country}/deployment/data_understanding'
             df_match = pd.read_excel(f'{BASE_DIR_NEXT_MATCHES}/df_match_next.xlsx', index_col=0)
             df_match_player = pd.read_excel(f'{BASE_DIR_NEXT_MATCHES}/df_match_player_next.xlsx', index_col=0)
             df_match_odds = pd.read_excel(f'{BASE_DIR_NEXT_MATCHES}/df_match_next_odds.xlsx', index_col=0)
@@ -1150,7 +1150,7 @@ def main(
         df = dp.clean_post_select(df, scaler_loaded=scaler, prod=True)
 
         # Exporto datos
-        df.to_excel(f"data/{country}/p6_deployment/data_preparation/df_to_predict.xlsx", index=True)
+        df.to_excel(f"data/{country}/deployment/data_preparation/df_to_predict.xlsx", index=True)
 
         # Mensajes antes de predecir
         logger.info(f"Shape Dataframe antes de Modeling(): {df.shape}")
@@ -1165,20 +1165,20 @@ def main(
         if d_run['modeling']:
             logger.warning("Se evitó por comando la preparacion de proximos partidos.")
             # Levanto dataset para prueba
-            df = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_selected_nan.xlsx', index_col=0)
+            df = pd.read_excel(f'./data/{country}/deployment/data_preparation/df_selected_nan.xlsx', index_col=0)
             print(df.head(2), df.shape)
 
-            df_match = pd.read_excel(f'data/{country}/p6_deployment/data_understanding/df_match_next.xlsx', index_col=0)
-            df_match_odds = pd.read_excel(f'./data/{country}/p6_deployment/data_understanding/df_match_next_odds.xlsx', index_col=0)
-            df_c1 = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/fill_data/df_copiado_formaciones.xlsx', index_col=0)
-            df_c2 = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/fill_data/df_copiado_ref_and_coaches.xlsx', index_col=0)
-            df_fill = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_filled.xlsx', index_col=0)
+            df_match = pd.read_excel(f'data/{country}/deployment/data_understanding/df_match_next.xlsx', index_col=0)
+            df_match_odds = pd.read_excel(f'./data/{country}/deployment/data_understanding/df_match_next_odds.xlsx', index_col=0)
+            df_c1 = pd.read_excel(f'./data/{country}/deployment/data_preparation/fill_data/df_copiado_formaciones.xlsx', index_col=0)
+            df_c2 = pd.read_excel(f'./data/{country}/deployment/data_preparation/fill_data/df_copiado_ref_and_coaches.xlsx', index_col=0)
+            df_fill = pd.read_excel(f'./data/{country}/deployment/data_preparation/df_filled.xlsx', index_col=0)
   
     #_____________________________________________________________ MODELING _____________________________________________________________ #
     logger.info("\n" + "+"*120 + "\n" + "MODELING".center(120) + "\n" + "+"*120 + "\n")
     if d_run['modeling']:
         logger.critical(f"n_model: {n_model} model_name: {model_name} iteration_date: {iteration_date}")
-        df_fill = pd.read_excel(f'./data/{country}/p6_deployment/data_preparation/df_filled.xlsx', index_col=0)
+        df_fill = pd.read_excel(f'./data/{country}/deployment/data_preparation/df_filled.xlsx', index_col=0)
 
         # Predigo con modelo cargado
         if predict_missing:
@@ -1219,7 +1219,7 @@ def main(
             df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
             
         if export:
-            df.to_excel(f'./data/{country}/p6_deployment/predicciones.xlsx', index=True)
+            df.to_excel(f'./data/{country}/deployment/predicciones.xlsx', index=True)
 
         logger.critical("LA PREDICCION FUE UN EXITO!")
 

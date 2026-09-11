@@ -15,9 +15,9 @@ def concat_raw_data_by_country(d_countries, missing: bool = True, verbose: int =
     for id_country, country in d_countries.items():
 
         # Levanto datasets de Flashscore
-        df1 = pd.read_excel(f'data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
-        df2 = pd.read_excel(f'data/{country}/p2_data_understanding/df_match_player.xlsx', index_col=0)
-        df3 = pd.read_excel(f'data/{country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
+        df1 = pd.read_excel(f'data/{country}/data_understanding/df_match.xlsx', index_col=0)
+        df2 = pd.read_excel(f'data/{country}/data_understanding/df_match_player.xlsx', index_col=0)
+        df3 = pd.read_excel(f'data/{country}/data_understanding/df_match_odds.xlsx', index_col=0)
 
         if verbose >= 1:
             logger.info(f"Country: {country}")
@@ -25,9 +25,9 @@ def concat_raw_data_by_country(d_countries, missing: bool = True, verbose: int =
 
         # Missing data
         if missing:
-            df4 = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
-            df5 = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
-            df6 = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
+            df4 = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+            df5 = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/all/df_match_player_miss.xlsx', index_col=0)
+            df6 = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
 
             if verbose >= 1:
                 logger.info(f"Missing data: df_match: {df4.shape}. df_match_player: {df5.shape} df_match_odds: {df6.shape}")

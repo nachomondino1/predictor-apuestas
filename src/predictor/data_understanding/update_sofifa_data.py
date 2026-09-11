@@ -50,7 +50,7 @@ def get_player_data(id_country, country, df_comp_country, n_seasons_update, path
 
 def read_last_player_data(country, verbose: int = 0):
     
-    base_path = f'data/{country}/p2_data_understanding'
+    base_path = f'data/{country}/data_understanding'
 
     # Levanto datos viejos
     df_player_sofifa_old = pd.read_excel(f'{base_path}/df_player_sofifa.xlsx', index_col=0)
@@ -160,8 +160,8 @@ def format_df_player_fifa_sofifa(df):
 if __name__ == "__main__":
 
     # try Format
-    df1 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_sofifa.xlsx')
-    df2 = pd.read_excel('data/spain/p2_data_understanding/sofifa_update/2025-01-19/data_seg/df_player_fifa_sofifa.xlsx')
+    df1 = pd.read_excel('data/spain/data_understanding/sofifa_update/2025-01-19/data_seg/df_player_sofifa.xlsx')
+    df2 = pd.read_excel('data/spain/data_understanding/sofifa_update/2025-01-19/data_seg/df_player_fifa_sofifa.xlsx')
 
     format_df_player_sofifa(df1)
     format_df_player_fifa_sofifa(df2)
@@ -176,14 +176,14 @@ if __name__ == "__main__":
     n_seasons_to_extract = 2
 
     # Levanto dataframes
-    df_countries = pd.read_excel('./data/df_countries.xlsx')
-    df_comp = pd.read_excel('./data/df_competencies.xlsx')
+    df_countries = pd.read_excel('./data/_shared/master_tables/df_countries.xlsx')
+    df_comp = pd.read_excel('./data/_shared/master_tables/df_competencies.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
     df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
     print(f' COUNTRY: {country} '.center(120, '#'), f"\nCompeticiones a extraer:\n{df_comp_country['competition_flashscore']}")
     
     date = datetime.datetime.now().date()
-    path_save = f'data/{country}/p2_data_understanding/sofifa_update/{date}'
+    path_save = f'data/{country}/data_understanding/sofifa_update/{date}'
     path_save_seg = f'{path_save}/data_seg'
 
     # Levanto los datos viejos

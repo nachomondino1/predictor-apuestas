@@ -24,8 +24,8 @@ class BettingStrategy:
             # Si no pasaron d_paths
             if self.d_paths is None:
 
-                self.BASE_PATH = f'data/{self.country}/p4_modeling/{self.iteration_date}'
-                self.BASE_PATH_sbm = f'data/{self.country}/p4_modeling/{self.iteration_date}/best_model'
+                self.BASE_PATH = f'data/{self.country}/modeling/{self.iteration_date}'
+                self.BASE_PATH_sbm = f'data/{self.country}/modeling/{self.iteration_date}/best_model'
                 directories.make_directories(l_directorios=[self.BASE_PATH_sbm])
         
             else:
@@ -408,7 +408,7 @@ if __name__ == "__main__":
     one_model = True
     assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
 
-    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+    df_best_models = pd.read_excel("./data/_shared/master_tables/df_best_models.xlsx")
 
     # Defino hiperparametros de apuesta
     bs_per_res = True

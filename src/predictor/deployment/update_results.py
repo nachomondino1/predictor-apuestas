@@ -74,7 +74,7 @@ def collect_results(df: pd.DataFrame, df_countries: pd.DataFrame, df_comp_public
         logger.info(df_pred_with_result)
 
         # Exportar dataset
-        df_pred_with_result.to_excel('data/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
+        df_pred_with_result.to_excel('data/_shared/predictions/predicciones.xlsx') # Los partidos que tiene son de historial_predicciones en realidad pero uso predicciones.xlsx para poder activar dispatch y enviar datos a VPS?
         logger.critical(f"Se recolecto el resultado de {len(df_results)} partidos.")
     else:
         logger.warning("Se evitó el update de resultados puesto que no se detectaron partidos jugados ayer")
@@ -154,9 +154,9 @@ if __name__ == "__main__":
         n_days = float(sys.argv[1])  # Numero de dias maximo desde hoy para extraer partidos (e.g. 7)
 
     # Levanto datasets
-    df_historial_predicciones = pd.read_excel('data/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  
-    df_countries = pd.read_excel('data/df_countries.xlsx')
-    df_comp = pd.read_excel('data/df_competencies.xlsx')
+    df_historial_predicciones = pd.read_excel('data/_shared/predictions/historial_predicciones.xlsx', index_col=0)  # Para garantizar que tengo todas las predicciones.  
+    df_countries = pd.read_excel('data/_shared/master_tables/df_countries.xlsx')
+    df_comp = pd.read_excel('data/_shared/master_tables/df_competencies.xlsx')
     df_comp_public = df_comp[df_comp['is_public'] == 1]  # Determino competencias a extraer
 
     # Selecciono los partidos de los ultimos <n_days>
@@ -170,4 +170,4 @@ if __name__ == "__main__":
     if len(df) > 0:
         df_nuevos_resultados = df.loc[:, ['goals_home', 'goals_away', 'result', 'acerte']]
         df_historial_predicciones.loc[df_nuevos_resultados.index, ['goals_home', 'goals_away', 'result', 'acerte']] = df_nuevos_resultados
-        df_historial_predicciones.to_excel('data/historial_predicciones.xlsx')  # Para garantizar que tengo todas las predicciones.  
+        df_historial_predicciones.to_excel('data/_shared/predictions/historial_predicciones.xlsx')  # Para garantizar que tengo todas las predicciones.  

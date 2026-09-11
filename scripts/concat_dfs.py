@@ -11,14 +11,14 @@ def concat_raw_data_by_competition(id_country, country, l_dataframes, export=Tru
     :return: Dataframe. Contiene todas las competiciones de un country (DataFrame)
     """
     # Levanto competiciones del country
-    df_comp = pd.read_excel('./data/df_competencies.xlsx')
+    df_comp = pd.read_excel('./data/_shared/master_tables/df_competencies.xlsx')
     df_comp_pais = df_comp[df_comp['id_country'] == id_country]
     print("Competiciones del country:\n", df_comp_pais)
 
     # Por dataframe (e.f. df_match, df_match_player)
     for dataframe in l_dataframes:
 
-        ruta_base_comp = f'./data/{country.lower()}/p2_data_understanding/data_seg/per_competition/{dataframe}'
+        ruta_base_comp = f'./data/{country.lower()}/data_understanding/data_seg/per_competition/{dataframe}'
         df_concat = pd.DataFrame()
         print("\n", f"\n Dataframe: {dataframe} \n".center(240, "#"))
 
@@ -55,7 +55,7 @@ def concat_raw_data_by_competition(id_country, country, l_dataframes, export=Tru
             logger.info(df_sin_duplicados)
 
         if export:
-            df_sin_duplicados.to_excel(f'./data/{country}/p2_data_understanding/{dataframe}.xlsx', index=True)
+            df_sin_duplicados.to_excel(f'./data/{country}/data_understanding/{dataframe}.xlsx', index=True)
 
 def concat_raw_data_by_season(country, l_dataframes, export=True):
     """
@@ -69,7 +69,7 @@ def concat_raw_data_by_season(country, l_dataframes, export=True):
     for dataframe in l_dataframes:
         print(f"\nProcesando dataframe: {dataframe}")
         df_concat = pd.DataFrame()
-        ruta_base = f'./data/{country}/p2_data_understanding/data_seg/per_season/{dataframe}'
+        ruta_base = f'./data/{country}/data_understanding/data_seg/per_season/{dataframe}'
 
         # Obtener automáticamente todos los archivos dentro de la ruta
         try:
@@ -107,7 +107,7 @@ def concat_raw_data_by_season(country, l_dataframes, export=True):
 
         # Exportar el resultado si se requiere
         if export:
-            export_path = f'./data/{country}/p2_data_understanding/{dataframe}_{country}.xlsx'
+            export_path = f'./data/{country}/data_understanding/{dataframe}_{country}.xlsx'
             os.makedirs(os.path.dirname(export_path), exist_ok=True)  # Crear directorios si no existen
             df_sin_duplicados.to_excel(export_path, index=True)
             print(f"Archivo exportado: {export_path}")
@@ -122,12 +122,12 @@ def concat_raw_data_by_country(d_countries, verbose: int = 1):
     for id_country, country in d_countries.items():
 
         # Levanto datasets de Flashscore
-        df1 = pd.read_excel(f'data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
-        df2 = pd.read_excel(f'data/{country}/p2_data_understanding/df_match_player.xlsx', index_col=0)
-        df3 = pd.read_excel(f'data/{country}/p2_data_understanding/df_match_odds.xlsx', index_col=0)
-        df4 = pd.read_excel(f'data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0)
-        df5 = pd.read_excel(f'data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx', index_col=0)
-        df6 = pd.read_excel(f'data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
+        df1 = pd.read_excel(f'data/{country}/data_understanding/df_match.xlsx', index_col=0)
+        df2 = pd.read_excel(f'data/{country}/data_understanding/df_match_player.xlsx', index_col=0)
+        df3 = pd.read_excel(f'data/{country}/data_understanding/df_match_odds.xlsx', index_col=0)
+        df4 = pd.read_excel(f'data/{country}/data_understanding/df_player_sofifa.xlsx', index_col=0)
+        df5 = pd.read_excel(f'data/{country}/data_understanding/df_player_fifa_sofifa.xlsx', index_col=0)
+        df6 = pd.read_excel(f'data/{country}/data_understanding/df_teams_sofifa.xlsx', index_col=0)
 
         if verbose >= 1:
             logger.info(f"Country: {country}. df_match: {df1.shape}. df_match_player: {df2.shape} df_match_odds: {df3.shape}")
@@ -155,8 +155,8 @@ def concat_missing_data_by_country(d_countries, verbose: int = 1):
     for id_country, country in d_countries.items():
 
         # Levanto datasets de Flashscore
-        df1 = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
-        df2 = pd.read_excel(f'data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)
+        df1 = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/all/df_match_odds_miss.xlsx', index_col=0)
+        df2 = pd.read_excel(f'data/{country}/deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index_col=0)
        
         if verbose >= 1:
             logger.info(f"Country: {country}. df1: {df1.shape}. df2: {df2.shape}")
@@ -180,29 +180,29 @@ if __name__ == "__main__":
         df_match, df_match_player, df_match_odds, df_player_sofifa, df_player_fifa_sofifa, df_teams_sofifa = concat_raw_data_by_country(d_countries)
         
         # Exporto datos
-        df_match.to_excel('data/all/p2_data_understanding/df_match.xlsx')
-        df_match_player.to_excel('data/all/p2_data_understanding/df_match_player.xlsx')
-        df_match_odds.to_excel('data/all/p2_data_understanding/df_match_odds.xlsx')
-        df_player_sofifa.to_excel('data/all/p2_data_understanding/df_player_sofifa.xlsx')
-        df_player_fifa_sofifa.to_excel('data/all/p2_data_understanding/df_player_fifa_sofifa.xlsx')
-        df_teams_sofifa.to_excel('data/all/p2_data_understanding/df_teams_sofifa.xlsx')
+        df_match.to_excel('data/all/data_understanding/df_match.xlsx')
+        df_match_player.to_excel('data/all/data_understanding/df_match_player.xlsx')
+        df_match_odds.to_excel('data/all/data_understanding/df_match_odds.xlsx')
+        df_player_sofifa.to_excel('data/all/data_understanding/df_player_sofifa.xlsx')
+        df_player_fifa_sofifa.to_excel('data/all/data_understanding/df_player_fifa_sofifa.xlsx')
+        df_teams_sofifa.to_excel('data/all/data_understanding/df_teams_sofifa.xlsx')
 
     if integrate_data:
         df_map, df_player_sofifa, df_player_fifa_sofifa, df_teams = concat_integrate_data_by_country(d_countries)
 
         # Exporto datos
-        df_map.to_excel('data/all/p3_data_preparation/integrate_data/df_map_players_fs_so.xlsx')
-        df_player_sofifa.to_excel('data/all/p3_data_preparation/clean_data/df_player_sofifa_cleaned.xlsx')
-        df_player_fifa_sofifa.to_excel('data/all/p3_data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
-        df_teams.to_excel('data/all/p3_data_preparation/integrate_data/df_teams.xlsx')
+        df_map.to_excel('data/all/data_preparation/integrate_data/df_map_players_fs_so.xlsx')
+        df_player_sofifa.to_excel('data/all/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx')
+        df_player_fifa_sofifa.to_excel('data/all/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
+        df_teams.to_excel('data/all/data_preparation/integrate_data/df_teams.xlsx')
 
     if missing_data:
-        directories.make_directories(l_directorios=['data/all/p6_deployment/missing/data_understanding/all', 'data/all/p6_deployment/missing/data_preparation/all'])
+        directories.make_directories(l_directorios=['data/all/deployment/missing/data_understanding/all', 'data/all/deployment/missing/data_preparation/all'])
         df_match_odds_miss, df_integrated_miss = concat_missing_data_by_country(d_countries)
 
         # Exporto datos
-        df_match_odds_miss.to_excel('data/all/p6_deployment/missing/data_understanding/all/df_match_odds_miss.xlsx')
-        df_integrated_miss.to_excel('data/all/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx')
+        df_match_odds_miss.to_excel('data/all/deployment/missing/data_understanding/all/df_match_odds_miss.xlsx')
+        df_integrated_miss.to_excel('data/all/deployment/missing/data_preparation/all/df_integrated_missing.xlsx')
 
 
     # CONCATENACION DE DATA SEG X SEASON O COMPETICION
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     export = True
 
     # Levento df_countries y obtengo id
-    df_countries = pd.read_excel(f'./data/df_countries.xlsx')
+    df_countries = pd.read_excel(f'./data/_shared/master_tables/df_countries.xlsx')
     country = df_countries[df_countries['id_country'] == id_country]['country_name'].values[0]
     print(country)
 

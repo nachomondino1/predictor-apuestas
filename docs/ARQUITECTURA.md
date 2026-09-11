@@ -33,11 +33,13 @@ estructura (`g-10`, ver REFACTOR.md), todo el código de librería vive bajo
 > El prefijo `pN_` ya no está en los nombres de carpeta (ver §1bis), pero la
 > tabla de arriba conserva la equivalencia con los 4 documentos de iteración.
 
-> **`data/` no se tocó** — las rutas siguen siendo
-> `data/{country}/p2_data_understanding/...`, `p3_data_preparation/...`, etc.
-> (literales en el código, no derivadas del nombre de la carpeta de código).
-> Renombrar el árbol de datos real (39→6 GB, cientos de f-strings) queda fuera
-> de alcance de este cambio — ver freno 2 en §1bis (histórico).
+> **`data/` sí se reorganizó, pero después (`g-11`)** — en `g-10` las rutas de
+> datos quedaron intactas a propósito (freno 2 de §1bis, histórico). El
+> pedido explícito de reordenar `data/` llegó después, y ahí sí se renombraron
+> las carpetas de fase para que coincidan con `src/predictor/` — ver §6
+> (Persistencia) para el árbol actual y REFACTOR.md ítem `g-11` para el detalle
+> de la migración (~7.1→6.5 GB tras borrar duplicados, ningún archivo de datos
+> perdido).
 
 ---
 
@@ -52,15 +54,15 @@ descuido y conviene respetar:
   de estructura (`g-10`) los renombró a nombres semánticos
   (`data_understanding/`, `data_preparation/`, `modeling/`, `deployment/`)
   bajo `src/predictor/`, sin perder la trazabilidad: queda documentada en la
-  tabla de §1 y no cambia `data/` (que sigue usando los nombres viejos como
-  segmentos de ruta, ver más abajo).
+  tabla de §1. `data/` mantuvo los nombres viejos (`p2_data_understanding/`,
+  etc.) hasta `g-11`, que los alineó con `src/predictor/` — ver §6.
 - **`id_match` como índice** de `df_match` / `df_match_player` (iter2) — sobrevive
   al shuffle y al split train/test; permite tener las odds en un df aparte y
   calcular ROI / precisión del bookie trivialmente; en `main_next_matches`
   identifica a qué partido corresponde cada predicción.
 - **Árbol `data/{country}/{fase}/…`** (iter3) — "unificación de archivos de datos
-  en una sola carpeta". Deliberado. Por eso los nombres de fase aparecen como
-  segmentos de ruta en cientos de f-strings.
+  en una sola carpeta". Deliberado, sigue vigente tras `g-11` (solo cambiaron
+  los nombres de fase, no la forma country→fase→iteration_date).
 - **`data/all/` + `id_country = -1`** — el experimento "entrenar con todos los
   países, testear en uno" (iter4). Está vivo.
 - **Selección de modelo** — `main_select_model.py` elige el modelo a deployar
@@ -356,28 +358,51 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   (`p6_deployment/main_next_matches.py`) — ver el detalle de qué quedó en cada
   formato en el registro de cambios de `g-6` en REFACTOR.md. Acumulación
   frecuente con `pd.concat([df, fila], axis=0)` dentro de loops.
-- **Layout:** `data/{country}/{fase}/...`, con subcarpetas por `iteration_date`
-  en `p3`/`p4` y sufijos `data_seg` / `per_season` / `per_competition` para
-  guardados intermedios "por seguridad".
+- **Layout** (reorganizado en `g-11`, ver REFACTOR.md):
+  ```
+  data/
+  ├── {country}/                    england, france, germany, italy, spain,
+  │   ├── data_understanding/       argentina, usa, all (todos los países
+  │   ├── data_preparation/         juntos), europe (excepciones paneuropeas)
+  │   ├── modeling/                 -- nombres de fase sin prefijo `pN_`,
+  │   └── deployment/                  iguales a los paquetes de código.
+  └── _shared/                      NO es un país -- global, cruza países.
+      ├── data_understanding/       (imágenes de scatter_plot, penalties_and_neutral)
+      ├── data_preparation/         (mapeos jugadores Sofifa↔Flashscore y sofifa
+      │                              "cleaned" compartidos, para cuando el FIFA
+      │                              nuevo aún no salió -- ver `concat_mapeos.py`)
+      ├── master_tables/            df_best_models.xlsx, df_countries.xlsx,
+      │                              df_competencies.xlsx
+      ├── predictions/              predicciones.xlsx, historial_predicciones.xlsx
+      ├── logs/                     _training_log.xlsx
+      └── meta/                     backup_predictor_apuestas.sql (no versionado)
+  ```
+  Dentro de cada `{country}/data_preparation/` y `{country}/modeling/` hay
+  subcarpetas por `iteration_date`, y sufijos `data_seg` / `per_season` /
+  `per_competition` para guardados intermedios "por seguridad".
+  `{country}/deployment/missing/` tiene su propia sub-estructura
+  `data_understanding/`/`data_preparation/` — es de ESE país, no confundir con
+  las carpetas globales de `_shared/`.
 - **Versionado (`.gitignore`):** `data/*` está ignorado **salvo** 6 archivos
-  clave: `df_best_models.xlsx`, `df_countries.xlsx`, `df_competencies.xlsx`,
-  `historial_predicciones.xlsx`, `predicciones.xlsx`, `_training_log.xlsx`.
-  También se ignoran `venv/`, `.env`, `images/`, `*.csv`, `*.pkl`, `data_seg/`,
-  `old/`, `desuso/`, `descarte/`.
-- **`data/_training_log.xlsx`** (`utils/training_log.py`) — historial
-  append-only de corridas de `comprehensive_search` (smoke o real): commit,
-  país, duración, métricas de test resumidas y carpeta de modelos guardados.
-  Se anota solo (sin intervención manual) al final de cada corrida.
-- **`df_countries.xlsx` / `df_competencies.xlsx`** — tablas maestras: id ↔ nombre
-  de país, y por competición su nombre en Flashscore/Sofifa, `is_cup`,
-  `is_public`.
-- **`data/backup_predictor_apuestas.sql`** (no versionado) — dump MySQL de la DB
-  de producción (Django + tabla `historial_predicciones` con resultados y
-  `acerte`/`bet_yield`). Es la fuente de verdad para la evaluación retrospectiva;
-  el `historial_predicciones.xlsx` de la rama `staging` NO tiene resultados
-  cargados (eso se escribe en `prod`).
-- **Salida final:** `predicciones.xlsx` (index = `id_match`, importante para
-  MySQL) → repo `landing` vía dispatch.
+  bajo `data/_shared/`: `master_tables/df_best_models.xlsx`,
+  `master_tables/df_countries.xlsx`, `master_tables/df_competencies.xlsx`,
+  `predictions/historial_predicciones.xlsx`, `predictions/predicciones.xlsx`,
+  `logs/_training_log.xlsx`. También se ignoran `venv/`, `.env`, `images/`,
+  `*.csv`, `*.pkl`, `data_seg/`, `old/`, `desuso/`, `descarte/`.
+- **`data/_shared/logs/_training_log.xlsx`** (`utils/training_log.py`) —
+  historial append-only de corridas de `comprehensive_search` (smoke o real):
+  commit, país, duración, métricas de test resumidas y carpeta de modelos
+  guardados. Se anota solo (sin intervención manual) al final de cada corrida.
+- **`master_tables/df_countries.xlsx` / `df_competencies.xlsx`** — tablas
+  maestras: id ↔ nombre de país, y por competición su nombre en
+  Flashscore/Sofifa, `is_cup`, `is_public`.
+- **`data/_shared/meta/backup_predictor_apuestas.sql`** (no versionado) —
+  dump MySQL de la DB de producción (Django + tabla `historial_predicciones`
+  con resultados y `acerte`/`bet_yield`). Es la fuente de verdad para la
+  evaluación retrospectiva; el `historial_predicciones.xlsx` de la rama
+  `staging` NO tiene resultados cargados (eso se escribe en `prod`).
+- **Salida final:** `predictions/predicciones.xlsx` (index = `id_match`,
+  importante para MySQL) → repo `landing` vía dispatch.
 
 ---
 

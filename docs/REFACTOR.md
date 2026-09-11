@@ -195,8 +195,9 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-6 | ~~P1~~ ✅ | Migrar intercambio de datos `.xlsx` → Parquet, alcance "desde `clean_data` en adelante" (`utils/io.py`). Medido: **8.1 → 6.8 min** en el smoke de england. | Medio (mucha superficie) — mitigado con scope acotado + grep exhaustivo |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
 | g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, + tests dedicados de p3-9/p3-1, 41 tests). Falta cobertura por fase. | Bajo |
-| g-9 | ~~P1~~ ✅ | Historial de entrenamientos (`utils/training_log.py` → `data/_training_log.xlsx`): cada corrida de `comprehensive_search` (smoke o real) queda anotada con commit, país, duración, métricas de test y carpeta de modelos, para comparar corridas entre sí. | Nulo |
+| g-9 | ~~P1~~ ✅ | Historial de entrenamientos (`utils/training_log.py` → `data/_shared/logs/_training_log.xlsx`): cada corrida de `comprehensive_search` (smoke o real) queda anotada con commit, país, duración, métricas de test y carpeta de modelos, para comparar corridas entre sí. | Nulo |
 | g-10 | ~~P1~~ ✅ | Estructura de carpetas Nivel 1: todo el código bajo `src/predictor/{data_understanding,data_preparation,modeling,deployment,utils}` + `stages.py`. Pedido explícito del usuario ("una sola carpeta para scripts .py"). Ver §2.7. | Medio (mitigado: codemod anclado a imports, no toca `data/`) |
+| g-11 | ~~P1~~ ✅ | Reorganizar `data/` (7.1 GB): carpetas de fase sin prefijo `pN_` (alineadas con `src/predictor/`), lo global bajo `data/_shared/`, cero archivos sueltos en la raíz. Pedido explícito del usuario ("muchos archivos sueltos... quiero que quede ordenado"). Ver §6 y el registro de cambios. | Medio-alto (dato real, sin red de `git revert`) — mitigado con codemod + smoke test + verificación exhaustiva |
 
 ### 2.7 Estructura de archivos
 
@@ -213,10 +214,11 @@ de los dos:
    iteración → **se preservó la semántica** (`data_understanding`,
    `data_preparation`, `modeling`, `deployment`, no nombres genéricos), documentada
    en ARQUITECTURA §1.
-2. El árbol `data/` (39 GB) espeja esos nombres, hardcodeado en cientos de
-   f-strings → **no se tocó**: las rutas de datos son strings independientes
-   del nombre de la carpeta de código, así que renombrar el código no obliga a
-   tocar `data/`.
+2. El árbol `data/` (7.1 GB en este momento) espeja esos nombres, hardcodeado
+   en cientos de f-strings → en `g-10` **no se tocó** (las rutas de datos son
+   strings independientes del nombre de la carpeta de código); en `g-11`
+   (pedido explícito del usuario) sí se reorganizó, con su propio codemod y
+   verificación — ver la fila de `g-11` en §2.5 y el registro de cambios.
 
 | Nivel | Qué | Riesgo | Estado |
 |---|---|---|---|
@@ -233,11 +235,12 @@ al refactor.
 **Hecho** ✅: módulo 1 (chromedriver), g-1, g-2, g-3 (packaging), g-5 (parcial),
 p2-6, p3-3/4/5, p3-7 (scatter_plot), p3-9 (vectorizo `integrate_data`), g-6
 (Parquet), g-9 (historial de entrenamientos), g-10 (estructura `src/predictor/`),
-p4-1 (selección de modelo por ROI real, se borra el estudio retrospectivo),
-**p3-1** (vectorizo `construct_data`), p4-2 (nn+TF), p4-3 (rename), estructura
-Nivel 0 + aplanado de carpetas, limpieza de peso (repo 52→16 GB, `data/`
-39→6 GB), primer entrenamiento real (england, grid completo 128×3), smoke de
-entrenamiento england (53.5 → 8.1 → 6.8 → 5.1 min).
+g-11 (reorganizo `data/`: sin archivos sueltos, carpetas de fase alineadas
+con el código), p4-1 (selección de modelo por ROI real, se borra el estudio
+retrospectivo), **p3-1** (vectorizo `construct_data`), p4-2 (nn+TF), p4-3
+(rename), estructura Nivel 0 + aplanado de carpetas, limpieza de peso (repo
+52→16 GB, `data/` 39→6.5 GB), primer entrenamiento real (england, grid
+completo 128×3), smoke de entrenamiento england (53.5 → 8.1 → 6.8 → 5.1 min).
 
 **Próximo:**
 1. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
@@ -266,6 +269,80 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — g-11: reorganizo `data/` (archivos sueltos, carpetas de fase)
+
+Pedido explícito del usuario: "reorganizar carpetas en data. Tengo muchos
+archivos sueltos, carpetas de países y carpetas de fases de CRISP-DM". Dato
+real (7.1 GB), sin red de `git revert` — se hizo con más cautela que un
+refactor de código: relevamiento primero, plan concreto confirmado con el
+usuario, y verificación exhaustiva después de mover.
+
+**Limpieza (sin tocar código, cero riesgo):**
+- Borradas ~700MB de carpetas de debug/backup sin ninguna referencia en el
+  código: `missing_bad/`, `missing_erroneo/`, `missing_correcto/`,
+  `missing copy/`, `missing (actual)/` (con espacios/paréntesis en el
+  nombre) en `p6_deployment/` de france/germany/italy/spain/england, más
+  varios `.DS_Store`.
+- Encontrado que `predicciones_seg.xlsx`/`historial_predicciones_seg.xlsx`
+  (que parecían sueltos) en realidad los regeneraba `collect_predictions.py`
+  en cada corrida como "backup por seguridad" — puro duplicado de
+  `predicciones.xlsx`/`historial_predicciones.xlsx`, sin aportar nada. Se
+  borran las 2 líneas que los escriben (no solo el archivo, si no reaparecían
+  la próxima corrida) y los archivos.
+- Movidos (no borrados) `cambios_2025-08-27.txt` y `backup_predictor_apuestas.sql`
+  a `data/_shared/meta/` — no son basura, pero tampoco deben quedar sueltos.
+
+**Reorganización de la jerarquía** (ver árbol completo en ARQUITECTURA §6):
+- Carpetas de fase por país: `p2_data_understanding/`, `p3_data_preparation/`,
+  `p4_modeling/`, `p6_deployment/` → `data_understanding/`, `data_preparation/`,
+  `modeling/`, `deployment/` (mismos nombres que `src/predictor/`, sin el
+  prefijo `pN_`) — para las 9 carpetas tipo-país (england, france, germany,
+  italy, spain, argentina, usa, all, europe).
+- Las 2 carpetas GLOBALES que vivían sueltas en la raíz (`data/data_preparation/`,
+  `data/data_understanding/` — mapeos/sofifa compartidos entre países, ver
+  `concat_mapeos.py`) pasan a `data/_shared/data_preparation/` y
+  `data/_shared/data_understanding/`. Antes de este cambio tenían el MISMO
+  nombre que las carpetas de fase por país, pero un significado totalmente
+  distinto (global vs. por país) — confuso a propósito de ser aclarado.
+- Los 6 archivos sueltos de la raíz (3 tablas maestras, 2 salidas, el log de
+  entrenamientos) van a subcarpetas de `data/_shared/`: `master_tables/`,
+  `predictions/`, `logs/`. La raíz de `data/` queda con **solo** carpetas de
+  país + `_shared/`, sin ni un archivo suelto.
+- `.gitignore` actualizado: los 6 archivos versionados ahora se excepcionan
+  en sus rutas nuevas (`!data/_shared/master_tables/df_best_models.xlsx`,
+  etc.), con las carpetas intermedias también excepcionadas (si no, `data/*`
+  bloquea la ignora-la-ignora antes de llegar al archivo).
+
+**Migración de código:** ~40 archivos (`stages.py`, `main_train_models.py`,
+todo `src/predictor/`, `scripts/*.py`, `analysis/evaluate_vs_bet365.py`)
+actualizados con 2 codemods de reemplazo de substring (uno para los
+segmentos de fase, otro para los 7 archivos de `_shared/`) — no anclados a
+`from`/`import` como en `g-10`, porque acá el patrón vive DENTRO de strings
+de rutas de archivo, no en imports. Confirmado con grep exhaustivo que no
+quedaba ningún import remanente con estos nombres antes de correr el
+reemplazo (ya los había migrado `g-10`).
+
+**Encontrado en el camino:** `scraper_flashscore.py::extract_missing_matches`
+tenía una ruta con el orden país/fase invertido respecto al resto del repo
+(`data/p2_data_understanding/{country}/data_seg` en vez de
+`data/{country}/p2_data_understanding/data_seg`) — bug preexistente, de antes
+de este refactor. Se deja documentado con un comentario en vez de
+"arreglarlo" de más: la función no tiene ningún caller en todo el repo (código
+muerto), así que no tiene efecto real y no vale la pena tocarla sin que el
+usuario lo pida (es código de scraping).
+
+**Verificación:** `pytest` 41/41, `py_compile` de todo el repo, grep
+exhaustivo confirmando cero referencias viejas remanentes (salvo la línea
+muerta arriba, marcada a propósito), y un smoke test end-to-end (england,
+5.1 min, sin errores) que confirmó que las tablas maestras, el log de
+entrenamientos (que se siguió anotando solo en su nueva ubicación) y los
+archivos globales de sofifa se leen/escriben correctamente desde las rutas
+nuevas. `data/`: 7.1 GB → 6.5 GB (por la limpieza, no por mover nada).
+
+⚠️ El workflow de CI (`update_results.yml`) sigue apuntando a la estructura
+vieja porque corre `sparse-checkout` contra la rama `prod`, que todavía no
+tiene este reorden — actualizar recién cuando `g-10`+`g-11` lleguen a `prod`.
 
 ### 2026-09-11 — p3-1: vectorizo `construct_data` (96% del tiempo → segundos)
 

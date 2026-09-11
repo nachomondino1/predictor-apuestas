@@ -25,7 +25,7 @@ def select_league_matches(df, verbose: int = 0):
     Filtra partidos seleccionado solo aquellos que son de liga (eliminando partidos de copa)
     """
     # Levanto df_competencies
-    df_comp = pd.read_excel('data/df_competencies.xlsx')
+    df_comp = pd.read_excel('data/_shared/master_tables/df_competencies.xlsx')
 
     # Selecciono solo las ligas del pais
     l_leagues = list(df_comp[(df_comp['is_cup']==0) & (df_comp['is_second_division']==0)]['id_competition'].values) 
@@ -440,7 +440,7 @@ def determine_country_competitions(id_country):
     Determina los grupos de competencias para el pais.
     """
     # Levanto competencias
-    df_comp = pd.read_excel('./data/df_competencies.xlsx')
+    df_comp = pd.read_excel('./data/_shared/master_tables/df_competencies.xlsx')
 
     if id_country == -1:
         df_comp_country = df_comp[(df_comp['id_country'].isin([48, 55, 59, 77, 148]))]
@@ -480,7 +480,7 @@ def prueba():
     export = False
 
     # Levanto dataset de prueba
-    df = pd.read_excel(f'./data/{country}/p3_data_preparation/df_constructed.xlsx', index_col=0)
+    df = pd.read_excel(f'./data/{country}/data_preparation/df_constructed.xlsx', index_col=0)
     print(df.head())
 
     # Elimino variables que no usare en el modelo como id o fecha (la idea es usar todas las posibles)

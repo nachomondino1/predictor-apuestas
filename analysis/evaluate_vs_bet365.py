@@ -11,7 +11,7 @@ NO scrapea nada. Solo lee el .sql.
 Uso:
     python analysis/evaluate_vs_bet365.py [ruta_al_dump.sql] [--md salida.md]
 
-Por defecto lee data/backup_predictor_apuestas.sql y escribe
+Por defecto lee data/_shared/meta/backup_predictor_apuestas.sql y escribe
 docs/EVALUACION_VS_BET365.md
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-DEFAULT_SQL = REPO / "data" / "backup_predictor_apuestas.sql"
+DEFAULT_SQL = REPO / "data" / "_shared" / "meta" / "backup_predictor_apuestas.sql"
 DEFAULT_MD = REPO / "docs" / "EVALUACION_VS_BET365.md"
 TABLE = "historial_predicciones"
 

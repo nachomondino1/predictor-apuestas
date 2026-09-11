@@ -22,7 +22,7 @@ def main(df_ite, country, iteration_date, graf_all_models: bool = False):
         
         # Levanto predicciones del modelo (no assess y ya con metricas)
         try:
-            df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
+            df_pred = pd.read_excel(f"data/{country}/modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
             # print(df_pred.shape)
         except FileNotFoundError:
             continue
@@ -64,7 +64,7 @@ def roi_in_time_one_model(n_model, model_name):
     # logger.info(f'{n_model} {model_name}')
     
     # Levanto predicciones del modelo (test o test + assess)
-    df_pred = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
+    df_pred = pd.read_excel(f"data/{country}/modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx")
     df_pred = df_pred.sort_values(by='date', ascending=False)
     print(df_pred.head())
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         country = d_countries[id_country][0]
         iteration_date = d_countries[id_country][1]
 
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/modeling/{iteration_date}/df_iteration.xlsx")
         df_ite = df_ite.sort_values(by='roi', ascending=False)
         print(df_ite)
 

@@ -489,8 +489,8 @@ def fillna_with_mean_in_last_matches(df: pd.DataFrame, cols_to_fill, country:str
         calculate_nan_values(df, variable)
 
     if verbose >= 0:
-        df_copiado_form.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_copiado_formaciones.xlsx", index=True)
-        df.to_excel(f"./data/{country}/p3_data_preparation/treat_nan/df_filled.xlsx", index=True)
+        df_copiado_form.to_excel(f"./data/{country}/data_preparation/treat_nan/df_copiado_formaciones.xlsx", index=True)
+        df.to_excel(f"./data/{country}/data_preparation/treat_nan/df_filled.xlsx", index=True)
 
     return df
 
@@ -606,7 +606,7 @@ if __name__ == "__main__":
     country = 'England'
 
     # Levanto dataset
-    df = pd.read_excel(f'data/{country}/p2_data_understanding/df_match.xlsx', index_col=0)
+    df = pd.read_excel(f'data/{country}/data_understanding/df_match.xlsx', index_col=0)
     print(df.head(2))
 
     # Eliminacion de NaN values

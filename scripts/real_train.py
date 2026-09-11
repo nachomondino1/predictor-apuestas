@@ -5,7 +5,7 @@ modelos: LogisticRegression, XGBoost, RandomForest). Pensado para correr en
 background — puede tardar bastante (construct_data todavía sin vectorizar,
 p3-1 pendiente).
 
-Resultado: `data/{country}/p4_modeling/{date}/df_iteration.xlsx`, que es el
+Resultado: `data/{country}/modeling/{date}/df_iteration.xlsx`, que es el
 insumo de `predictor.modeling.main_select_model` para elegir qué modelo deployar
 (ya selecciona por ROI real de test + expected_error, ver docs/REFACTOR.md
 ítem p4-1).
@@ -52,7 +52,7 @@ df_params_ite, df_ite_train, df_ite_test = mtm.comprehensive_search(
 )
 
 df_iteration = concat_dataframes_on_iteration(df_params_ite, df_ite_train, df_ite_test)
-df_iteration.to_excel(f"./data/{country}/p4_modeling/{date}/df_iteration.xlsx", index=False)
+df_iteration.to_excel(f"./data/{country}/modeling/{date}/df_iteration.xlsx", index=False)
 
 print("\n================ RESULTADO ================")
 print(f"df_iteration: {df_iteration.shape}")

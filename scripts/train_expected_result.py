@@ -34,7 +34,7 @@ if data_unders:
         iteration_date = lista[1]
 
         # Levanto df_integrated del pais.
-        df_country = pd.read_excel(f'data/{country}/p3_data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0)
+        df_country = pd.read_excel(f'data/{country}/data_preparation/{iteration_date}/df_integrated.xlsx', index_col=0)
         print(df_country.shape)
 
         df = pd.concat([df, df_country], axis=0)
@@ -42,7 +42,7 @@ if data_unders:
 
     df.to_excel('data/df_integrated_all.xlsx')
 else:
-    df = pd.read_excel('data/all/p3_data_preparation/2025-04-22/df_integrated.xlsx', index_col=0)
+    df = pd.read_excel('data/all/data_preparation/2025-04-22/df_integrated.xlsx', index_col=0)
     print(df)
 
 # DATA PREPARATION

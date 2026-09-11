@@ -34,16 +34,28 @@ images/
 # Ignorar todo el contenido de la carpeta data
 data/*
 
-# Asegurarse de no ignorar la carpeta data
+# Asegurarse de no ignorar data/ ni data/_shared/ (hace falta "abrir" cada
+# nivel para que git llegue a mirar las excepciones de más abajo), pero
+# volver a ignorar TODO lo de adentro de _shared/ -- si no, al abrir
+# data/_shared/ quedaría expuesto todo (incluye backup_predictor_apuestas.sql,
+# imágenes y los parquets de sofifa compartidos, que NO deben versionarse).
 !data/
+!data/_shared/
+data/_shared/*
+
+# Vuelvo a abrir solo las 3 subcarpetas con archivos versionados (ver
+# docs/REFACTOR.md, g-11) y de ahí los archivos específicos.
+!data/_shared/master_tables/
+!data/_shared/predictions/
+!data/_shared/logs/
 
 # Excepciones: incluir estos archivos específicos
-!data/df_best_models.xlsx
-!data/df_countries.xlsx
-!data/df_competencies.xlsx
-!data/historial_predicciones.xlsx
-!data/predicciones.xlsx
-!data/_training_log.xlsx
+!data/_shared/master_tables/df_best_models.xlsx
+!data/_shared/master_tables/df_countries.xlsx
+!data/_shared/master_tables/df_competencies.xlsx
+!data/_shared/predictions/historial_predicciones.xlsx
+!data/_shared/predictions/predicciones.xlsx
+!data/_shared/logs/_training_log.xlsx
 
 # pytest
 .pytest_cache/

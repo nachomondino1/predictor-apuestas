@@ -176,7 +176,7 @@ if __name__ == "__main__":
     hoy = datetime.now()
 
     # Load bets to publish
-    df = pd.read_excel("./data/predicciones.xlsx", index_col=0)
+    df = pd.read_excel("./data/_shared/predictions/predicciones.xlsx", index_col=0)
     logger.info(df)
     print(df.shape)
 

@@ -746,7 +746,7 @@ def extract_data(id_country, country: str, id_competicion: int, competition: str
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
     competition_form = competition.lower().replace(".", "").replace(" ", "-")  # formateo competition para las rutas de archivo y urls
-    ruta_base = f"./data/{country_form}/p2_data_understanding/data_seg"
+    ruta_base = f"./data/{country_form}/data_understanding/data_seg"
     make_directories(l_directorios=[
         f'{ruta_base}/per_competition/df_match', f'{ruta_base}/per_competition/df_match_player', f'{ruta_base}/per_competition/df_match_odds',
         f'{ruta_base}/per_season/df_match', f'{ruta_base}/per_season/df_match_player', f'{ruta_base}/per_season/df_match_odds'
@@ -864,7 +864,7 @@ def extract_missing_matches(id_country, country: str, id_competicion, competitio
     # Formateo variables para guardado de datos
     country_form = country.lower().replace(' ', "-")
     competition_form = competition.lower().replace(".", "").replace(" ", "-")  # formateo competition para las rutas de archivo y urls
-    ruta_base = f"./data/p2_data_understanding/{country_form}/data_seg"
+    ruta_base = f"./data/data_understanding/{country_form}/data_seg"  # ⚠️ orden pais/fase invertido vs. el resto del repo (ya así antes del refactor); sin efecto real porque extract_missing_matches() no tiene ningún caller.
 
     # Ingreso a pagina
     url = f'https://www.flashscore.com/football/{country_form}/{competition_form}/archive/'
@@ -990,7 +990,7 @@ if __name__ == "__main__":
     l_competences = [1001, 1002, 1003]
 
     d_countries = {-1: "all", 1000: "europe", 6: "argentina", 48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa"}
-    df_comp = pd.read_excel("data/df_competencies.xlsx")
+    df_comp = pd.read_excel("data/_shared/master_tables/df_competencies.xlsx")
     print(df_comp)
     
     # Por pais
@@ -1010,6 +1010,6 @@ if __name__ == "__main__":
             extract_data(id_country, country, id_comp, competition, is_cup=is_cup, n_seasons_max=15)  # df_match, df_match_player, df_match_odds = 
 
             # Exporto datos
-            # df_match.to_excel(f"data/{country}/p2_data_understanding/df_match.xlsx") 
-            # df_match_player.to_excel(f"data/{country}/p2_data_understanding/df_match_player.xlsx") 
-            # df_match_odds.to_excel(f"data/{country}/p2_data_understanding/df_match_odds.xlsx") 
+            # df_match.to_excel(f"data/{country}/data_understanding/df_match.xlsx") 
+            # df_match_player.to_excel(f"data/{country}/data_understanding/df_match_player.xlsx") 
+            # df_match_odds.to_excel(f"data/{country}/data_understanding/df_match_odds.xlsx") 

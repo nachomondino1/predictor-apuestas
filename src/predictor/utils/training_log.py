@@ -1,10 +1,10 @@
 """
 Historial de entrenamientos. Cada corrida de `comprehensive_search`
-(entrenamiento real o smoke test) agrega una fila a `data/_training_log.xlsx`
+(entrenamiento real o smoke test) agrega una fila a `data/_shared/logs/_training_log.xlsx`
 para poder comparar entrenamientos entre sí (cuál salió mejor, cuánto tardó,
 con qué código) y saber dónde quedaron guardados los modelos de esa corrida.
 
-`data/_training_log.xlsx` es un archivo chico pensado para abrirse a mano en
+`data/_shared/logs/_training_log.xlsx` es un archivo chico pensado para abrirse a mano en
 Excel (por eso queda en .xlsx, no Parquet — ver docs/REFACTOR.md ítem g-6).
 """
 import datetime
@@ -12,7 +12,7 @@ import subprocess
 
 import pandas as pd
 
-LOG_PATH = "data/_training_log.xlsx"
+LOG_PATH = "data/_shared/logs/_training_log.xlsx"
 
 # Métricas de df_ite_test que vale la pena resumir en el log, si están presentes.
 _SUMMARY_METRICS = ["f1_score", "test_accuracy", "roi", "expected_roi"]
@@ -39,7 +39,7 @@ def log_run(
     notes: str = "",
 ) -> dict:
     """
-    Agrega una fila al historial de entrenamientos (`data/_training_log.xlsx`).
+    Agrega una fila al historial de entrenamientos (`data/_shared/logs/_training_log.xlsx`).
 
     # Parameters
         country: país entrenado. (str)

@@ -301,13 +301,13 @@ def extract_players(id_country, country, id_competition, league, n_seasons = Non
 
         # Exporto datos del fifa (Por seguridad)
         if export:
-            df_player.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_season/df_player_sofifa/{fifa}_{league_form}.xlsx', index=True)
-            df_player_fifa.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league_form}.xlsx', index=False)
+            df_player.to_excel(f'./data/{country}/data_understanding/data_seg/per_season/df_player_sofifa/{fifa}_{league_form}.xlsx', index=True)
+            df_player_fifa.to_excel(f'./data/{country}/data_understanding/data_seg/per_season/df_player_fifa_sofifa/{fifa}_{league_form}.xlsx', index=False)
 
     # Exporto dataset final
     if export:
-        df_player.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/df_player_sofifa/{league_form}.xlsx', index=True)
-        df_player_fifa.to_excel(f'./data/{country}/p2_data_understanding/data_seg/per_competition/df_player_fifa_sofifa/{league_form}.xlsx', index=False)
+        df_player.to_excel(f'./data/{country}/data_understanding/data_seg/per_competition/df_player_sofifa/{league_form}.xlsx', index=True)
+        df_player_fifa.to_excel(f'./data/{country}/data_understanding/data_seg/per_competition/df_player_fifa_sofifa/{league_form}.xlsx', index=False)
 
     # Cierro webdriver
     crawler.driver.close()

@@ -61,7 +61,7 @@ def calculate_metrics(
     # Calculo matriz de confusion  --> Hacerlo solo del mejor modelo?
     if verbose >= 1:
         df_conf_mat = confusion_matrix(y_test, y_pred)
-        # df_conf_mat.to_excel(f'/data/{country}/p4_modeling/modeling/df_conf_matrix.xlsx')
+        # df_conf_mat.to_excel(f'/data/{country}/modeling/modeling/df_conf_matrix.xlsx')
 
     if n_predictions:
         n_home, n_draw, n_away = np.sum(y_pred == 1), np.sum(y_pred == 0), np.sum(y_pred == 2)

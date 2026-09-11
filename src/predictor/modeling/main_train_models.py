@@ -95,11 +95,11 @@ def comprehensive_search(
 
     # DIRECTORIOS
     # Defino rutas segun country y date
-    BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated/{date}"
-    BASE_DIR_flashscore = f'data/{country}/p6_deployment/missing/old_updated'
-    BASE_DIR_sofifa = f'data/{country}/p2_data_understanding/sofifa_update' if retrain else f'data/{country}/p2_data_understanding'
-    BASE_DIR_dp = f"./data/{country}/p3_data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
-    BASE_DIR_mod = f"./data/{country}/p4_modeling/{date}"
+    BASE_DIR_du = f"./data/{country}/data_understanding/old_updated/{date}"
+    BASE_DIR_flashscore = f'data/{country}/deployment/missing/old_updated'
+    BASE_DIR_sofifa = f'data/{country}/data_understanding/sofifa_update' if retrain else f'data/{country}/data_understanding'
+    BASE_DIR_dp = f"./data/{country}/data_preparation/{date}"     # BASE_DIR_mod = f"./data/{country}/modeling/{date}"
+    BASE_DIR_mod = f"./data/{country}/modeling/{date}"
     ruta_base_modelos = f"{BASE_DIR_mod}/models" 
     directories.make_directories(l_directorios=[BASE_DIR_dp, BASE_DIR_mod, ruta_base_modelos])
     
@@ -130,13 +130,13 @@ def comprehensive_search(
 
             logger.warning("Mapeo con todos los paises pues aun no salio el nuevo fifa. Te recomiendo haber ejecutado concat_mapeos.py antes para tener datos lo mas recientes posibles. ")
             directories.duplicate_archivo(
-                source_path='./data/data_preparation/integrate_data/df_map_players_fs_so.xlsx',
-                destination_path=f'./data/{country}/p3_data_preparation/{date}/integrate_data/df_map_players_fs_so.xlsx'
+                source_path='./data/_shared/data_preparation/integrate_data/df_map_players_fs_so.xlsx',
+                destination_path=f'./data/{country}/data_preparation/{date}/integrate_data/df_map_players_fs_so.xlsx'
             )
         
             # Acordate de ejecutar concat_mapeos.py recientemente para tener datos relativamente nuevos.
-            df_player_sofifa = read_df('./data/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx')
-            df_player_fifa_sofifa = read_df('./data/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
+            df_player_sofifa = read_df('./data/_shared/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx')
+            df_player_fifa_sofifa = read_df('./data/_shared/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
         
         else:
             df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa, n_seasons_update=1)
@@ -182,7 +182,7 @@ def comprehensive_search(
     if data_prep_int_miss:
 
         # Levanto datos missing (solamente missing)
-        df_match_miss = pd.read_excel(f'data/{country}/p6_deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
+        df_match_miss = pd.read_excel(f'data/{country}/deployment/missing/data_understanding/all/df_match_miss.xlsx', index_col=0)
         idxs_missing = df_match_miss.index
         print(df_match_miss.shape)
 
@@ -194,7 +194,7 @@ def comprehensive_search(
             logger.error(f"Fallo la obtencion del df_integrated_missing a partir del df_integrated. {len(df_match_miss)} ≠ {len(df_integrated_missing)}.")
             raise ValueError
         
-        df_integrated_missing.to_excel(f'data/{country}/p6_deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
+        df_integrated_missing.to_excel(f'data/{country}/deployment/missing/data_preparation/all/df_integrated_missing.xlsx', index=True)
         
     ####################################################################### DATA PREPARATION (desde construct) #######################################################################
     # Determino registros a usar en test_set
@@ -331,7 +331,7 @@ def comprehensive_search(
     if verbose >= 0:
         logger.info(f"Tiempo total de entrenamiento: {duration_min:.1f} minutos")
 
-    # Anoto la corrida en el historial (data/_training_log.xlsx), sea smoke o entrenamiento real.
+    # Anoto la corrida en el historial (data/_shared/logs/_training_log.xlsx), sea smoke o entrenamiento real.
     training_log.log_run(
         country=country, date=date, n_iter=n_iter, l_modelos=l_modelos,
         duration_min=duration_min, models_path=ruta_base_modelos,
@@ -387,7 +387,7 @@ def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, n_seasons_update: i
     """
     if update_sofifa:
         # Actualizar sofifa con las ultimas seasons
-        df_comp = pd.read_excel('./data/df_competencies.xlsx')
+        df_comp = pd.read_excel('./data/_shared/master_tables/df_competencies.xlsx')
         df_comp_country = df_comp[(df_comp['id_country'] == id_country) & (df_comp['is_cup'] == 0)]
         
         # Levanto los datos viejos
@@ -554,6 +554,6 @@ if __name__ == "__main__":
         df_iteration = concat_dataframes_on_iteration(df_params_ite, df_ite_train, df_ite_test)
 
         # Exportar resultados
-        df_params.to_csv(f'data/{country}/p4_modeling/{date}/hyperparameters.csv')
-        df_iteration.to_excel(f'./data/{country}/p4_modeling/{date}/df_iteration.xlsx', index=False)
+        df_params.to_csv(f'data/{country}/modeling/{date}/hyperparameters.csv')
+        df_iteration.to_excel(f'./data/{country}/modeling/{date}/df_iteration.xlsx', index=False)
 

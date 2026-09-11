@@ -15,9 +15,9 @@ def concat_raw_data_by_country(d_countries, verbose: int = 1):
     for id_country, country in d_countries.items():
 
         # Levanto datasets de Sofifa
-        df4 = pd.read_excel(f'data/{country}/p2_data_understanding/df_player_sofifa.xlsx', index_col=0)
-        df5 = pd.read_excel(f'data/{country}/p2_data_understanding/df_player_fifa_sofifa.xlsx', index_col=0)
-        df6 = pd.read_excel(f'data/{country}/p2_data_understanding/df_teams_sofifa.xlsx', index_col=0)
+        df4 = pd.read_excel(f'data/{country}/data_understanding/df_player_sofifa.xlsx', index_col=0)
+        df5 = pd.read_excel(f'data/{country}/data_understanding/df_player_fifa_sofifa.xlsx', index_col=0)
+        df6 = pd.read_excel(f'data/{country}/data_understanding/df_teams_sofifa.xlsx', index_col=0)
 
         if verbose >= 1:
             logger.info(f"Country: {country}. player: {df4.shape}. fifa: {df5.shape} team: {df6.shape}")

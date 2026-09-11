@@ -19,7 +19,7 @@ def assess_models_in_prod(
         verbose: int = 1
 ):
     date = datetime.datetime.now().date()
-    path = f"data/{country}/p4_modeling/{iteration_date}/best_model/2_assess/{date}" # _con_ea
+    path = f"data/{country}/modeling/{iteration_date}/best_model/2_assess/{date}" # _con_ea
     directories.make_directories(l_directorios=[path])    
     bs = betting_strategy.BettingStrategy(country, iteration_date, verbose=0)
     rows = []
@@ -47,7 +47,7 @@ def assess_models_in_prod(
         # 2. Concat test + missing 
         if concat_with_test:
             # Levanto predicciones del modelo (test o test + assess)
-            path_test = f"data/{country}/p4_modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
+            path_test = f"data/{country}/modeling/{iteration_date}/models/{n_model}__{model_name}_predicciones.xlsx"
             df_pred_test = pd.read_excel(path_test, index_col=0)
             df_pred = pd.concat([df_pred_test, df_pred_missing], axis=0)
         else:
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     n_models = 10
 
     # Levanto df_best_models
-    df_best_models = pd.read_excel('data/df_best_models.xlsx')
+    df_best_models = pd.read_excel('data/_shared/master_tables/df_best_models.xlsx')
     
     # Por pais
     for id_country in l_countries:
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         print(f"--- {country} {iteration_date_dt} ---")
 
         # Levanto df_ite
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date_dt}/best_model/3_bet_strategy/df_ite_bs.xlsx") # pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/modeling/{iteration_date_dt}/best_model/3_bet_strategy/df_ite_bs.xlsx") # pd.read_excel(f"data/{country}/modeling/{iteration_date}/df_iteration.xlsx")
      
         if one_model:
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 export=True
                 )
             
-            df_ite_bs.to_excel(f'data/{country}/p4_modeling/metrics_{n_model}_{model_name}.xlsx')
+            df_ite_bs.to_excel(f'data/{country}/modeling/metrics_{n_model}_{model_name}.xlsx')
 
         else:
             df_ite = df_ite.head(n_models)
@@ -159,4 +159,4 @@ if __name__ == "__main__":
                 xlsx_name=xlsx_name
                 )
     
-            df_ite_bs.to_excel(f"data/{country}/p4_modeling/{iteration_date_dt}/best_model/2_assess/{xlsx_name}.xlsx")
+            df_ite_bs.to_excel(f"data/{country}/modeling/{iteration_date_dt}/best_model/2_assess/{xlsx_name}.xlsx")

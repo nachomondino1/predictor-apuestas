@@ -17,7 +17,7 @@ def initialize_directories(country, iteration_date):
     fecha_hoy = datetime.datetime.now().date()
     
     # Definir paths principales
-    base_path = f"data/{country}/p4_modeling/{iteration_date}"
+    base_path = f"data/{country}/modeling/{iteration_date}"
     base_path_sbm = f"{base_path}/best_model"
     
     d_paths = {
@@ -227,7 +227,7 @@ if __name__ == "__main__":
         l_metrics = ['roi', 'expected_error'] # Tras define_metrics_v02.py max test_acc (sin n_draw y esas)  (semana 3)
 
     # Levanto df_best_models
-    df_bm = pd.read_excel('data/df_best_models.xlsx')
+    df_bm = pd.read_excel('data/_shared/master_tables/df_best_models.xlsx')
 
     for id_country in l_countries:
         country = d_countries[id_country][0]
@@ -239,8 +239,8 @@ if __name__ == "__main__":
         l_weights = [1 / len(l_metrics) for elem in l_metrics] # Pesos iguales para todas las metricas
 
         # Levanto df_iteration con datos de train y test
-        df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/df_iteration.xlsx")
-        # df_ite = pd.read_excel(f"data/{country}/p4_modeling/{iteration_date}/bs/stake_kelly_linear_no_home/df_iteration.xlsx")
+        df_ite = pd.read_excel(f"data/{country}/modeling/{iteration_date}/df_iteration.xlsx")
+        # df_ite = pd.read_excel(f"data/{country}/modeling/{iteration_date}/bs/stake_kelly_linear_no_home/df_iteration.xlsx")
 
         print(df_ite.head(5))
         print(df_ite.shape)
@@ -267,4 +267,4 @@ if __name__ == "__main__":
         df_bm.loc[df_bm['id_country'] == id_country, ['iteration_date', 'n_model', 'model_name']] = [iteration_date, n_model, model_name]
         print(df_bm)
     
-    df_bm.to_excel('data/df_best_models.xlsx', index=False)
+    df_bm.to_excel('data/_shared/master_tables/df_best_models.xlsx', index=False)

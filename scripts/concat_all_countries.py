@@ -6,13 +6,13 @@ from predictor.utils import directories
 def paths(country, iteration_date):
     # Defino paths
     d_paths = {
-        'BASE_DIR_du': f"./data/{country}/p2_data_understanding/old_updated/{iteration_date}",
-        # BASE_DIR_flashscore = f'data/{country}/p6_deployment/missing/old_updated'
-        # BASE_DIR_sofifa = f'data/{country}/p2_data_understanding/sofifa_update'
-        'BASE_DIR_dp': f'data/{country}/p3_data_preparation/{iteration_date}',
-        'BASE_DIR_miss': f'data/{country}/p6_deployment/missing/old_updated',
-        'BASE_DIR_miss_du': f'data/{country}/p6_deployment/missing/data_understanding/all',
-        'BASE_DIR_miss_dp': f'data/{country}/p6_deployment/missing/data_preparation/all',
+        'BASE_DIR_du': f"./data/{country}/data_understanding/old_updated/{iteration_date}",
+        # BASE_DIR_flashscore = f'data/{country}/deployment/missing/old_updated'
+        # BASE_DIR_sofifa = f'data/{country}/data_understanding/sofifa_update'
+        'BASE_DIR_dp': f'data/{country}/data_preparation/{iteration_date}',
+        'BASE_DIR_miss': f'data/{country}/deployment/missing/old_updated',
+        'BASE_DIR_miss_du': f'data/{country}/deployment/missing/data_understanding/all',
+        'BASE_DIR_miss_dp': f'data/{country}/deployment/missing/data_preparation/all',
     }
 
     directories.make_directories(l_directorios=d_paths.values())

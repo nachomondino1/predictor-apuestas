@@ -15,7 +15,7 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
     """
     # Defino condiciones del analisis
     df_predicciones = pd.DataFrame()
-    df_best_models = pd.read_excel("./data/df_best_models.xlsx")
+    df_best_models = pd.read_excel("./data/_shared/master_tables/df_best_models.xlsx")
 
     # Por country
     for id_country in l_countries:
@@ -37,10 +37,6 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
                 # Concatenar df_countries....
                 df_predicciones = pd.concat([df_predicciones, df_predicciones_country], axis=0)
 
-                # Exporto por seguridad
-                df_predicciones.to_excel(f'data/predicciones_seg.xlsx', index=True)
-                df_historial_predicciones.to_excel(f'data/historial_predicciones_seg.xlsx', index=True)
-
             else:
                 logger.warning(f"No se generaron predicciones para el país {id_country}.")
 
@@ -60,8 +56,8 @@ def collect_predictions(d_run: dict, l_countries:list, n_days:float, df_historia
 
     # Exporto datos
     df_predicciones.index.name = 'id_match'  # Es importante para la base de datos MySQL
-    df_predicciones.to_excel(f'data/predicciones.xlsx', index=True)
-    df_historial_predicciones.to_excel(f'data/historial_predicciones.xlsx', index=True)
+    df_predicciones.to_excel(f'data/_shared/predictions/predicciones.xlsx', index=True)
+    df_historial_predicciones.to_excel(f'data/_shared/predictions/historial_predicciones.xlsx', index=True)
 
 # Código que se ejecuta solo cuando el archivo se ejecuta directamente
 if __name__ == "__main__":
@@ -84,6 +80,6 @@ if __name__ == "__main__":
         d_run = json.loads(sys.argv[3])  # Parametros de ejecucion (e.g. {'run_missing': True, 'data_unders': False, 'data_prep': False, 'modeling': False, 'export': True})
 
     # Levanto historial_predicciones.xlsx
-    df_historial_predicciones = pd.read_excel(f'data/historial_predicciones.xlsx', index_col=0)
+    df_historial_predicciones = pd.read_excel(f'data/_shared/predictions/historial_predicciones.xlsx', index_col=0)
     
     collect_predictions(d_run, l_countries, n_days, df_historial_predicciones)

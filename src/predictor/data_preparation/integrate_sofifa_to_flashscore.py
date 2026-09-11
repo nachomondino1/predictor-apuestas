@@ -572,7 +572,7 @@ if __name__ == "__main__":
     iteration_date = d_countries[id_country][1]
 
     # Levanto datasets para pruebas
-    base_path = f'./data/{country}/p3_data_preparation/{iteration_date}'
+    base_path = f'./data/{country}/data_preparation/{iteration_date}'
     df_match = read_df(f"{base_path}/clean_data/df_match_cleaned.xlsx")
     df_match_player = read_df(f"{base_path}/clean_data/df_match_player_cleaned.xlsx")
     df_player_sofifa = read_df(f"{base_path}/clean_data/df_player_sofifa_cleaned.xlsx")
@@ -587,7 +587,7 @@ if __name__ == "__main__":
     if map_players:
         df_map_players_fs_so = map_players(df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa, id_country=id_country, base_path=base_path)
     else:
-        df_map_players_fs_so = pd.read_excel('data/spain/p3_data_preparation/2025-01-19/integrate_data/df_map_players_fs_so.xlsx')
+        df_map_players_fs_so = pd.read_excel('data/spain/data_preparation/2025-01-19/integrate_data/df_map_players_fs_so.xlsx')
         logger.info("Levanto df_map ya usado.")
 
     df, df_aux = integrate_player_data_in_match(df_match, df_match_player, df_map_players_fs_so, df_player_sofifa, df_player_fifa_sofifa)
