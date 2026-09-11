@@ -78,9 +78,11 @@ descuido y conviene respetar:
   matan `expected_goals` (85% NaN) y todas sus derivadas.
 - **`fill_na` solo `None` / `"0"`** (ya no `'ml'`) — el fill por modelo requería
   guardar un modelo por columna para prod, demasiado almacenamiento.
-- **Betting strategy** — la iter4 concluye explícitamente que hay que reducirla a
-  "sin ea" (stake plano) y dejar de seleccionar estrategia por test (duplicaba el
-  overfitting). Ver [`REFACTOR.md`](./REFACTOR.md) ítem p4-7.
+- **Betting strategy** — "ea" = estrategia de apuesta. La iter4 concluye
+  explícitamente que hay que reducirla a "sin ea" (una sola estrategia fija,
+  sin variar por país ni por resultado) y dejar de seleccionarla según el
+  test (duplicaba el overfitting de la selección de modelo). Hecho en
+  `p4-7` — ver [`REFACTOR.md`](./REFACTOR.md).
 
 ---
 
@@ -310,10 +312,15 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   / `determine_roi`, `calculate_yield`, `calculate_bookie_metrics`,
   `calculate_result_probabilities_by_bookmaker`, `calculate_gp_by_result`,
   `calculate_combined_metric`, `normalize_column`…
-- **`betting_strategy.py`** — clase `BettingStrategy`: `determine_result_to_bet`
-  (umbral de probabilidad), `determine_stake_to_bet` (relación lineal / Kelly),
-  `stake_reduction` / `cap_stake` / `normalize_stake`, `determine_winning_bets`,
-  `calculate_roi_in_combination`, `apply_strategy` / `apply_strategy_by_result`.
+- **`betting_strategy.py`** — clase `BettingStrategy`, estrategia **"sin ea"**
+  desde `p4-7`: `define_hiperparameters(strategy)` devuelve un dict fijo por
+  contexto (`"train"`: linear; `"prod"`: kelly_linear), sin búsqueda ni
+  selección por país/resultado (eso duplicaba el overfitting de la selección
+  de modelo — ver §1bis). `determine_result_to_bet` (umbral de probabilidad),
+  `determine_stake_to_bet` (relación lineal / Kelly), `stake_reduction`
+  (las 2 salvedades: no apostar en local, `player_emergency_fill`) /
+  `cap_stake`, `determine_winning_bets`, `calculate_roi_in_combination`,
+  `apply_strategy`.
 - ~~**`nn.py`** — `TrainNeuralNetwork` (MLP Keras)~~ — **borrado** en el refactor
   (junto con tensorflow/keras/scikeras de `requirements.txt`). Recuperable del
   historial git si se quiere volver a probar redes neuronales.

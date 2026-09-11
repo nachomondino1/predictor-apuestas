@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from predictor.utils.set_up_logging import logger
-from predictor.data_preparation.format_data import value_nan_to_none
 from predictor.data_preparation.construct_data import determine_expected_result
 from predictor.modeling.assess_model import calculate_roi
 from predictor.utils import directories
@@ -34,38 +33,33 @@ class BettingStrategy:
                 self.BASE_PATH_sbm = self.d_paths['base_path_sbm']
 
     # HIPER SPACE
-    def define_hiperparameters(self, strategy, vary_dp: bool = False, vary_k: bool = False, val_min: int = 10, val_max: int = 100, step_m: int = 10):
+    def define_hiperparameters(self, strategy: str):
         """
-        Defino hiperparametros de estrategia de apuesta a probar segun si apuesto como la realidad o no.
+        Hiperparámetros de la estrategia de apuesta "sin ea": un único valor
+        fijo por contexto, sin búsqueda de hiperparámetros ni variación por
+        país o por resultado predicho (ver docs/REFACTOR.md ítem p4-7 y la
+        conclusión de la iter4: seleccionar la estrategia según el test
+        duplicaba el overfitting ya presente en la selección de modelo).
 
-        Mejoras:
-            - lista de estrategias (e.g. kelly, linear, etc)
+        # Parameters
+            strategy: "train" (backtesting/entrenamiento — se usa con
+                `apply_strategy(..., prod=False)`) o "prod" (predicciones
+                reales — `apply_strategy(..., prod=True)`, que además aplica
+                las salvedades de `stake_reduction`). (str)
+
+        # Returns
+            Diccionario de hiperparámetros fijo para `apply_strategy()`. (dict)
         """
-        list_dp = [None, -1, -0.75, -0.5, -0.25] if vary_dp else [None] 
-        list_m = list(range(val_min, val_max + 1, step_m))
-        list_strat = strategy if isinstance(strategy, list) else [strategy]
-        list_b = [0]
-        list_k = [1, 1.5] if vary_k else [1] # [1, 2, 4, 8]
-        
-        if strategy == "train": # "Sin estrategia"
-            dic = {
-                'prob_dp': None,
-                'curva': 'linear',
-                'm': 10,
-                'b': 0,
-            }
+        if strategy == "train":
+            dic = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}
+        elif strategy == "prod":
+            dic = {'prob_dp': None, 'curva': 'kelly_linear', 'm': 10, 'b': 0, 'k': 1}
         else:
-            dic = {
-                'prob_dp': list_dp,
-                'curva': list_strat,
-                'm': list_m,
-                'b': list_b,
-                'k': list_k # Cuanto mayor es k, mas favorece los stakes en 0
-            }
-    
+            raise ValueError(f"Estrategia '{strategy}' no soportada — sin ea, solo existen 'train' y 'prod'.")
+
         if self.verbose >= 1:
             logger.info(f"Hiperparametros estrategia de apuesta: {dic}")
-    
+
         return dic
 
     # RESULT TO BET
@@ -239,9 +233,15 @@ class BettingStrategy:
     
     def stake_reduction(self, df):
         """
-        Aplico reducciones a stake en PROD.
+        Aplico las 2 salvedades de la estrategia "sin ea" en PROD (ver
+        docs/REFACTOR.md ítem p4-7 / conclusión de la iter4).
         """
         logger.warning("Aplicando modificadores de stake para PROD...")
+
+        # No apuesto en local: temporada tras temporada resultó no rentable
+        # (a diferencia de empate y visitante) — única salvedad "de la
+        # realidad" que la iter4 decide mantener sobre la estrategia fija.
+        df.loc[df['result_to_bet'] == 1, 'stake_to_bet'] *= 0
 
         # Disminuyo stake por rellenado de emergencia
         df.loc[df['player_emergency_fill'] == 1, 'stake_to_bet'] *= 0
@@ -252,19 +252,6 @@ class BettingStrategy:
         val_min, val_max = 0, 99  # 100 no pues sino el bank es negativo.
         func = lambda x: val_min if x < val_min else (val_max if x>val_max else x)
         df.loc[:, 'stake_to_bet'] = df['stake_to_bet'].apply(func)         # df['stake_to_bet'] = df['stake_to_bet'].apply(func)
-        return df
-    
-    def normalize_stake(self, df, p_min, p_max):
-        """
-        Capa de funcion sigmoide (creo que sirve nada mas para Kelly. 
-        Para linear seria muy parecico a la variacion exponencial puesto que buscas agrandar las diferencias entre probas de 0.33 y 1)
-        """
-        if p_min >= p_max:
-            raise ValueError("p_min debe ser menor que p_max para una normalización correcta.")
-
-        # Normalización: Escalar los valores de kelly_raw entre 0 y 1
-        df['stake_to_bet_norm'] = (df['kelly_criterion'] - p_min) / (p_max - p_min)
-
         return df
     
     # Calculo de ROI en predicciones
@@ -364,67 +351,3 @@ class BettingStrategy:
             df = self.stake_reduction(df)
             
         return df
-
-    def apply_strategy_by_result(self, df, df_hiper):
-        """
-        Es para usar en produccion.
-
-        df_hiper: Parametros a probar por result
-        """
-        df_comp = pd.DataFrame()
-        print(df.shape)
-
-        # Por resultado
-        for pred in [1, 0, 2]:
-            print(f"Resultado: {pred}")
-
-            df_pred = df[df['predicted_result'] == pred] 
-            print(df_pred.shape)
-
-            # Si no hay registros falla...
-            if len(df_pred) > 0:
-                row_pred = df_hiper.loc[pred]
-                prob, curva, m, b, k = row_pred['prob_dp'], row_pred['curva'], row_pred['m'], row_pred['b'], row_pred['k']
-                prob = value_nan_to_none(prob)
-
-                # Determino result to bet
-                df_pred = self.determine_result_to_bet(df_pred, thr_prob_min=prob)
-
-                # Determino stake to bet
-                d_params_stake = {'type_relation': curva, 'm': m, 'b': b, 'k': k}
-                df_pred = self.determine_stake_to_bet(df_pred, **d_params_stake)
-
-                df_comp = pd.concat([df_comp, df_pred], axis=0)
-
-            else:
-                logger.warning(f"No hay partidos para el resultado {pred}, por lo que, no se aplica la estrategia a dicho resultado.")
-
-        return df_comp
-
-# Código que se ejecuta solo cuando el archivo se ejecuta directamente
-if __name__ == "__main__":
-
-    l_countries = [48, 55, 59, 77, 148] 
-    one_model = True
-    assess, date_assess = False, '2025-04-29' # datetime.datetime.now().date() 
-
-    df_best_models = pd.read_excel("./data/_shared/master_tables/df_best_models.xlsx")
-
-    # Defino hiperparametros de apuesta
-    bs_per_res = True
-    ## Result to bet
-    vary_dp = False # Doble oportunidad --> te recomendaria que fuerzes dp con curvas linear o kelly_linear (sin kelly) para no inflar su stake desmedidamente
-    ## Stake to bet
-    strat = ['kelly', 'kelly_linear'] # 'linear' no usar linear para que no pueda usar mas stake en 1 o 2 si justo hubo una buena racha como en SPA
-    space_m = [10, 11, 10] # Problema al variar: muev
-    vary_k = True
-    ## Seleccion de bs
-    roi_weight = 0.5 # Expected tiene mas razon a largo plazo que roi (segun libro). Puede que coincida.
-
-    d_countries = {
-        48: ["england"],
-        55: ["france"], 
-        59: ["germany"],
-        77: ["italy"],
-        148: ["spain"]
-        }

@@ -163,7 +163,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
-| p4-7 | **P1 (endorsed por iter4)** | **`betting_strategy.py` → "sin ea".** La iter4 concluye: reducir la bs a stake plano, sacar `apply_strategy_by_result`, `define_hiperparameters(strategy=…)` y la selección de estrategia por test (duplicaba overfitting). Dejar solo las 2 salvedades que iter4 mantiene: `stake=0` en local (`result_to_bet==1`) y `stake=0` si `player_emergency_fill==1`. | Bajo | No |
+| p4-7 | ~~P1~~ ✅ | **`betting_strategy.py` → "sin ea".** Borrados `apply_strategy_by_result`, la búsqueda de hiperparámetros de `define_hiperparameters` (sin ningún caller vivo), `normalize_stake` (sin caller) y el `__main__` inconcluso. `define_hiperparameters(strategy)` pasa a devolver un dict fijo por contexto: `"train"` (linear, m=10, b=0) y `"prod"` (kelly_linear, m=10, b=0, k=1 — reemplaza los valores hardcodeados en `main_next_matches.py`, distintos de los documentados en la iter4). Agregada la salvedad que faltaba: `stake=0` en local (`result_to_bet==1`), junto a la de `player_emergency_fill`, ambas en `stake_reduction()` (solo PROD). | Bajo (agregado `tests/test_betting_strategy.py`) | No |
 | p4-1 | ~~P2~~ ✅ | **Decidido:** se borra el estudio retrospectivo de correlación por país (`define_metrics.py`, `define_metrics_v02.py`, `evaluate_test_with_new_metrics.py`). `main_select_model.py` ya elige el modelo a deployar por ROI real de test (+ `expected_error`) directamente — no hace falta la correlación. Se conserva `roi_in_time.py` (gráfico de ROI en el tiempo, para detectar cuándo un modelo se degrada y hay que reentrenar) y `assess_in_prod.py` (re-evalúa candidatos contra partidos reales recientes antes de elegir, ya integrado en `main_select_model.py` vía `assess=True`). | Bajo | No |
 | p4-2 | P1 | ~~Decidir sobre `nn.py`: borrar + sacar `tensorflow`/`keras`/`scikeras` de requirements~~ ✅ | Bajo | No |
 | p4-3 | ~~P2~~ ✅ | `asses_model.py` → `assess_model.py` + 8 importadores. | Bajo | No |
@@ -194,7 +194,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
 | g-6 | ~~P1~~ ✅ | Migrar intercambio de datos `.xlsx` → Parquet, alcance "desde `clean_data` en adelante" (`utils/io.py`). Medido: **8.1 → 6.8 min** en el smoke de england. | Medio (mucha superficie) — mitigado con scope acotado + grep exhaustivo |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
-| g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, + tests dedicados de p3-9/p3-1, 41 tests). Falta cobertura por fase. | Bajo |
+| g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, + tests dedicados de p3-9/p3-1/p4-7, 47 tests). Falta cobertura por fase. | Bajo |
 | g-9 | ~~P1~~ ✅ | Historial de entrenamientos (`utils/training_log.py` → `data/_shared/logs/_training_log.xlsx`): cada corrida de `comprehensive_search` (smoke o real) queda anotada con commit, país, duración, métricas de test y carpeta de modelos, para comparar corridas entre sí. | Nulo |
 | g-10 | ~~P1~~ ✅ | Estructura de carpetas Nivel 1: todo el código bajo `src/predictor/{data_understanding,data_preparation,modeling,deployment,utils}` + `stages.py`. Pedido explícito del usuario ("una sola carpeta para scripts .py"). Ver §2.7. | Medio (mitigado: codemod anclado a imports, no toca `data/`) |
 | g-11 | ~~P1~~ ✅ | Reorganizar `data/` (7.1 GB): carpetas de fase sin prefijo `pN_` (alineadas con `src/predictor/`), lo global bajo `data/_shared/`, cero archivos sueltos en la raíz. Pedido explícito del usuario ("muchos archivos sueltos... quiero que quede ordenado"). Ver §6 y el registro de cambios. | Medio-alto (dato real, sin red de `git revert`) — mitigado con codemod + smoke test + verificación exhaustiva |
@@ -237,13 +237,15 @@ p2-6, p3-3/4/5, p3-7 (scatter_plot), p3-9 (vectorizo `integrate_data`), g-6
 (Parquet), g-9 (historial de entrenamientos), g-10 (estructura `src/predictor/`),
 g-11 (reorganizo `data/`: sin archivos sueltos, carpetas de fase alineadas
 con el código), p4-1 (selección de modelo por ROI real, se borra el estudio
-retrospectivo), **p3-1** (vectorizo `construct_data`), p4-2 (nn+TF), p4-3
-(rename), estructura Nivel 0 + aplanado de carpetas, limpieza de peso (repo
-52→16 GB, `data/` 39→6.5 GB), primer entrenamiento real (england, grid
-completo 128×3), smoke de entrenamiento england (53.5 → 8.1 → 6.8 → 5.1 min).
+retrospectivo), **p3-1** (vectorizo `construct_data`), **p4-7** (`betting_strategy.py`
+→ "sin ea"), p4-2 (nn+TF), p4-3 (rename), estructura Nivel 0 + aplanado de
+carpetas, limpieza de peso (repo 52→16 GB, `data/` 39→6.5 GB), primer
+entrenamiento real (england, grid completo 128×3), smoke de entrenamiento
+england (53.5 → 8.1 → 6.8 → 5.1 min).
 
 **Próximo:**
-1. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
+1. **p4-4** — podar `assess_model.py` (métricas de ROI/estrategia sin uso
+   tras p4-7, si las hay — no encontré nada obvio al hacer p4-7, revisar aparte).
 2. **g-4** — separar requirements + pinear `mnm`.
 3. **p6-1** — partir `main_next_matches.main` + sacar los 11 `input()`.
 4. **p3-2** (sprawl `prod`): extraer core compartido, train/prod como wrappers
@@ -269,6 +271,68 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — p4-7: `betting_strategy.py` → "sin ea"
+
+Pedido del usuario: seguir con el plan, ítem p4-7. Antes de tocar nada, leí
+la conclusión exacta de la iter4 (docs no versionados, `~/Downloads/doc_tiptopia`):
+**"ea" = estrategia de apuesta**. "Sin ea" significa una única forma fija de
+apostar para todos los países y resultados, en vez de buscar/seleccionar la
+mejor por test — eso duplicaba el overfitting que ya tenía la selección de
+modelo. La única salvedad "de la realidad" que la iter4 decide mantener: no
+apostar en local (temporada tras temporada resultó no rentable, a diferencia
+de empate y visitante).
+
+**Encontrado al comparar el doc con el código real** (antes de tocar nada):
+`main_next_matches.py` tenía hardcodeado `curva='kelly', m=8, b=0, k=2,
+prob_dp=0.4` (con doble oportunidad activa) en vez de los valores "sin ea"
+documentados (`kelly_linear, m=10, b=0, k=1, prob_dp=None`) — con
+alternativas comentadas arriba, señal de que se habían retocado a mano
+después de esa conclusión. Consulté al usuario en vez de asumir: confirmó
+reemplazar por los de la iter4. También vi que la salvedad "no apostar en
+local" nunca se había implementado (`stake_reduction` solo tenía la de
+`player_emergency_fill`) — confirmé con el usuario que la salvedad aplica
+solo en PROD, no en el cálculo de ROI de entrenamiento.
+
+**Cambios en `betting_strategy.py`:**
+- Borrado `apply_strategy_by_result` — confirmado sin ningún caller vivo
+  (`main_next_matches.py` siempre pasa un dict fijo, nunca entraba a esa
+  rama).
+- `define_hiperparameters(strategy, vary_dp, vary_k, ...)` → `define_hiperparameters(strategy)`:
+  se borra toda la búsqueda de hiperparámetros (listas de `dp`/`m`/`k`/curvas
+  a probar), sin ningún caller vivo tampoco. Devuelve un dict fijo por
+  contexto: `"train"` → `{prob_dp: None, curva: linear, m: 10, b: 0}` (ya
+  existía, sin cambios) y `"prod"` → `{prob_dp: None, curva: kelly_linear,
+  m: 10, b: 0, k: 1}` (nuevo, valores de la iter4).
+- Borrado `normalize_stake` — sin ningún caller.
+- Borrado el bloque `__main__` — quedó a medio escribir (arma un dict de
+  países y termina ahí, no hace nada más); representaba justo el enfoque de
+  búsqueda de estrategia que la iter4 concluye abandonar.
+- `stake_reduction()` (solo se llama con `prod=True`): agregada la salvedad
+  que faltaba, `stake=0` cuando `result_to_bet == 1` (local), junto a la de
+  `player_emergency_fill`.
+- Import `value_nan_to_none` borrado (solo lo usaba `apply_strategy_by_result`).
+
+**`main_next_matches.py`:** el dict de la predicción real (no
+`predict_missing`) pasa a construirse con `bs.define_hiperparameters(strategy='prod')`
+en vez de estar hardcodeado ahí — reemplaza los valores retocados a mano por
+los de la iter4. Se deja intacto el dict de `predict_missing` (no formaba
+parte de lo consultado/aprobado). Se simplifica el `if isinstance(d_strategy, dict)`
+— ya no hace falta, `apply_strategy_by_result` no existe más.
+
+**Verificación:** `tests/test_betting_strategy.py` (nuevo, 6 tests):
+`define_hiperparameters` para `"train"`/`"prod"`/estrategia inválida, y
+`stake_reduction` para cada salvedad por separado y combinadas. `pytest`
+47/47. Smoke end-to-end (england) para confirmar que el path de
+entrenamiento (`bs.define_hiperparameters(strategy='train')` vía
+`stages.py`) sigue funcionando igual.
+
+**Pendiente relacionado (no incluido acá):** p4-4 ("podar `assess_model.py`
+de las métricas de ROI/estrategia que quedan sin uso") — la plan lo marca
+para hacer junto con p4-7, pero esta simplificación fue más quirúrgica
+(no tocó el cálculo de métricas en sí) y no encontré nada nuevo que podar en
+`assess_model.py` como consecuencia directa. Queda para revisar aparte si
+se quiere ir más a fondo.
 
 ### 2026-09-11 — g-11: reorganizo `data/` (archivos sueltos, carpetas de fase)
 

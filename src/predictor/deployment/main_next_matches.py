@@ -1206,18 +1206,16 @@ def main(
             # d_strategy = {'prob_dp': None, 'curva': 'linear', 'm': 10, 'b': 0}  # Usamos prod=True porque no tenemos result todavia
             d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10}
         else:
-            # d_strategy = {'prob_dp': 0.41, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # Linear infla mucho con cuotas chotas..
-            # d_strategy = {'prob_dp': None, 'curva': 'kelly', 'm': 5, 'b': 0, 'k': 10} # demasiada volatilidad en stakes. Dejamos $ en la mesa por kelly_crit < 0 y al ser k alto, el stake lo hace 0.
-            d_strategy = {'prob_dp': 0.4, 'curva': 'kelly', 'm': 8, 'b': 0, 'k': 2}
+            # "sin ea" (ver docs/REFACTOR.md p4-7 / conclusión de la iter4):
+            # una sola estrategia fija para todos los países y resultados, sin
+            # buscar/seleccionar según el test (duplicaba el overfitting de la
+            # selección de modelo). Las salvedades (no apostar en local,
+            # player_emergency_fill) las aplica stake_reduction() más abajo.
+            d_strategy = bs.define_hiperparameters(strategy='prod')
 
-        if isinstance(d_strategy, dict):
-            logger.warning("Aplico MISMA estrategia A TODOS LOS RDOS. ")
-            df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
+        logger.warning("Aplico la misma estrategia de apuesta a todos los resultados (sin ea). ")
+        df = bs.apply_strategy(df_predicciones, param_dict=d_strategy)
 
-        else:
-            logger.warning("Aplico estrategia DISTINTA POR RESULTADO. ")
-            df = bs.apply_strategy_by_result(df_predicciones, df_hiper=d_strategy)
-            
         if export:
             df.to_excel(f'./data/{country}/deployment/predicciones.xlsx', index=True)
 
