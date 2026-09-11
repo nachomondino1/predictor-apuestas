@@ -156,7 +156,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | p3-4 | ~~P2~~ ✅ | Fix bug (era `main.py` construct_data): `df_preconstructed` indefinida si `with_historic=False`. | Bajo | No |
 | p3-5 | ~~P2~~ ✅ | Quitado `clean_data.py` dump `~/Desktop/df_nan.xlsx` y `select_data.py` `sys.path` absoluto. | Bajo | No |
 | p3-6 | P2 | `integrate_sofifa_to_flashscore`: blocking key + caché en el fuzzy matcher. | Medio. Test de calidad de mapeo. | No |
-| p3-7 | P3 | `describe_data.scatter_plot`: cap de columnas / flag (originó los PNG de 29 MB). | Bajo | No |
+| p3-7 | ~~P1 (subió de prioridad)~~ ✅ | `describe_data.scatter_plot`: cap a 12 cols / 2000 filas, crea el dir, try/except. Pasó de "nice to have" a **bloqueante**: colgaba `comprehensive_search(verbose>=1)` con el `df_match` real (121 cols). También arreglé el bug de `stages.py::describe_data()` que pasaba `df_match` a los 4 llamados (por eso los 4 PNG borrados pesaban exactamente igual). | Bajo | No |
 
 ### 2.3 `p4_modeling`
 
@@ -224,57 +224,64 @@ processed,models}`. Refs: cookiecutter-data-science, Kedro.
 
 ### 2.6 Orden de ejecución sugerido
 
-Foco actual: **simplificar / lean**, y llegar a un **primer entrenamiento de
-prueba** (england) que valide que el código corre end-to-end.
+Foco actual: **simplificar / lean**. El primer entrenamiento de prueba (england)
+**ya se corrió y funcionó** (§2.8) — confirma que el pipeline de train sobrevivió
+al refactor.
 
 **Hecho** ✅: módulo 1 (chromedriver), g-1, g-2, g-3 (packaging), g-5 (parcial),
-p2-6, p3-3/4/5, p4-2 (nn+TF), p4-3 (rename), estructura Nivel 0 + aplanado de
-carpetas, limpieza de peso (repo 52→16 GB, `data/` 39→6 GB).
+p2-6, p3-3/4/5, p3-7 (scatter_plot), p4-2 (nn+TF), p4-3 (rename), estructura
+Nivel 0 + aplanado de carpetas, limpieza de peso (repo 52→16 GB, `data/`
+39→6 GB), smoke de entrenamiento england.
 
 **Próximo:**
-1. **Smoke de entrenamiento england** (ver §2.8) — `main_train_models` con grid
-   mínimo. Forma más rápida de saber si el refactor rompió algo del pipeline de
-   train. Bloqueadores de código: ninguno detectado; solo config + velocidad.
-2. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
-3. **g-4** — separar requirements + pinear `mnm`.
-4. **p6-1** — partir `main_next_matches.main` + sacar los 11 `input()`.
-5. **p3-1** (vectorizar `construct_data`) → **p3-2** (sprawl `prod`). Grandes;
-   p3-1 acelera la iteración de modelos.
-6. **p6-2** (workflows), **g-6** (Parquet), **g-8** (más tests), **p4-1**
+1. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
+2. **g-4** — separar requirements + pinear `mnm`.
+3. **p6-1** — partir `main_next_matches.main` + sacar los 11 `input()`.
+4. **p3-1** (vectorizar `construct_data`) → **p3-2** (sprawl `prod`). El smoke
+   confirmó que sin p3-1 un grid completo tarda ~5-6 h por país.
+5. **p6-2** (workflows), **g-6** (Parquet), **g-8** (más tests), **p4-1**
    (`define_metrics`, cuando digas cuál usás).
-7. **[pausa]** comparación vs bet365 · **[pausa]** p2-1/2/8 (scrapers) · **[P3]**
+6. **[pausa]** comparación vs bet365 · **[pausa]** p2-1/2/8 (scrapers) · **[P3]**
    estructura Nivel 1.
 
-### 2.8 Distancia a un primer entrenamiento de prueba (england)
+### 2.8 Primer entrenamiento de prueba (england) — ✅ hecho, 2026-09-10
 
-**Muy cerca.** Entrada verificada: todos los `.xlsx` que lee
-`comprehensive_search` para england existen tras la limpieza de `data/`
-(`p6_deployment/missing/old_updated/df_match*.xlsx`,
-`p2_data_understanding/df_player_*sofifa.xlsx`,
-`data/data_preparation/{integrate_data,clean_data}/*`,
-`df_competencies`/`df_countries`).
+`scripts/smoke_train.py` corrió `comprehensive_search` para england con grid
+mínimo (1 iteración, 1 modelo). **53.5 min, sin errores.** Detalle y métricas en
+el registro de cambios más abajo. Bloqueador encontrado y resuelto en el camino:
+`describe_data()` colgaba con `verbose>=1` (p3-7).
 
-- **Sin `input()`** en el path de train (están en `main_next_matches`, que no se
-  toca con `update_missing=False`).
-- `stages` / `assess_model` / `model_selection` ya renombrados; `tests` 29/29.
-- Mes 9 → `fifa_not_released_yet=True` → usa `data/data_preparation/*` (existe).
-  Es el path previsto para septiembre.
-
-**Config para el smoke** (en `main_train_models.__main__` / `define_params_space`):
-`l_countries=[48]`, `data_unders=True`, `data_prep_int=True`,
-`data_prep_int_miss=False`, `update_sofifa=False`, `update_missing=False`, y
-`d_params` reducido a 1 valor por hiperparámetro + 1 modelo. Grid completo =
-128 iter × 3 modelos; smoke = 1.
-
-**Riesgos:** (a) bugs latentes en el path "fresh completo" que no se ejecutó en
-este estado; (b) velocidad de `construct_data` O(n²) (minutos por combo). La
-única forma de saberlo es correrlo.
-
+Para un entrenamiento real (grid completo de `define_params_space`, los 3
+modelos) contá **horas por país** hasta que se resuelva p3-1.
 ---
 
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-10 — Smoke de entrenamiento england + p3-7
+- **`scripts/smoke_train.py`** (nuevo, reutilizable): corre `comprehensive_search`
+  para 1 país con grid mínimo (1 iteración, 1 modelo). Primer intento con
+  `verbose=1` se colgó — diagnostiqué que `describe_data()` hace `sns.pairplot`
+  sobre el `df_match` completo (121 columnas) → subí `p3-7` de "nice to have" a
+  bloqueante y lo arreglé (cap 12 cols / 2000 filas, crea el dir, try/except; de
+  paso arreglé el bug de que los 4 `scatter_plot` de `describe_data()` pasaban
+  siempre `df_match` en vez del df correcto).
+- **Resultado del smoke (`verbose=0`, england, id_country=48):** ✅ corrió
+  end-to-end sin errores. 53.5 min. `df_match` 34.697×121 → filtro fecha →
+  5.212 filas → selección de features sobre 1.272 → test set de 99.
+  `LogisticRegression` (GridSearchCV): `test_accuracy≈42%`, `f1_score
+  train 44.8%→test 40.2%` (marcó posible overfitting; 1 combo arbitrario, no es
+  tuning real). Confirma que **el pipeline de train funciona post-refactor**
+  (renames, packaging, aplanado de carpetas, limpieza de `data/`).
+- **Costo:** ~20 min de data prep una sola vez (`integrate_data` iteró 15.886
+  partidos a ~15/s) + `construct_data` (el O(n²) de `p3-1`). El grid completo
+  real (128 iter × 3 modelos) proyecta **~5-6 h por país** → confirma que
+  **p3-1 (vectorizar `construct_data`) es la mejora de mayor impacto** para
+  poder iterar modelos.
+- **Verificación:** `pytest` 29/29, `py_compile` OK, test funcional sintético de
+  `scatter_plot` (wide+grande: 5.1s vs colgado antes; <2 cols numéricas: skip
+  sin crash).
 
 ### 2026-09-11 — Aplanado de carpetas (estructura, dentro de fase)
 Sin renombrar los paquetes de fase `pN_` (mapean con CRISP-DM y con `data/`).
