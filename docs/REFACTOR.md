@@ -150,7 +150,8 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
-| p3-1 | P1 | Vectorizar el hot path de `construct_data.py` (medias móviles / h2h / nº partidos) con `groupby` + rolling temporal / `merge_asof`. | Alto esfuerzo, alto payoff. Requiere golden-output test. | No |
+| p3-9 | ~~P1~~ ✅ | **Vectorizar `integrate_player_data_in_match`** (`integrate_sofifa_to_flashscore.py`). Medido con el profiling del smoke: **85% del tiempo de entrenamiento**, no `construct_data`. **45.7 min → 0.85 seg** sobre los 15.886 partidos de england (~3200x). Ver detalle en el registro de cambios. | Bajo (test bit-a-bit contra la versión vieja) | No |
+| p3-1 | P3 (bajó de prioridad) | Vectorizar `construct_data.py` (medias móviles / h2h / nº partidos). Medido: solo ~3% del tiempo total (1.7 min de 53.5 min) — mucho menos urgente de lo que se pensaba antes de medir. | Alto esfuerzo, payoff medio. Requiere golden-output test. | No |
 | p3-2 | P1 | Domar el sprawl de `prod`: extraer core compartido, train/prod como wrappers finos. | Medio-alto. Test de paridad. | No |
 | p3-3 | ~~P2~~ ✅ | Fix bug (era `main.py` format_data, no `format_data.py:256`): archivo de dtypes pisado. | Nulo | No |
 | p3-4 | ~~P2~~ ✅ | Fix bug (era `main.py` construct_data): `df_preconstructed` indefinida si `with_historic=False`. | Bajo | No |
@@ -258,6 +259,46 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — p3-9: vectorizo `integrate_player_data_in_match` (85% → segundos)
+
+Perfilé el smoke de entrenamiento (los `print(f"... en X minutos")` que ya tenía
+cada fase) y medí, sobre england (15.886 partidos): `format_data` 0.0 min,
+`clean_data` 0.1 min, **`integrate_data` 45.7 min (85% del total)**,
+`construct_data` 1.7 min, resto ~0. La sospecha original (que `construct_data`
+era el cuello de botella, siguiendo la queja de iter3) **era incorrecta** para
+este dataset — quedó corregida en el plan (§2.6/§2.8 y aquí).
+
+**Diagnóstico:** `integrate_player_data_in_match` (en
+`integrate_sofifa_to_flashscore.py`) recorre 3 titularidades × 2 condiciones ×
+15.886 partidos × hasta 11 columnas de jugador (~1M iteraciones), y en **cada
+una** recastea (`.astype(str)`/`.astype(int)`) y escanea linealmente las
+columnas completas de `df_map_fs_so` (26.742 filas) y `df_player_fifa_sofifa`
+(144.589 filas) en vez de usar un índice — un lookup lineal repetido ~1M veces
+sobre tablas de decenas/cientos de miles de filas.
+
+**Reescritura:** arma los lookups (dict `id_player_fs→id_player_so`, dict
+`id_player_so→height`, `MultiIndex (id_player, fifa_year)→stats`) **una sola
+vez**, y resuelve cada columna de jugador con un join vectorizado
+(`.map()`/`.reindex()`/`groupby`) sobre todos los partidos a la vez, en vez de
+partido por partido. Mismo pipeline de fallback al FIFA anterior, mismos
+umbrales `n_reg_min`, misma propagación de NaN en las métricas (pandas
+`sum()`/`mean()` ignoran NaN por default; se "envenenan" a mano los grupos con
+algún NaN para replicar el `sum()` de Python puro que usaba la versión vieja).
+
+**Validación** (antes de tocar el módulo real): benchmark con los inputs
+cacheados del smoke de ayer (`data/england/p3_data_preparation/2026-09-10/...`)
+— justo el patrón de "guardar los df de cada etapa" que ya usás. Comparé
+bit-a-bit contra la versión vieja en 3 muestras (300 secuenciales, 800 al azar,
+3000 al azar) — **idéntico** en las 3. Agregué
+`tests/test_integrate_sofifa_to_flashscore.py` (5 tests sintéticos: match
+directo, fallback a FIFA anterior, NaN que propaga en una sola métrica, jugador
+sin mapeo, partido por debajo de `n_reg_min`). `pytest` 34/34.
+
+**Resultado:** `integrate_player_data_in_match` sobre los 15.886 partidos de
+england: **45.7 min → 0.85 seg (~3200x)**. El entrenamiento completo debería
+pasar de ~53.5 min a poco más de 1 minuto para 1 combinación (falta confirmar
+end-to-end).
 
 ### 2026-09-10 — Smoke de entrenamiento england + p3-7
 - **`scripts/smoke_train.py`** (nuevo, reutilizable): corre `comprehensive_search`
