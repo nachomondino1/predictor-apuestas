@@ -20,7 +20,7 @@ numerada:
 | `p3_data_preparation/` | Data preparation | Formateo, limpieza, integración de fuentes, construcción de features, selección |
 | `p4_modeling/` | Modeling | Diseño de test, entrenamiento, evaluación, estrategia de apuesta, selección de modelo |
 | `p6_deployment/` | Deployment | Predicción de próximos partidos, scrapeo de resultados, publicación de apuestas |
-| `utils/` | — | Logging, creación de directorios, helpers varios |
+| `utils/` | — | Logging, creación de directorios, I/O Parquet/Excel (`io.py`), historial de entrenamientos (`training_log.py`), helpers varios |
 | `stages.py` | — | **Biblioteca de clases** (`DataUnderstanding`, `DataPreparation`, `Modeling`) usada por los orquestadores. (ex `main.py`) |
 | `main_train_models.py` | — | Orquestador de **entrenamiento** |
 | `analysis/` | — | Análisis ad-hoc fuera del pipeline (p. ej. `evaluate_vs_bet365.py`) |
@@ -321,17 +321,28 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
 
 ## 6. Persistencia
 
-- **Formato:** todo en **`.xlsx`** (`openpyxl`). Lectura/escritura con
-  `pd.read_excel` / `df.to_excel`. Acumulación frecuente con
-  `pd.concat([df, fila], axis=0)` dentro de loops.
+- **Formato:** mixto tras `g-6` (ver REFACTOR.md). **Parquet** (`utils/io.py`
+  → `read_df`/`write_df`, sobre `pyarrow`) para los archivos internos del
+  pipeline de training desde `clean_data` en adelante (`stages.py`,
+  `main_train_models.py`, `concat_mapeos.py`). **`.xlsx`** (`openpyxl`, `pd.read_excel`/
+  `df.to_excel`) para todo lo demás: datos crudos pre-`clean_data` (tienen
+  columnas de tipo mixto a propósito, incompatible con Parquet), tablas
+  maestras, salidas finales, y cualquier archivo que también toque producción
+  (`p6_deployment/main_next_matches.py`) — ver el detalle de qué quedó en cada
+  formato en el registro de cambios de `g-6` en REFACTOR.md. Acumulación
+  frecuente con `pd.concat([df, fila], axis=0)` dentro de loops.
 - **Layout:** `data/{country}/{fase}/...`, con subcarpetas por `iteration_date`
   en `p3`/`p4` y sufijos `data_seg` / `per_season` / `per_competition` para
   guardados intermedios "por seguridad".
-- **Versionado (`.gitignore`):** `data/*` está ignorado **salvo** 5 archivos
+- **Versionado (`.gitignore`):** `data/*` está ignorado **salvo** 6 archivos
   clave: `df_best_models.xlsx`, `df_countries.xlsx`, `df_competencies.xlsx`,
-  `historial_predicciones.xlsx`, `predicciones.xlsx`. También se ignoran `venv/`,
-  `.env`, `images/`, `*.csv`, `*.pkl`, `data_seg/`, `old/`, `desuso/`,
-  `descarte/`.
+  `historial_predicciones.xlsx`, `predicciones.xlsx`, `_training_log.xlsx`.
+  También se ignoran `venv/`, `.env`, `images/`, `*.csv`, `*.pkl`, `data_seg/`,
+  `old/`, `desuso/`, `descarte/`.
+- **`data/_training_log.xlsx`** (`utils/training_log.py`) — historial
+  append-only de corridas de `comprehensive_search` (smoke o real): commit,
+  país, duración, métricas de test resumidas y carpeta de modelos guardados.
+  Se anota solo (sin intervención manual) al final de cada corrida.
 - **`df_countries.xlsx` / `df_competencies.xlsx`** — tablas maestras: id ↔ nombre
   de país, y por competición su nombre en Flashscore/Sofifa, `is_cup`,
   `is_public`.

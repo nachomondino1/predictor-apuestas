@@ -3,6 +3,7 @@ from utils.set_up_logging import logger
 import os
 from dotenv import load_dotenv
 import utils.directories as directories
+from utils.io import read_df, write_df
 
 """
 El objetivo es concatenar los df_map de todos los paises para tener un mapeo centralizado y ser inmune al traspaso de jugadores entre ligas. 
@@ -27,8 +28,8 @@ def concat_integrate_data_by_country(d_countries: dict, d_dates: dict, verbose: 
         logger.info(f"Country: {country} Date: {date}")
 
         # Levanto su df_map
-        df_player_sofifa_p = pd.read_excel(f'data/{country}/p3_data_preparation/{date}/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
-        df_player_fifa_sofifa_p = pd.read_excel(f'data/{country}/p3_data_preparation/{date}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+        df_player_sofifa_p = read_df(f'data/{country}/p3_data_preparation/{date}/clean_data/df_player_sofifa_cleaned.xlsx')
+        df_player_fifa_sofifa_p = read_df(f'data/{country}/p3_data_preparation/{date}/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
         df_map_p = pd.read_excel(f'data/{country}/p3_data_preparation/{date}/integrate_data/df_map_players_fs_so.xlsx', index_col=0)
         
         if 'Unnamed: 0' in df_player_fifa_sofifa_p.columns:
@@ -69,8 +70,8 @@ def concat_integrate_data_by_country(d_countries: dict, d_dates: dict, verbose: 
 
     # Exporto datos
     df_map.to_excel(f'{base_path_int}/df_map_players_fs_so.xlsx')
-    df_player_sofifa.to_excel(f'{base_path_clean}/df_player_sofifa_cleaned.xlsx')
-    df_player_fifa_sofifa.to_excel(f'{base_path_clean}/df_player_fifa_sofifa_cleaned.xlsx')
+    write_df(df_player_sofifa, f'{base_path_clean}/df_player_sofifa_cleaned.xlsx')
+    write_df(df_player_fifa_sofifa, f'{base_path_clean}/df_player_fifa_sofifa_cleaned.xlsx')
 
     return df_map, df_player_sofifa, df_player_fifa_sofifa
     
@@ -104,8 +105,8 @@ def integrate_with_new_map(l_countries):
         logger.info(f"Country: {country}")
 
         # Levanto datos del pais (de Sofifa levanta en integrate...)
-        df_match = pd.read_excel(f'./data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx', index_col=0)
-        df_match_player = pd.read_excel(f'./data/{country}/p3_data_preparation/clean_data/df_match_player_cleaned.xlsx', index_col=0)
+        df_match = read_df(f'./data/{country}/p3_data_preparation/clean_data/df_match_cleaned.xlsx')
+        df_match_player = read_df(f'./data/{country}/p3_data_preparation/clean_data/df_match_player_cleaned.xlsx')
 
         # Integro datos
         df_p = dp.integrate_data(df_match, df_match_player, df_player_sofifa=pd.DataFrame(), df_player_fifa_sofifa=pd.DataFrame(), prod=True, export=False) 

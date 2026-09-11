@@ -192,9 +192,10 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-3 | ~~P2~~ ✅ | `pyproject.toml` + `pip install -e .`; `sys.path.append('.')` borrado de 33 archivos; CI usa `PYTHONPATH=.`. | Medio |
 | g-4 | P2 | Requirements: `requirements-scrape.txt` / `requirements-train.txt`, pinear `mnm`, dropear deps no usadas. | Bajo |
 | g-5 | 🟡 | ~20 rutas `/Users/nachomondino/...`: **hechas las de código activo**; quedan las de `archive/` y 1 comentada. | Bajo |
-| g-6 | **P1 (subió)** | Migrar intercambio de datos `.xlsx` → Parquet + acumulación por lista. Medido: con `integrate_data` arreglado (p3-9), la lectura/escritura de Excel pasó a ser **~78% del tiempo de entrenamiento** (6.3 de 8.1 min). | Medio (mucha superficie) |
+| g-6 | ~~P1~~ ✅ | Migrar intercambio de datos `.xlsx` → Parquet, alcance "desde `clean_data` en adelante" (`utils/io.py`). Medido: **8.1 → 6.8 min** en el smoke de england. | Medio (mucha superficie) — mitigado con scope acotado + grep exhaustivo |
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
 | g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, 29 tests). Falta cobertura por fase. | Bajo |
+| g-9 | ~~P1~~ ✅ | Historial de entrenamientos (`utils/training_log.py` → `data/_training_log.xlsx`): cada corrida de `comprehensive_search` (smoke o real) queda anotada con commit, país, duración, métricas de test y carpeta de modelos, para comparar corridas entre sí. | Nulo |
 
 ### 2.7 Estructura de archivos
 
@@ -230,18 +231,20 @@ Foco actual: **simplificar / lean**. El primer entrenamiento de prueba (england)
 al refactor.
 
 **Hecho** ✅: módulo 1 (chromedriver), g-1, g-2, g-3 (packaging), g-5 (parcial),
-p2-6, p3-3/4/5, p3-7 (scatter_plot), p4-2 (nn+TF), p4-3 (rename), estructura
-Nivel 0 + aplanado de carpetas, limpieza de peso (repo 52→16 GB, `data/`
-39→6 GB), smoke de entrenamiento england.
+p2-6, p3-3/4/5, p3-7 (scatter_plot), p3-9 (vectorizo `integrate_data`), g-6
+(Parquet), g-9 (historial de entrenamientos), p4-2 (nn+TF), p4-3 (rename),
+estructura Nivel 0 + aplanado de carpetas, limpieza de peso (repo 52→16 GB,
+`data/` 39→6 GB), smoke de entrenamiento england (53.5 → 8.1 → 6.8 min).
 
 **Próximo:**
 1. **p4-7 + p4-4** — `betting_strategy.py` → "sin ea" + podar `assess_model.py`.
 2. **g-4** — separar requirements + pinear `mnm`.
 3. **p6-1** — partir `main_next_matches.main` + sacar los 11 `input()`.
-4. **p3-1** (vectorizar `construct_data`) → **p3-2** (sprawl `prod`). El smoke
-   confirmó que sin p3-1 un grid completo tarda ~5-6 h por país.
-5. **p6-2** (workflows), **g-6** (Parquet), **g-8** (más tests), **p4-1**
-   (`define_metrics`, cuando digas cuál usás).
+4. **p3-1** (vectorizar `construct_data`) → **p3-2** (sprawl `prod`). Con
+   `integrate_data` y el I/O resueltos, `construct_data` (1.7 min, ahora la
+   mayor parte del total) vuelve a ser el próximo cuello de botella real.
+5. **p6-2** (workflows), **g-8** (más tests), **p4-1** (`define_metrics`,
+   cuando digas cuál usás).
 6. **[pausa]** comparación vs bet365 · **[pausa]** p2-1/2/8 (scrapers) · **[P3]**
    estructura Nivel 1.
 
@@ -259,6 +262,66 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-11 — g-6: Excel → Parquet + g-9: historial de entrenamientos
+
+**g-6.** Con `integrate_data` resuelto (p3-9), el I/O de Excel pasó a ser el
+cuello de botella (~78% del tiempo). Reemplacé `pd.read_excel`/`to_excel` por
+`pd.read_parquet`/`to_parquet` (`utils/io.py`, helper `read_df`/`write_df` que
+mapea `algo.xlsx` → `algo.parquet`) en los archivos **100% internos del
+pipeline de training, desde `clean_data` en adelante**: `stages.py`
+(`clean_data`, `describe_integrate_data`, `clean_post_integrate`,
+`construct_data`, `tag_string_data_to_integer`, `clean_post_construct`,
+`select_data`, `clean_post_select`, `generate_test_design`),
+`main_train_models.py` (lectura de los sofifa cleaned globales) y
+`p3_data_preparation/concat_mapeos.py`.
+
+**Alcance acotado a propósito** (decisión conjunta, no toqué esto):
+- Quedan en `.xlsx` los datos crudos pre-`clean_data` (`format_data.py`) porque
+  tienen columnas de tipo mixto a propósito (señal para el type-sniffing) —
+  verifiqué con un chequeo real que desde `clean_data` en adelante **no hay
+  columnas de tipo mixto**, lo que hace segura la conversión.
+- Quedan en `.xlsx` las tablas maestras (`df_competencias`, `df_countries`,
+  `df_best_models`) y las salidas finales (`predicciones`,
+  `historial_predicciones`).
+- Quedan en `.xlsx` los archivos que también toca producción
+  (`p6_deployment/main_next_matches.py`): `df_integrated.xlsx`,
+  `df_teams.xlsx`, `df_map_players_fs_so.xlsx`, y la familia con sufijo
+  `df_constructed_*`/`df_etiquetas_*`/`df_ite_*`/`df_iteration`/
+  `*_predicciones` (usada por `TrainingDataLoader` en producción o inspeccionada
+  a mano en Excel según la iter4).
+- **Sin doble escritura**: se reemplaza `.xlsx` por `.parquet`, no se mantienen
+  los dos formatos.
+
+**Verificación:** grep exhaustivo de cada patrón de archivo convertido en todo
+el repo para confirmar que no quedó ningún lector/escritor fuera de lo tocado
+(2 falsos positivos revisados a mano y descartados). Validación funcional
+sobre datos reales cacheados (round-trip idéntico). `pytest` 34/34. Smoke
+end-to-end (england): encontré y corregí un archivo compartido entre corridas
+(`df_player_sofifa_cleaned`/`df_player_fifa_sofifa_cleaned`, mantenido por
+`concat_mapeos.py`, no regenerado en cada training) que aún estaba en `.xlsx`
+— migración puntual + borrado del `.xlsx` viejo.
+
+**Resultado confirmado con `scripts/smoke_train.py`:** **8.1 → 6.8 min**
+(~16%). Menos dramático que p3-9 porque el smoke solo hace I/O una vez por
+etapa, pero el ahorro es proporcionalmente mayor en un grid con muchas
+iteraciones (cada combo reescribe varios `.xlsx`).
+
+**g-9 (pedido nuevo — "Objetivo 2: anotar entrenamientos"):** cada corrida de
+`comprehensive_search`, sea smoke o real, ahora se anota en
+`data/_training_log.xlsx` (`utils/training_log.py::log_run`, llamado
+incondicionalmente al final de `comprehensive_search`, antes del `return`):
+commit de git, país, fecha de iteración, cantidad de combos, modelos
+probados, duración, carpeta de modelos guardados (los `.pkl` ya se guardaban;
+esto no cambió), y un resumen de `f1_score`/`test_accuracy`/`roi` si están
+disponibles. Queda en `.xlsx` (no Parquet) a propósito, para poder abrirlo a
+mano. Se agregó `!data/_training_log.xlsx` a las excepciones del `.gitignore`
+y se completaron a mano 2 filas históricas (baseline pre-p3-9 y post-p3-9
+pre-g-6) para tener el historial completo desde el primer smoke.
+
+**Verificación:** `pytest` 34/34, `py_compile` OK. Confirmado en vivo: la
+corrida de smoke lanzada ya con el hook activo agregó su fila automáticamente
+a `data/_training_log.xlsx` sin intervención manual.
 
 ### 2026-09-11 — p3-9: vectorizo `integrate_player_data_in_match` (85% → segundos)
 

@@ -6,6 +6,7 @@ import datetime
 import time
 from utils.set_up_logging import logger
 from utils import directories
+from utils.io import write_df
 ## Data understanding
 from p2_data_understanding import scraper_flashscore, scraper_sofifa
 from p2_data_understanding import describe_data
@@ -318,10 +319,10 @@ class DataPreparation:
             ## (hay muchas stats que Flashscore les da valor 0 en vez de nan. Fijate en attacks y essas
 
         if export:
-            df_match.to_excel(f'{self.base_path}/clean_data/df_match_cleaned.xlsx', index=True)
-            df_match_player.to_excel(f'{self.base_path}/clean_data/df_match_player_cleaned.xlsx', index=True)
-            df_player_sofifa.to_excel(f'{self.base_path}/clean_data/df_player_sofifa_cleaned.xlsx', index=True)
-            df_player_fifa_sofifa.to_excel(f'{self.base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index=True)
+            write_df(df_match, f'{self.base_path}/clean_data/df_match_cleaned.xlsx')
+            write_df(df_match_player, f'{self.base_path}/clean_data/df_match_player_cleaned.xlsx')
+            write_df(df_player_sofifa, f'{self.base_path}/clean_data/df_player_sofifa_cleaned.xlsx')
+            write_df(df_player_fifa_sofifa, f'{self.base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
     
         return df_match, df_match_player, df_player_sofifa, df_player_fifa_sofifa
 
@@ -432,9 +433,9 @@ class DataPreparation:
             print(df_nan_by_competition)
         
         if export:
-            df_dtype.to_excel(f'{self.base_path}/describe_integrate_data/dtypes.xlsx', index=True)
-            df_nan_col.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_col.xlsx', index=True)
-            df_nan_by_competition.to_excel(f'{self.base_path}/describe_integrate_data/nan_per_competition.xlsx', index=True)
+            write_df(df_dtype, f'{self.base_path}/describe_integrate_data/dtypes.xlsx')
+            write_df(df_nan_col.to_frame(), f'{self.base_path}/describe_integrate_data/nan_per_col.xlsx')
+            write_df(df_nan_by_competition, f'{self.base_path}/describe_integrate_data/nan_per_competition.xlsx')
 
     def clean_post_integrate(self, df: pd.DataFrame, n_years_to_select: int = None, competencies_to_select: list = None, prod: bool = False):
         """
@@ -484,7 +485,7 @@ class DataPreparation:
 
         # Exporto datos
         if self.verbose >= 0 and not prod:
-            df.to_excel(f'{self.base_path}/clean_post_integrate/df_cleaned.xlsx', index=True)
+            write_df(df, f'{self.base_path}/clean_post_integrate/df_cleaned.xlsx')
 
         return df
 
@@ -652,9 +653,9 @@ class DataPreparation:
         
         # Exporto datos
         sp = path_prod if prod else self.base_path
-        df.to_excel(f'{sp}/df_constructed.xlsx', index=True)
+        write_df(df, f'{sp}/df_constructed.xlsx')
         if with_historic:  # df_preconstructed solo existe si se construyeron variables historicas
-            df_preconstructed.to_excel(f'{sp}/df_pre_constructed.xlsx', index=True) # Para ver como queda el df
+            write_df(df_preconstructed, f'{sp}/df_pre_constructed.xlsx') # Para ver como queda el df
         
         return df
 
@@ -683,8 +684,8 @@ class DataPreparation:
         df, df_etiquetas = format_data.convert_columns_to_int(df, df_etiquetas=df_etiquetas, verbose=self.verbose, prod=prod)
 
         if self.verbose >= 1:
-            df_etiquetas.to_excel(f'{self.base_path}/df_etiquetas.xlsx', index=False)
-            df.to_excel(f'{self.base_path}/df_constructed_etiquetado.xlsx', index=True)
+            write_df(df_etiquetas, f'{self.base_path}/df_etiquetas.xlsx', index=False)
+            write_df(df, f'{self.base_path}/df_constructed_etiquetado.xlsx')
 
         return df, df_etiquetas
     
@@ -754,7 +755,7 @@ class DataPreparation:
         print(f"Tratamiento de NaN values en {(end - start)/60:.1f} minutos")
 
         if self.verbose >= 1:
-            df.to_excel(f'{self.base_path}/clean_post_construct/df_treat_nan.xlsx', index=True)
+            write_df(df, f'{self.base_path}/clean_post_construct/df_treat_nan.xlsx')
 
         return df
     
@@ -785,7 +786,7 @@ class DataPreparation:
                 print(f"\tSe eliminaron {len(l_columnas_a_eliminar)} de {len(df.columns)-1+len(l_columnas_a_eliminar)} columnas por tener una correlacion mayor a thr_corr={thr_corr*100:.0f}%: {l_columnas_a_eliminar}")
 
             if self.verbose >= 0:
-                df_corr_tri_X.to_excel(f'{self.base_path}/select_data/df_correlation.xlsx', index=True)
+                write_df(df_corr_tri_X, f'{self.base_path}/select_data/df_correlation.xlsx')
 
         # Elimino variables menos importantes (feature selection)
         if thr_fs is not None:
@@ -799,7 +800,7 @@ class DataPreparation:
                 print(f"\tSe eliminaron {n_cols-len(l_important_features)} de {n_cols} columnas por tener un peso menor a thr_fs={thr_fs * 100:.0f}%. Columnas eliminadas: {l_col_eliminated}")
 
             if self.verbose >= 0:
-                df_normalized.to_excel(f'{self.base_path}/select_data/df_fs.xlsx', index=True)
+                write_df(df_normalized, f'{self.base_path}/select_data/df_fs.xlsx')
 
         if self.verbose >= 0:
             print(f"\nLas siguientes {len(df.columns)-1} columnas son las seleccionadas: {list(df.drop(self.var_resp, axis=1).columns)}")
@@ -812,7 +813,7 @@ class DataPreparation:
         logger.critical(f"Shape df_aux: {df_aux.shape}")
 
         if self.verbose >= 1:
-            df_aux.to_excel(f'{self.base_path}/df_selected.xlsx', index=True)
+            write_df(df_aux, f'{self.base_path}/df_selected.xlsx')
 
         return df_aux
     
@@ -830,7 +831,7 @@ class DataPreparation:
         df = self.scale_data(df, scaler_loaded=scaler_loaded, path_save=path_save, prod=prod)  # Escalado de datos para eliminar diferencias x escala
 
         if self.verbose >= 1:
-            df.to_excel(f'{self.base_path}/clean_post_select/df_sel_cleaned.xlsx', index=True)
+            write_df(df, f'{self.base_path}/clean_post_select/df_sel_cleaned.xlsx')
 
         return df
 
@@ -956,12 +957,12 @@ class Modeling:
             print(f'Train: {X_train.shape} {y_train.shape}', f'\nVal: {X_val.shape} {y_val.shape}', f'\nTest: {X_test.shape} {y_test.shape}')
 
         if export:
-            X_train.to_excel(f'{self.base_path}/generate_test_design/X_train.xlsx', index=True)
-            X_val.to_excel(f'{self.base_path}/generate_test_design/X_val.xlsx', index=True)
-            X_test.to_excel(f'{self.base_path}/generate_test_design/X_test.xlsx', index=True)
-            y_train.to_excel(f'{self.base_path}/generate_test_design/y_train.xlsx', index=True)
-            y_val.to_excel(f'{self.base_path}/generate_test_design/y_val.xlsx', index=True)
-            y_test.to_excel(f'{self.base_path}/generate_test_design/y_test.xlsx', index=True)
+            write_df(X_train, f'{self.base_path}/generate_test_design/X_train.xlsx')
+            write_df(X_val, f'{self.base_path}/generate_test_design/X_val.xlsx')
+            write_df(X_test, f'{self.base_path}/generate_test_design/X_test.xlsx')
+            write_df(y_train.to_frame(), f'{self.base_path}/generate_test_design/y_train.xlsx')
+            write_df(y_val.to_frame(), f'{self.base_path}/generate_test_design/y_val.xlsx')
+            write_df(y_test.to_frame(), f'{self.base_path}/generate_test_design/y_test.xlsx')
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 

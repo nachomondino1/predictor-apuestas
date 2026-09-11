@@ -6,6 +6,7 @@ from tqdm import tqdm
 import datetime
 from utils.set_up_logging import logger
 from p3_data_preparation import select_data
+from utils.io import read_df
 
 def create_df_teams(df: pd.DataFrame):
     """
@@ -572,10 +573,10 @@ if __name__ == "__main__":
 
     # Levanto datasets para pruebas
     base_path = f'./data/{country}/p3_data_preparation/{iteration_date}'
-    df_match = pd.read_excel(f"{base_path}/clean_data/df_match_cleaned.xlsx", index_col=0)
-    df_match_player = pd.read_excel(f"{base_path}/clean_data/df_match_player_cleaned.xlsx",  index_col=0)
-    df_player_sofifa = pd.read_excel(f"{base_path}/clean_data/df_player_sofifa_cleaned.xlsx", index_col=0) 
-    df_player_fifa_sofifa = pd.read_excel(f"{base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx", index_col=0)
+    df_match = read_df(f"{base_path}/clean_data/df_match_cleaned.xlsx")
+    df_match_player = read_df(f"{base_path}/clean_data/df_match_player_cleaned.xlsx")
+    df_player_sofifa = read_df(f"{base_path}/clean_data/df_player_sofifa_cleaned.xlsx")
+    df_player_fifa_sofifa = read_df(f"{base_path}/clean_data/df_player_fifa_sofifa_cleaned.xlsx")
 
     print(df_match_player.head(2))
     print(df_player_fifa_sofifa.head(2))

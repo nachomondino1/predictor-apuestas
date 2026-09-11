@@ -67,6 +67,7 @@ df_params_ite, df_ite_train, df_ite_test = mtm.comprehensive_search(
     update_sofifa=False,
     retrain=True,
     verbose=0,  # verbose>=1 dispara du.describe_data() -> sns.pairplot sobre df de 121 cols -> se cuelga
+    run_type="smoke",
 )
 
 print("\n================ RESULTADO ================")

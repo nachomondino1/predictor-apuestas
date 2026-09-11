@@ -15,6 +15,8 @@ from p3_data_preparation import concat_mapeos
 from p3_data_preparation.select_data import determine_country_competitions
 from p6_deployment import main_next_matches
 import utils.directories as directories
+from utils.io import read_df
+from utils import training_log
 from itertools import product
 from stages import DataUnderstanding, DataPreparation, Modeling
 import time
@@ -31,9 +33,10 @@ def comprehensive_search(
     data_prep_int_miss: bool = True,
     update_sofifa: bool = True,
     retrain: bool = True, 
-    verbose: int = 0, 
-    checkpoint: int = 5, 
-    export: bool = True
+    verbose: int = 0,
+    checkpoint: int = 5,
+    export: bool = True,
+    run_type: str = "train",
 ):
     """
     Busca los hiperparámetros óptimos en las etapas de DataPreparation y Modeling de main.py.
@@ -86,10 +89,10 @@ def comprehensive_search(
 
     # Imprimo largo de iteraciones
     n_iter = define_n_iterations(d_params)
+    start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC. Sin gate de verbose: siempre se loguea la corrida (ver utils/training_log.py)
     if verbose >= 0:
         logger.info(f"Numero de iteraciones totales: {n_iter}")
-        start_train = time.time()  # segundos desde el 1 de enero de 1970 UTC
-    
+
     # DIRECTORIOS
     # Defino rutas segun country y date
     BASE_DIR_du = f"./data/{country}/p2_data_understanding/old_updated/{date}"
@@ -132,8 +135,8 @@ def comprehensive_search(
             )
         
             # Acordate de ejecutar concat_mapeos.py recientemente para tener datos relativamente nuevos.
-            df_player_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx', index_col=0)
-            df_player_fifa_sofifa = pd.read_excel('./data/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx', index_col=0)
+            df_player_sofifa = read_df('./data/data_preparation/clean_data/df_player_sofifa_cleaned.xlsx')
+            df_player_fifa_sofifa = read_df('./data/data_preparation/clean_data/df_player_fifa_sofifa_cleaned.xlsx')
         
         else:
             df_player_sofifa, df_player_fifa_sofifa = get_sofifa_data(country, update_sofifa=update_sofifa, BASE_DIR_sofifa=BASE_DIR_sofifa, n_seasons_update=1)
@@ -323,9 +326,17 @@ def comprehensive_search(
                                 logger.info(f"Tiempo total proyectado de entrenamiento: {horas_train:.1f} horas.")
 
 
+    end_train = time.time()
+    duration_min = (end_train - start_train) / 60
     if verbose >= 0:
-        end_train = time.time()
-        logger.info(f"Tiempo total de entrenamiento: {(end_train - start_train) / 60:.1f} minutos")
+        logger.info(f"Tiempo total de entrenamiento: {duration_min:.1f} minutos")
+
+    # Anoto la corrida en el historial (data/_training_log.xlsx), sea smoke o entrenamiento real.
+    training_log.log_run(
+        country=country, date=date, n_iter=n_iter, l_modelos=l_modelos,
+        duration_min=duration_min, models_path=ruta_base_modelos,
+        df_ite_test=df_ite_test, run_type=run_type,
+    )
 
     return df_params_ite, df_ite_train, df_ite_test
 
