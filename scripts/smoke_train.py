@@ -13,8 +13,8 @@ import datetime
 
 from sklearn.linear_model import LogisticRegression
 
-import main_train_models as mtm
-from p3_data_preparation.select_data import determine_country_competitions
+import predictor.modeling.main_train_models as mtm
+from predictor.data_preparation.select_data import determine_country_competitions
 
 ID_COUNTRY = int(sys.argv[1]) if len(sys.argv) > 1 else 48
 D_COUNTRIES = {48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa", 6: "argentina"}

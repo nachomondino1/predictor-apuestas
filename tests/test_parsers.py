@@ -2,7 +2,7 @@
 Tests de las funciones puras de parseo de Flashscore (regex sobre hrefs / ids).
 Son las más frágiles ante cambios de formato y las más baratas de testear.
 """
-from p2_data_understanding.scraper_flashscore import (
+from predictor.data_understanding.scraper_flashscore import (
     clean_id,
     extract_id_from_href,
     extract_name_from_href,

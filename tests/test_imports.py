@@ -10,37 +10,37 @@ import importlib
 import pytest
 
 LIBRARY_MODULES = [
-    "stages",
-    "main_train_models",
-    # scraping (p2)
-    "p2_data_understanding.web_scraping_selenium",
-    "p2_data_understanding.scraper_flashscore",
-    "p2_data_understanding.scraper_sofifa",
-    "p2_data_understanding.update_sofifa_data",
-    "p2_data_understanding.describe_data",
-    # preparation (p3)
-    "p3_data_preparation.format_data",
-    "p3_data_preparation.clean_data",
-    "p3_data_preparation.integrate_sofifa_to_flashscore",
-    "p3_data_preparation.construct_data",
-    "p3_data_preparation.select_data",
-    "p3_data_preparation.concat_mapeos",
-    # modeling (p4)
-    "p4_modeling.build_model",
-    "p4_modeling.assess_model",
-    "p4_modeling.betting_strategy",
-    "p4_modeling.generate_test_design",
-    "p4_modeling.main_select_model",
-    "p4_modeling.model_selection.assess_in_prod",
-    # deployment (p6)
-    "p6_deployment.main_next_matches",
-    "p6_deployment.collect_predictions",
-    "p6_deployment.update_results",
-    "p6_deployment.predict_models",
-    "p6_deployment.publish_bets",
+    "predictor.stages",
+    "predictor.modeling.main_train_models",
+    # scraping (data_understanding)
+    "predictor.data_understanding.web_scraping_selenium",
+    "predictor.data_understanding.scraper_flashscore",
+    "predictor.data_understanding.scraper_sofifa",
+    "predictor.data_understanding.update_sofifa_data",
+    "predictor.data_understanding.describe_data",
+    # preparation (data_preparation)
+    "predictor.data_preparation.format_data",
+    "predictor.data_preparation.clean_data",
+    "predictor.data_preparation.integrate_sofifa_to_flashscore",
+    "predictor.data_preparation.construct_data",
+    "predictor.data_preparation.select_data",
+    "predictor.data_preparation.concat_mapeos",
+    # modeling
+    "predictor.modeling.build_model",
+    "predictor.modeling.assess_model",
+    "predictor.modeling.betting_strategy",
+    "predictor.modeling.generate_test_design",
+    "predictor.modeling.main_select_model",
+    "predictor.modeling.model_selection.assess_in_prod",
+    # deployment
+    "predictor.deployment.main_next_matches",
+    "predictor.deployment.collect_predictions",
+    "predictor.deployment.update_results",
+    "predictor.deployment.predict_models",
+    "predictor.deployment.publish_bets",
     # infra
-    "utils.set_up_logging",
-    "utils.directories",
+    "predictor.utils.set_up_logging",
+    "predictor.utils.directories",
 ]
 
 

@@ -128,7 +128,7 @@ Prioridades: **P1** = alto impacto / hacer primero · **P2** = valioso ·
 **P3** = oportunista.
 Riesgo y sensibilidad al scraping anotados por ítem.
 
-### 2.1 `p2_data_understanding`
+### 2.1 `p2_data_understanding` (hoy `src/predictor/data_understanding/`)
 
 > ⚠️ **p2-1, p2-2, p2-8 CONGELADOS** (2026-09-10). La evaluación
 > [`EVALUACION_VS_BET365.md`](./EVALUACION_VS_BET365.md) mostró que el modelo aún
@@ -146,7 +146,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | p2-6 | P3 | Decidir destino de ~~`scraper_whoscored.py` → `archive/`~~ ✅ / `scraper_new_variables.py` / `validate_data.py` (pendiente). | Bajo | No |
 | p2-7 | P3 | `concat_*.py` → funciones con parámetros. | Bajo | No |
 
-### 2.2 `p3_data_preparation`
+### 2.2 `p3_data_preparation` (hoy `src/predictor/data_preparation/`)
 
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
@@ -159,7 +159,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | p3-6 | P2 | `integrate_sofifa_to_flashscore`: blocking key + caché en el fuzzy matcher. | Medio. Test de calidad de mapeo. | No |
 | p3-7 | ~~P1 (subió de prioridad)~~ ✅ | `describe_data.scatter_plot`: cap a 12 cols / 2000 filas, crea el dir, try/except. Pasó de "nice to have" a **bloqueante**: colgaba `comprehensive_search(verbose>=1)` con el `df_match` real (121 cols). También arreglé el bug de `stages.py::describe_data()` que pasaba `df_match` a los 4 llamados (por eso los 4 PNG borrados pesaban exactamente igual). | Bajo | No |
 
-### 2.3 `p4_modeling`
+### 2.3 `p4_modeling` (hoy `src/predictor/modeling/`)
 
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
@@ -171,7 +171,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | p4-5 | P2 | `build_model.py::space_params`: escalera if/elif → dict/config. | Bajo | No |
 | p4-6 | ~~P3~~ | ~~Externalizar params de `betting_strategy` a config por país~~ — obsoleto: p4-7 elimina esos params. | — | No |
 
-### 2.4 `p6_deployment`
+### 2.4 `p6_deployment` (hoy `src/predictor/deployment/`)
 
 | # | Prio | Cambio | Riesgo | Scraping sensible |
 |---|---|---|---|---|
@@ -196,6 +196,7 @@ Riesgo y sensibilidad al scraping anotados por ítem.
 | g-7 | P3 | `raise ValueError` sin mensaje, `except:` desnudo, typos en nombres públicos — oportunista por módulo. | Bajo |
 | g-8 | 🟡 | `pytest` + un smoke test por fase. **Hecho el esqueleto** (`tests/test_imports.py`, `tests/test_parsers.py`, 29 tests). Falta cobertura por fase. | Bajo |
 | g-9 | ~~P1~~ ✅ | Historial de entrenamientos (`utils/training_log.py` → `data/_training_log.xlsx`): cada corrida de `comprehensive_search` (smoke o real) queda anotada con commit, país, duración, métricas de test y carpeta de modelos, para comparar corridas entre sí. | Nulo |
+| g-10 | ~~P1~~ ✅ | Estructura de carpetas Nivel 1: todo el código bajo `src/predictor/{data_understanding,data_preparation,modeling,deployment,utils}` + `stages.py`. Pedido explícito del usuario ("una sola carpeta para scripts .py"). Ver §2.7. | Medio (mitigado: codemod anclado a imports, no toca `data/`) |
 
 ### 2.7 Estructura de archivos
 
@@ -206,23 +207,22 @@ profundidades, `p6_deployment/` como cajón de sastre, prefijos `pN_` verbosos,
 librería, sin `src/` ni `tests/`.
 
 **Dos frenos a renombrar los paquetes `pN_`** (contexto de las iteraciones, ver
-ARQUITECTURA §1bis):
+ARQUITECTURA §1bis) — **resueltos en `g-10` (2026-09-11)** sin caer en ninguno
+de los dos:
 1. Los prefijos `pN_` mapean 1:1 con las fases CRISP-DM y con los 4 documentos de
-   iteración → renombrar rompe esa trazabilidad.
+   iteración → **se preservó la semántica** (`data_understanding`,
+   `data_preparation`, `modeling`, `deployment`, no nombres genéricos), documentada
+   en ARQUITECTURA §1.
 2. El árbol `data/` (39 GB) espeja esos nombres, hardcodeado en cientos de
-   f-strings.
-→ **Nivel 1 baja a P3.** Si se hace, preservar la semántica de fase (no
-`scraping/` a secas) y desacoplar los nombres de `data/` con una constante.
-
-**Target propuesto** (para Nivel 2): `src/predictor/{scraping,preparation,modeling,
-betting,pipeline,publish}` + `conf/` + `[project.scripts]` + `data/{raw,interim,
-processed,models}`. Refs: cookiecutter-data-science, Kedro.
+   f-strings → **no se tocó**: las rutas de datos son strings independientes
+   del nombre de la carpeta de código, así que renombrar el código no obliga a
+   tocar `data/`.
 
 | Nivel | Qué | Riesgo | Estado |
 |---|---|---|---|
 | **0** | Renombrar `main.py`→`stages.py`; `scripts/` con los glue; limpiar `utils/`; esqueleto `tests/`. | Bajo | ✅ 2026-09-10 |
-| **1** | Renombrar paquetes `pN_` por codemod (~66 imports). Desacoplar nombres de `data/` vía constante en `config.py` **o** migrar el árbol. Commit dedicado + test de imports. | Medio | **P3** — 2 frenos arriba; hacer solo si el Nivel 2 lo pide |
-| **2** | `src/` layout + `[project.scripts]` + disolver `stages.DataPreparation`. Va con p3-2 y p6-1. | Alto | pendiente |
+| **1** | Renombrar paquetes `pN_` por codemod (~68 imports) a `src/predictor/{data_understanding,data_preparation,modeling,deployment,utils}` + `stages.py`. Sin tocar `data/`. Commit dedicado + `pytest` + smoke end-to-end. | Medio | ✅ 2026-09-11 (`g-10`) |
+| **2** | `[project.scripts]` + disolver `stages.DataPreparation` en clases por fase. Va con p3-2 y p6-1. | Alto | pendiente |
 
 ### 2.6 Orden de ejecución sugerido
 

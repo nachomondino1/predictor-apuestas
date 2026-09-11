@@ -4,32 +4,40 @@
 > Se actualiza a medida que el refactor avanza. Para el plan y el registro de
 > cambios ver [`REFACTOR.md`](./REFACTOR.md).
 >
-> Última actualización: 2026-09-11 (post aplanado de carpetas) · commit base `6b5a83e8f`
+> Última actualización: 2026-09-11 (post estructura `src/predictor/`, `g-10`) · commit base `930b516ba`
 
 ---
 
 ## 1. Qué es
 
 Sistema de predicción de resultados de fútbol para apuestas. Pipeline de ciencia
-de datos organizado por **fases estilo CRISP-DM**, cada una en su carpeta
-numerada:
+de datos organizado por **fases estilo CRISP-DM**. Desde el refactor de
+estructura (`g-10`, ver REFACTOR.md), todo el código de librería vive bajo
+`src/predictor/` (layout estándar `pip install -e .`), una carpeta por fase:
 
-| Carpeta | Fase | Responsabilidad |
+| Carpeta | Fase (ex prefijo `pN_`) | Responsabilidad |
 |---|---|---|
-| `p2_data_understanding/` | Data understanding | Web scraping (Flashscore, Sofifa) y descripción de datos crudos |
-| `p3_data_preparation/` | Data preparation | Formateo, limpieza, integración de fuentes, construcción de features, selección |
-| `p4_modeling/` | Modeling | Diseño de test, entrenamiento, evaluación, estrategia de apuesta, selección de modelo |
-| `p6_deployment/` | Deployment | Predicción de próximos partidos, scrapeo de resultados, publicación de apuestas |
-| `utils/` | — | Logging, creación de directorios, I/O Parquet/Excel (`io.py`), historial de entrenamientos (`training_log.py`), helpers varios |
-| `stages.py` | — | **Biblioteca de clases** (`DataUnderstanding`, `DataPreparation`, `Modeling`) usada por los orquestadores. (ex `main.py`) |
-| `main_train_models.py` | — | Orquestador de **entrenamiento** |
-| `analysis/` | — | Análisis ad-hoc fuera del pipeline (p. ej. `evaluate_vs_bet365.py`) |
-| `scripts/` | — | Scripts sueltos de una sola vez (concat de dfs, regeneración de artefactos) |
+| `src/predictor/data_understanding/` | p2 · Data understanding | Web scraping (Flashscore, Sofifa) y descripción de datos crudos |
+| `src/predictor/data_preparation/` | p3 · Data preparation | Formateo, limpieza, integración de fuentes, construcción de features, selección |
+| `src/predictor/modeling/` | p4 · Modeling | Entrenamiento (`main_train_models.py`), diseño de test, evaluación, estrategia de apuesta, selección de modelo |
+| `src/predictor/deployment/` | p6 · Deployment | Predicción de próximos partidos, scrapeo de resultados, publicación de apuestas |
+| `src/predictor/utils/` | — | Logging, creación de directorios, I/O Parquet/Excel (`io.py`), historial de entrenamientos (`training_log.py`), helpers varios |
+| `src/predictor/stages.py` | — | **Biblioteca de clases** (`DataUnderstanding`, `DataPreparation`, `Modeling`) usada por los orquestadores. (ex `main.py`) |
+| `analysis/` | — | Análisis ad-hoc fuera del pipeline (p. ej. `evaluate_vs_bet365.py`) — no forma parte del paquete instalado |
+| `scripts/` | — | Scripts sueltos de una sola vez (`smoke_train.py`, `real_train.py`, concat de dfs, regeneración de artefactos) — tampoco forma parte del paquete |
 | `tests/` | — | `pytest`: smoke de imports + tests de parsers |
 | `docs/` | — | Documentación viva (`ARQUITECTURA.md`, `REFACTOR.md`, `EVALUACION_VS_BET365.md`) |
 
-> No hay carpeta `p1` ni `p5`; la numeración sigue CRISP-DM (p1 = business
-> understanding, p5 = evaluation) aunque esas fases no tienen código propio.
+> No hay fase `p1` ni `p5`; la numeración CRISP-DM (p1 = business
+> understanding, p5 = evaluation) no tiene código propio en ninguna de las dos.
+> El prefijo `pN_` ya no está en los nombres de carpeta (ver §1bis), pero la
+> tabla de arriba conserva la equivalencia con los 4 documentos de iteración.
+
+> **`data/` no se tocó** — las rutas siguen siendo
+> `data/{country}/p2_data_understanding/...`, `p3_data_preparation/...`, etc.
+> (literales en el código, no derivadas del nombre de la carpeta de código).
+> Renombrar el árbol de datos real (39→6 GB, cientos de f-strings) queda fuera
+> de alcance de este cambio — ver freno 2 en §1bis (histórico).
 
 ---
 
@@ -39,9 +47,13 @@ El proyecto lleva 4 iteraciones CRISP-DM documentadas (ene-2023 → jun-2025, en
 `~/Downloads/doc_tiptopia/`, no versionadas). Decisiones de diseño que **no** son
 descuido y conviene respetar:
 
-- **Prefijos `p2_/p3_/p4_/p6_`** — mapean 1:1 con las fases CRISP-DM y con los
-  documentos de iteración. Es trazabilidad código ↔ documentación; renombrar
-  pierde ese vínculo.
+- **Prefijos `p2_/p3_/p4_/p6_`** — mapeaban 1:1 con las fases CRISP-DM y con los
+  documentos de iteración (trazabilidad código ↔ documentación). El refactor
+  de estructura (`g-10`) los renombró a nombres semánticos
+  (`data_understanding/`, `data_preparation/`, `modeling/`, `deployment/`)
+  bajo `src/predictor/`, sin perder la trazabilidad: queda documentada en la
+  tabla de §1 y no cambia `data/` (que sigue usando los nombres viejos como
+  segmentos de ruta, ver más abajo).
 - **`id_match` como índice** de `df_match` / `df_match_player` (iter2) — sobrevive
   al shuffle y al split train/test; permite tener las odds en un df aparte y
   calcular ROI / precisión del bookie trivialmente; en `main_next_matches`
@@ -73,12 +85,12 @@ descuido y conviene respetar:
 ## 2. Los dos modos de ejecución
 
 El sistema tiene **dos flujos** que comparten las clases de `stages.py` y los
-módulos de `p3`/`p4`:
+módulos de `data_preparation`/`modeling`:
 
 ### 2.1 Entrenamiento (manual / local)
 
 ```
-main_train_models.py  →  comprehensive_search()
+predictor/modeling/main_train_models.py  →  comprehensive_search()
 ```
 
 - Recorre un espacio de hiperparámetros con `itertools.product` **anidado en 5
@@ -88,15 +100,16 @@ main_train_models.py  →  comprehensive_search()
   de modelos (`LogisticRegression`, `XGBClassifier`, `RandomForestClassifier`) →
   evalúa en test con métricas de ROI.
 - Escribe una fila por modelo entrenado en `df_ite_train.xlsx` / `df_ite_test.xlsx`
-  / `df_params_ite.xlsx` bajo `data/{country}/p4_modeling/{date}/`.
-- La selección del "mejor modelo" se hace después con `p4_modeling/main_select_model.py`
-  y `p4_modeling/model_selection/`.
+  / `df_params_ite.xlsx` bajo `data/{country}/p4_modeling/{date}/` (la ruta de
+  datos sigue usando el nombre de fase viejo, ver nota en §1).
+- La selección del "mejor modelo" se hace después con
+  `predictor/modeling/main_select_model.py` y `predictor/modeling/model_selection/`.
 
 ### 2.2 Producción / predicción (manual / local hoy)
 
 ```
-p6_deployment/collect_predictions.py
-   →  p6_deployment/main_next_matches.py :: main(d_run, id_country, ...)
+predictor/deployment/collect_predictions.py
+   →  predictor/deployment/main_next_matches.py :: main(d_run, id_country, ...)
 ```
 
 - `collect_predictions.py` itera países, lee de `data/df_best_models.xlsx` la
@@ -107,7 +120,7 @@ p6_deployment/collect_predictions.py
   1. **MISSING DATA** — scrapea partidos ya jugados que aún no estaban en el
      dataset de entrenamiento y los integra.
   2. **DATA UNDERSTANDING** — scrapea los próximos partidos (`extract_next_matches`).
-  3. **DATA PREPARATION** — replica el pipeline de `p3` sobre los próximos
+  3. **DATA PREPARATION** — replica el pipeline de `data_preparation` sobre los próximos
      partidos usando los hiperparámetros y artefactos (`scaler`, `df_etiquetas`)
      guardados en el entrenamiento.
   4. **MODELING** — carga el `.pkl` del modelo, predice probabilidades, aplica
@@ -118,12 +131,15 @@ p6_deployment/collect_predictions.py
 
 ```
 .github/workflows/update_results.yml  (cron)
-   →  p6_deployment/update_results.py 1
-   →  p6_deployment/dispatch_event.py
+   →  predictor/deployment/update_results.py 1
+   →  predictor/deployment/dispatch_event.py
 ```
 
 - **Único flujo que corre en GitHub Actions.** ~25 crons (fines de semana y
-  noches).
+  noches). El workflow hace `sparse-checkout` de la rama **`prod`**, que
+  todavía tiene la estructura de carpetas vieja — las rutas `src/predictor/...`
+  de este documento son las de `claude-test`/`staging`; se actualiza el
+  workflow recién cuando el refactor de estructura llegue a `prod`.
 - Scrapea de Flashscore el marcador final de los partidos de los últimos `n_days`
   que están en `historial_predicciones.xlsx`, calcula `result` / `acerte` /
   `bet_yield`, hace `git push` a la rama `prod` y dispara vía
@@ -136,17 +152,17 @@ p6_deployment/collect_predictions.py
 
 | Archivo | Rol | ¿Se usa? |
 |---|---|---|
-| `main_train_models.py` | Entrenamiento (orquestador real) | **Sí**, manual |
-| `p6_deployment/collect_predictions.py` | Predicción multi-país | **Sí**, manual |
-| `p6_deployment/main_next_matches.py` | Predicción de un país (también librería) | **Sí**, manual / debug |
-| `p6_deployment/update_results.py` | Scrapeo de resultados | **Sí**, CI |
-| `p6_deployment/publish_bets.py` | Auto-bet en stakehunters.com vía Selenium | **Sí**, manual |
-| `p6_deployment/predict_models.py` | Comparación de N modelos candidatos | Ocasional, manual |
-| `p2_data_understanding/scraper_flashscore.py` | Scrapeo histórico Flashscore | **Sí**, manual (bootstrap) |
-| `p2_data_understanding/scraper_sofifa.py` | Scrapeo histórico Sofifa | **Sí**, manual (bootstrap) |
-| `stages.py` | ~~`main()` + `__main__`~~ | Removidos en el refactor. Solo quedan las **clases** (biblioteca). (ex `main.py`) |
-| `scripts/*.py` | Glue de una sola vez (concat de dfs, regeneración de artefactos) | Esporádico, no importados |
-| El resto de `p3_*/`, `p4_*/` con `__main__` | Bloques de prueba / scripts sueltos | Esporádico |
+| `predictor/modeling/main_train_models.py` | Entrenamiento (orquestador real) | **Sí**, manual |
+| `predictor/deployment/collect_predictions.py` | Predicción multi-país | **Sí**, manual |
+| `predictor/deployment/main_next_matches.py` | Predicción de un país (también librería) | **Sí**, manual / debug |
+| `predictor/deployment/update_results.py` | Scrapeo de resultados | **Sí**, CI |
+| `predictor/deployment/publish_bets.py` | Auto-bet en stakehunters.com vía Selenium | **Sí**, manual |
+| `predictor/deployment/predict_models.py` | Comparación de N modelos candidatos | Ocasional, manual |
+| `predictor/data_understanding/scraper_flashscore.py` | Scrapeo histórico Flashscore | **Sí**, manual (bootstrap) |
+| `predictor/data_understanding/scraper_sofifa.py` | Scrapeo histórico Sofifa | **Sí**, manual (bootstrap) |
+| `predictor/stages.py` | ~~`main()` + `__main__`~~ | Removidos en el refactor. Solo quedan las **clases** (biblioteca). (ex `main.py`) |
+| `scripts/*.py` | Glue de una sola vez (`smoke_train.py`, `real_train.py`, concat de dfs, regeneración de artefactos) | Esporádico, no importados — vive fuera de `src/predictor/` |
+| El resto de `data_preparation/`, `modeling/` con `__main__` | Bloques de prueba / scripts sueltos | Esporádico |
 
 ---
 
@@ -201,9 +217,9 @@ p6_deployment/collect_predictions.py
 
 ## 5. Componentes clave por fase
 
-### 5.1 `p2_data_understanding`
+### 5.1 `predictor/data_understanding/`
 
-- **`p2_data_understanding/web_scraping_selenium.py`** — clase base `Crawler`.
+- **`web_scraping_selenium.py`** — clase base `Crawler`.
   Encapsula:
   - Init del WebDriver. `inicialize_chrome_driver()` intenta **3 estrategias en
     orden** (última versión vía `webdriver-manager` → versión del Chrome local →
@@ -238,7 +254,7 @@ p6_deployment/collect_predictions.py
   movido a `archive/`), `scraper_new_variables.py`, `validate_data.py` (tiene un
   validador de esquema útil pero huérfano), `scripts/concat_*.py` (movidos en el Nivel 0).
 
-### 5.2 `p3_data_preparation`
+### 5.2 `predictor/data_preparation/`
 
 Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
 `DataPreparationNew` en `main_next_matches.py`).
@@ -277,7 +293,7 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
 - **`concat_mapeos.py`** — consolida los `df_map_players_fs_so` de todos los
   países en `data/data_preparation/` (para cuando el FIFA nuevo aún no salió).
 
-### 5.3 `p4_modeling`
+### 5.3 `predictor/modeling/`
 
 - **`generate_test_design.py`** — `balance_dataset` (under/over/SMOTE),
   `separate_train_val_and_test`, `n_rows_to_test`.
@@ -305,22 +321,22 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   de test usar por país — se borraron en `p4-1`: el ROI de test ya es la
   métrica de negocio.)* Carpeta `old/` con 4 archivos muertos.
 
-### 5.4 `p6_deployment`
+### 5.4 `predictor/deployment/`
 
 - **`main_next_matches.py`** — el pipeline de producción. Clases:
   `DataUnderstandingNew`, `DataPreparationNew(DataPreparation)`,
   `TrainingDataLoader` (carga hiperparámetros/artefactos del entrenamiento),
   `MissingData` (lee/concatena datasets old + missing). Función `main()` de ~370
   líneas.
-- **`p6_deployment/collect_predictions.py`** — loop de países + acumulación
+- **`collect_predictions.py`** — loop de países + acumulación
   en los xlsx de `data/`.
-- **`p6_deployment/update_results.py`** — scrapeo de marcadores finales +
+- **`update_results.py`** — scrapeo de marcadores finales +
   cálculo de acierto/yield.
-- **`p6_deployment/dispatch_event.py`** — POST a la API de GitHub para
+- **`dispatch_event.py`** — POST a la API de GitHub para
   `repository_dispatch` (dispara el repo `landing`).
-- **`p6_deployment/publish_bets.py`** — `StakeHunterCrawler(Crawler)`: login y
+- **`publish_bets.py`** — `StakeHunterCrawler(Crawler)`: login y
   carga de apuestas reales en stakehunters.com vía Selenium.
-- **`p6_deployment/predict_models.py`** — corre `main_next_matches.main()` para
+- **`predict_models.py`** — corre `main_next_matches.main()` para
   los N mejores modelos y cuenta coincidencias de predicción.
 
 ---
@@ -365,8 +381,9 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
 ## 7. Automatización (GitHub Actions)
 
 - **Activo:** `.github/workflows/update_results.yml` — cron, `sparse-checkout` de
-  un subconjunto de carpetas de la rama **`prod`**, Python 3.12, instala
-  `p6_deployment/requirements_mnm.txt`, corre `update_results.py`, hace `git push`
+  un subconjunto de carpetas de la rama **`prod`** (estructura vieja, ver nota
+  en §2.3), Python 3.12, instala
+  `requirements_mnm.txt`, corre `update_results.py`, hace `git push`
   a `prod` y dispatch.
 - **Deshabilitados:** `.github/workflows/desuso/` — 6 workflows
   (`get_predictions.yml`, `update_predictions.yml`, `create_update_predictions.yml`,
@@ -387,11 +404,12 @@ Todo se orquesta desde `stages.py :: DataPreparation` (y su subclase
   - `CHROMEDRIVER_PATH` — *(añadido en el refactor, módulo 1)* ruta al ejecutable
     de chromedriver como último fallback del init del driver.
 - **Imports:** el repo se instala como paquete con `pip install -e . --no-deps`
-  (`pyproject.toml`, namespace packages). Eso reemplaza el viejo
-  `sys.path.append('.')` que había al inicio de ~33 archivos. Alternativa sin
-  instalar: `PYTHONPATH=.` (lo que usa la GitHub Action).
-- **`utils/set_up_logging.py`** — logger con formato de colores por nivel
-  (CRITICAL en verde = "éxito"). Emite 4 líneas de ejemplo en cada import
+  (`pyproject.toml`, layout `src/`, namespace packages — ver §1). Eso reemplaza
+  el viejo `sys.path.append('.')` que había al inicio de ~33 archivos; con el
+  paquete instalado no hace falta `PYTHONPATH` en ningún lado (ni siquiera en
+  la GitHub Action, que ahora también corre `pip install -e .`).
+- **`predictor/utils/set_up_logging.py`** — logger con formato de colores por
+  nivel (CRITICAL en verde = "éxito"). Emite 4 líneas de ejemplo en cada import
   (pendiente de limpiar). Existe también `set_up_logging_save.py` (muerto).
 
 ---

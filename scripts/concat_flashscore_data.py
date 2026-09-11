@@ -1,8 +1,8 @@
 import pandas as pd
-from utils.set_up_logging import logger
+from predictor.utils.set_up_logging import logger
 import os
 from dotenv import load_dotenv
-import utils.directories as directories
+import predictor.utils.directories as directories
 
 
 def concat_raw_data_by_country(d_countries, missing: bool = True, verbose: int = 1):

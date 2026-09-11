@@ -6,7 +6,7 @@ background — puede tardar bastante (construct_data todavía sin vectorizar,
 p3-1 pendiente).
 
 Resultado: `data/{country}/p4_modeling/{date}/df_iteration.xlsx`, que es el
-insumo de `p4_modeling/main_select_model.py` para elegir qué modelo deployar
+insumo de `predictor.modeling.main_select_model` para elegir qué modelo deployar
 (ya selecciona por ROI real de test + expected_error, ver docs/REFACTOR.md
 ítem p4-1).
 
@@ -19,8 +19,8 @@ import datetime
 
 import pandas as pd
 
-import main_train_models as mtm
-from main_train_models import define_params_space, concat_dataframes_on_iteration
+import predictor.modeling.main_train_models as mtm
+from predictor.modeling.main_train_models import define_params_space, concat_dataframes_on_iteration
 
 ID_COUNTRY = int(sys.argv[1]) if len(sys.argv) > 1 else 48
 D_COUNTRIES = {48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa", 6: "argentina"}

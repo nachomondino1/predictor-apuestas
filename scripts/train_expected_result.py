@@ -1,7 +1,7 @@
 import pandas as pd
-from p3_data_preparation import construct_data
-from p3_data_preparation.select_data import determine_country_competitions
-from p4_modeling import build_model
+from predictor.data_preparation import construct_data
+from predictor.data_preparation.select_data import determine_country_competitions
+from predictor.modeling import build_model
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, accuracy_score, recall_score
 import pickle

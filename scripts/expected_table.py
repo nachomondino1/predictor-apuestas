@@ -1,5 +1,5 @@
 import pandas as pd
-from p3_data_preparation import construct_data
+from predictor.data_preparation import construct_data
 
 
 def main(id_competition):

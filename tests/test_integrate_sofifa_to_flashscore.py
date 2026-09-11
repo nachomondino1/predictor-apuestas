@@ -15,7 +15,7 @@ seguir respetando:
 import numpy as np
 import pandas as pd
 
-from p3_data_preparation.integrate_sofifa_to_flashscore import integrate_player_data_in_match
+from predictor.data_preparation.integrate_sofifa_to_flashscore import integrate_player_data_in_match
 
 # n_reg_min de 'miss' es 1 -> alcanza con 1 jugador por partido para simplificar los fixtures.
 # Los partidos de fixture son de octubre (mes >= 7 -> "post mercado de pases de invierno"),

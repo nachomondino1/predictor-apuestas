@@ -9,14 +9,17 @@
 python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt      # dependencias (para entrenar)
-# o, más liviano, solo para predecir/scrapear:  pip install -r p6_deployment/requirements_mnm.txt
+# o, más liviano, solo para predecir/scrapear:  pip install -r src/predictor/deployment/requirements_mnm.txt
 pip install -e . --no-deps           # instala el repo como paquete -> imports absolutos sin sys.path hacks
 ```
 
-El `pip install -e .` reemplaza el viejo `sys.path.append('.')` que había al inicio
-de cada script: con el paquete instalado, `import main`, `from utils...`,
-`from p3_data_preparation...` funcionan desde cualquier directorio. Alternativa
-sin instalar nada: correr los scripts con `PYTHONPATH=.` (así lo hace la GitHub Action).
+El código de librería vive en `src/predictor/` (`data_understanding/`,
+`data_preparation/`, `modeling/`, `deployment/`, `utils/`, `stages.py`). El
+`pip install -e .` reemplaza el viejo `sys.path.append('.')` que había al inicio
+de cada script: con el paquete instalado, `from predictor.utils...`,
+`from predictor.data_preparation...` funcionan desde cualquier directorio, sin
+necesitar `PYTHONPATH`. Ver [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) para
+el detalle completo de la estructura.
 
 ## Actualizar el Virtual Environment luego de agregar una libreria: 
 

@@ -1,6 +1,6 @@
 import pandas as pd
 import datetime
-from utils import directories
+from predictor.utils import directories
 
 
 def paths(country, iteration_date):
