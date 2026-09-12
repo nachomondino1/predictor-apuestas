@@ -120,3 +120,44 @@ def test_debajo_de_n_reg_min_no_genera_fila_en_df_aux():
 
     assert df_aux.empty
     assert "mean_age_player_start_home" not in df_out.columns
+
+
+def test_id_match_duplicado_en_df_match_player_toma_el_primero():
+    """
+    Algunos países traen el mismo id_match repetido en df_match_player (germany: 81
+    de 7311; england: 0). La versión vieja se quedaba con el primero
+    (`df_match_player.loc[id_match, col].values[0]`); la vectorizada tiene que hacer
+    lo mismo y no romper — con etiquetas repetidas, `.loc[lista]` "abre" filas y
+    desalinea (ValueError: Length of values (N) does not match length of index (M)).
+    """
+    df_match = pd.DataFrame(
+        {"date": pd.to_datetime(["2024-10-01", "2024-10-02"])},
+        index=["m1", "m2"],
+    )
+    # m1 aparece DOS veces, con jugadores distintos: debe valer el primero ("p1").
+    df_match_player = pd.DataFrame(
+        {"id_player_miss_home_1": ["p1", "p2", "p3"]},
+        index=["m1", "m1", "m2"],
+    )
+    df_map_fs_so = pd.DataFrame({"id_player_fs": ["p1", "p2", "p3"], "id_player_so": [10, 20, 30]})
+    df_player_sofifa = pd.DataFrame({"height": [180, 175, 190]}, index=["10", "20", "30"])
+    df_player_fifa_sofifa = pd.DataFrame({
+        "id_player": ["10", "20", "30"],
+        "fifa_year": [FIFA_YEAR, FIFA_YEAR, FIFA_YEAR],
+        "age": [20, 22, 24],
+        "overall_rating": [70.0, 65.0, 60.0],
+        "wage": [1000.0, 2000.0, 3000.0],
+        "value": [5_000_000.0, 3_000_000.0, 1_000_000.0],
+        "potential": [75.0, 70.0, 60.0],
+        "int_reputation": [1, 1, 2],
+    })
+
+    df_out, df_aux = integrate_player_data_in_match(
+        df_match, df_match_player, df_map_fs_so, df_player_sofifa, df_player_fifa_sofifa
+    )
+
+    # Se queda con "p1" (age 20), no con "p2" (age 22) ni con el promedio de ambos.
+    assert df_out.loc["m1", "mean_age_player_miss_home"] == 20
+    assert df_aux.loc["m1", "n_player_miss_home"] == 1
+    # El otro partido no se ve afectado.
+    assert df_out.loc["m2", "mean_age_player_miss_home"] == 24

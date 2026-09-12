@@ -400,6 +400,24 @@ def integrate_player_data_in_match(df_match, df_match_player, df_map_fs_so, df_p
     d_n_reg_min = {'start': 8, 'sub': 5, 'miss': 1}
     stat_cols = ['age', 'overall_rating', 'wage', 'value', 'potential', 'int_reputation']
 
+    # ---- id_match duplicados ----
+    # Algunos países traen el mismo id_match repetido en df_match_player (germany:
+    # 81 de 7311; england: 0 — por eso no salió al validar p3-9 solo con england).
+    # La versión vieja lo resolvía con `df_match_player.loc[id_match, col].values[0]`,
+    # o sea: se quedaba con el PRIMERO (ver el try/except con el comentario "fallo en
+    # assess_model_in_prod de Argentina"). Acá hace falta deduplicar explícitamente
+    # porque el camino vectorizado usa `.loc[]` con listas de etiquetas, y con
+    # etiquetas repetidas eso "abre" filas y desalinea
+    # (ValueError: Length of values (7092) does not match length of index (6930)).
+    if df_match_player.index.duplicated().any():
+        n_dup = int(df_match_player.index.duplicated().sum())
+        logger.warning(f"df_match_player tiene {n_dup} id_match duplicados: me quedo con el primero de cada uno (igual que la versión vieja).")
+        df_match_player = df_match_player[~df_match_player.index.duplicated(keep='first')]
+    if df_match.index.duplicated().any():
+        n_dup = int(df_match.index.duplicated().sum())
+        logger.warning(f"df_match tiene {n_dup} id_match duplicados: me quedo con el primero de cada uno.")
+        df_match = df_match[~df_match.index.duplicated(keep='first')]
+
     # ---- Lookups armados UNA sola vez (antes se recalculaban en cada una de ~1M iteraciones) ----
     df_map_fs_so = df_map_fs_so.copy()
     df_map_fs_so['id_player_fs'] = df_map_fs_so['id_player_fs'].astype(str)
