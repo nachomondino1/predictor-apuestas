@@ -272,6 +272,53 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
 
+### 2026-09-13 — Smoke de los 5 países + 2 hallazgos que condicionan el plan
+
+Pedido del usuario: correr un smoke de entrenamiento para los 5 países "para
+chequear" después de todo el refactor. **Los 5 corrieron sin errores** (tras
+arreglar un bug, ver abajo):
+
+| país | duración | f1 | accuracy | ROI |
+|---|---|---|---|---|
+| england | 5.0 min | 41.4 | 46.5 | −47.1 |
+| france | 6.4 h | 37.1 | 45.2 | −60.5 |
+| germany | 3.3 h | 43.8 | 50.0 | −8.7 |
+| italy | 8.4 h | 48.0 | 54.0 | +7.6 |
+| spain | 7.1 h | 43.8 | 51.0 | −15.3 |
+
+**Bug encontrado y arreglado** (introducido por el propio p3-9): germany
+fallaba con `ValueError: Length of values (7092) does not match length of
+index (6930)` en `integrate_player_data_in_match`. Causa: germany trae 81
+`id_match` duplicados en `df_match_player` (england: 0 — por eso la
+validación de p3-9, hecha toda con england, no lo agarró) y el camino
+vectorizado usa `.loc[]` con listas de etiquetas, que con etiquetas repetidas
+"abre" filas y desalinea. La versión vieja sí lo manejaba
+(`.loc[id_match, col].values[0]` → se quedaba con el primero; el try/except
+tenía el comentario "fallo en assess_model_in_prod de Argentina", o sea ya lo
+habían sufrido). Se replica esa semántica deduplicando por índice con warning
+explícito + test de regresión. Commit `ac26402b6`.
+
+**Hallazgo 1 — la métrica tiene más ruido que las mejoras a testear.** Seis
+corridas smoke del 11-sep con config idéntica y código computacionalmente
+equivalente dieron **f1 entre 40.0 y 45.0** (5 puntos) y **ROI entre −50.6 y
+−19.2** (31 puntos). Causa: `RandomUnderSampler()` / `RandomOverSampler()` se
+instancian **sin `random_state`** (los `train_test_split` sí usan 42; el
+balanceo no). Consecuencia directa: la tabla de arriba **no es un ranking de
+países** (la diferencia germany-vs-france es en buena parte ruido), y
+cualquier ciclo de "meto un cambio y veo si mejoró" es inviable hasta
+arreglarlo.
+
+**Hallazgo 2 — de dónde sale el tiempo.** El costo se paga **una vez por
+(país, `iteration_date`)**, no por corrida: england con la caché del día ya
+armada tardó 5 min, contra 3-8 h de los demás con fecha nueva. Los dos
+bloques que se recalculan y dominan (medido en germany) son el **mapeo global
+de sofifa (~1h28)** y el **formateo (~1h48)**; todo lo de abajo (integrate,
+construct, select, modeling) ya corre en ~0 min gracias a p3-9/p3-1/g-6. Ambos
+bloques son **parseo de `.xlsx`** — justo lo que `g-6` dejó fuera de alcance a
+propósito (los crudos tienen tipos mixtos). Aplicarles el mismo tratamiento
+Parquet (con dtypes explícitos) es la palanca de performance más grande que
+queda. Total de compute de este smoke: **25.3 h**.
+
 ### 2026-09-11 — p4-7: `betting_strategy.py` → "sin ea"
 
 Pedido del usuario: seguir con el plan, ítem p4-7. Antes de tocar nada, leí
