@@ -17,6 +17,12 @@ from predictor.deployment import main_next_matches
 import predictor.utils.directories as directories
 from predictor.utils.io import read_df
 from predictor.utils import training_log
+from predictor.config import SEED, WALK_FORWARD_N_FOLDS, WALK_FORWARD_FOLD_SIZE
+
+# Minimo de filas de train (sin NaN) para que valga la pena entrenar un fold.
+# 5x el ~36 de features tipico: por debajo de eso `train_and_assess_models` ya
+# avisa "EVITO TRAIN" por relacion filas/columnas.
+MIN_TRAIN_ROWS_FOLD = 180
 from itertools import product
 from predictor.stages import DataUnderstanding, DataPreparation, Modeling
 import time
@@ -85,6 +91,7 @@ def comprehensive_search(
     cont_iter = 0
     df_ite_train, df_ite_test, df_params_ite = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     rows_ite_list, rows_train_list, rows_test_list = [], [], []
+    rows_test_by_fold_list = []  # detalle sin promediar (1 fila por combinacion x modelo x fold)
     du, dp, mo = DataUnderstanding(id_country=id_country, country=country), DataPreparation(id_country=id_country, country=country, date=date), Modeling(country, date=date) # Creo objetos de clases DataPreparation y Modeling
 
     # Imprimo largo de iteraciones
@@ -205,8 +212,15 @@ def comprehensive_search(
         n_reg_val = n_reg_val[0]  # Si es una lista, obtenemos el primer elemento
         
     logger.info(d_params['modeling'].values())
-    logger.info(f"N_REG_VAL: {n_reg_val} y N_REG_TEST: {n_reg_test}")
-    index_val, index_test = determine_rows_for_test_set(df_match=df_match, n_reg_val=n_reg_val, n_reg_test=n_reg_test)  # Usar n_reg_test.
+    logger.info(f"N_REG_VAL: {n_reg_val} y FOLD_SIZE (ex N_REG_TEST): {n_reg_test}")
+
+    # Walk-forward: en vez de UN split de 100 partidos, N folds consecutivos
+    # (default 5 x 200 = 1000 partidos de evaluacion). Ver predictor/config.py.
+    folds = determine_walk_forward_folds(df_match=df_match, fold_size=n_reg_test, n_reg_val=n_reg_val, verbose=1)
+
+    # Fechas por partido, para resolver el train de cada fold (todo lo anterior a
+    # su date_cutoff, copas incluidas).
+    dates_by_match = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M') if df_match['date'].dtype == object else df_match['date']
 
     # Clean post integrate
     for zz, param_values_00 in enumerate(product(*d_params['clean_post_integrate'].values()), start=1):
@@ -251,34 +265,86 @@ def comprehensive_search(
                 print(f"Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs}")            
                 path_sel = f'{path_cons}__{thr_corr}_{thr_fs}_{fill_na}'
 
-                df_sel = dp.select_data(df_cons_etiquetado, thr_corr=thr_corr, thr_fs=thr_fs, export=True)
-                if verbose >= 2:
-                    path_select = f'{BASE_DIR_dp}/select_data/df_selected_{path_sel}.xlsx'
-                    df_sel.to_excel(path_select, index=True)
-    
-                # Clean post select
-                df_sel = dp.clean_post_select(df=df_sel, fill_na=fill_na, path_save=f'{BASE_DIR_dp}/clean_post_select/scaler_model_{path_sel}.pkl')
-
                 ####################################################################### MODELING #######################################################################
                 for h, param_values_5 in enumerate(product(*d_params['modeling'].values()), start=1):
-                    
+
                     # Asigno valor a cada hiperparametro
                     bal_type, k = param_values_5[0], param_values_5[1]
+                    cont_iter += 1
                     if verbose >= 0:
-                        cont_iter += 1
                         logger.info(f" Iteracion Modeling Nº {i}.{zz}.{j}.{h} ".center(120, "#"))
-                        print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_post_construct n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> n_reg_val: {n_reg_val} ; n_reg_test: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
+                        print(f'\n - Hiper construct --> n_last_matches: {n_last_matches} ; n_years_h2h: {n_years_h2h} ; segun_localia: {segun_localia} \n - Hiper clean_post_construct n_years_to_sel: {n_years_to_select} comp_to_select: {comp_to_select} \n- Hiper select --> thr_corr: {thr_corr} ; thr_fs: {thr_fs} \n - Hiper treat_nan --> {fill_na} \n - Hiper modeling --> n_reg_val: {n_reg_val} ; fold_size: {n_reg_test}; bal_type: {bal_type} ; k: {k}')
                         logger.critical(f" Iteracion Nº {cont_iter} de {n_iter} ({cont_iter*100/n_iter:.0f}%)")
 
-                        # Generar el diseño de la prueba
-                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(df_sel, bal_type=bal_type, index_val=index_val, index_test_set=index_test, export=False)
+                    # WALK-FORWARD: entreno y evaluo una vez por fold, y despues
+                    # promedio. La feature selection y el scaler se ajustan DENTRO
+                    # de cada fold, solo con sus filas de train: antes corrian
+                    # sobre el dataset completo (test incluido), lo cual filtraba
+                    # informacion y inflaba las metricas del backtest.
+                    rows_train_folds, rows_test_folds = [], []
+                    for fold in folds:
+                        n_fold, index_test, index_val = fold['n_fold'], fold['index_test'], fold['index_val']
+                        idx_train_fold = dates_by_match[dates_by_match < fold['date_cutoff']].index
 
-                        # Entreno y evaluo modelos
-                        rows_train, rows_test = mo.train_and_assess_models(
-                            X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, 
-                            l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter, 
-                            df_match=df_match, df_match_odds=df_match_odds, 
-                                k=k)
+                        df_train_rows = df_cons_etiquetado[df_cons_etiquetado.index.isin(idx_train_fold)]
+
+                        # `select_data` dropea toda fila con algun NaN antes de medir
+                        # importancias, y la disponibilidad de features cae hacia atras
+                        # en el tiempo (e.g. expected_goals no existe en partidos
+                        # viejos): en los folds mas antiguos eso puede dejar 0 filas.
+                        # Salteo el fold con un aviso fuerte en vez de romper la corrida.
+                        n_train_sin_nan = len(df_train_rows.dropna(axis=0, how='any'))
+                        if n_train_sin_nan < MIN_TRAIN_ROWS_FOLD:
+                            logger.error(
+                                f"Fold {n_fold}: solo {n_train_sin_nan} filas de train sin NaN "
+                                f"(de {len(df_train_rows)}), menos que el minimo {MIN_TRAIN_ROWS_FOLD}. "
+                                f"SALTEO el fold -- el promedio va a salir de menos folds (ver n_folds). "
+                                f"Si pasa en varios, hay que acortar el walk-forward o rellenar NaN antes de seleccionar."
+                            )
+                            continue
+
+                        try:
+                            # (a) Feature selection ajustada SOLO con el train del fold
+                            df_sel_train = dp.select_data(df_train_rows, thr_corr=thr_corr, thr_fs=thr_fs, export=False)
+                            cols_sel = list(df_sel_train.columns)
+                        except Exception as e:
+                            logger.error(f"Fold {n_fold}: fallo la seleccion de features, lo salteo. {e}", exc_info=True)
+                            continue
+
+                        # (b) Aplico esas columnas a train + val + test del fold
+                        idx_fold = idx_train_fold.union(index_val).union(index_test)
+                        df_sel_fold = df_cons_etiquetado.loc[df_cons_etiquetado.index.isin(idx_fold), cols_sel]
+
+                        # (c) Scaler ajustado SOLO con el train del fold
+                        df_sel_fold = dp.clean_post_select(
+                            df=df_sel_fold, fill_na=fill_na,
+                            path_save=f'{BASE_DIR_dp}/clean_post_select/scaler_model_{path_sel}_f{n_fold}.pkl',
+                            fit_rows=idx_train_fold,
+                        )
+                        if verbose >= 2:
+                            df_sel_fold.to_excel(f'{BASE_DIR_dp}/select_data/df_selected_{path_sel}_f{n_fold}.xlsx', index=True)
+
+                        # (d) Split y entrenamiento de este fold
+                        X_train, X_val, X_test, y_train, y_val, y_test = mo.generate_test_design(
+                            df_sel_fold, bal_type=bal_type, index_val=index_val, index_test_set=index_test, export=False)
+
+                        rows_train_f, rows_test_f = mo.train_and_assess_models(
+                            X_val=X_val, y_val=y_val, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
+                            l_modelos=l_modelos, ruta_base_mod_seg=ruta_base_modelos, cont_iter=cont_iter,
+                            df_match=df_match, df_match_odds=df_match_odds, k=k,
+                            save_artifacts=(n_fold == 1),  # 1 solo .pkl por combinacion (el fold mas reciente)
+                        )
+                        for r in rows_train_f + rows_test_f:
+                            r['n_fold'] = n_fold
+                        rows_train_folds.extend(rows_train_f)
+                        rows_test_folds.extend(rows_test_f)
+
+                    # Promedio entre folds: 1 fila por (combinacion, modelo), con el
+                    # desvio de las metricas clave para saber si una mejora supera
+                    # al ruido.
+                    rows_train = aggregate_folds(rows_train_folds)
+                    rows_test = aggregate_folds(rows_test_folds)
+                    rows_test_by_fold_list.extend(rows_test_folds)
                     
                     if len(rows_test) > 0:
                         # Guardo datos en dataframe
@@ -309,6 +375,8 @@ def comprehensive_search(
                             df_ite_train.to_excel(f'{BASE_DIR_mod}/df_ite_train.xlsx', index=False)
                             df_ite_test.to_excel(f'{BASE_DIR_mod}/df_ite_test.xlsx', index=False)
                             df_params_ite.to_excel(f'{BASE_DIR_mod}/df_params_ite.xlsx', index=False)
+                            if rows_test_by_fold_list:  # detalle por fold, para inspeccionar la dispersion
+                                pd.DataFrame(rows_test_by_fold_list).to_excel(f'{BASE_DIR_mod}/df_ite_test_folds.xlsx', index=False)
 
                             # Limpiar listas después de exportar
                             rows_ite_list.clear()
@@ -414,6 +482,141 @@ def get_sofifa_data(country, update_sofifa, BASE_DIR_sofifa, n_seasons_update: i
 
     return df_player_sofifa, df_player_fifa_sofifa
 
+def aggregate_folds(rows: list, std_metrics=('f1_score', 'test_accuracy', 'roi', 'expected_roi', 'error', 'f1_score_train')):
+    """
+    Colapsa las filas de los folds del walk-forward a UNA fila por modelo.
+
+    Los nombres de las métricas se mantienen (`f1_score`, `roi`, etc.) pero ahora
+    el valor es el **promedio entre folds** — así `main_select_model.py` y
+    `training_log.py` siguen funcionando sin cambios, y de paso eligen por un
+    promedio de 1000 partidos en vez de por un único corte de ~100.
+
+    Además agrega `std_<metrica>` para las métricas clave: es el número que dice
+    si una mejora de "+2 de f1" está dentro del ruido entre folds o no. Y
+    `n_folds`, para no confundir un promedio de 5 folds con uno de 2.
+
+    # Parameters
+        rows: Filas devueltas por `train_and_assess_models`, ya etiquetadas con
+            `n_fold`. (list[dict])
+        std_metrics: Métricas a las que además se les calcula el desvío. (tuple)
+
+    # Returns
+        Una fila por modelo. (list[dict])
+    """
+    if not rows:
+        return []
+
+    df = pd.DataFrame(rows)
+    if 'model_name' not in df.columns:
+        return rows
+
+    out = []
+    for model_name, g in df.groupby('model_name', sort=False):
+        row = {}
+        for col in g.columns:
+            if col == 'n_fold':
+                continue
+            s = g[col]
+            # Numéricas -> promedio entre folds. El resto (hiperparámetros,
+            # shapes, listas de columnas) -> el valor del primer fold, a título
+            # informativo: puede diferir entre folds (cada uno elige sus features
+            # y sus hiperparámetros con su propio train).
+            row[col] = s.mean() if pd.api.types.is_numeric_dtype(s) else s.iloc[0]
+        row['model_name'] = model_name
+        row['n_folds'] = len(g)
+        for m in std_metrics:
+            if m in g.columns and pd.api.types.is_numeric_dtype(g[m]):
+                row[f'std_{m}'] = g[m].std(ddof=0)
+        out.append(row)
+
+    return out
+
+def determine_walk_forward_folds(df_match, n_folds: int = None, fold_size: int = None, n_reg_val: int = 100, verbose: int = 0):
+    """
+    Arma los folds de la evaluación walk-forward: bloques consecutivos de
+    partidos ordenados por fecha, del más reciente al más viejo. Reemplaza al
+    split único de `determine_rows_for_test_set` (ver predictor/config.py).
+
+    Para el fold k: test = su bloque de `fold_size` partidos; val = los
+    `n_reg_val` partidos inmediatamente ANTERIORES (para elegir hiperparámetros);
+    train = todo lo anterior a eso. O sea, cada fold se entrena y valida solo
+    con pasado respecto de su test — nunca ve el futuro, igual que producción.
+
+    Mismos 2 requisitos que antes para que un partido pueda ir a test:
+    competición pública y estar entre los últimos partidos.
+
+    # Parameters
+        df_match: Dataframe con `date` e `id_competition`.
+        n_folds: Cantidad de folds. Default `config.WALK_FORWARD_N_FOLDS`.
+        fold_size: Partidos por fold de test. Default `config.WALK_FORWARD_FOLD_SIZE`.
+        n_reg_val: Partidos de validación por fold. (int)
+
+    # Returns
+        Lista de dicts `{'n_fold', 'index_test', 'index_val'}`, del fold más
+        reciente al más viejo. Si no hay suficientes partidos para los `n_folds`
+        pedidos, devuelve los que entran y avisa.
+    """
+    n_folds = WALK_FORWARD_N_FOLDS if n_folds is None else n_folds
+    fold_size = WALK_FORWARD_FOLD_SIZE if fold_size is None else fold_size
+
+    # Ordeno por fecha descendiente (0 = más reciente)
+    df_match = df_match.copy()
+    df_match['date'] = pd.to_datetime(df_match['date'], format='%d.%m.%Y %H:%M')
+    df_match = df_match.sort_values(by='date', ascending=False)
+
+    # Requisito 1: solo competiciones públicas (idem determine_rows_for_test_set)
+    index_comp = select_league_matches(df_match).index
+    df_match_comp = df_match[df_match.index.isin(index_comp)]
+    idx = df_match_comp.index
+
+    # Cuántos folds entran: cada fold consume fold_size (test) y necesito además
+    # n_reg_val de validación + algo de train para el fold más viejo.
+    min_train = fold_size  # piso arbitrario pero explícito: al menos un bloque de train
+    max_folds = max(0, (len(idx) - n_reg_val - min_train) // fold_size)
+    if max_folds < n_folds:
+        logger.warning(
+            f"Solo alcanza para {max_folds} folds de {fold_size} partidos (hay {len(idx)} "
+            f"partidos de competiciones públicas, y hacen falta {n_reg_val} de val + "
+            f"{min_train} de train). Pedidos: {n_folds}."
+        )
+        n_folds = max_folds
+    if n_folds <= 0:
+        raise ValueError(
+            f"No hay suficientes partidos ({len(idx)}) para armar ni un fold de {fold_size} "
+            f"con {n_reg_val} de validación. Bajá fold_size/n_reg_val o usá más años de datos."
+        )
+
+    folds = []
+    for k in range(n_folds):
+        start_test = k * fold_size
+        end_test = start_test + fold_size
+        index_test = idx[start_test:end_test]
+        index_val = idx[end_test:end_test + n_reg_val]
+
+        # Todo lo anterior a la fecha mas vieja de (test + val) puede ser train.
+        # Se usa una FECHA de corte (y no "lo que no es test ni val") para que el
+        # train del fold k no incluya los folds mas recientes -- que son futuro
+        # respecto de k -- y para que las copas (no elegibles como test) entren
+        # al train solo si son anteriores.
+        idx_eval = index_test.union(index_val)
+        date_cutoff = df_match_comp.loc[df_match_comp.index.isin(idx_eval), 'date'].min()
+        folds.append({
+            'n_fold': k + 1,
+            'index_test': index_test,
+            'index_val': index_val,
+            'date_cutoff': date_cutoff,
+        })
+
+        if verbose >= 1:
+            fechas_test = df_match_comp.loc[index_test, 'date']
+            logger.info(
+                f"  Fold {k + 1}: test={len(index_test)} partidos "
+                f"({fechas_test.min().date()} → {fechas_test.max().date()}), val={len(index_val)}"
+            )
+
+    logger.info(f"Walk-forward: {len(folds)} folds de {fold_size} partidos de test + {n_reg_val} de val cada uno.")
+    return folds
+
 def determine_rows_for_test_set(df_match, n_reg_val: int = 100, n_reg_test: int = 100, verbose : int = 0):
     """
     Determina qué registros pueden ser utilizados en el test
@@ -476,7 +679,9 @@ def define_params_space(id_country):
 
     # Defino hiperparametros a probar
     d_comps = determine_country_competitions(id_country)
-    l_modelos = [LogisticRegression(), XGBClassifier(), RandomForestClassifier()] # Pruebo Modelos no lineales #  MLPClassifier() (distrib de probas rara)
+    # random_state=SEED para que dos corridas de la misma config den el mismo
+    # resultado (RandomForest y XGBoost son aleatorios; ver predictor/config.py).
+    l_modelos = [LogisticRegression(random_state=SEED), XGBClassifier(random_state=SEED), RandomForestClassifier(random_state=SEED)] # Pruebo Modelos no lineales #  MLPClassifier() (distrib de probas rara)
 
     l_comp = [d_comps['all_comp']]
     l_comp_sin_duplicados = list(map(list, set(map(tuple, l_comp))))
@@ -501,7 +706,7 @@ def define_params_space(id_country):
         },
         'modeling': {
             'n_reg_val': [100],
-            'n_reg_test': [100],
+            'n_reg_test': [200],  # tamaño de cada fold del walk-forward (ver predictor/config.py)
             'bal_type': ['under'], 
             'k': [10],
             # 'refit': ['mean_test_cross_entropy_loss', 'mean_test_f1_score'] # A futuro...

@@ -1,5 +1,6 @@
 # Importo librerias
 from predictor.utils.set_up_logging import logger
+from predictor.config import SEED
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from predictor.data_preparation import clean_data
@@ -192,7 +193,7 @@ class FeatureSelection():
 
         # Entreno modelo con los mejores hiperparámetros
         model, params, best_metric, results  = select_best_hiperparameters(
-            DecisionTreeClassifier(), # RandomForestClassifier(), 
+            DecisionTreeClassifier(random_state=SEED), # RandomForestClassifier(),  # semilla: sin esto cambian las importancias y por ende que features se seleccionan (ver predictor/config.py)
             X_train=X_train, 
             y_train=y_train, 
             X_val=X_val, 
@@ -233,7 +234,7 @@ class FeatureSelection():
 
         # Entreno modelos buscando los mejores hiperparametros
         model, params, best_metric, results  = select_best_hiperparameters(
-            LogisticRegression(), 
+            LogisticRegression(random_state=SEED), 
             X_train=X_train, 
             y_train=y_train, 
             X_val=X_val, 

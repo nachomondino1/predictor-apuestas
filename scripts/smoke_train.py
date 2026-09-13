@@ -5,8 +5,16 @@ que el pipeline de train corre end-to-end tras un refactor, no para obtener un
 modelo bueno.
 
 Uso:
-    python scripts/smoke_train.py            # england
-    python scripts/smoke_train.py 55         # otro id_country
+    python scripts/smoke_train.py                       # england, fecha de hoy
+    python scripts/smoke_train.py 55                    # otro id_country
+    python scripts/smoke_train.py 48 2026-09-11         # fecha fija (reusa cache)
+
+El 2º argumento (`iteration_date`) es clave para comparar corridas: con una
+fecha nueva, el pipeline rearma el mapeo global de sofifa y el formateo desde
+los .xlsx crudos y tarda 3-8 h; con una fecha ya usada reusa esa cache y tarda
+minutos. Para el ciclo "meto un cambio y veo si mejora la métrica" hay que
+pasar SIEMPRE la misma fecha, si no se mezcla el efecto del cambio con el de
+haber regenerado los datos.
 """
 import sys
 import datetime
@@ -14,12 +22,16 @@ import datetime
 from sklearn.linear_model import LogisticRegression
 
 import predictor.modeling.main_train_models as mtm
+from predictor.config import SEED
 from predictor.data_preparation.select_data import determine_country_competitions
 
 ID_COUNTRY = int(sys.argv[1]) if len(sys.argv) > 1 else 48
 D_COUNTRIES = {48: "england", 55: "france", 59: "germany", 77: "italy", 148: "spain", 167: "usa", 6: "argentina"}
 country = D_COUNTRIES[ID_COUNTRY]
-date = datetime.datetime.now().date()
+if len(sys.argv) > 2:
+    date = datetime.datetime.strptime(sys.argv[2], '%Y-%m-%d').date()
+else:
+    date = datetime.datetime.now().date()
 
 # comprehensive_search usa `id_country` como global del módulo (no como parámetro)
 mtm.id_country = ID_COUNTRY
@@ -46,12 +58,12 @@ d_params = {
     },
     "modeling": {
         "n_reg_val": [100],
-        "n_reg_test": [100],
+        "n_reg_test": [200],  # tamaño de cada fold del walk-forward (5 folds -> 1000 partidos de test)
         "bal_type": ["under"],
         "k": [5],
     },
 }
-l_modelos = [LogisticRegression()]
+l_modelos = [LogisticRegression(random_state=SEED)]
 
 print(f"SMOKE TRAIN · country={country} ({ID_COUNTRY}) · date={date} · 1 iter · LogisticRegression")
 

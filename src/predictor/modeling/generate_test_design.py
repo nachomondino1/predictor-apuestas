@@ -1,28 +1,33 @@
 from predictor.utils.set_up_logging import logger
+from predictor.config import SEED
 import pandas as pd
 import numpy as np
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import train_test_split
 
-def balance_dataset(X, y, bal_type: str, verbose: int = 0):
+def balance_dataset(X, y, bal_type: str, verbose: int = 0, random_state: int = SEED):
     """
     Balanceo de datos
     # Parameters
         X: Dataframe solo con variables predictoras.
         y: Dataframe solo con variable respuesta.
         bal_type: Tipo de balanceo a aplicar. Puede ser 'over' o 'under'. (str)
+        random_state: Semilla del muestreo. Por default `config.SEED`, para que
+            dos corridas de la misma config den el mismo resultado (sin esto,
+            el balanceo movía el f1 ~5 puntos entre corridas idénticas — ver
+            predictor/config.py). Pasar otro valor para medir la banda de ruido.
 
     # Returns
         X e y pasados como parametros balanceados segun bal_type indicado.
     """
     # Balanceamos segun variable respuesta
     if bal_type == 'over':
-        oversampler = RandomOverSampler()  #
+        oversampler = RandomOverSampler(random_state=random_state)
         X_bal, y_bal = oversampler.fit_resample(X, y)
 
     elif bal_type == 'under':
-        undersampler = RandomUnderSampler()
+        undersampler = RandomUnderSampler(random_state=random_state)
         X_bal, y_bal = undersampler.fit_resample(X, y)
 
     else:

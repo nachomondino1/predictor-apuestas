@@ -272,6 +272,91 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
 
+### 2026-09-13 — "Paso 0": entrenamiento reproducible + evaluación walk-forward
+
+Precondición para el ciclo "meto un cambio y veo si mejora la métrica": que la
+métrica se pueda comparar entre corridas. Dos partes.
+
+**Parte 1 — reproducibilidad.** Eran **cinco** fuentes de aleatoriedad sin
+sembrar, no una: `RandomUnderSampler`/`RandomOverSampler`
+(`generate_test_design.py`), `RandomForestClassifier` y `XGBClassifier`
+(`define_params_space`), `LogisticRegression` del grid real, `LogisticRegression`
+del smoke, y `DecisionTreeClassifier`/`LogisticRegression` de la feature
+selection (`select_data.py`). Los `train_test_split` ya usaban 42 desde antes; el
+`cv=pds` (PredefinedSplit) es determinista.
+
+Se centralizó en `predictor/config.py::SEED`. Sembrar solo el balanceo NO
+alcanzaba: el grid de `LogisticRegression` prueba solvers estocásticos (`sag`,
+`saga`, `liblinear`), así que faltando un solo caller las corridas seguían
+difiriendo (se comprobó: primer intento dio f1 40.77 vs 41.54). Por eso además
+hay una **red centralizada** en `select_best_hiperparameters`: si el modelo
+acepta `random_state` y viene en `None`, le pone `SEED`; si el caller pasa uno
+explícito, gana el del caller (así se puede medir la banda de ruido corriendo
+varias semillas).
+
+**Verificado**: dos corridas de la misma config dan valores bit-idénticos
+(f1 `40.77104526020934` en ambas, ídem accuracy y ROI). Antes: f1 entre 40.0 y
+45.0, ROI entre −50.6 y −19.2.
+
+⚠️ Las métricas del histórico anterior a hoy **no son comparables** con las de
+ahora (eran una muestra al azar de una distribución, no un valor fijo).
+
+**Parte 2 — walk-forward (reemplaza el split único).** `determine_walk_forward_folds`
+arma N folds consecutivos de partidos ordenados por fecha (config: 5 × 200). Cada
+fold entrena y valida **solo con partidos anteriores** a su bloque de test, vía
+una **fecha de corte** — no "todo lo que no es test/val" — para que el train del
+fold 3 no incluya los folds 1 y 2 (su futuro) y para que las copas entren al
+train solo si son anteriores.
+
+**Se arregló un leakage** que estaba desde antes: la feature selection y el
+`StandardScaler` corrían sobre el dataset completo, test incluido, y recién
+después se partía. Ahora ambos se ajustan **dentro de cada fold, solo con sus
+filas de train**.
+
+`aggregate_folds` colapsa los folds a 1 fila por modelo: mantiene los nombres de
+métricas (el valor pasa a ser el **promedio entre folds**, así
+`main_select_model.py` y `training_log.py` siguen andando sin cambios) y agrega
+**`std_<métrica>`** + `n_folds`. El detalle sin promediar va a
+`df_ite_test_folds.xlsx`. Los artefactos (`.pkl`, predicciones) se guardan solo
+del fold 1, para no sobrescribir 5 veces el mismo nombre y que producción siga
+encontrando un modelo por combinación.
+
+**Hallazgo — los datos sostienen ~4 folds, no 5.** La disponibilidad de features
+cae hacia atrás en el tiempo (`expected_goals` no existe en partidos viejos) y
+`select_data` dropea toda fila con algún NaN. Filas de train sin NaN por fold
+(england): 900 / 697 / 440 / 184 / **0**. El fold 5 se saltea con un error
+explícito (antes rompía la corrida). Decisión pendiente del usuario: 3 folds,
+rellenar NaN antes de seleccionar, o recortar features históricamente ausentes.
+
+**Resultado en england (smoke, 4 folds efectivos)** — y acá está el valor de
+haber hecho esto:
+
+| | promedio | desvío entre folds |
+|---|---|---|
+| f1 | 45.3 | ± 2.3 |
+| accuracy | 53.1 | ± 3.4 |
+| ROI | −25.6 | **± 28.7** |
+
+→ **f1 y accuracy son usables como métrica de selección; ROI no.** Con un desvío
+de ±29 sobre una media de −26 (por fold: de −48.3 a +23.4), rankear 384 modelos
+por ROI sigue siendo rankear suerte. Esto **obliga a revisar `p4-1`**, que había
+simplificado la selección a "mejor ROI de test".
+
+→ El backtest ahora **coincide** con producción: accuracy 53.1 del modelo vs
+57.3 del bookie (−4 pts), consistente con los 49.0 vs 53.7 medidos sobre 2079
+partidos reales. Antes el backtest decía f1 55.6 / accuracy 57.8 y producción
+decía 49.0: esa contradicción era, en parte, el leakage.
+
+Ojo con la interpretación: las métricas subieron respecto de la corrida anterior
+(f1 45.3 vs 40.8), pero **no son comparables** — cambió el test (4 ventanas de
+200 vs un corte de ~73-99), cambió el train por fold y se quitó el leakage al
+mismo tiempo. No se puede atribuir la diferencia a una sola causa.
+
+Tests: `tests/test_walk_forward.py` (8 nuevos: folds consecutivos y disjuntos,
+fold 1 el más reciente, la fecha de corte excluye el futuro, recorte y error
+cuando faltan partidos, y el promedio/desvío de `aggregate_folds`). `pytest`
+56/56.
+
 ### 2026-09-13 — Smoke de los 5 países + 2 hallazgos que condicionan el plan
 
 Pedido del usuario: correr un smoke de entrenamiento para los 5 países "para

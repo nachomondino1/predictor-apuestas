@@ -833,7 +833,7 @@ class DataPreparation:
 
         return df_aux
     
-    def clean_post_select(self, df: pd.DataFrame, fill_na: str = None, scaler_loaded = None, path_save: str = None, prod: bool = False):
+    def clean_post_select(self, df: pd.DataFrame, fill_na: str = None, scaler_loaded = None, path_save: str = None, prod: bool = False, fit_rows = None):
         """
         Limpieza de datos 4 (drop nan en rows + escalado)
         """
@@ -844,7 +844,7 @@ class DataPreparation:
             df = self.treat_nan_in_rows(df, fill_na=fill_na)  # Elimino registros con al menos un NaN value
 
         # Escalado de datos para eliminar diferencias x escala
-        df = self.scale_data(df, scaler_loaded=scaler_loaded, path_save=path_save, prod=prod)  # Escalado de datos para eliminar diferencias x escala
+        df = self.scale_data(df, scaler_loaded=scaler_loaded, path_save=path_save, prod=prod, fit_rows=fit_rows)  # Escalado de datos para eliminar diferencias x escala
 
         if self.verbose >= 1:
             write_df(df, f'{self.base_path}/clean_post_select/df_sel_cleaned.xlsx')
@@ -865,7 +865,7 @@ class DataPreparation:
     
         return df_filled
     
-    def scale_data(self, df: pd.DataFrame, scaler_loaded = None, path_save:str = None, prod: bool = False):
+    def scale_data(self, df: pd.DataFrame, scaler_loaded = None, path_save:str = None, prod: bool = False, fit_rows = None):
 
         print("\nEscalado de datos...")
 
@@ -873,9 +873,12 @@ class DataPreparation:
             # Separo X e y
             X, y = df.drop(self.var_resp, axis=1), df[self.var_resp]  
         
-            # Paso 1: Ajusta el StandardScaler a tus datos
+            # Paso 1: Ajusta el StandardScaler a tus datos.
+            # `fit_rows` (walk-forward): ajusto SOLO con esas filas -- las de train
+            # del fold -- para no filtrar informacion de val/test en el escalado.
             scaler = StandardScaler()
-            scaler.fit(X) 
+            X_fit = X[X.index.isin(fit_rows)] if fit_rows is not None else X
+            scaler.fit(X_fit) 
 
             # Exporto scaler entrenado (para usar en prod)
             joblib.dump((scaler, df.columns), path_save)
@@ -1191,7 +1194,7 @@ class Modeling:
         df = format_data.map_teams(df,df_teams=df_teams)
         return df
 
-    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, k: int = 5, verbose: int = 0):
+    def train_and_assess_models(self, X_val, y_val, X_train, y_train, X_test, y_test, l_modelos: list, ruta_base_mod_seg: str, cont_iter: int,  df_match:pd.DataFrame, df_match_odds: pd.DataFrame, k: int = 5, verbose: int = 0, save_artifacts: bool = True):
         """
         Pruebo varios modelos 
         Me gusta que este en Modeling() (y no en find_best_hyper) puesto que usa build_model y assess_model.
@@ -1241,10 +1244,14 @@ class Modeling:
                     train_rows.append(new_row)
                     test_rows.append(new_row_test)
                     
-                    # Exporto datos del modelo
-                    pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
-                    results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
-                    df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
+                    # Exporto datos del modelo. Con walk-forward esto corre una vez
+                    # por fold: guardo solo el primero (save_artifacts=False en el
+                    # resto) para no sobrescribir 5 veces el mismo nombre y para que
+                    # produccion siga encontrando UN .pkl por combinacion.
+                    if save_artifacts:
+                        pickle.dump(model, open(f"{ruta_base_mod_seg}/{cont_iter}_{model_name}.pkl", "wb"))
+                        results.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_params.xlsx')
+                        df_predicciones.to_excel(f'{ruta_base_mod_seg}/{cont_iter}__{model_name}_predicciones.xlsx', index=True)
 
                 except KeyboardInterrupt as e:
                     logger.warning(f"Entrenamiento interrumpido: {e}")

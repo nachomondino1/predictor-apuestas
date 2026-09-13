@@ -3,6 +3,7 @@ import numpy as np
 import time
 from itertools import product
 from predictor.utils.set_up_logging import logger
+from predictor.config import SEED
 import warnings
 # Grid y Bayes
 from sklearn.model_selection import PredefinedSplit, GridSearchCV
@@ -38,6 +39,18 @@ def select_best_hiperparameters(
     if verbose >= 2:
         logger.warning(f'X_train: {X_train.shape} + X_val: {X_val.shape} = {X_val_train.shape}')
         logger.warning(pds)
+
+    # Reproducibilidad: si el modelo acepta random_state y viene sin setear, le
+    # pongo config.SEED. Va acá (y no solo en cada sitio que instancia modelos)
+    # porque el grid de LogisticRegression prueba solvers estocásticos ('sag',
+    # 'saga', 'liblinear') y alcanza con olvidarse de sembrar UN caller para que
+    # dos corridas de la misma config den métricas distintas. Si el caller pasa
+    # un random_state explícito, gana el del caller (así se puede medir la banda
+    # de ruido corriendo varias semillas). Ver predictor/config.py.
+    if model is not None and hasattr(model, 'get_params'):
+        model_params = model.get_params()
+        if 'random_state' in model_params and model_params['random_state'] is None:
+            model.set_params(random_state=SEED)
 
     # Definicion de variables
     model_name = str(model)[:str(model).find('(')]   # Obtengo el nombre del modelo para poder buscar sus hiperparametros
