@@ -43,6 +43,7 @@ def comprehensive_search(
     checkpoint: int = 5,
     export: bool = True,
     run_type: str = "train",
+    notes: str = "",
 ):
     """
     Busca los hiperparámetros óptimos en las etapas de DataPreparation y Modeling de main.py.
@@ -76,6 +77,16 @@ def comprehensive_search(
     export : bool, opcional (por defecto True)
         Si es True, exporta los DataFrames generados durante la ejecución de la función
         a la ubicación especificada en `ruta_base_mod`.
+
+    run_type : str, opcional (por defecto "train")
+        "smoke" | "train" | "retrain". Queda en el historial de corridas para poder
+        distinguir pruebas de humo de entrenamientos reales.
+
+    notes : str, opcional (por defecto "")
+        Comentario libre que queda en el historial de corridas: qué cambió en el
+        código respecto de la corrida anterior, por qué se corrió. Es lo que
+        permite leer el historial como una tabla de experimentos
+        (ver docs/EXPERIMENTOS.md).
 
     Return:
     ----------
@@ -403,7 +414,7 @@ def comprehensive_search(
     training_log.log_run(
         country=country, date=date, n_iter=n_iter, l_modelos=l_modelos,
         duration_min=duration_min, models_path=ruta_base_modelos,
-        df_ite_test=df_ite_test, run_type=run_type,
+        df_ite_test=df_ite_test, run_type=run_type, notes=notes,
     )
 
     return df_params_ite, df_ite_train, df_ite_test

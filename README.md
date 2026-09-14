@@ -1,7 +1,17 @@
 # Predictor de apuestas deportivas
 
-> Documentación del código y del refactor en curso: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)
-> y [`docs/REFACTOR.md`](docs/REFACTOR.md).
+> **Para retomar el trabajo, empezar por [`docs/ESTADO.md`](docs/ESTADO.md)**: dónde
+> estamos, qué decisiones están abiertas y qué sigue. El contexto permanente del
+> proyecto (reglas, convenciones, trampas conocidas) está en [`CLAUDE.md`](CLAUDE.md).
+
+| Doc | Para qué |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Contexto permanente: reglas, convenciones, cómo correr, trampas |
+| [`docs/ESTADO.md`](docs/ESTADO.md) | El presente: estado, métricas, decisiones abiertas, próximos pasos |
+| [`docs/EXPERIMENTOS.md`](docs/EXPERIMENTOS.md) | Cómo probar un cambio y saber si mejoró |
+| [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Estructura del código y por qué está así |
+| [`docs/REFACTOR.md`](docs/REFACTOR.md) | Backlog del refactor + historial de cambios |
+| [`docs/EVALUACION_VS_BET365.md`](docs/EVALUACION_VS_BET365.md) | Cuán lejos está el modelo del bookie |
 
 ## Instalación
 

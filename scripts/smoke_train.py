@@ -8,6 +8,7 @@ Uso:
     python scripts/smoke_train.py                       # england, fecha de hoy
     python scripts/smoke_train.py 55                    # otro id_country
     python scripts/smoke_train.py 48 2026-09-11         # fecha fija (reusa cache)
+    python scripts/smoke_train.py 48 2026-09-11 "post p4-4"   # + nota en el historial
 
 El 2º argumento (`iteration_date`) es clave para comparar corridas: con una
 fecha nueva, el pipeline rearma el mapeo global de sofifa y el formateo desde
@@ -32,6 +33,7 @@ if len(sys.argv) > 2:
     date = datetime.datetime.strptime(sys.argv[2], '%Y-%m-%d').date()
 else:
     date = datetime.datetime.now().date()
+notes = sys.argv[3] if len(sys.argv) > 3 else ""
 
 # comprehensive_search usa `id_country` como global del módulo (no como parámetro)
 mtm.id_country = ID_COUNTRY
@@ -65,7 +67,8 @@ d_params = {
 }
 l_modelos = [LogisticRegression(random_state=SEED)]
 
-print(f"SMOKE TRAIN · country={country} ({ID_COUNTRY}) · date={date} · 1 iter · LogisticRegression")
+print(f"SMOKE TRAIN · country={country} ({ID_COUNTRY}) · date={date} · 1 iter · LogisticRegression"
+      + (f" · notes={notes!r}" if notes else ""))
 
 df_params_ite, df_ite_train, df_ite_test = mtm.comprehensive_search(
     country=country,
@@ -80,6 +83,7 @@ df_params_ite, df_ite_train, df_ite_test = mtm.comprehensive_search(
     retrain=True,
     verbose=0,  # verbose>=1 dispara du.describe_data() -> sns.pairplot sobre df de 121 cols -> se cuelga
     run_type="smoke",
+    notes=notes,
 )
 
 print("\n================ RESULTADO ================")

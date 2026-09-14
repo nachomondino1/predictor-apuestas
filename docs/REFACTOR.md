@@ -1,7 +1,9 @@
 # Refactor — estado inicial, plan y registro de cambios
 
 > Documento vivo. Acompaña a [`ARQUITECTURA.md`](./ARQUITECTURA.md) (que explica
-> cómo funciona el código).
+> cómo funciona el código) y a [`ESTADO.md`](./ESTADO.md) (el presente: dónde
+> estamos, decisiones abiertas, próximos pasos). **Este doc es historia**: se le
+> agregan entradas, no se reescribe. Lo que cambia del presente va en `ESTADO.md`.
 >
 > Objetivo del refactor: **simplificar y optimizar** el código manteniendo la
 > **robustez del scraping**. Trabajo **módulo por módulo**, con diffs revisables.
@@ -271,6 +273,56 @@ modelos) contá **horas por país** hasta que se resuelva p3-1.
 ## 3. Registro de cambios
 
 Formato: fecha · ítem del plan · qué se hizo · verificación · commit.
+
+### 2026-09-14 — Bases para trabajar en sesiones nuevas
+
+Pedido del usuario: dejar las bases asentadas para poder retomar el trabajo en una
+sesión nueva sin arrancar de cero. El contexto vivía en la conversación y en dos
+docs largos (`ARQUITECTURA.md` 29 KB + `REFACTOR.md` 62 KB) donde el **presente**
+estaba mezclado con la historia: para saber "en qué estamos" había que leer el
+registro de cambios completo.
+
+**Tres docs nuevos, con una división de responsabilidades explícita:**
+
+| Doc | Rol | Se edita |
+|---|---|---|
+| `CLAUDE.md` (raíz) | contexto permanente: reglas duras, convenciones, cómo correr, trampas conocidas | cuando cambia una regla |
+| `docs/ESTADO.md` | **el presente**: qué funciona, métricas vigentes, decisiones abiertas, próximos pasos, backlog | cada vez que cambia el presente |
+| `docs/EXPERIMENTOS.md` | protocolo del ciclo "meto un cambio y veo si mejoró" + registro de experimentos | una fila por experimento |
+
+`CLAUDE.md` va en la raíz porque Claude Code lo carga solo al abrir una sesión en
+este repo: es el único lugar donde poner "no toques los delays del scraper sin
+preguntar" y tener garantía de que se lee. `REFACTOR.md` queda como historia
+append-only y `ARQUITECTURA.md` como estructura.
+
+**Se descartó** crear un `docs/decisiones.md` + `docs/roadmap.md` aparte (era parte
+de la recomendación que el usuario traía): las decisiones ya están registradas en
+las entradas de este doc con su rationale, y el roadmap es §2.6 acá + §4 de
+`ESTADO.md`. Un cuarto doc solapado se desactualiza y contradice a los otros tres.
+
+**Cambios de código para que el protocolo sea ejecutable** (no solo documentado):
+
+- `scripts/real_train.py` usaba `datetime.now().date()`, sin forma de fijar la
+  fecha. Como el costo de datos se paga **una vez por (país, `iteration_date`)**,
+  cada entrenamiento real regeneraba la caché (3-8 h) y el "antes" y el "después"
+  no compartían datos de entrada: **comparar dos corridas reales era imposible**.
+  Ahora acepta `date` como 2º argumento, igual que `smoke_train.py`.
+- `comprehensive_search(..., notes="")` → se pasa a `training_log.log_run`, que ya
+  tenía el parámetro pero nadie lo llenaba. Ambos scripts lo exponen como 3er
+  argumento: `python scripts/real_train.py 48 2026-09-11 "calibracion isotonica"`.
+  Con eso `_training_log.xlsx` se lee como tabla de experimentos.
+- `real_train.py` ahora imprime también `std_<métrica>` y `n_folds`, y documenta
+  `df_ite_test_folds.xlsx` (el detalle por fold, que es el archivo con el que se
+  comparan dos corridas).
+
+**Contenido sustantivo que quedó escrito por primera vez**: el criterio para
+decidir si una mejora es real. La corrida es determinista y los folds son los
+mismos, así que la comparación es **pareada** → mirar el signo del delta en cada
+fold (4/4 creíble, 2/4 ruido), y no declarar mejora por menos de ~1 punto de f1 en
+el promedio (desvío entre folds ±2.3 → error estándar del promedio ≈1.2). Más la
+advertencia de no comparar "el mejor de 384", que es sobreajustar el test.
+
+`pytest` 56/56.
 
 ### 2026-09-13 — "Paso 0": entrenamiento reproducible + evaluación walk-forward
 
